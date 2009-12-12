@@ -5,3 +5,5 @@
 ^scikits\.sparse\.egg-info
 ~$
 \.pyc$
+\.c$
+\.so$

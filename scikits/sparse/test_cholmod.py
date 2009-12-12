@@ -2,6 +2,7 @@
 # Released under the terms of the GNU GPL v2, or, at your option, any
 # later version.
 
+import numpy as np
 from scipy import sparse
 from cholmod import cholesky
 
