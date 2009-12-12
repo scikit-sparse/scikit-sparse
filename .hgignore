@@ -2,4 +2,6 @@
 ^install/
 ^MANIFEST$
 ^dist/
+^scikits\.sparse\.egg-info
 ~$
+\.pyc$

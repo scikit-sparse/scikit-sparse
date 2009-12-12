@@ -47,7 +47,7 @@ def configuration(parent_package='', top_path=None, package_name=DISTNAME):
 
 if __name__ == "__main__":
     setup(configuration = configuration,
-        install_requires = 'numpy',
+        install_requires = ['numpy', 'scipy'],
         namespace_packages = ['scikits'],
         packages = setuptools.find_packages(),
         include_package_data = True,
