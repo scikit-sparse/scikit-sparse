@@ -1,0 +1,44 @@
+***********************************************************************
+WARNING WARNING
+
+This code needs more tests. Note the version is "0.0.0". As far as I
+know it works, but if you're planning to rely on it, then you might
+want to write some first!
+
+WARNING WARNING
+***********************************************************************
+
+It also needs docs, but to get started, the most important part of the API is:
+
+from scikits.sparse.cholmod import cholesky
+
+cholesky(A, beta=0)
+cholesky_AAt(A, beta=0):
+  factors either A + beta*I or AA' + beta*I, where A is a
+scipy.sparse matrix (ideally in CSC format)
+  returns a Factor object
+
+Factor objects have a bunch of methods, some highlights include:
+ .cholesky_inplace(A, beta=0), .cholesky_AAt_inplace(A, beta=0):
+   Update this Factor object to be the factor of A/AA', *without
+re-doing the fill-reduction analysis*; this is useful when you have a
+bunch of matrices to factor with the same non-zero pattern. (There are
+also non-inplace variants that return a new Factor object.)
+
+ .P(): returns the permutation in use
+ .L(), .LD(), .L_D(): return different pieces of the factorization in
+different forms; these may be inefficient (cholmod sometimes likes to
+make LDL' factorizations, sometimes LL', then if you ask for the type
+it didn't choose to use then it has to convert, etc.)
+
+ .solve_A(b): solves the equation Ax = b (or AA'x = b or whatever it
+is you actually factored). 'b' may be dense or sparse; x -- the return
+value -- will be dense or sparse when b is. There are also a bunch of
+other .solve_* variants.
+
+__call__ is an alias for .solve_A(b), so the simplest way to solve the
+equation Ax = b where A is sparse, symmetric, and positive definite, is:
+
+from scikits.sparse.cholmod import cholesky
+factor = cholesky(A)
+x = factor(b)

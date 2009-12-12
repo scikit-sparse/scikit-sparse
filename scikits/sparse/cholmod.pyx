@@ -134,6 +134,9 @@ class CholmodError(Exception):
 class CholmodWarning(UserWarning):
     pass
 
+class CholmodTypeConversionWarning(CholmodWarning):
+    pass
+
 cdef object _integer_py_dtype
 if sizeof(UF_long) == 4:
     _integer_py_dtype = np.dtype(np.int32)
@@ -143,7 +146,11 @@ else:
 
 cdef _require_1d_integer(a):
     if a.dtype.itemsize != _integer_py_dtype.itemsize:
-        warnings.warn("integer array has wrong number of bits, requiring a copy", CholmodWarning)
+        warnings.warn("array contains %s bit integers; "
+                      "this will be slower than using %s bit integers"
+                      % (a.dtype.itemsize * 8,
+                         _integer_py_dtype.itemsize * 8),
+                      CholmodTypeConversionWarning)
     a = np.ascontiguousarray(a, dtype=_integer_py_dtype)
     assert a.ndim == 1
     return a
@@ -310,7 +317,11 @@ cdef class Common(object):
     # sparse matrix; you must ensure that you hold onto a reference to this
     # Python object for as long as you want to use the cholmod_sparse*
     cdef _view_sparse(self, m, symmetric, cholmod_sparse **outp):
-        m = m.tocsc()
+        if not sparse.isspmatrix_csc(m):
+            warnings.warn("converting matrix of class %s to CSC format"
+                          % (m.__class__.__name__,),
+                          CholmodTypeConversionWarning)
+            m = m.tocsc()
         if symmetric and m.shape[0] != m.shape[1]:
             raise CholmodError, "supposedly symmetric matrix is not square!"
         m.sort_indices()
