@@ -506,11 +506,11 @@ cdef class Factor(object):
     def D(self):
         """If necessary, converts this factorization to the style
 
-        .. math:: LDL' = PAP'
+          .. math:: LDL' = PAP'
 
         or
 
-        .. math:: LDL' = PAA'P'
+          .. math:: LDL' = PAA'P'
 
         and then returns the diagonal matrix D *as a 1d vector*.
         """
@@ -522,11 +522,11 @@ cdef class Factor(object):
     def L(self):
         """If necessary, converts this factorization to the style
 
-        .. math:: LL' = PAP'
+          .. math:: LL' = PAP'
 
         or
 
-        .. math:: LL' = PAA'P'
+          .. math:: LL' = PAA'P'
 
         and then returns the sparse lower-triangular matrix L.
 
@@ -538,11 +538,11 @@ cdef class Factor(object):
     def LD(self):
         """If necessary, converts this factorization to the style
 
-        .. math:: LDL' = PAP'
+          .. math:: LDL' = PAP'
 
         or
 
-        .. math:: LDL' = PAA'P'
+          .. math:: LDL' = PAA'P'
 
         and then returns a sparse lower-triangular matrix "LD", which contains
         the D matrix on its diagonal, plus the below-diagonal part of L (the
@@ -554,11 +554,11 @@ cdef class Factor(object):
     def L_D(self):
         """If necessary, converts this factorization to the style
 
-        .. math:: LDL' = PAP'
+          .. math:: LDL' = PAP'
 
         or
 
-        .. math:: LDL' = PAA'P'
+          .. math:: LDL' = PAA'P'
 
         and then returns the pair (L, D) where L is a sparse lower-triangular
         matrix and D is a sparse diagonal matrix.
@@ -712,7 +712,7 @@ def _analyze(A, symmetric, mode):
 def cholesky(A, beta=0, mode="auto"):
     """Computes the fill-reducing Cholesky decomposition of
 
-    .. math:: A + \\beta I
+      .. math:: A + \\beta I
 
     where A is a sparse, symmetric, positive-definite matrix, preferably
     in CSC format, and beta is any real scalar (usually 0 or 1). (And I is the
