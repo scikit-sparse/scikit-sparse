@@ -1,0 +1,18 @@
+** DRAFT **
+
+1) run tests
+2) update doc/changes.rst
+3) make sure docs are up to date
+4) update version in doc/changes.rst, setup.py, doc/conf.py
+5) tag
+6) sdist
+7) run tests on sdist
+8) upload source dist to google code and pypi
+9) build and upload docs somewhere
+  python setup.py build && (cd doc && PYTHONPATH=../build/lib.linux-x86_64-2.6/ make html
+10) announce release on:
+  web page
+  mailing list
+  scipy-dev?
+  pypi
+11) update version in setup.py and doc/conf.py again (add "pre")

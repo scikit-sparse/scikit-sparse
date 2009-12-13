@@ -135,7 +135,7 @@ class CholmodWarning(UserWarning):
 class CholmodTypeConversionWarning(CholmodWarning):
     pass
 
-_integer_py_dtype = np.dtype(np.int32)
+cdef object _integer_py_dtype = np.dtype(np.int32)
 assert sizeof(int) == _integer_py_dtype.itemsize == 4
 
 cdef _require_1d_integer(a):
@@ -149,9 +149,9 @@ cdef _require_1d_integer(a):
     assert a.ndim == 1
     return a
 
-_real_py_dtype = np.dtype(np.float64)
+cdef object _real_py_dtype = np.dtype(np.float64)
 assert sizeof(double) == _real_py_dtype.itemsize == 8
-_complex_py_dtype = np.dtype(np.complex128)
+cdef object _complex_py_dtype = np.dtype(np.complex128)
 assert _complex_py_dtype.itemsize == 2 * sizeof(double) == 16
 
 ##########
@@ -368,9 +368,10 @@ cdef class Common(object):
 cdef object factor_secret_handshake = object()
 
 cdef class Factor(object):
-    """This class represents a cholesky decomposition with a particular
+    """This class represents a Cholesky decomposition with a particular
     fill-reducing permutation. It cannot be instantiated directly; see
-    'analyze' and 'cholesky', both of which return objects of type Factor."""
+    :func:`analyze` and :func:`cholesky`, both of which return objects of type
+    Factor."""
 
     cdef readonly Common _common
     cdef cholmod_factor * _factor
@@ -382,20 +383,19 @@ cdef class Factor(object):
     def __dealloc__(self):
         cholmod_free_factor(&self._factor, &self._common._common)
 
-    def cholesky_AAt_inplace(self, A, beta=0):
-        """The same as cholesky_inplace, except it factors AA' + beta*I instead
-        of A + beta*I."""
-        return self._cholesky_inplace(A, False, beta=beta)
-
     def cholesky_inplace(self, A, beta=0):
         """Updates this Factor so that it represents the Cholesky
-        decomposition of A + beta*I, rather than whatever it contained
-        before.
+        decomposition of :math:`A + \\beta I`, rather than whatever it
+        contained before.
 
-        A *must* have the same pattern of non-zeros as the matrix used to
-        create this factor originally."""
-        # must have the same pattern of zeros as previous occupant
+        :math:`A` must have the same pattern of non-zeros as the matrix used
+        to create this factor originally."""
         return self._cholesky_inplace(A, True, beta=beta)
+
+    def cholesky_AAt_inplace(self, A, beta=0):
+        """The same as :meth:`cholesky_inplace`, except it factors :math:`AA'
+        + \\beta I` instead of :math:`A + \\beta I`."""
+        return self._cholesky_inplace(A, False, beta=beta)
 
     def _cholesky_inplace(self, A, symmetric, beta=0, **kwargs):
         cdef cholmod_sparse * c_A
@@ -418,24 +418,31 @@ cdef class Factor(object):
         clone._factor = c_clone
         return clone
 
-    def cholesky_AAt(self, A, beta=0):
-        """The same as cholesky_inplace, except it factors AA' + beta*I instead
-        of A + beta*I."""
-        clone = self._clone()
-        clone.cholesky_AAt_inplace(A, beta=beta)
-        return clone
-
     def cholesky(self, A, beta=0):
+        """The same as :meth:`cholesky_inplace` except that it first creates
+        a copy of the current :class:`Factor` and modifes the copy.
+
+        :returns: The new :class:`Factor` object."""
         clone = self._clone()
         clone.cholesky_inplace(A, beta=beta)
         return clone
 
+    def cholesky_AAt(self, A, beta=0):
+        """The same as :meth:`cholesky_AAt_inplace` except that it first
+        creates a copy of the current :class:`Factor` and modifes the copy.
+
+        :returns: The new :class:`Factor` object."""
+        clone = self._clone()
+        clone.cholesky_AAt_inplace(A, beta=beta)
+        return clone
+
     def update_inplace(self, C, int subtract=False):
-        """Incremental building of AA' decompositions.
+        """Incremental building of :math:`AA'` decompositions.
 
         Updates this factor so that instead of representing the decomposition
-        of AA', it instead represents the decomposition of AA' + CC' (for
-        subtract=False, the default), or AA' - CC' (for subtract=True).
+        of :math:`AA'`, it instead represents the decomposition of :math:`AA'
+        + CC'` (for ``subtract=False``, the default), or :math:`AA' - CC'` (for
+        ``subtract=True``).
 
         The usual use for this is to factor AA' where A has a large number of
         columns, or those columns become available incrementally. Instead of
@@ -443,8 +450,8 @@ cdef class Factor(object):
         pass them to this method one at a time.
 
         Note that no fill-reduction analysis is done; whatever permutation was
-        chosen by the initial call to analyze() will be used regardless of the
-        pattern of non-zeros in C."""
+        chosen by the initial call to :func:`analyze` will be used regardless
+        of the pattern of non-zeros in C."""
         # permute C
         cdef cholmod_sparse * c_C
         c_C_ref = self._common._view_sparse(C, False, &c_C)
@@ -480,7 +487,7 @@ cdef class Factor(object):
                                              0, None),
                         self)
 
-    def L_or_LD(self, want_L):
+    def _L_or_LD(self, want_L):
         cdef Factor f = self._clone()
         cdef cholmod_sparse * l
         with nogil:
@@ -492,80 +499,124 @@ cdef class Factor(object):
                                     f._factor,
                                     &self._common._common)
             l = cholmod_factor_to_sparse(f._factor,
-                                           &f._common._common)
+                                         &f._common._common)
         assert l
         return _py_sparse(l, self._common)
 
     def D(self):
+        """If necessary, converts this factorization to the style
+
+        .. math:: LDL' = PAP'
+
+        or
+
+        .. math:: LDL' = PAA'P'
+
+        and then returns the diagonal matrix D *as a 1d vector*.
+        """
         # XX FIXME: extract diagonal quickly, without converting to LDL,
         # copying the whole matrix, etc...
-        # (or just have a .det() option?)
-        raise NotImplementedError
+        # (or just have a .det() method?)
+        return self.LD().diagonal()
 
     def L(self):
         """If necessary, converts this factorization to the style
-          LL' = PAP' (or LL' = PA'AP').
-        and then returns the sparse lower-triangular matrix L."""
+
+        .. math:: LL' = PAP'
+
+        or
+
+        .. math:: LL' = PAA'P'
+
+        and then returns the sparse lower-triangular matrix L.
+
+        .. warning:: The L matrix returned by this method and the one returned
+           by :meth:`L_D` are different!
+        """
         return self._L_or_LD(True)
 
     def LD(self):
         """If necessary, converts this factorization to the style
-          LDL' = PAP' (or LDL' = PA'AP').
+
+        .. math:: LDL' = PAP'
+
+        or
+
+        .. math:: LDL' = PAA'P'
+
         and then returns a sparse lower-triangular matrix "LD", which contains
         the D matrix on its diagonal, plus the below-diagonal part of L (the
-        actual diagonal of L is all-ones)."""
+        actual diagonal of L is all-ones).
+
+        See :meth:`L_D` for a more convenient interface."""
         return self._L_or_LD(False)
 
     def L_D(self):
         """If necessary, converts this factorization to the style
-          LDL' = PAP' (or LDL' = PA'AP').
+
+        .. math:: LDL' = PAP'
+
+        or
+
+        .. math:: LDL' = PAA'P'
+
         and then returns the pair (L, D) where L is a sparse lower-triangular
-        matrix and D is a sparse diagonal matrix."""
+        matrix and D is a sparse diagonal matrix.
+
+        .. warning:: The L matrix returned by this method and the one returned
+           by :meth:`L` are different!
+        """
         ld = self.LD()
         l = sparse.tril(ld, -1) + sparse.eye(*ld.shape)
         d = sparse.dia_matrix((ld.diagonal(), [0]), shape=ld.shape)
         return (l, d)
 
     def solve_A(self, b):
-        "Returns x, where Ax = b (or AA'x = b, if that's how you did things)."
+        """Returns :math:`x`, where :math:`Ax = b` (or :math:`AA'x = b`, if
+        you used :func:`cholesky_AAt`).
+
+        :meth:`__call__` is an alias for this function, i.e., you can simply
+        call the :class:`Factor` object like a function to solve :math:`Ax =
+        b`."""
         return self._solve(b, CHOLMOD_A)
 
     def __call__(self, b):
+        "Alias for :meth:`solve_A`."
         return self.solve_A(b)
 
     def solve_LDLt(self, b):
-        """Returns x, where LDL'x = b.
+        """Returns :math:`x`, where :math:`LDL'x = b`.
 
-        (This is different from Ax = b because it does not account for the
-        fill-reducing permutation.)"""
+        (This is different from :meth:`solve_A` because it does not correct
+        for the fill-reducing permutation.)"""
         return self._solve(b, CHOLMOD_LDLt)
 
     def solve_LD(self, b):
-        "Returns x, where LDx = b."
+        "Returns :math:`x`, where :math:`LDx = b`."
         return self._solve(b, CHOLMOD_LD)
 
     def solve_DLt(self, b):
-        "Returns x, where DL'x = b."
+        "Returns :math:`x`, where :math:`DL'x = b`."
         return self._solve(b, CHOLMOD_DLt)
 
     def solve_L(self, b):
-        "Returns x, where Lx = b."
+        "Returns :math:`x`, where :math:`Lx = b`."
         return self._solve(b, CHOLMOD_L)
 
     def solve_Lt(self, b):
-        "Returns x, where L'x = b."
+        "Returns :math:`x`, where :math:`L'x = b`."
         return self._solve(b, CHOLMOD_Lt)
 
     def solve_D(self, b):
-        "Returns x, where Dx = b."
+        "Returns :math:`x`, where :math:`Dx = b`."
         return self._solve(b, CHOLMOD_D)
 
     def solve_P(self, b):
-        "Returns x, where x = Pb."
+        "Returns :math:`x`, where :math:`x = Pb`."
         return self._solve(b, CHOLMOD_P)
 
     def solve_Pt(self, b):
-        "Returns x, where x = P'b."
+        "Returns :math:`x`, where :math:`x = P'b`."
         return self._solve(b, CHOLMOD_Pt)
 
     def _solve(self, b, system):
@@ -592,18 +643,54 @@ cdef class Factor(object):
                                   &self._common._common)
         return _py_dense(out, self._common)
         
-def analyze(A, **kwargs):
-    return _analyze(A, True, **kwargs)
+def analyze(A, mode="auto"):
+    """Computes the optimal fill-reducing permutation for the symmetric matrix
+    A, but does *not* factor it (i.e., it performs a "symbolic Cholesky
+    decomposition"). This function ignores the actual contents of the matrix
+    A. All it cares about are (1) which entries are non-zero, and (2) whether
+    A has real or complex type.
 
-def analyze_AAt(A, **kwargs):
-    return _analyze(A, False, **kwargs)
+    :param A: The matrix to be analyzed.
+
+    :param auto: Specifies which algorithm should be used to (eventually)
+      compute the Cholesky decomposition -- one of "simplicial", "supernodal",
+      or "auto". See the CHOLMOD documentation for details on how "auto" chooses
+      the algorithm to be used.
+
+    :returns: A :class:`Factor` object representing the analysis. Many
+      operations on this object will fail, because it does not yet hold a full
+      decomposition. Use :meth:`Factor.cholesky_inplace` (or similar) to
+      actually factor a matrix.
+    """
+    return _analyze(A, True, mode=mode)
+
+def analyze_AAt(A, mode="auto"):
+    """Computes the optimal fill-reducing permutation for the symmetric matrix
+    :math:`AA'`, but does *not* factor it (i.e., it performs a "symbolic
+    Cholesky decomposition"). This function ignores the actual contents of the
+    matrix A. All it cares about are (1) which entries are non-zero, and (2)
+    whether A has real or complex type.
+
+    :param A: The matrix to be analyzed.
+
+    :param auto: Specifies which algorithm should be used to (eventually)
+      compute the Cholesky decomposition -- one of "simplicial", "supernodal",
+      or "auto". See the CHOLMOD documentation for details on how "auto" chooses
+      the algorithm to be used.
+
+    :returns: A :class:`Factor` object representing the analysis. Many
+      operations on this object will fail, because it does not yet hold a full
+      decomposition. Use :meth:`Factor.cholesky_AAt_inplace` (or similar) to
+      actually factor a matrix.
+    """
+    return _analyze(A, False, mode=mode)
 
 _modes = {
     "simplicial": CHOLMOD_SIMPLICIAL,
     "supernodal": CHOLMOD_SUPERNODAL,
     "auto": CHOLMOD_AUTO,
     }
-def _analyze(A, symmetric, mode="auto", **kwargs):
+def _analyze(A, symmetric, mode):
     cdef Common common = Common(issubclass(A.dtype.type, np.complexfloating))
     cdef cholmod_sparse * c_A
     c_A_ref = common._view_sparse(A, symmetric, &c_A)
@@ -622,15 +709,43 @@ def _analyze(A, symmetric, mode="auto", **kwargs):
     f._factor = c_f
     return f
 
-def cholesky(A, **kwargs):
-    return _cholesky(A, True, **kwargs)
+def cholesky(A, beta=0, mode="auto"):
+    """Computes the fill-reducing Cholesky decomposition of
 
-def cholesky_AAt(A, **kwargs):
-    return _cholesky(A, False, **kwargs)
+    .. math:: A + \\beta I
 
-def _cholesky(A, symmetric, **kwargs):
-    f = _analyze(A, symmetric, **kwargs)
-    f._cholesky_inplace(A, symmetric, **kwargs)
+    where A is a sparse, symmetric, positive-definite matrix, preferably
+    in CSC format, and beta is any real scalar (usually 0 or 1). (And I is the
+    identity matrix.)
+
+    ``mode`` is passed to :func:`analyze`.
+
+    :returns: A :class:`Factor` object represented the decomposition.
+    """
+    return _cholesky(A, True, beta=beta, mode=mode)
+
+def cholesky_AAt(A, beta=0, mode="auto"):
+    """Computes the fill-reducing Cholesky decomposition of
+
+      .. math:: AA' + \\beta I
+
+    where A is a sparse matrix, preferably in CSC format, and beta is any real
+    scalar (usually 0 or 1). (And I is the identity matrix.)
+
+    Note that if you are solving a conventional least-squares problem, you
+    will need to transpose your matrix before calling this function, and
+    therefore it will be somewhat more efficient to construct your matrix in
+    CSR format (so that its transpose will be in CSC format).
+
+    ``mode`` is passed to :func:`analyze_AAt`.
+
+    :returns: A :class:`Factor` object represented the decomposition.
+    """
+    return _cholesky(A, False, beta=beta, mode=mode)
+
+def _cholesky(A, symmetric, beta, mode):
+    f = _analyze(A, symmetric, mode=mode)
+    f._cholesky_inplace(A, symmetric, beta=beta)
     return f
 
 __all__ = ["analyze", "analyze_AAt", "cholesky", "cholesky_AAt"]

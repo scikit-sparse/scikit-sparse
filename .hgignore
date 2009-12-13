@@ -7,3 +7,4 @@
 \.pyc$
 \.c$
 \.so$
+^doc/_build
