@@ -76,10 +76,11 @@ of the ``analyze`` functions, which perform only fill-reduction:
 .. autofunction:: analyze_AAt(A, mode="auto")
 
 .. note:: Even if you used :func:`cholesky` or :func:`cholesky_AAt`,
-  you can still call :meth:`cholesky_inplace <Factor.cholesky_inplace>` or
-  :meth:`cholesky_AAt_inplace <Factor.cholesky_AAt_inplace>` on the result to quickly factor
-  another matrix with the same non-zero pattern as your original
-  matrix.
+  you can still call :meth:`cholesky_inplace()
+  <Factor.cholesky_inplace>` or :meth:`cholesky_AAt_inplace()
+  <Factor.cholesky_AAt_inplace>` on the resulting :class:`Factor` to
+  quickly factor another matrix with the same non-zero pattern as your
+  original matrix.
 
 :class:`Factor` objects
 -----------------------
