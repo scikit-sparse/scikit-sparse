@@ -112,12 +112,21 @@ def test_solve_edge_cases():
     # And ditto for the sparse version:
     assert_raises(CholmodError, f, sparse.eye(m.shape[0] + 1, m.shape[1]).tocsc())
 
-def test_cholesky_matrix_market():
+def mm_matrix(name):
     from scipy.io import mmread
-    data_dir = os.path.join(os.path.split(__file__)[0], "test_data")
+    # Supposedly, it is better to use resource_stream and pass the resulting
+    # open file object to mmread()... but for some reason this fails?
+    from pkg_resources import resource_filename
+    filename = resource_filename(__name__, "test_data/%s.mtx.gz" % name)
+    matrix = mmread(filename)
+    if sparse.issparse(matrix):
+        matrix = matrix.tocsc()
+    return matrix
+
+def test_cholesky_matrix_market():
     for problem in ("well1033", "illc1033", "well1850", "illc1850"):
-        X = mmread(os.path.join(data_dir, problem + ".mtx.gz")).tocsc()
-        y = mmread(os.path.join(data_dir, problem + "_rhs1.mtx.gz"))
+        X = mm_matrix(problem)
+        y = mm_matrix(problem + "_rhs1")
         answer = np.linalg.lstsq(X.todense(), y)[0]
         XtX = (X.T * X).tocsc()
         Xty = X.T * y

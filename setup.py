@@ -33,9 +33,11 @@ if __name__ == "__main__":
     setup(install_requires = ['numpy', 'scipy'],
           namespace_packages = ['scikits'],
           packages = find_packages(),
-          include_package_data = True,
+          package_data = {
+              "": ["*.mtx.gz"],
+              },
           #test_suite="tester", # for python setup.py test
-          zip_safe = False, # the package can run out of an .egg file
+          zip_safe = True,
           name = DISTNAME,
           version = VERSION,
           maintainer = MAINTAINER,
