@@ -2,10 +2,6 @@
 # Released under the terms of the GNU GPL v2, or, at your option, any
 # later version.
 
-# TODO:
-#   -- lower 'print' level to 0 once we are confident that all errors are
-#      being caught by our error callback system
-
 import warnings
 cimport stdlib
 cimport python as py
@@ -56,6 +52,7 @@ cdef extern from "suitesparse/cholmod.h":
     ctypedef struct cholmod_common:
         int supernodal
         int status
+        int print_ "print"
         void (*error_handler)(int status, char * file, int line, char * msg)
         
     int cholmod_start(cholmod_common *) except? 0
@@ -268,6 +265,7 @@ cdef class Common(object):
         else:
             self._xtype = CHOLMOD_REAL
         cholmod_start(&self._common)
+        self._common.print_ = 0
         self._common.error_handler = <void (*)(int, char *, int, char *)>_error_handler
 
     def __dealloc__(self):
