@@ -1,44 +1,35 @@
-***********************************************************************
-WARNING WARNING
+This is scikits.sparse, a companion to the scipy.sparse library for
+sparse matrix manipulation in Python. It provides routines that are
+not suitable for inclusion in scipy.sparse proper, usually because
+they are GPL'ed.
 
-This code needs more tests. Note the version is "0.0.0". As far as I
-know it works, but if you're planning to rely on it, then you might
-want to write some first!
+Homepage:
+  http://code.google.com/p/scikits-sparse
+Bug tracker:
+  http://code.google.com/p/scikits-sparse/issues/list
+Mailing list:
+  scikits-sparse-discuss@lists.vorpus.org
+  http://lists.vorpus.org/cgi-bin/mailman/listinfo/scikits-sparse-discuss
 
-WARNING WARNING
-***********************************************************************
+For more details, including dependencies and installation
+instructions, see doc/overview.rst.
 
-It also needs docs, but to get started, the most important part of the API is:
+License
+-------
+    scikits.sparse
+    Copyright (C) 2009 Nathaniel Smith <njs@pobox.com>
 
-from scikits.sparse.cholmod import cholesky
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
 
-cholesky(A, beta=0)
-cholesky_AAt(A, beta=0):
-  factors either A + beta*I or AA' + beta*I, where A is a
-scipy.sparse matrix (ideally in CSC format)
-  returns a Factor object
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
 
-Factor objects have a bunch of methods, some highlights include:
- .cholesky_inplace(A, beta=0), .cholesky_AAt_inplace(A, beta=0):
-   Update this Factor object to be the factor of A/AA', *without
-re-doing the fill-reduction analysis*; this is useful when you have a
-bunch of matrices to factor with the same non-zero pattern. (There are
-also non-inplace variants that return a new Factor object.)
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
- .P(): returns the permutation in use
- .L(), .LD(), .L_D(): return different pieces of the factorization in
-different forms; these may be inefficient (cholmod sometimes likes to
-make LDL' factorizations, sometimes LL', then if you ask for the type
-it didn't choose to use then it has to convert, etc.)
-
- .solve_A(b): solves the equation Ax = b (or AA'x = b or whatever it
-is you actually factored). 'b' may be dense or sparse; x -- the return
-value -- will be dense or sparse when b is. There are also a bunch of
-other .solve_* variants.
-
-__call__ is an alias for .solve_A(b), so the simplest way to solve the
-equation Ax = b where A is sparse, symmetric, and positive definite, is:
-
-from scikits.sparse.cholmod import cholesky
-factor = cholesky(A)
-x = factor(b)
