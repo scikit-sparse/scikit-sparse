@@ -1,0 +1,5 @@
+include COPYING *.txt
+global-include *.mtx.gz
+graft doc
+prune doc/_build
+global-exclude *~ *.so *.pyc
