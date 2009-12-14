@@ -3,6 +3,8 @@ sparse matrix manipulation in Python. It provides routines that are
 not suitable for inclusion in scipy.sparse proper, usually because
 they are GPL'ed.
 
+Manual:
+  http://packages.python.org/scikits.sparse/
 Homepage:
   http://code.google.com/p/scikits-sparse
 Bug tracker:
