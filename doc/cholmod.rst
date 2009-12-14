@@ -4,7 +4,7 @@ Sparse Cholesky decomposition (:mod:`scikits.sparse.cholmod`)
 .. module:: scikits.sparse.cholmod
    :synopsis: Sparse Cholesky decomposition using CHOLMOD
 
-.. versionadded:: 0.0.1
+.. versionadded:: 0.1
 
 Overview
 --------

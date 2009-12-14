@@ -24,7 +24,7 @@ MAINTAINER_EMAIL    = 'njs@pobox.com',
 URL                 = 'http://code.google.com/p/scikits-sparse/'
 LICENSE             = 'GPL'
 DOWNLOAD_URL        = "http://code.google.com/p/scikits-sparse/downloads/list"
-VERSION             = '0.0.0'
+VERSION             = '0.1'
 
 from setuptools import setup, find_packages, Extension
 from Cython.Distutils import build_ext
