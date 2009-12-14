@@ -141,6 +141,15 @@ All methods in this section accept both sparse and dense matrices (or
 vectors) ``b``, and return either a sparse or dense ``x``
 accordingly.
 
+All methods in this section act on :math:`LDL'` factorizations; `L`
+always refers to the matrix returned by :meth:`L_D`, not that
+returned by :meth:`L` (though conversion is not performed unless
+necessary).
+
+.. note:: If you need an efficient implementation of :meth:`solve_L`
+   or :meth:`solve_Lt` that works with the :math:`LL'` factorization,
+   then drop us a line, it'd be easy to add.
+
 .. automethod:: Factor.solve_A(b)
 
 .. automethod:: Factor.__call__(b)
@@ -160,6 +169,35 @@ accordingly.
 .. automethod:: Factor.solve_P(b)
 
 .. automethod:: Factor.solve_Pt(b)
+
+Error handling
+--------------
+
+.. class:: CholmodError
+
+  Errors detected by CHOLMOD or by our wrapper code are converted into
+  exceptions of type :class:`CholmodError`.
+
+.. class:: CholmodWarning
+
+  Warnings issued by CHOLMOD are converted into Python warnings of
+  type :class:`CholmodWarning`.
+
+.. class:: CholmodTypeConversionWarning
+
+  CHOLMOD itself supports matrices in CSC form with 32-bit integer
+  indices and 'double' precision floats (64-bits, or 128-bits total
+  for complex numbers). If you pass some other sort of matrix, then
+  the wrapper code will convert it for you before passing it to
+  CHOLMOD, and issue a warning of type
+  :class:`CholmodTypeConversionWarning` to let you know that your
+  efficiency is not as high as it might be.
+
+  .. warning:: Not all conversions currently produce warnings. This is
+    a bug.
+
+  Child of :class:`CholmodWarning`.
+
 
 Citing CHOLMOD
 --------------

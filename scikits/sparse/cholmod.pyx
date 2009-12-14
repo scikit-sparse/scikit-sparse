@@ -43,7 +43,7 @@ cdef inline np.ndarray set_base(np.ndarray arr, object base):
     hack.base = <void *> base
     return arr
 
-cdef extern from "suitesparse/cholmod.h" nogil:
+cdef extern from "suitesparse/cholmod.h":
     cdef enum:
         CHOLMOD_INT
         CHOLMOD_PATTERN, CHOLMOD_REAL, CHOLMOD_COMPLEX
@@ -348,7 +348,8 @@ cdef class Common(object):
     # dense matrix; you must ensure that you hold onto a reference to this
     # Python object for as long as you want to use the cholmod_dense*
     cdef _view_dense(self, np.ndarray m, cholmod_dense **outp):
-        assert m.ndim == 2
+        if m.ndim != 2:
+            raise CholmodError, "array has %s dimensions (expected 2)" % m.ndim
         m = self._cast(m)
         cdef cholmod_dense * out = <cholmod_dense *> stdlib.malloc(sizeof(cholmod_dense))
         try:
@@ -403,9 +404,8 @@ cdef class Factor(object):
         cdef double c_beta[2]
         c_beta[0] = beta
         c_beta[1] = 0
-        with nogil:
-            cholmod_factorize_p(c_A, c_beta, NULL, 0,
-                                  self._factor, &self._common._common)
+        cholmod_factorize_p(c_A, c_beta, NULL, 0,
+                            self._factor, &self._common._common)
         if self._common._common.status == CHOLMOD_NOT_POSDEF:
             raise CholmodError, "Matrix is not positive definite"
 
@@ -442,9 +442,11 @@ cdef class Factor(object):
         Updates this factor so that instead of representing the decomposition
         of :math:`AA'`, it instead represents the decomposition of :math:`AA'
         + CC'` (for ``subtract=False``, the default), or :math:`AA' - CC'` (for
-        ``subtract=True``).
+        ``subtract=True``). This method does not require that the
+        :class:`Factor` was created with :func:`cholesky_AAt`, though that
+        is the common case.
 
-        The usual use for this is to factor AA' where A has a large number of
+        The usual use for this is to factor AA' when A has a large number of
         columns, or those columns become available incrementally. Instead of
         loading all of A into memory, one can load in 'strips' of columns and
         pass them to this method one at a time.
@@ -463,9 +465,8 @@ cdef class Factor(object):
                                      &self._common._common)
         assert C_perm
         try:
-            with nogil:
-                cholmod_updown(not subtract, C_perm, self._factor,
-                                 &self._common._common)
+            cholmod_updown(not subtract, C_perm, self._factor,
+                           &self._common._common)
         except:
             cholmod_free_sparse(&C_perm, &self._common._common)
             raise
@@ -475,7 +476,11 @@ cdef class Factor(object):
     def P(self):
         """Returns the fill-reducing permutation P, as a vector of indices.
 
-        The decomposition LL' or LDL' is of A[P, P] or AA'[P, P]."""
+        The decomposition :math:`LL'` or :math:`LDL'` is of::
+
+          A[P[:, np.newaxis], P[np.newaxis, :]]
+
+        (or similar for AA')."""
         if self._factor.Perm is NULL:
             raise CholmodError, "you must analyze a matrix first"
         assert self._factor.itype == CHOLMOD_INT
@@ -487,19 +492,27 @@ cdef class Factor(object):
                                              0, None),
                         self)
 
+    def _ensure_L_or_LD_inplace(self, want_L):
+        # In CHOLMOD, supernodal factorizations are always LL'. If we request
+        # to change to a supernodal LDL' factorization, cholmod_change_factor
+        # will silently do nothing! So we can only stay supernodal when LL' is
+        # requested:
+        want_super = self._factor.is_super and want_L
+        cholmod_change_factor(self._factor.xtype,
+                              want_L, # to_ll
+                              want_super,
+                              True, # to_packed
+                              self._factor.is_monotonic,
+                              self._factor,
+                              &self._common._common)
+        assert bool(self._factor.is_ll) == want_L
+
     def _L_or_LD(self, want_L):
         cdef Factor f = self._clone()
         cdef cholmod_sparse * l
-        with nogil:
-            cholmod_change_factor(f._factor.xtype,
-                                    want_L, # to_ll
-                                    f._factor.is_super,
-                                    True, # to_packed
-                                    f._factor.is_monotonic,
-                                    f._factor,
-                                    &self._common._common)
-            l = cholmod_factor_to_sparse(f._factor,
-                                         &f._common._common)
+        f._ensure_L_or_LD_inplace(want_L)
+        l = cholmod_factor_to_sparse(f._factor,
+                                     &f._common._common)
         assert l
         return _py_sparse(l, self._common)
 
@@ -593,18 +606,22 @@ cdef class Factor(object):
 
     def solve_LD(self, b):
         "Returns :math:`x`, where :math:`LDx = b`."
+        self._ensure_L_or_LD_inplace(False)
         return self._solve(b, CHOLMOD_LD)
 
     def solve_DLt(self, b):
         "Returns :math:`x`, where :math:`DL'x = b`."
+        self._ensure_L_or_LD_inplace(False)
         return self._solve(b, CHOLMOD_DLt)
 
     def solve_L(self, b):
         "Returns :math:`x`, where :math:`Lx = b`."
+        self._ensure_L_or_LD_inplace(False)
         return self._solve(b, CHOLMOD_L)
 
     def solve_Lt(self, b):
         "Returns :math:`x`, where :math:`L'x = b`."
+        self._ensure_L_or_LD_inplace(False)
         return self._solve(b, CHOLMOD_Lt)
 
     def solve_D(self, b):
@@ -629,18 +646,19 @@ cdef class Factor(object):
         cdef cholmod_sparse * c_b
         b_ref = self._common._view_sparse(b, False, &c_b)
         cdef cholmod_sparse * out
-        with nogil:
-            out = cholmod_spsolve(system, self._factor, c_b,
-                                    &self._common._common)
+        out = cholmod_spsolve(system, self._factor, c_b,
+                              &self._common._common)
         return _py_sparse(out, self._common)
 
     def _solve_dense(self, b, system):
+        b = np.asarray(b)
+        if b.ndim == 1:
+            b = b[:, np.newaxis]
         cdef cholmod_dense * c_b
         b_ref = self._common._view_dense(b, &c_b)
         cdef cholmod_dense * out
-        with nogil:
-            out = cholmod_solve(system, self._factor, c_b,
-                                  &self._common._common)
+        out = cholmod_solve(system, self._factor, c_b,
+                            &self._common._common)
         return _py_dense(out, self._common)
         
 def analyze(A, mode="auto"):
@@ -700,8 +718,7 @@ def _analyze(A, symmetric, mode):
         raise CholmodError, ("Unknown mode '%s', must be one of %s"
                              % (mode, ", ".join(_modes.keys())))
     cdef cholmod_factor * c_f
-    with nogil:
-        c_f = cholmod_analyze(c_A, &common._common)
+    c_f = cholmod_analyze(c_A, &common._common)
     if c_f is NULL:
         raise CholmodError, "Error in cholmod_analyze"
     cdef Factor f = Factor(factor_secret_handshake)
@@ -714,9 +731,9 @@ def cholesky(A, beta=0, mode="auto"):
 
       .. math:: A + \\beta I
 
-    where A is a sparse, symmetric, positive-definite matrix, preferably
-    in CSC format, and beta is any real scalar (usually 0 or 1). (And I is the
-    identity matrix.)
+    where ``A`` is a sparse, symmetric, positive-definite matrix, preferably
+    in CSC format, and ``beta`` is any real scalar (usually 0 or 1). (And
+    :math:`I` denotes the identity matrix.)
 
     ``mode`` is passed to :func:`analyze`.
 
@@ -729,8 +746,9 @@ def cholesky_AAt(A, beta=0, mode="auto"):
 
       .. math:: AA' + \\beta I
 
-    where A is a sparse matrix, preferably in CSC format, and beta is any real
-    scalar (usually 0 or 1). (And I is the identity matrix.)
+    where ``A`` is a sparse matrix, preferably in CSC format, and ``beta`` is
+    any real scalar (usually 0 or 1). (And :math:`I` denotes the identity
+    matrix.)
 
     Note that if you are solving a conventional least-squares problem, you
     will need to transpose your matrix before calling this function, and
