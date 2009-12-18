@@ -129,7 +129,8 @@ class CholmodError(Exception):
 class CholmodWarning(UserWarning):
     pass
 
-class CholmodTypeConversionWarning(CholmodWarning):
+class CholmodTypeConversionWarning(CholmodWarning,
+                                   sparse.SparseEffiencyWarning):
     pass
 
 cdef object _integer_py_dtype = np.dtype(np.int32)
