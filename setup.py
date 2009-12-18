@@ -37,7 +37,10 @@ if __name__ == "__main__":
               "": ["*.mtx.gz"],
               },
           #test_suite="tester", # for python setup.py test
-          zip_safe = True,
+          # Well, technically zipping the package will work, but since it's
+          # all compiled code it'll just get unzipped again at runtime, which
+          # is pointless:
+          zip_safe = False,
           name = DISTNAME,
           version = VERSION,
           maintainer = MAINTAINER,
