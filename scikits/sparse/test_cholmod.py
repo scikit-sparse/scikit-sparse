@@ -6,7 +6,9 @@ import os.path
 from nose.tools import assert_raises
 import numpy as np
 from scipy import sparse
-from cholmod import cholesky, cholesky_AAt, analyze, analyze_AAt, CholmodError
+from scikits.sparse.cholmod import (cholesky, cholesky_AAt,
+                                    analyze, analyze_AAt,
+                                    CholmodError)
 
 # At time of writing (scipy 0.7.0), scipy.sparse.csc.csc_matrix explicitly
 # uses 32-bit integers for everything (even on 64-bit machines), and therefore
