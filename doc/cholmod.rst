@@ -30,7 +30,7 @@ package. Specifically, it provides:
   constraints), or when many matrices with similar but non-identical
   columns must be factored.
 
-The most common use is probably for solving least squares problems.
+One common use is for solving least squares problems.
 
 Quickstart
 ----------
@@ -53,6 +53,10 @@ as::
   # Notice that CHOLMOD computes AA' and we want M'M, so we must set A = M'!
   factor = cholesky_AAt(M.T)
   x = factor(M.T * b)
+
+However, you should be aware that for least squares problems, the
+Cholesky method is usually faster but somewhat less numerically stable
+than QR- or SVD-based techniques.
 
 Top-level functions
 -------------------
