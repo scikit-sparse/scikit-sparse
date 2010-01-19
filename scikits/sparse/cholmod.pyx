@@ -734,6 +734,8 @@ def cholesky(A, beta=0, mode="auto"):
     in CSC format, and ``beta`` is any real scalar (usually 0 or 1). (And
     :math:`I` denotes the identity matrix.)
 
+    Only the lower triangular part of ``A`` is used.
+
     ``mode`` is passed to :func:`analyze`.
 
     :returns: A :class:`Factor` object represented the decomposition.
