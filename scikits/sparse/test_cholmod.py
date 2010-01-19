@@ -103,8 +103,9 @@ def test_solve_edge_cases():
     assert sparse.issparse(f(sparse.eye(*m.shape).tocsc()))
     # dense matrices give a dense back:
     assert not sparse.issparse(f(np.eye(*m.shape)))
-    # 1d dense matrices are accepted and treated as column vectors:
-    assert f(np.arange(m.shape[0])).shape == (m.shape[0], 1)
+    # 1d dense matrices are accepted and a 1d vector is returned (this matches
+    # the behavior of np.dot):
+    assert f(np.arange(m.shape[0])).shape == (m.shape[0],)
     # 2d dense matrices are also accepted:
     assert f(np.arange(m.shape[0])[:, np.newaxis]).shape == (m.shape[0], 1)
     # But not if the dimensions are wrong...:

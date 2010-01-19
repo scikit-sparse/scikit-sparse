@@ -651,6 +651,7 @@ cdef class Factor(object):
 
     def _solve_dense(self, b, system):
         b = np.asarray(b)
+        ndim = b.ndim
         if b.ndim == 1:
             b = b[:, np.newaxis]
         cdef cholmod_dense * c_b
@@ -658,7 +659,10 @@ cdef class Factor(object):
         cdef cholmod_dense * out
         out = cholmod_solve(system, self._factor, c_b,
                             &self._common._common)
-        return _py_dense(out, self._common)
+        py_out = _py_dense(out, self._common)
+        if ndim == 1:
+            py_out = py_out[:, 0]
+        return py_out
         
 def analyze(A, mode="auto"):
     """Computes the optimal fill-reducing permutation for the symmetric matrix
