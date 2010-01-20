@@ -65,11 +65,11 @@ def test_complex():
     assert factor_of(fc, c)
 
     assert np.allclose(fc(np.arange(4)),
-                       c.todense().I * np.arange(4)[:, np.newaxis])
+                       (c.todense().I * np.arange(4)[:, np.newaxis]).ravel())
     assert np.allclose(fc(np.arange(4) * 1j),
-                       c.todense().I * (np.arange(4) * 1j)[:, np.newaxis])
+                       (c.todense().I * (np.arange(4) * 1j)[:, np.newaxis]).ravel())
     assert np.allclose(fr(np.arange(4)),
-                       r.todense().I * np.arange(4)[:, np.newaxis])
+                       (r.todense().I * np.arange(4)[:, np.newaxis]).ravel())
     # If we did a real factorization, we can't do solves on complex arrays:
     assert_raises(CholmodError, fr, np.arange(4) * 1j)
 
