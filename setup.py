@@ -36,7 +36,7 @@ if __name__ == "__main__":
           package_data = {
               "": ["*.mtx.gz"],
               },
-          #test_suite="tester", # for python setup.py test
+          test_suite="nose.collector",
           # Well, technically zipping the package will work, but since it's
           # all compiled code it'll just get unzipped again at runtime, which
           # is pointless:

@@ -92,6 +92,10 @@ cdef extern from "suitesparse/cholmod.h":
         int itype
         int xtype
         int is_ll, is_super, is_monotonic
+        size_t xsize, nzmax, nsuper
+        void * x, * p
+        void * super_ "super"
+        void * pi, * px
     int cholmod_free_factor(cholmod_factor **, cholmod_common *) except? 0
     cholmod_factor * cholmod_copy_factor(cholmod_factor *, cholmod_common *) except? NULL
 
@@ -516,7 +520,7 @@ cdef class Factor(object):
         return _py_sparse(l, self._common)
 
     def D(self):
-        """If necessary, converts this factorization to the style
+        """Converts this factorization to the style
 
           .. math:: LDL' = PAP'
 
@@ -525,11 +529,68 @@ cdef class Factor(object):
           .. math:: LDL' = PAA'P'
 
         and then returns the diagonal matrix D *as a 1d vector*.
+
+        Note: This method uses an efficient implementation that extracts the
+        diagonal D directly from CHOLMOD's internal representation. It never
+        requires copying the factor matrices, or actually converting an `LL'`
+        factorization into an `LDL'` factorization just to extract the
+        diagonal.
         """
-        # XX FIXME: extract diagonal quickly, without converting to LDL,
-        # copying the whole matrix, etc...
-        # (or just have a .det() method?)
-        return self.LD().diagonal()
+        
+        if self._factor.xtype == CHOLMOD_PATTERN:
+            raise CholmodError, ("cannot extract diagonal from a symbolic "
+                                 "factor; call a cholesky*() method first.")
+        cdef np.npy_intp x_len
+        if self._factor.is_super:
+            x_len = self._factor.xsize
+        else:
+            x_len = self._factor.nzmax
+        dtype = _np_dtype_for(self._factor.xtype)
+        py.Py_INCREF(dtype)
+        x = PyArray_NewFromDescr(&PyArray_Type,
+                                 dtype, 1, &x_len,
+                                 NULL, self._factor.x,
+                                 0, None)
+        cdef int i
+        cdef np.npy_intp n
+        cdef int * super_ = <int *> self._factor.super_
+        cdef int * pi = <int *> self._factor.pi
+        cdef int * px = <int *> self._factor.px
+        if self._factor.is_super:
+            # This is a supernodal factorization, which is stored as a bunch
+            # of dense, lower-triangular, column-major arrays packed into the
+            # x vector. This is not documented in the CHOLMOD user-guide, or
+            # anywhere else as far as I can tell; I got the details from
+            # CVXOPT's C/cholmod.c.
+            d = np.empty(self._factor.n, dtype=dtype)
+            filled = 0
+            for i in xrange(self._factor.nsuper):
+                ncols = super_[i + 1] - super_[i]
+                nrows = pi[i + 1] - pi[i]
+                d[filled:filled + ncols] = x[px[i]
+                                             :px[i] + nrows * ncols
+                                             :nrows + 1]
+                filled += ncols
+        else:
+            # This is a simplicial factorization, which is simply stored as a
+            # sparse CSC matrix in x, p, i. We want the diagonal, which is
+            # just the first entry in each column; p gives the offsets in x to
+            # the beginning of each column.
+
+            # The ->p array actually has n+1 entries, but only the first n
+            # entries actually point to real columns (the last entry is a
+            # sentinel), so we just create a view onto those:
+            n = self._factor.n
+            py.Py_INCREF(_integer_py_dtype)
+            p = PyArray_NewFromDescr(&PyArray_Type,
+                                     _integer_py_dtype, 1, &n,
+                                     NULL, self._factor.p,
+                                     0, None)
+            d = x[p]
+        if self._factor.is_ll:
+            return d ** 2
+        else:
+            return d
 
     def L(self):
         """If necessary, converts this factorization to the style
