@@ -199,3 +199,17 @@ def test_cholesky_matrix_market():
                 # Pt is the inverse of P, and argsort inverts permutation
                 # vectors:
                 assert np.allclose(f.solve_Pt(b), b[np.argsort(f.P()), :])
+
+def test_convenience():
+    A_dense_seed = np.array([[10, 0, 3, 0],
+                             [0, 5, 0, -2],
+                             [3, 0, 5, 0],
+                             [0, -2, 0, 2]])
+    for mode in ("simplicial", "supernodal"):
+        for dtype in (float, complex):
+            A_dense = np.array(A_dense_seed, dtype=dtype)
+            A_sp = sparse.csc_matrix(A_dense)
+            f = cholesky(A_sp, mode=mode)
+            assert np.allclose(f.det(), np.linalg.det(A_dense))
+            assert np.allclose(f.logdet(), np.log(np.linalg.det(A_dense)))
+            assert np.allclose((f.inv() * A_sp).todense(), np.eye(4))

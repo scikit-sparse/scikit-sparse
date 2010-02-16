@@ -9,9 +9,13 @@ Sparse Cholesky decomposition (:mod:`scikits.sparse.cholmod`)
 Overview
 --------
 
-This module exposes most of the capabilities of the `CHOLMOD
-<http://www.cise.ufl.edu/research/sparse/cholmod/>`_
-package. Specifically, it provides:
+This module provides efficient implementations of all the basic linear
+algebra operations for sparse, symmetric, positive-definite matrices
+(as, for instance, commonly arise in least squares problems).
+
+Specifically, it exposes most of the capabilities of the `CHOLMOD
+<http://www.cise.ufl.edu/research/sparse/cholmod/>`_ package,
+including:
 
 * Computation of the `Cholesky decomposition
   <http://en.wikipedia.org/wiki/Cholesky_decomposition>`_ :math:`LL' =
@@ -29,8 +33,8 @@ package. Specifically, it provides:
   :math:`A` become available incrementally (e.g., due to memory
   constraints), or when many matrices with similar but non-identical
   columns must be factored.
-
-One common use is for solving least squares problems.
+* Convenience functions for calculating the determinant of a matrix
+  that has been factored, and its inverse.
 
 Quickstart
 ----------
@@ -42,6 +46,15 @@ following code solves the equation :math:`Ax = b`::
   from scikits.sparse.cholmod import cholesky
   factor = cholesky(A)
   x = factor(b)
+
+If we just want to compute its determinant::
+
+  factor = cholesky(A)
+  ld = factor.logdet()
+
+(This returns the log of the determinant, rather than the determinant
+itself, to avoid issues with underflow/overflow. See :meth:`logdet`,
+:meth:`log`.)
 
 If you have a least-squares problem to solve, minimizing :math:`||Mx -
 b||^2`, and :math:`M` is a sparse matrix, the `solution
@@ -174,6 +187,16 @@ necessary).
 .. automethod:: Factor.solve_P(b)
 
 .. automethod:: Factor.solve_Pt(b)
+
+Convenience methods
+-------------------
+
+.. automethod:: Factor.logdet()
+
+.. automethod:: Factor.det()
+
+.. automethod:: Factor.inv()
+
 
 Error handling
 --------------

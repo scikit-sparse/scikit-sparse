@@ -530,11 +530,12 @@ cdef class Factor(object):
 
         and then returns the diagonal matrix D *as a 1d vector*.
 
-        Note: This method uses an efficient implementation that extracts the
-        diagonal D directly from CHOLMOD's internal representation. It never
-        requires copying the factor matrices, or actually converting an `LL'`
-        factorization into an `LDL'` factorization just to extract the
-        diagonal.
+          .. note:: This method uses an efficient implementation that extracts
+             the diagonal D directly from CHOLMOD's internal
+             representation. It never makes a copy of the factor matrices, or
+             actually converts a full `LL'` factorization into an `LDL'`
+             factorization just to extract `D`.
+
         """
         
         if self._factor.xtype == CHOLMOD_PATTERN:
@@ -725,6 +726,51 @@ cdef class Factor(object):
             py_out = py_out[:, 0]
         return py_out
         
+    def logdet(self):
+        """Computes the log-determinant of the matrix A.
+
+        If `f` is a factor, then `f.logdet()` is equivalent to
+        `np.sum(np.log(f.D()))`.
+
+        .. versionadded:: 0.2
+        """
+        return np.sum(np.log(self.D()))
+
+    def det(self):
+        """Computes the determinant of the matrix A.
+
+        Consider using :meth:`logdet` instead, for improved numerical
+        stability. (In particular, determinants are often prone to problems
+        with underflow or overflow.)
+
+        .. versionadded:: 0.2
+        """
+        return np.exp(self.logdet())
+
+    def inv(self):
+        """Returns the inverse of the matrix A, as a sparse (CSC) matrix.
+
+          .. warning:: For most purposes, it is better to use :meth:`solve`
+             instead of computing the inverse explicitly. That is, the
+             following two pieces of code produce identical results::
+    
+               x = f.solve(b)
+               x = f.inv() * b  # DON'T DO THIS!
+
+             But the first line is both faster and produces more accurate
+             results.
+
+        Sometimes, though, you really do need the inverse explicitly (e.g.,
+        for calculating standard errors in least squares regression), so if
+        that's your situation, here you go.
+
+        .. versionadded:: 0.2
+        """
+
+        return self(sparse.eye(self._factor.n, self._factor.n,
+                               dtype=_np_dtype_for(self._factor.xtype),
+                               format="csc"))
+
 def analyze(A, mode="auto"):
     """Computes the optimal fill-reducing permutation for the symmetric matrix
     A, but does *not* factor it (i.e., it performs a "symbolic Cholesky
