@@ -28,6 +28,7 @@ VERSION             = '0.1+dev'
 
 from setuptools import setup, find_packages, Extension
 from Cython.Distutils import build_ext
+from numpy.distutils.misc_util import get_numpy_include_headers
 
 if __name__ == "__main__":
     setup(install_requires = ['numpy', 'scipy'],
@@ -62,6 +63,11 @@ if __name__ == "__main__":
               Extension("scikits.sparse.cholmod",
                         ["scikits/sparse/cholmod.pyx"],
                         libraries=["cholmod"],
+                        include_dirs=get_numpy_include_headers(),
+                        # If your CHOLMOD is in a funny place, you may need to
+                        # add something like this:
+                        #library_dirs=["/opt/suitesparse/lib"],
+                        # And modify include_dirs above in a similar way.
                         ),
               ],
           )
