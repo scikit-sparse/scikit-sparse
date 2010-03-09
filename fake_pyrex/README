@@ -1,0 +1,2 @@
+This directory is here to fool setuptools into building .pyx files
+even if Pyrex is not installed. See ../setup.py.

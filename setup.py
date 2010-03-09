@@ -26,6 +26,14 @@ LICENSE             = 'GPL'
 DOWNLOAD_URL        = "http://code.google.com/p/scikits-sparse/downloads/list"
 VERSION             = '0.1+dev'
 
+# Add our fake Pyrex at the end of the Python search path
+# in order to fool setuptools into allowing compilation of
+# pyx files to C files. Importing Cython.Distutils then
+# makes Cython the tool of choice for this rather than
+# (the possibly nonexisting) Pyrex.
+project_path = os.path.split(__file__)[0]
+sys.path.append(os.path.join(project_path, 'fake_pyrex'))
+
 from setuptools import setup, find_packages, Extension
 from Cython.Distutils import build_ext
 import numpy as np
