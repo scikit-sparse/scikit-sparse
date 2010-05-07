@@ -726,8 +726,21 @@ cdef class Factor(object):
             py_out = py_out[:, 0]
         return py_out
         
+    def slogdet(self):
+        """Computes the log-determinant of the matrix A, with the same API as
+        :meth:`numpy.linalg.slogdet`.
+
+        This returns a tuple `(sign, logdet)`, where `sign` is always the
+        number 1.0 (because the determinant of a positive-definite matrix is
+        always a positive real number), and `logdet` is the (natural)
+        logarithm of the determinant of the matrix A.
+
+        .. versionadded:: 0.2
+        """
+        return (1.0, self.logdet())
+
     def logdet(self):
-        """Computes the log-determinant of the matrix A.
+        """Computes the (natural) log of the determinant of the matrix A.
 
         If `f` is a factor, then `f.logdet()` is equivalent to
         `np.sum(np.log(f.D()))`.

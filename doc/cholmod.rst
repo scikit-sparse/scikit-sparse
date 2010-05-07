@@ -33,8 +33,10 @@ including:
   :math:`A` become available incrementally (e.g., due to memory
   constraints), or when many matrices with similar but non-identical
   columns must be factored.
-* Convenience functions for calculating the determinant of a matrix
-  that has been factored, and its inverse.
+* Convenience functions for computing the (log) determinant of the
+  matrix that has been factored.
+* A convenience function for explicitly computing the inverse of the
+  matrix that has been factored (though this is rarely useful).
 
 Quickstart
 ----------
@@ -194,6 +196,8 @@ Convenience methods
 .. automethod:: Factor.logdet()
 
 .. automethod:: Factor.det()
+
+.. automethod:: Factor.slogdet()
 
 .. automethod:: Factor.inv()
 

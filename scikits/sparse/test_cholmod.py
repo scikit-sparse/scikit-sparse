@@ -212,4 +212,5 @@ def test_convenience():
             f = cholesky(A_sp, mode=mode)
             assert np.allclose(f.det(), np.linalg.det(A_dense))
             assert np.allclose(f.logdet(), np.log(np.linalg.det(A_dense)))
+            assert np.allclose(f.slogdet(), [1, np.log(np.linalg.det(A_dense))])
             assert np.allclose((f.inv() * A_sp).todense(), np.eye(4))
