@@ -33,6 +33,13 @@ cdef extern from "numpy/arrayobject.h":
     ctypedef struct ndarray_with_base "PyArrayObject":
         void * base
 
+    # In Cython 0.14.1, np.NPY_F_CONTIGUOUS is broken, because numpy.pxd
+    # claims that it is of a non-existent type called 'enum requirements', and
+    # new versions of Cython attempt to stash it in a temporary variable of
+    # this type, which then annoys the C compiler.
+    enum:
+        NPY_F_CONTIGUOUS
+
 cdef inline np.ndarray set_base(np.ndarray arr, object base):
     cdef ndarray_with_base * hack = <ndarray_with_base *> arr
     py.Py_INCREF(base)
@@ -201,7 +208,7 @@ cdef _py_sparse(cholmod_sparse * m, Common common):
                                            &ncol_plus_1,
                                            NULL,
                                            m.p,
-                                           np.NPY_F_CONTIGUOUS, None),
+                                           NPY_F_CONTIGUOUS, None),
                       cleaner)
     py.Py_INCREF(_integer_py_dtype)
     cdef np.npy_intp nzmax = m.nzmax
@@ -210,7 +217,7 @@ cdef _py_sparse(cholmod_sparse * m, Common common):
                                             &nzmax,
                                             NULL,
                                             m.i,
-                                            np.NPY_F_CONTIGUOUS, None),
+                                            NPY_F_CONTIGUOUS, None),
                        cleaner)
     data_dtype = _np_dtype_for(m.xtype)
     data = set_base(PyArray_NewFromDescr(&PyArray_Type,
@@ -218,7 +225,7 @@ cdef _py_sparse(cholmod_sparse * m, Common common):
                                          &nzmax,
                                          NULL,
                                          m.x,
-                                         np.NPY_F_CONTIGUOUS, None),
+                                         NPY_F_CONTIGUOUS, None),
                     cleaner)
     return sparse.csc_matrix((data, indices, indptr), shape=shape)
 
@@ -245,7 +252,7 @@ cdef _py_dense(cholmod_dense * m, Common common):
     dims[1] = m.ncol
     cdef np.ndarray out
     return set_base(PyArray_NewFromDescr(&PyArray_Type, dtype, 2, dims, NULL,
-                                         m.x, np.NPY_F_CONTIGUOUS, None),
+                                         m.x, NPY_F_CONTIGUOUS, None),
                     cleaner)
 
 cdef void _error_handler(int status, char * file, int line, char * msg) except * with gil:
