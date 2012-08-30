@@ -29,6 +29,7 @@
 # SUCH DAMAGE.
 
 import os.path
+import warnings
 from nose.tools import assert_raises
 import numpy as np
 from scipy import sparse
@@ -175,8 +176,8 @@ def test_cholesky_matrix_market():
             assert_raises(CholmodError, f1.solve_DLt, Xty)
             assert_raises(CholmodError, f1.solve_L, Xty)
             assert_raises(CholmodError, f1.solve_D, Xty)
-            assert_raises(CholmodError, f1.solve_P, Xty)
-            assert_raises(CholmodError, f1.solve_Pt, Xty)
+            assert_raises(CholmodError, f1.apply_P, Xty)
+            assert_raises(CholmodError, f1.apply_Pt, Xty)
             f1.P()
             assert_raises(CholmodError, f1.L)
             assert_raises(CholmodError, f1.LD)
@@ -221,10 +222,24 @@ def test_cholesky_matrix_market():
                                    np.dot(L.T.todense().I, b))
                 assert np.allclose(f.solve_D(b),
                                    np.dot(D.todense().I, b))
+
+                assert np.allclose(f.apply_P(b), b[f.P(), :])
                 assert np.allclose(f.solve_P(b), b[f.P(), :])
                 # Pt is the inverse of P, and argsort inverts permutation
                 # vectors:
+                assert np.allclose(f.apply_Pt(b), b[np.argsort(f.P()), :])
                 assert np.allclose(f.solve_Pt(b), b[np.argsort(f.P()), :])
+
+def test_deprecation():
+    f = cholesky(sparse.eye(5, 5))
+    b = np.ones(5)
+    for dep_method in "solve_P", "solve_Pt":
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            getattr(f, dep_method)(b)
+            assert len(w) == 1
+            assert issubclass(w[-1].category, DeprecationWarning)
+            assert "deprecated" in str(w[-1].message)
 
 def test_convenience():
     A_dense_seed = np.array([[10, 0, 3, 0],
