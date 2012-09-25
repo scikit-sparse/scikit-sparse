@@ -72,6 +72,10 @@ cdef inline np.ndarray set_base(np.ndarray arr, object base):
     hack.base = <void *> base
     return arr
 
+cdef extern from "cholmod_extra.h":
+    cholmod_sparse * cholmod_spinv(cholmod_factor *,
+                                   cholmod_common *) except? NULL	        
+
 cdef extern from "suitesparse/cholmod.h":
     cdef enum:
         CHOLMOD_INT
@@ -834,6 +838,43 @@ cdef class Factor(object):
         return self(sparse.eye(self._factor.n, self._factor.n,
                                dtype=_np_dtype_for(self._factor.xtype),
                                format="csc"))
+
+    def spinv(self, form="full"):
+        """Returns the sparse inverse of the matrix A, as a sparse
+        (CSC) matrix.
+
+        The sparse inverse contains those elements of the inverse that
+        correspond to the (symbolically) non-zero elements in A.
+
+          .. warning:: The sparse inverse is different from the
+          inverse, which is dense in general. For most purposes, it is
+          better to use :meth:`solve` or :meth:`inv`.
+
+        Sometimes, though, you only need a small set of elements of
+        the inverse. This is useful, for instance, when computing the
+        element-wise product (or the trace of the dot product) between
+        the inverse of A and a matrix with the same sparsity structure
+        as A.
+
+        ``form`` tells which part of the symmetric sparse inverse
+        matrix is computed - one of ``lower``, ``upper``, ``full``.
+
+        .. versionadded:: ??
+        """
+
+        cdef cholmod_sparse * out
+        out = cholmod_spinv(self._factor,
+                            &self._common._common)
+        X = _py_sparse(out, self._common)
+        if form.lower() == "full":
+            X = X + sparse.triu(X.T, k=1)
+        elif form.lower() == "upper":
+            X = X.T
+        elif form.lower() == "lower":
+            pass
+        else:
+            raise ValueError("Unknown form requested")
+        return X
 
 def analyze(A, mode="auto"):
     """Computes the optimal fill-reducing permutation for the symmetric matrix
