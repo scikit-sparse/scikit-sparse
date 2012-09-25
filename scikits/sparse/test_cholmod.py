@@ -230,6 +230,37 @@ def test_cholesky_matrix_market():
                 assert np.allclose(f.apply_Pt(b), b[np.argsort(f.P()), :])
                 assert np.allclose(f.solve_Pt(b), b[np.argsort(f.P()), :])
 
+def test_spinv():
+    X = sparse.rand(500,500,density=0.03)
+    K = (X.T * X).tocsc() + sparse.identity(500)
+    for mode in ("simplicial", "supernodal"):
+        L = cholesky(K, mode=mode)
+        # Full inverse
+        inv_K = L.inv().todense()
+        for form in ("lower", "upper", "full"):
+            # Sparse inverse
+            spinv_K = L.spinv(form=form)
+            # 1) Check that the non-zero elements of spinv_K are
+            # correct
+            spinv_K = spinv_K.tocoo()
+            i = spinv_K.row
+            j = spinv_K.col
+            x = spinv_K.data
+            assert(np.allclose(x, inv_K[i,j]))
+            # 2) Check that the elements that are non-zero in K
+            # are correct in spinv_K
+            K = K.tocoo()
+            i = K.row
+            j = K.col
+            spinv_K = spinv_K.todense()
+            if form == "lower":
+                Z = np.tril(inv_K)
+            elif form == "upper":
+                Z = np.triu(inv_K)
+            else:
+                Z = inv_K
+            assert(np.allclose(spinv_K[i,j], Z[i,j]))
+
 def test_deprecation():
     f = cholesky(sparse.eye(5, 5))
     b = np.ones(5)
