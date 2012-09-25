@@ -80,4 +80,5 @@ if __name__ == "__main__":
                         # And modify include_dirs above in a similar way.
                         ),
               ],
+          use_2to3 = True,
           )
