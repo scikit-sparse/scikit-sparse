@@ -847,8 +847,8 @@ cdef class Factor(object):
         correspond to the (symbolically) non-zero elements in A.
 
           .. warning:: The sparse inverse is different from the
-          inverse, which is dense in general. For most purposes, it is
-          better to use :meth:`solve` or :meth:`inv`.
+             inverse, which is dense in general. For most purposes, it
+             is better to use :meth:`solve_A` or :meth:`inv`.
 
         Sometimes, though, you only need a small set of elements of
         the inverse. This is useful, for instance, when computing the

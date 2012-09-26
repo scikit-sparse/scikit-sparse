@@ -201,6 +201,8 @@ Convenience methods
 
 .. automethod:: Factor.inv()
 
+.. automethod:: Factor.spinv
+
 
 Error handling
 --------------
