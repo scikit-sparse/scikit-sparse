@@ -856,8 +856,9 @@ cdef class Factor(object):
         the inverse of A and a matrix with the same sparsity structure
         as A.
 
-        ``form`` tells which part of the symmetric sparse inverse
-        matrix is computed - one of ``lower``, ``upper``, ``full``.
+        Because the sparse inverse is symmetric, ``form`` can be used
+        to tell which part of the symmetric sparse inverse matrix
+        should be computed: ``lower``, ``upper`` or ``full``.
 
         .. versionadded:: ??
         """
