@@ -3,12 +3,15 @@ sparse matrix manipulation in Python. It provides routines that are
 not suitable for inclusion in scipy.sparse proper, usually because
 they are GPL'ed.
 
+So far it just contains a wrapper for the CHOLMOD library for sparse
+cholesky decomposition. Further contributions are welcome!
+
 Manual:
   http://packages.python.org/scikits.sparse/
 Homepage:
-  http://code.google.com/p/scikits-sparse
+  https://github.com/njsmith/scikits-sparse
 Bug tracker:
-  http://code.google.com/p/scikits-sparse/issues/list
+  https://github.com/njsmith/scikits-sparse/issues
 Mailing list:
   scikits-sparse-discuss@lists.vorpus.org
   http://lists.vorpus.org/cgi-bin/mailman/listinfo/scikits-sparse-discuss
@@ -24,7 +27,10 @@ original code contained in this package, and NOT to the libraries
 (e.g., CHOLMOD) which it uses. These libraries are generally
 licensed under less permissive licenses, such as the GNU GPL or LGPL,
 and users of this package are responsible for determining what
-requirements these licenses impose on their usage.
+requirements these licenses impose on their usage. (The intent here is
+that if you, for example, buy a license to use CHOLMOD in a commercial
+product, then you can also go ahead and use our wrapper code with your
+commercial license.)
 
     scikits.sparse
     Copyright (c) 2009, Nathaniel Smith <njs@pobox.com>
