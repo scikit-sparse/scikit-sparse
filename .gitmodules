@@ -1,3 +1,0 @@
-[submodule "scikits/sparse/cholmod-extra"]
-	path = scikits/sparse/cholmod-extra
-	url = https://github.com/jluttine/cholmod-extra.git
