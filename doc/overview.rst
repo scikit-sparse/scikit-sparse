@@ -25,14 +25,14 @@ The current release may be downloaded from the Python Package index at
 
   http://pypi.python.org/pypi/scikits.sparse/
 
-Or from the `homepage <http://code.google.com/p/scikits-sparse>`_ at
+Or from the `homepage <https://github.com/njsmith/scikits-sparse>`_ at
 
-  http://code.google.com/p/scikits-sparse/downloads/list
+  https://github.com/njsmith/scikits-sparse/downloads
 
-Or the latest *development version* may be found in our `Mercurial
-repository <http://code.google.com/p/scikits-sparse/source/list>`_::
+Or the latest *development version* may be found in our `Git
+repository <https://github.com/njsmith/scikits-sparse>`_::
 
-  hg clone https://scikits-sparse.googlecode.com/hg/ scikits.sparse
+  git clone git://github.com/njsmith/scikits-sparse.git
 
 Requirements
 ------------
@@ -72,5 +72,5 @@ Contact
 Post your suggestions and questions directly to the `mailing list
 <http://lists.vorpus.org/cgi-bin/mailman/listinfo/scikits-sparse-discuss>`_
 (scikits-sparse-discuss@lists.vorpus.org), or to our `bug tracker
-<http://code.google.com/p/scikits-sparse/issues/list>`_. You may also
+<https://github.com/njsmith/scikits-sparse/issues>`_. You may also
 contact `Nathaniel Smith <mailto:njs@pobox.com>`_ directly.

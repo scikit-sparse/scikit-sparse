@@ -21,9 +21,9 @@ DESCRIPTION         = 'Scikits sparse matrix package'
 LONG_DESCRIPTION    = descr
 MAINTAINER          = 'Nathaniel Smith',
 MAINTAINER_EMAIL    = 'njs@pobox.com',
-URL                 = 'http://code.google.com/p/scikits-sparse/'
+URL                 = 'https://github.com/njsmith/scikits-sparse/'
 LICENSE             = 'GPL'
-DOWNLOAD_URL        = "http://code.google.com/p/scikits-sparse/downloads/list"
+DOWNLOAD_URL        = "https://github.com/njsmith/scikits-sparse/downloads"
 VERSION             = '0.1+dev'
 
 # Add our fake Pyrex at the end of the Python search path
