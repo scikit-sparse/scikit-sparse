@@ -29,8 +29,8 @@
 # SUCH DAMAGE.
 
 import warnings
-cimport stdlib
-cimport python as py
+from libc cimport stdlib
+cimport cpython as py
 import numpy as np
 cimport numpy as np
 from scipy import sparse
@@ -72,7 +72,7 @@ cdef inline np.ndarray set_base(np.ndarray arr, object base):
     hack.base = <void *> base
     return arr
 
-cdef extern from "suitesparse/cholmod.h":
+cdef extern from "cholmod.h":
     cdef enum:
         CHOLMOD_INT
         CHOLMOD_PATTERN, CHOLMOD_REAL, CHOLMOD_COMPLEX
