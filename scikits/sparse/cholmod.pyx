@@ -860,6 +860,8 @@ cdef class Factor(object):
         to tell which part of the symmetric sparse inverse matrix
         should be computed: ``lower``, ``upper`` or ``full``.
 
+          .. warning:: Only real matrices are supported.
+
         .. versionadded:: ??
         """
 
