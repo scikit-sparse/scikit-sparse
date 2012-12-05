@@ -261,6 +261,19 @@ def test_spinv():
                 Z = inv_K
             assert(np.allclose(spinv_K[i,j], Z[i,j]))
 
+def test_spinv_complex():
+    # Complex matrices do not work yet, but this test checks that some
+    # reasonable error is produced
+    C = complex_matrix()
+    L = cholesky(C)
+    try:
+        # This should result CholmodError because spinv is not
+        # implemented for complex matrices - yet
+        invC = L.spinv()
+        assert(False)
+    except CholmodError:
+        assert(True)
+
 def test_deprecation():
     f = cholesky(sparse.eye(5, 5))
     b = np.ones(5)

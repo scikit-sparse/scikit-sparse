@@ -74,7 +74,7 @@ cdef inline np.ndarray set_base(np.ndarray arr, object base):
 
 cdef extern from "cholmod_extra.h":
     cholmod_sparse * cholmod_spinv(cholmod_factor *,
-                                   cholmod_common *) except? NULL	        
+                                   cholmod_common *) except? NULL
 
 cdef extern from "suitesparse/cholmod.h":
     cdef enum:

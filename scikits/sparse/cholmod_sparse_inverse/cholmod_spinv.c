@@ -393,22 +393,21 @@ cholmod_sparse *CHOLMOD(spinv_super)   /* returns the sparse inverse of X */
     free(V) ;
     free(perm) ;
 
-    // The result is symmetric but only the lower triangular part was
-    // computed.
-    X->stype = -1 ;
-
-    // Sort columns (is it necessary?)
-    CHOLMOD(sort) (X, Common) ;
-    
     if (Common->status == CHOLMOD_OK)
     {
-        return (X) ;
+        // The result is symmetric but only the lower triangular part was
+        // computed.
+        X->stype = -1 ;
+
+        // Sort columns (is it necessary?)
+        CHOLMOD(sort) (X, Common) ;
+    
+        if (Common->status == CHOLMOD_OK)
+            return (X) ;
     }
-    else
-    {
-        CHOLMOD(free_sparse) (&X, Common) ;
-        return (NULL) ;
-    }
+
+    CHOLMOD(free_sparse) (&X, Common) ;
+    return (NULL) ;
 
 }
 /* ========================================================================== */
@@ -640,22 +639,21 @@ cholmod_sparse *CHOLMOD(spinv_simplicial)  /* returns the sparse solution X */
     free(z) ;
     free(perm) ;
 
-    // The result is symmetric but only the lower triangular part was
-    // computed.
-    X->stype = -1 ;
-
-    // Sort columns (is it necessary?)
-    CHOLMOD(sort) (X, Common) ;
-    
     if (Common->status == CHOLMOD_OK)
     {
-        return (X) ;
+        // The result is symmetric but only the lower triangular part was
+        // computed.
+        X->stype = -1 ;
+
+        // Sort columns (is it necessary?)
+        CHOLMOD(sort) (X, Common) ;
+    
+        if (Common->status == CHOLMOD_OK)
+            return (X) ;
     }
-    else
-    {
-        CHOLMOD(free_sparse) (&X, Common) ;
-        return (NULL) ;
-    }
+
+    CHOLMOD(free_sparse) (&X, Common) ;
+    return (NULL) ;
 
 }
 
