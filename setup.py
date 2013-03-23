@@ -34,14 +34,15 @@ VERSION             = '0.1+dev'
 project_path = os.path.split(__file__)[0]
 sys.path.append(os.path.join(project_path, 'fake_pyrex'))
 
-from setuptools import setup, find_packages, Extension
+from distutils.core import setup
+from distutils.extension import Extension
 from Cython.Distutils import build_ext
 import numpy as np
 
 if __name__ == "__main__":
     setup(install_requires = ['numpy', 'scipy'],
           namespace_packages = ['scikits'],
-          packages = find_packages(),
+          packages = ['scikits', 'scikits.sparse'],
           package_data = {
               "": ["*.mtx.gz"],
               },
