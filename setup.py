@@ -24,7 +24,7 @@ MAINTAINER_EMAIL    = 'njs@pobox.com',
 URL                 = 'https://github.com/njsmith/scikits-sparse/'
 LICENSE             = 'GPL'
 DOWNLOAD_URL        = "https://github.com/njsmith/scikits-sparse/downloads"
-VERSION             = '0.2'
+VERSION             = '0.2+dev'
 
 # Add our fake Pyrex at the end of the Python search path
 # in order to fool setuptools into allowing compilation of
