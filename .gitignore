@@ -1,6 +1,7 @@
 # Project specific files #
 ##########################
 
+scikits/sparse/cholmod.c
 .coverage
 htmlcov/
 .tox
