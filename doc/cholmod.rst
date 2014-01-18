@@ -186,7 +186,11 @@ necessary).
 
 .. automethod:: Factor.solve_D(b)
 
+.. automethod:: Factor.apply_P(b)
+
 .. automethod:: Factor.solve_P(b)
+
+.. automethod:: Factor.apply_Pt(b)
 
 .. automethod:: Factor.solve_Pt(b)
 
