@@ -1,14 +1,15 @@
-1) run tests
+1) run tests: python setup.py build_ext -i && nosetests scikits --all-modules
 2) update doc/changes.rst
 3) make sure docs are up to date
 4) update version in doc/changes.rst, setup.py, doc/conf.py
-5) make a clean checkout
+5) git clean -xdn  # to check
+   git clean -xdf  # to do it
 6) python setup.py sdist
 7) cd dist; unpack; run tests on sdist
 8) tag
 9) upload source dist to google code and pypi
 10) build and upload docs
-  python setup.py build && (cd doc && PYTHONPATH=../build/lib.linux-x86_64-2.6/ make html)
+  python setup.py build && (cd doc && PYTHONPATH=../build/lib.linux-x86_64-2.7/ make html)
   cd doc/_build/html
   zip -r doc .
   (upload doc.zip to pypi)
