@@ -12,7 +12,9 @@ v0.2
   * New methods for computing determinants of positive-definite
     matrices: :meth:`Factor.det`, :meth:`Factor.logdet`,
     :meth:`Factor.slogdet`.
-  * :meth:`Factor.D` has much-improved implementation.
+  * New method for explicitly computing inverse of a positive-definite
+    matrix: :meth:`Factor.inv`.
+  * :meth:`Factor.D` has much better implementation.
   * Build system improvements.
   * Wrapper code re-licensed under BSD terms.
 
