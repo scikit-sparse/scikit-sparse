@@ -43,7 +43,7 @@ if __name__ == "__main__":
           namespace_packages = ['scikits'],
           packages = find_packages(),
           package_data = {
-              "": ["*.mtx.gz"],
+              "": ["test_data/*.mtx.gz"],
               },
           test_suite="nose.collector",
           # Well, technically zipping the package will work, but since it's
