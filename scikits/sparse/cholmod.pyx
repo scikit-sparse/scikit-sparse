@@ -712,28 +712,14 @@ cdef class Factor(object):
     # CHOLMOD API is quite confusing here -- unlike all the other solve
     # magic constants, CHOLMOD_P and CHOLMOD_Pt actually apply the matrix to b
     # rather than performing a matrix solve. Basically their names are
-    # backwards... therefore let's
+    # backwards... therefore let's call the functions `apply_P` and `apply_Pt`.
     def apply_P(self, b):
         "Returns :math:`x`, where :math:`x = Pb`."
         return self._solve(b, CHOLMOD_P)
 
-    def solve_P(self, b):
-        """A misleadingly-named alias for :meth:`apply_P`. Deprecated."""
-        warnings.warn("solve_P is confusingly-named and deprecated. "
-                      "Use apply_P instead.",
-                      DeprecationWarning)
-        return self.apply_P(b)
-
     def apply_Pt(self, b):
         "Returns :math:`x`, where :math:`x = P'b`."
         return self._solve(b, CHOLMOD_Pt)
-
-    def solve_Pt(self, b):
-        """A misleadingly-named alias for :meth:`apply_Pt`. Deprecated."""
-        warnings.warn("solve_Pt is confusingly-named and deprecated. "
-                      "Use apply_Pt instead.",
-                      DeprecationWarning)
-        return self.apply_Pt(b)
 
     def _solve(self, b, system):
         if sparse.issparse(b):

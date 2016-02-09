@@ -230,22 +230,11 @@ def test_cholesky_matrix_market():
                                 np.dot(D.todense().I, b))
 
                 assert_allclose(f.apply_P(b), b[f.P(), :])
-                assert_allclose(f.solve_P(b), b[f.P(), :])
+                assert_allclose(f.apply_P(b), b[f.P(), :])
                 # Pt is the inverse of P, and argsort inverts permutation
                 # vectors:
                 assert_allclose(f.apply_Pt(b), b[np.argsort(f.P()), :])
-                assert_allclose(f.solve_Pt(b), b[np.argsort(f.P()), :])
-
-def test_deprecation():
-    f = cholesky(sparse.eye(5, 5))
-    b = np.ones(5)
-    for dep_method in "solve_P", "solve_Pt":
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            getattr(f, dep_method)(b)
-            assert len(w) == 1
-            assert issubclass(w[-1].category, DeprecationWarning)
-            assert "deprecated" in str(w[-1].message)
+                assert_allclose(f.apply_Pt(b), b[np.argsort(f.P()), :])
 
 def test_convenience():
     A_dense_seed = np.array([[10, 0, 3, 0],
