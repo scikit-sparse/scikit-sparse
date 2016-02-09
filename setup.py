@@ -2,8 +2,9 @@
 
 # Copyright (C) 2008 Cournapeau David <cournape@gmail.com>
 # Copyright (C) 2009 Nathaniel Smith <njs@pobox.com>
+# Copyright (C) 2016 Antony Lee <anntzer.lee@gmail.com>
 
-descr   = """Sparse matrix tools.
+"""Sparse matrix tools.
 
 This is a home for sparse matrix code in Python that plays well with
 scipy.sparse, but that is somehow unsuitable for inclusion in scipy
@@ -13,26 +14,15 @@ So far we have a wrapper for the CHOLMOD library for sparse cholesky
 decomposition. Further contributions are welcome!
 """
 
-import os
-import sys
-
 DISTNAME            = 'scikit-sparse'
 DESCRIPTION         = 'Scikits sparse matrix package'
-LONG_DESCRIPTION    = descr
+LONG_DESCRIPTION    = __doc__
 MAINTAINER          = 'Nathaniel Smith',
 MAINTAINER_EMAIL    = 'njs@pobox.com',
 URL                 = 'https://github.com/njsmith/scikits-sparse/'
 LICENSE             = 'GPL'
 DOWNLOAD_URL        = "https://github.com/njsmith/scikits-sparse/downloads"
 VERSION             = '0.2+dev'
-
-# Add our fake Pyrex at the end of the Python search path
-# in order to fool setuptools into allowing compilation of
-# pyx files to C files. Importing Cython.Distutils then
-# makes Cython the tool of choice for this rather than
-# (the possibly nonexisting) Pyrex.
-project_path = os.path.split(__file__)[0]
-sys.path.append(os.path.join(project_path, 'fake_pyrex'))
 
 from setuptools import setup, find_packages, Extension
 from Cython.Build import cythonize
