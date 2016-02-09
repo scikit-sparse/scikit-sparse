@@ -36,9 +36,8 @@ from nose.tools import assert_raises
 import numpy as np
 from numpy.testing import assert_allclose
 from scipy import sparse
-from scikits.sparse.cholmod import (cholesky, cholesky_AAt,
-                                    analyze, analyze_AAt,
-                                    CholmodError)
+from sksparse.cholmod import (
+    cholesky, cholesky_AAt, analyze, analyze_AAt, CholmodError)
 
 # Match defaults of np.allclose, which were used before (and are needed).
 assert_allclose = partial(assert_allclose, rtol=1e-5, atol=1e-8)

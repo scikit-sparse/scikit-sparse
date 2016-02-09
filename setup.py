@@ -16,7 +16,7 @@ decomposition. Further contributions are welcome!
 import os
 import sys
 
-DISTNAME            = 'scikits.sparse'
+DISTNAME            = 'scikit-sparse'
 DESCRIPTION         = 'Scikits sparse matrix package'
 LONG_DESCRIPTION    = descr
 MAINTAINER          = 'Nathaniel Smith',
@@ -35,12 +35,11 @@ project_path = os.path.split(__file__)[0]
 sys.path.append(os.path.join(project_path, 'fake_pyrex'))
 
 from setuptools import setup, find_packages, Extension
-from Cython.Distutils import build_ext
+from Cython.Build import cythonize
 import numpy as np
 
 if __name__ == "__main__":
     setup(install_requires = ['numpy', 'scipy'],
-          namespace_packages = ['scikits'],
           packages = find_packages(),
           package_data = {
               "": ["test_data/*.mtx.gz"],
@@ -66,17 +65,9 @@ if __name__ == "__main__":
               'Intended Audience :: Science/Research',
               'License :: OSI Approved :: GNU General Public License (GPL)',
               'Topic :: Scientific/Engineering'],
-          cmdclass = {"build_ext": build_ext},
-          ext_modules = [
-              Extension(
-                  "scikits.sparse.cholmod",
-                  ["scikits/sparse/cholmod.pyx"],
-                  libraries=["cholmod"],
-                  include_dirs=[np.get_include(), "/usr/include/suitesparse"],
-                  # If your CHOLMOD is in a funny place, you may need to
-                  # add something like this:
-                  #library_dirs=["/opt/suitesparse/lib"],
-                  # And modify include_dirs above in a similar way.
-                  ),
-              ],
-          )
+          # You may specify the directory where CHOLMOD is installed using the
+          # include_path and library_dirs distutils directives at the top of
+          # cholmod.pyx.
+          ext_modules = cythonize(
+              "sksparse/cholmod.pyx",
+              aliases={"NP_GET_INCLUDE": np.get_include()}))

@@ -28,6 +28,11 @@
 # THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
+#cython: binding = True
+#cython: language_level = 3
+#distutils: include_dirs = NP_GET_INCLUDE /usr/include/suitesparse
+#distutils: libraries = cholmod
+
 import warnings
 cimport cpython as py
 import numpy as np
