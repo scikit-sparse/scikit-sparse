@@ -1,7 +1,7 @@
-Sparse Cholesky decomposition (:mod:`scikits.sparse.cholmod`)
-=============================================================
+Sparse Cholesky decomposition (:mod:`sksparse.cholmod`)
+=======================================================
 
-.. module:: scikits.sparse.cholmod
+.. module:: sksparse.cholmod
    :synopsis: Sparse Cholesky decomposition using CHOLMOD
 
 .. versionadded:: 0.1
@@ -45,7 +45,7 @@ If :math:`A` is a sparse, symmetric, positive-definite matrix, and
 :math:`b` is a matrix or vector (either sparse or dense), then the
 following code solves the equation :math:`Ax = b`::
 
-  from scikits.sparse.cholmod import cholesky
+  from sksparse.cholmod import cholesky
   factor = cholesky(A)
   x = factor(b)
 
@@ -60,11 +60,11 @@ itself, to avoid issues with underflow/overflow. See :meth:`logdet`,
 
 If you have a least-squares problem to solve, minimizing :math:`||Mx -
 b||^2`, and :math:`M` is a sparse matrix, the `solution
-<http://en.wikipedia.org/wiki/Linear_least_squares#Derivation_of_the_normal_equations>`_
+<http://en.wikipedia.org/wiki/Linear_least_squares_(mathematics)#Derivation_of_the_normal_equations>`_
 is :math:`x = (M'M)^{-1} M'b`, which can be efficiently calculated
 as::
 
-  from scikits.sparse.cholmod import cholesky_AAt
+  from sksparse.cholmod import cholesky_AAt
   # Notice that CHOLMOD computes AA' and we want M'M, so we must set A = M'!
   factor = cholesky_AAt(M.T)
   x = factor(M.T * b)
@@ -229,28 +229,3 @@ Error handling
     a bug.
 
   Child of :class:`CholmodWarning`.
-
-
-Citing CHOLMOD
---------------
-
-Tim Davies, the author of CHOLMOD, `asks
-<http://www.cise.ufl.edu/research/sparse/cholmod/>`_ that if you use
-CHOLMOD in the production of published scientific research, you cite
-one or more of the following papers:
-
-* Dynamic supernodes in sparse Cholesky update/downdate and triangular
-  solves, T. A. Davis and W. W. Hager, ACM Trans. Math. Software, Vol
-  35, No. 4, 2009.
-* Algorithm 887: CHOLMOD, supernodal sparse Cholesky factorization and
-  update/downdate , Y. Chen, T. A. Davis, W. W. Hager, and
-  S. Rajamanickam, ACM Trans. Math. Software, Vol 35, No. 3, 2009.
-* Row modifications of a sparse Cholesky factorization, T. A. Davis
-  and W. W. Hager, SIAM Journal on Matrix Analysis and Applications,
-  vol 26, no 3, pp. 621-639, 2005.
-* Multiple-rank modifications of a sparse Cholesky factorization,
-  T. A. Davis and W. W. Hager, SIAM Journal on Matrix Analysis and
-  Applications, vol. 22, no. 4, pp. 997-1013, 2001.
-* Modifying a sparse Cholesky factorization, T. A. Davis and
-  W. W. Hager, SIAM Journal on Matrix Analysis and Applications,
-  vol. 20, no. 3, pp. 606-627, 1999.

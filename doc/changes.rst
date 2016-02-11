@@ -1,7 +1,7 @@
 Changes
 =======
 
-.. module:: scikits.sparse.cholmod
+.. module:: sksparse.cholmod
 
 v0.3
 -------

@@ -1,6 +1,7 @@
 # CHOLMOD wrapper for scikits.sparse
 
 # Copyright (C) 2009 Nathaniel Smith <njs@pobox.com>
+# Copyright (C) 2016 Antony Lee <anntzer.lee@gmail.com>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without

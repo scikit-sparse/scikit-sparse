@@ -10,19 +10,19 @@ This is a home for sparse matrix code in Python that plays well with
 scipy.sparse, but that is somehow unsuitable for inclusion in scipy
 proper. Usually this will be because it is released under the GPL.
 
-So far we have a wrapper for the CHOLMOD library for sparse cholesky
+So far we have a wrapper for the CHOLMOD library for sparse Cholesky
 decomposition. Further contributions are welcome!
 """
 
 DISTNAME            = 'scikit-sparse'
 DESCRIPTION         = 'Scikits sparse matrix package'
 LONG_DESCRIPTION    = __doc__
-MAINTAINER          = 'Nathaniel Smith',
-MAINTAINER_EMAIL    = 'njs@pobox.com',
-URL                 = 'https://github.com/njsmith/scikits-sparse/'
+MAINTAINER          = 'Antony Lee',
+MAINTAINER_EMAIL    = 'anntzer.lee@gmail.com',
+URL                 = 'https://github.com/scikit-sparse/scikit-sparse/'
 LICENSE             = 'GPL'
-DOWNLOAD_URL        = "https://github.com/njsmith/scikits-sparse/downloads"
-VERSION             = '0.2+dev'
+DOWNLOAD_URL        = "https://github.com/scikit-sparse/scikit-sparse/downloads"
+VERSION             = '0.3'
 
 from setuptools import setup, find_packages, Extension
 from Cython.Build import cythonize

@@ -4,13 +4,13 @@ Overview
 Introduction
 ------------
 
-The :mod:`scikits.sparse` package is a companion to the
-:mod:`scipy.sparse` library for sparse matrix manipulation in
-Python. All :mod:`scikits.sparse` routines expect and return
-:mod:`scipy.sparse` matrices (usually in CSC format). Unlike SciPy
-proper, :mod:`scikits.sparse` is covered by the GPLv2+ (see the file
-COPYING for details), and thus can take advantage of GPL'ed code like
-`SuiteSparse <http://www.cise.ufl.edu/research/sparse/SuiteSparse/>`_.
+The :mod:`scikit-sparse` package (previously known as :mod:`scikits.sparse`)
+is a companion to the :mod:`scipy.sparse` library for sparse matrix
+manipulation in Python. All :mod:`scikit-sparse` routines expect and
+return :mod:`scipy.sparse` matrices (usually in CSC format). The intent
+of :mod:`scikit-sparse` is to wrap GPL'ed code such as `SuiteSparse
+<http://www.cise.ufl.edu/research/sparse/SuiteSparse/>`_, which cannot be
+included in SciPy proper.
 
 Currently our coverage is rather... sparse, with only a wrapper for
 the CHOLMOD routines for sparse Cholesky decomposition, but we hope
@@ -23,21 +23,22 @@ Download
 
 The current release may be downloaded from the Python Package index at
 
-  http://pypi.python.org/pypi/scikits.sparse/
+  http://pypi.python.org/pypi/scikit-sparse/
 
-Or from the `homepage <https://github.com/njsmith/scikits-sparse>`_ at
+Or from the `homepage <https://github.com/scikit-sparse/scikit-sparse>`_
+at
 
-  https://github.com/njsmith/scikits-sparse/downloads
+  https://github.com/scikit-sparse/scikit-sparse/downloads
 
 Or the latest *development version* may be found in our `Git
-repository <https://github.com/njsmith/scikits-sparse>`_::
+repository <https://github.com/scikit-sparse/scikit-sparse>`_::
 
-  git clone git://github.com/njsmith/scikits-sparse.git
+  git clone git://github.com/scikit-sparse/scikit-sparse.git
 
 Requirements
 ------------
 
-Installing :mod:`scikits.sparse` requires:
+Installing :mod:`scikit-sparse` requires:
 
 * `Python <http://python.org/>`_
 * `NumPy <http://numpy.scipy.org/>`_
@@ -49,28 +50,18 @@ On Debian/Ubuntu systems, the following command should suffice::
 
   apt-get install python-scipy libsuitesparse-dev
 
-.. note:: If you work out more detailed instructions for some other
-  system, then please `drop us a note
-  <scikits-sparse-discuss@lists.vorpus.org>`_ so that they may be
-  included here.
+On Arch Linux, the `python-scikit-sparse` AUR package declares the
+required dependencies.
 
 Installation
 ------------
 
-If you have ``easy_install`` installed, then a simple ::
+As usual, ::
 
-  easy_install -U scikits.sparse
-
-should get you the latest version. Otherwise, download and unpack the
-source distribution, and then run ::
-
-  python setup.py install
+  pip install --user scikit-sparse
 
 Contact
 -------
 
-Post your suggestions and questions directly to the `mailing list
-<http://lists.vorpus.org/cgi-bin/mailman/listinfo/scikits-sparse-discuss>`_
-(scikits-sparse-discuss@lists.vorpus.org), or to our `bug tracker
-<https://github.com/njsmith/scikits-sparse/issues>`_. You may also
-contact `Nathaniel Smith <mailto:njs@pobox.com>`_ directly.
+Post your suggestions and questions directly to our `bug tracker
+<https://github.com/scikit-sparse/scikit-sparse/issues>`_.

@@ -1,10 +1,10 @@
-.. scikits.sparse documentation master file, created by
+.. scikit-sparse documentation master file, created by
    sphinx-quickstart on Sat Dec 12 22:10:41 2009.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-scikits.sparse - Sparse matrix extensions for SciPy
-===================================================
+scikit-sparse - Sparse matrix extensions for SciPy
+==================================================
 
 Contents:
 
