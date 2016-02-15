@@ -26,22 +26,29 @@ LICENSE             = 'GPL'
 DOWNLOAD_URL        = "https://github.com/njsmith/scikits-sparse/downloads"
 VERSION             = '0.2+dev'
 
-# Add our fake Pyrex at the end of the Python search path
-# in order to fool setuptools into allowing compilation of
-# pyx files to C files. Importing Cython.Distutils then
-# makes Cython the tool of choice for this rather than
-# (the possibly nonexisting) Pyrex.
-project_path = os.path.split(__file__)[0]
-sys.path.append(os.path.join(project_path, 'fake_pyrex'))
+from numpy.distutils.core import setup, Extension
+from numpy.distutils.system_info import lapack_info, lapack_mkl_info
 
-from setuptools import setup, find_packages, Extension
-from Cython.Distutils import build_ext
+lapack_libs = []
+lapack_lib_dirs = []
+lapack_include_dirs = []
+for l in [lapack_mkl_info().get_info(), lapack_info().get_info()]:
+  try:
+    lapack_libs += l['libraries']
+    lapack_lib_dirs += l['library_dirs']
+    lapack_include_dirs += l['include_dirs']
+    break
+  except:
+    pass
+
 import numpy as np
+# the monkey patch trick so that cython is called on pyx files.
+import monkey
 
 if __name__ == "__main__":
     setup(install_requires = ['numpy', 'scipy'],
           namespace_packages = ['scikits'],
-          packages = find_packages(),
+          packages = ['scikits.sparse'], #find_packages(),
           package_data = {
               "": ["test_data/*.mtx.gz"],
               },
@@ -66,16 +73,14 @@ if __name__ == "__main__":
               'Intended Audience :: Science/Research',
               'License :: OSI Approved :: GNU General Public License (GPL)',
               'Topic :: Scientific/Engineering'],
-          cmdclass = {"build_ext": build_ext},
           ext_modules = [
               Extension("scikits.sparse.cholmod",
                         ["scikits/sparse/cholmod.pyx"],
-                        libraries=["cholmod"],
-                        include_dirs=[np.get_include()],
+                        libraries=["cholmod", "colamd", "amd", "suitesparseconfig", 'rt'] + lapack_libs,
+                        include_dirs=[np.get_include()] + lapack_include_dirs,
                         # If your CHOLMOD is in a funny place, you may need to
-                        # add something like this:
-                        #library_dirs=["/opt/suitesparse/lib"],
-                        # And modify include_dirs above in a similar way.
+                        # add some LDFLAGS and CFLAGS before running setup
+                        library_dirs=lapack_lib_dirs,
                         ),
               ],
           )
