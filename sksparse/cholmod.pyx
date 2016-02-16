@@ -43,39 +43,16 @@ from scipy import sparse
 np.import_array()
 
 cdef extern from "numpy/arrayobject.h":
-    # Cython 0.12 complains about PyTypeObject being an "incomplete type" on
-    # this line:
-    #py.PyTypeObject PyArray_Type
-    # So use a hack:
-    struct MyHackReallyPyTypeObject:
-        pass
-    MyHackReallyPyTypeObject PyArray_Type
-    object PyArray_NewFromDescr(MyHackReallyPyTypeObject * subtype,
+    py.PyTypeObject PyArray_Type
+
+    object PyArray_NewFromDescr(py.PyTypeObject *subtype,
                                 np.dtype descr,
                                 int nd,
-                                np.npy_intp * dims,
-                                np.npy_intp * strides,
-                                void * data,
+                                np.npy_intp *dims,
+                                np.npy_intp *strides,
+                                void *data,
                                 int flags,
                                 object obj)
-    # This is ridiculous: the description of PyArrayObject in numpy.pxd does
-    # not mention the 'base' member, so we need a separate wrapper just to
-    # expose it:
-    ctypedef struct ndarray_with_base "PyArrayObject":
-        void * base
-
-    # In Cython 0.14.1, np.NPY_F_CONTIGUOUS is broken, because numpy.pxd
-    # claims that it is of a non-existent type called 'enum requirements', and
-    # new versions of Cython attempt to stash it in a temporary variable of
-    # this type, which then annoys the C compiler.
-    enum:
-        NPY_F_CONTIGUOUS
-
-cdef inline np.ndarray set_base(np.ndarray arr, object base):
-    cdef ndarray_with_base * hack = <ndarray_with_base *> arr
-    py.Py_INCREF(base)
-    hack.base = <void *> base
-    return arr
 
 cdef extern from "cholmod.h":
     cdef enum:
@@ -90,7 +67,7 @@ cdef extern from "cholmod.h":
     ctypedef struct cholmod_common:
         int supernodal
         int status
-        int print_ "print"
+        int print
         void (*error_handler)(int status, char * file, int line, char * msg)
 
     int cholmod_start(cholmod_common *) except? 0
@@ -208,7 +185,7 @@ cdef np.dtype _np_dtype_for(int xtype):
         py.Py_INCREF(_real_py_dtype)
         return _real_py_dtype
     else:
-        raise CholmodError, "cholmod->numpy type conversion failed"
+        raise CholmodError("cholmod->numpy type conversion failed")
 
 cdef class _SparseCleanup(object):
     cdef cholmod_sparse * _sparse
@@ -236,30 +213,21 @@ cdef _py_sparse(cholmod_sparse * m, Common common):
     assert m.itype == CHOLMOD_INT
     py.Py_INCREF(_integer_py_dtype)
     cdef np.npy_intp ncol_plus_1 = m.ncol + 1
-    indptr = set_base(PyArray_NewFromDescr(&PyArray_Type,
-                                           _integer_py_dtype, 1,
-                                           &ncol_plus_1,
-                                           NULL,
-                                           m.p,
-                                           NPY_F_CONTIGUOUS, None),
-                      cleaner)
+    cdef np.ndarray indptr = PyArray_NewFromDescr(
+        &PyArray_Type, _integer_py_dtype, 1, &ncol_plus_1,
+        NULL, m.p, np.NPY_F_CONTIGUOUS, None)
+    np.set_array_base(indptr, cleaner)
     py.Py_INCREF(_integer_py_dtype)
     cdef np.npy_intp nzmax = m.nzmax
-    indices = set_base(PyArray_NewFromDescr(&PyArray_Type,
-                                            _integer_py_dtype, 1,
-                                            &nzmax,
-                                            NULL,
-                                            m.i,
-                                            NPY_F_CONTIGUOUS, None),
-                       cleaner)
+    cdef np.ndarray indices = PyArray_NewFromDescr(
+        &PyArray_Type, _integer_py_dtype, 1, &nzmax,
+        NULL, m.i, np.NPY_F_CONTIGUOUS, None)
+    np.set_array_base(indices, cleaner)
     data_dtype = _np_dtype_for(m.xtype)
-    data = set_base(PyArray_NewFromDescr(&PyArray_Type,
-                                         data_dtype, 1,
-                                         &nzmax,
-                                         NULL,
-                                         m.x,
-                                         NPY_F_CONTIGUOUS, None),
-                    cleaner)
+    cdef np.ndarray data = PyArray_NewFromDescr(
+        &PyArray_Type, data_dtype, 1, &nzmax,
+        NULL, m.x, np.NPY_F_CONTIGUOUS, None)
+    np.set_array_base(data, cleaner)
     return sparse.csc_matrix((data, indices, indptr), shape=shape)
 
 cdef class _DenseCleanup(object):
@@ -283,10 +251,11 @@ cdef _py_dense(cholmod_dense * m, Common common):
     cdef np.npy_intp dims[2]
     dims[0] = m.nrow
     dims[1] = m.ncol
-    cdef np.ndarray out
-    return set_base(PyArray_NewFromDescr(&PyArray_Type, dtype, 2, dims, NULL,
-                                         m.x, NPY_F_CONTIGUOUS, None),
-                    cleaner)
+    cdef np.ndarray out = PyArray_NewFromDescr(
+        &PyArray_Type, dtype, 2, dims,
+        NULL, m.x, np.NPY_F_CONTIGUOUS, None)
+    np.set_array_base(out, cleaner)
+    return out
 
 cdef void _error_handler(int status, char * file, int line, char * msg) except * with gil:
     if status == CHOLMOD_OK:
@@ -296,7 +265,7 @@ cdef void _error_handler(int status, char * file, int line, char * msg) except *
         # Warning:
         warnings.warn(full_msg, CholmodWarning)
     else:
-        raise CholmodError, full_msg
+        raise CholmodError(full_msg)
 
 cdef class Common(object):
     cdef cholmod_common _common
@@ -310,7 +279,7 @@ cdef class Common(object):
         else:
             self._xtype = CHOLMOD_REAL
         cholmod_start(&self._common)
-        self._common.print_ = 0
+        self._common.print = 0
         self._common.error_handler = <void (*)(int, char *, int, char *)>_error_handler
 
     def __dealloc__(self):
@@ -318,20 +287,20 @@ cdef class Common(object):
 
     # Debugging:
     def _print(self):
-        print cholmod_check_common(&self._common)
+        print(cholmod_check_common(&self._common))
         name = repr(self)
         return cholmod_print_common(name, &self._common)
 
     def _print_sparse(self, name, symmetric, matrix):
         cdef cholmod_sparse m
         cdef object ref = self._init_view_sparse(&m, matrix, symmetric)
-        print cholmod_check_sparse(&m, &self._common)
+        print(cholmod_check_sparse(&m, &self._common))
         return cholmod_print_sparse(&m, name, &self._common)
 
     def _print_dense(self, name, matrix):
         cdef cholmod_dense m
         cdef object ref = self._init_view_dense(&m, matrix)
-        print cholmod_check_dense(&m, &self._common)
+        print(cholmod_check_dense(&m, &self._common))
         return cholmod_print_dense(&m, name, &self._common)
 
     ##########
@@ -339,14 +308,14 @@ cdef class Common(object):
     ##########
     cdef np.ndarray _cast(self, np.ndarray arr):
         if not issubclass(arr.dtype.type, np.number):
-            raise CholmodError, "non-numeric dtype %s" % (arr.dtype,)
+            raise CholmodError("non-numeric dtype %s" % (arr.dtype,))
         if self._complex:
             # All numeric types can be upcast to complex:
             return np.asfortranarray(arr, dtype=_complex_py_dtype)
         else:
             # Refuse to downcast complex types to real:
             if issubclass(arr.dtype.type, np.complexfloating):
-                raise CholmodError, "inconsistent use of complex array"
+                raise CholmodError("inconsistent use of complex array")
             else:
                 return np.asfortranarray(arr, dtype=_real_py_dtype)
 
@@ -360,7 +329,7 @@ cdef class Common(object):
                           CholmodTypeConversionWarning)
             m = m.tocsc()
         if symmetric and m.shape[0] != m.shape[1]:
-            raise CholmodError, "supposedly symmetric matrix is not square!"
+            raise CholmodError("supposedly symmetric matrix is not square!")
         m.sort_indices()
         cdef np.ndarray indptr = _require_1d_integer(m.indptr)
         cdef np.ndarray indices = _require_1d_integer(m.indices)
@@ -386,7 +355,7 @@ cdef class Common(object):
     # to use the matrix.
     cdef object _init_view_dense(self, cholmod_dense *out, np.ndarray m):
         if m.ndim != 2:
-            raise CholmodError, "array has %s dimensions (expected 2)" % m.ndim
+            raise CholmodError("array has %s dimensions (expected 2)" % m.ndim)
         m = self._cast(m)
         out.nrow = m.shape[0]
         out.ncol = m.shape[1]
@@ -411,7 +380,7 @@ cdef class Factor(object):
 
     def __init__(self, handshake):
         if handshake is not factor_secret_handshake:
-            raise CholmodError, "Factor may not be constructed directly; use analyze()"
+            raise CholmodError("Factor may not be constructed directly; use analyze()")
 
     def __dealloc__(self):
         cholmod_free_factor(&self._factor, &self._common._common)
@@ -439,7 +408,7 @@ cdef class Factor(object):
         cholmod_factorize_p(&c_A, c_beta, NULL, 0,
                             self._factor, &self._common._common)
         if self._common._common.status == CHOLMOD_NOT_POSDEF:
-            raise CholmodError, "Matrix is not positive definite"
+            raise CholmodError("Matrix is not positive definite")
 
     def _clone(self):
         cdef cholmod_factor * c_clone = cholmod_copy_factor(self._factor,
@@ -496,9 +465,8 @@ cdef class Factor(object):
         try:
             cholmod_updown(not subtract, C_perm, self._factor,
                            &self._common._common)
-        except:
+        finally:
             cholmod_free_sparse(&C_perm, &self._common._common)
-            raise
 
     # Everything below here will fail for matrices that were only analyzed,
     # not factorized.
@@ -511,15 +479,15 @@ cdef class Factor(object):
 
         (or similar for AA')."""
         if self._factor.Perm is NULL:
-            raise CholmodError, "you must analyze a matrix first"
+            raise CholmodError("you must analyze a matrix first")
         assert self._factor.itype == CHOLMOD_INT
         py.Py_INCREF(_integer_py_dtype)
         cdef np.npy_intp n = self._factor.n
-        return set_base(PyArray_NewFromDescr(&PyArray_Type,
-                                             _integer_py_dtype, 1, &n,
-                                             NULL, self._factor.Perm,
-                                             0, None),
-                        self)
+        cdef np.ndarray out = PyArray_NewFromDescr(
+            &PyArray_Type, _integer_py_dtype, 1, &n,
+            NULL, self._factor.Perm, 0, None)
+        np.set_array_base(out, self)
+        return out
 
     def _ensure_L_or_LD_inplace(self, want_L):
         # In CHOLMOD, supernodal factorizations are always LL'. If we request
@@ -565,8 +533,8 @@ cdef class Factor(object):
         """
 
         if self._factor.xtype == CHOLMOD_PATTERN:
-            raise CholmodError, ("cannot extract diagonal from a symbolic "
-                                 "factor; call a cholesky*() method first.")
+            raise CholmodError("cannot extract diagonal from a symbolic "
+                               "factor; call a cholesky*() method first.")
         cdef np.npy_intp x_len
         if self._factor.is_super:
             x_len = self._factor.xsize
@@ -574,10 +542,8 @@ cdef class Factor(object):
             x_len = self._factor.nzmax
         dtype = _np_dtype_for(self._factor.xtype)
         py.Py_INCREF(dtype)
-        x = PyArray_NewFromDescr(&PyArray_Type,
-                                 dtype, 1, &x_len,
-                                 NULL, self._factor.x,
-                                 0, None)
+        x = PyArray_NewFromDescr(&PyArray_Type, dtype, 1, &x_len,
+                                 NULL, self._factor.x, 0, None)
         cdef size_t i
         cdef np.npy_intp n
         cdef int * super_ = <int *> self._factor.super_
@@ -609,10 +575,8 @@ cdef class Factor(object):
             # sentinel), so we just create a view onto those:
             n = self._factor.n
             py.Py_INCREF(_integer_py_dtype)
-            p = PyArray_NewFromDescr(&PyArray_Type,
-                                     _integer_py_dtype, 1, &n,
-                                     NULL, self._factor.p,
-                                     0, None)
+            p = PyArray_NewFromDescr(&PyArray_Type, _integer_py_dtype, 1, &n,
+                                     NULL, self._factor.p, 0, None)
             d = x[p]
         if self._factor.is_ll:
             return d ** 2
@@ -866,11 +830,11 @@ def _analyze(A, symmetric, mode):
     if mode in _modes:
         common._common.supernodal = _modes[mode]
     else:
-        raise CholmodError, ("Unknown mode '%s', must be one of %s"
-                             % (mode, ", ".join(_modes.keys())))
+        raise CholmodError("Unknown mode '%s', must be one of %s" %
+                           (mode, ", ".join(_modes.keys())))
     cdef cholmod_factor *c_f = cholmod_analyze(&c_A, &common._common)
     if c_f is NULL:
-        raise CholmodError, "Error in cholmod_analyze"
+        raise CholmodError("Error in cholmod_analyze")
     cdef Factor f = Factor(factor_secret_handshake)
     f._common = common
     f._factor = c_f
