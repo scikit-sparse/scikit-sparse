@@ -21,7 +21,7 @@ MAINTAINER          = 'Antony Lee',
 MAINTAINER_EMAIL    = 'anntzer.lee@gmail.com',
 URL                 = 'https://github.com/scikit-sparse/scikit-sparse/'
 LICENSE             = 'GPL'
-DOWNLOAD_URL        = "https://github.com/scikit-sparse/scikit-sparse/downloads"
+DOWNLOAD_URL        = 'https://github.com/scikit-sparse/scikit-sparse/downloads'
 VERSION             = '0.3'
 
 from setuptools import setup, find_packages, Extension

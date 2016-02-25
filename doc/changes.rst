@@ -4,12 +4,12 @@ Changes
 .. module:: sksparse.cholmod
 
 v0.3
--------
+----
   * Dropped deprecated :meth:`Factor.solve_P` and :meth:`Factor.solve_P`.
   * Fixed a memory leak upon garbage collection of :class:`Factor`.
 
 v0.2
--------
+----
   * :class:`Factor` solve methods now return 1d output for 1d input
     (just like ``np.dot`` does).
   * :meth:`Factor.solve_P` and :meth:`Factor.solve_P` deprecated; use
@@ -24,5 +24,5 @@ v0.2
   * Wrapper code re-licensed under BSD terms.
 
 v0.1
-------
+----
   First public release.

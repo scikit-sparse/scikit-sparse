@@ -5,6 +5,7 @@ scikits/sparse/cholmod.c
 .coverage
 htmlcov/
 .tox
+.cache
 
 # Cribbed from numpy's .gitignore:
 
