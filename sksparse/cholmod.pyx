@@ -42,6 +42,9 @@ from scipy import sparse
 
 np.import_array()
 
+cdef extern from "numpy/arrayobject.h":
+    void PyArray_ENABLEFLAGS(np.ndarray arr, int flags)
+
 cdef extern from "cholmod.h":
     cdef enum:
         CHOLMOD_INT
@@ -206,12 +209,15 @@ cdef _py_sparse(cholmod_sparse * m, Common common):
 
     cdef np.ndarray indptr = np.PyArray_SimpleNewFromData(
         1, [m.ncol + 1], _integer_typenum, m.p)
+    PyArray_ENABLEFLAGS(indptr, np.NPY_WRITEABLE)
     np.set_array_base(indptr, cleaner)
     cdef np.ndarray indices = np.PyArray_SimpleNewFromData(
         1, [m.nzmax], _integer_typenum, m.i)
+    PyArray_ENABLEFLAGS(indices, np.NPY_WRITEABLE)
     np.set_array_base(indices, cleaner)
     cdef np.ndarray data = np.PyArray_SimpleNewFromData(
         1, [m.nzmax], _np_typenum_for(m.xtype), m.x)
+    PyArray_ENABLEFLAGS(data, np.NPY_WRITEABLE)
     np.set_array_base(data, cleaner)
 
     return sparse.csc_matrix((data, indices, indptr), shape=(m.nrow, m.ncol))
@@ -236,6 +242,7 @@ cdef _py_dense(cholmod_dense * m, Common common):
 
     cdef np.ndarray out = np.PyArray_SimpleNewFromData(
         1, [m.ncol * m.nrow], _np_typenum_for(m.xtype), m.x).reshape((m.ncol, m.nrow)).T
+    PyArray_ENABLEFLAGS(out, np.NPY_WRITEABLE)
     np.set_array_base(out, cleaner)
 
     return out

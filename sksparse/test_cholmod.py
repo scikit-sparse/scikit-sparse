@@ -57,12 +57,12 @@ def test_integer_size():
     assert m.indptr.dtype.itemsize == 4
 
 def test_cholesky_smoke_test():
-    f = cholesky(sparse.eye(10, 10) * 1.)
+    f = cholesky(sparse.eye(10, 10))
     d = np.arange(20).reshape(10, 2)
     print("dense")
     assert_allclose(f(d), d)
     print("sparse")
-    s_csc = sparse.csc_matrix(np.eye(10)[:, :2] * 1.)
+    s_csc = sparse.csc_matrix(np.eye(10)[:, :2])
     assert sparse.issparse(f(s_csc))
     assert_allclose(f(s_csc).todense(), s_csc.todense())
     print("csr")
@@ -71,6 +71,10 @@ def test_cholesky_smoke_test():
     assert_allclose(f(s_csr).todense(), s_csr.todense())
     print("extract")
     assert np.all(f.P() == np.arange(10))
+
+def test_writeability():
+    t = cholesky(sparse.eye(10, 10))(np.arange(10))
+    assert t.flags["WRITEABLE"]
 
 def real_matrix():
     return sparse.csc_matrix([[10, 0, 3, 0],

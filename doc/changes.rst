@@ -3,6 +3,11 @@ Changes
 
 .. module:: sksparse.cholmod
 
+v0.3.1
+------
+  * Ensure that arrays returned by the :meth:`Factor.solve_...` methods are
+    writeable.
+
 v0.3
 ----
   * Dropped deprecated :meth:`Factor.solve_P` and :meth:`Factor.solve_P`.
