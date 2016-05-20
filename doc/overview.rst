@@ -40,7 +40,7 @@ Requirements
 
 Installing :mod:`scikit-sparse` requires:
 
-* `Python <http://python.org/>`_
+* `Python <http://python.org/>`_ (2.7 or 3.1+)
 * `NumPy <http://numpy.scipy.org/>`_
 * `SciPy <http://www.scipy.org/>`_
 * `Cython <http://www.cython.org/>`_
@@ -52,6 +52,11 @@ On Debian/Ubuntu systems, the following command should suffice::
 
 On Arch Linux, the `python-scikit-sparse` AUR package declares the
 required dependencies.
+
+Using Anaconda, `suitesparse` can currently be installed through the
+`menpo` channel::
+
+  conda install -c menpo suitesparse
 
 Installation
 ------------
