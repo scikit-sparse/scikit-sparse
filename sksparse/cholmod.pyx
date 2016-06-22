@@ -426,7 +426,7 @@ cdef class Factor:
         clone.cholesky_AAt_inplace(A, beta=beta)
         return clone
 
-    def update_inplace(self, C, int subtract=False):
+    def update_inplace(self, C, bint subtract=False):
         """Incremental building of :math:`AA'` decompositions.
 
         Updates this factor so that instead of representing the decomposition

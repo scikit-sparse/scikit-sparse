@@ -33,7 +33,7 @@ at
 Or the latest *development version* may be found in our `Git
 repository <https://github.com/scikit-sparse/scikit-sparse>`_::
 
-  git clone git://github.com/scikit-sparse/scikit-sparse.git
+  $ git clone git://github.com/scikit-sparse/scikit-sparse.git
 
 Requirements
 ------------
@@ -41,6 +41,7 @@ Requirements
 Installing :mod:`scikit-sparse` requires:
 
 * `Python <http://python.org/>`_
+  (2.7 or 3.5 -- older versions may work but are untested)
 * `NumPy <http://numpy.scipy.org/>`_
 * `SciPy <http://www.scipy.org/>`_
 * `Cython <http://www.cython.org/>`_
@@ -48,17 +49,18 @@ Installing :mod:`scikit-sparse` requires:
 
 On Debian/Ubuntu systems, the following command should suffice::
 
-  apt-get install python-scipy libsuitesparse-dev
+  $ sudo apt-get install python-scipy libsuitesparse-dev
 
-On Arch Linux, the `python-scikit-sparse` AUR package declares the
-required dependencies.
+On Arch Linux, run::
+
+  $ sudo pacman -S suitesparse
 
 Installation
 ------------
 
 As usual, ::
 
-  pip install --user scikit-sparse
+  $ pip install --user scikit-sparse
 
 Contact
 -------

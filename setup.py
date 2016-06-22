@@ -21,7 +21,6 @@ MAINTAINER          = 'Antony Lee',
 MAINTAINER_EMAIL    = 'anntzer.lee@gmail.com',
 URL                 = 'https://github.com/scikit-sparse/scikit-sparse/'
 LICENSE             = 'GPL'
-DOWNLOAD_URL        = 'https://github.com/scikit-sparse/scikit-sparse/downloads'
 VERSION             = '0.3'
 
 from setuptools import setup, find_packages, Extension
@@ -34,11 +33,7 @@ if __name__ == "__main__":
           package_data = {
               "": ["test_data/*.mtx.gz"],
               },
-          test_suite="nose.collector",
-          # Well, technically zipping the package will work, but since it's
-          # all compiled code it'll just get unzipped again at runtime, which
-          # is pointless:
-          zip_safe = False,
+          test_suite = "nose.collector",
           name = DISTNAME,
           version = VERSION,
           maintainer = MAINTAINER,
@@ -46,7 +41,6 @@ if __name__ == "__main__":
           description = DESCRIPTION,
           license = LICENSE,
           url = URL,
-          download_url = DOWNLOAD_URL,
           long_description = LONG_DESCRIPTION,
           classifiers =
             [ 'Development Status :: 3 - Alpha',
