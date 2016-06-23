@@ -430,9 +430,10 @@ cdef class Factor:
         """Incremental building of :math:`AA'` decompositions.
 
         Updates this factor so that instead of representing the decomposition
-        of :math:`AA'`, it instead represents the decomposition of :math:`AA'
-        + CC'` (for ``subtract=False``, the default), or :math:`AA' - CC'` (for
-        ``subtract=True``). This method does not require that the
+        of :math:`A` (:math:`AA'`), it computes the decomposition of
+        :math:`A + CC'` (:math:`AA' + CC'`) for ``subtract=False`` which is the
+        default, or :math:`A - CC'` (:math:`AA' - CC'`) for
+        ``subtract=True``. This method does not require that the
         :class:`Factor` was created with :func:`cholesky_AAt`, though that
         is the common case.
 
