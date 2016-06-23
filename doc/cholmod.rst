@@ -29,8 +29,10 @@ including:
   then re-use it to efficiently decompose many matrices with the same
   pattern of non-zero entries.
 * In-place 'update' and 'downdate' operations, for computing the
-  Cholesky decomposition of a product :math:`AA'` when the columns of
-  :math:`A` become available incrementally (e.g., due to memory
+  Cholesky decomposition of a rank-k update of :math:`A` and of
+  product :math:`AA'`. So, the result is the Cholesky decomposition of
+  :math:`A + CC'` (or :math:`AA' + CC'`). The last case is useful when the
+  columns of `A` become available incrementally (e.g., due to memory
   constraints), or when many matrices with similar but non-identical
   columns must be factored.
 * Convenience functions for computing the (log) determinant of the
