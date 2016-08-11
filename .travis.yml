@@ -1,0 +1,10 @@
+language: python
+python: ["2.7", "3.5"]
+addons:
+    apt:
+        packages:
+            - libsuitesparse-dev
+install:
+    - pip install cython scipy
+    - python setup.py build_ext --inplace
+script: py.test
