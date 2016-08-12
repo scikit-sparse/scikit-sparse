@@ -11,7 +11,6 @@
 # 2016        Alex Grigorievskiy      <alex.grigorievskiy@gmail.com>
 # 2016        Joscha Reimer           <jor@informatik.uni-kiel.de>
 
-
 """Sparse matrix tools.
 
 This is a home for sparse matrix code in Python that plays well with
@@ -30,8 +29,10 @@ MAINTAINER_EMAIL    = 'anntzer.lee@gmail.com',
 URL                 = 'https://github.com/scikit-sparse/scikit-sparse/'
 LICENSE             = 'GPL'
 
-from setuptools import setup, find_packages, Extension
+import sys
+
 import numpy as np
+from setuptools import setup, find_packages, Extension
 import versioneer
 
 if __name__ == "__main__":
@@ -62,8 +63,13 @@ if __name__ == "__main__":
           setup_requires = ['setuptools>=18.0', 'numpy', 'cython'],
           # You may specify the directory where CHOLMOD is installed using the
           # library_dirs and include_dirs keywords in the lines below.
-          ext_modules = [Extension("sksparse.cholmod", ["sksparse/cholmod.pyx"],
-              include_dirs=[np.get_include(), '/usr/include/suitesparse'],
-              library_dirs=[],
-              libraries=['cholmod'])],
+          ext_modules = [
+              Extension("sksparse.cholmod", ["sksparse/cholmod.pyx"],
+                        include_dirs=[np.get_include(),
+                                      sys.prefix + "/include",
+                                      # Debian's suitesparse-dev installs to
+                                      # /usr/include/suitesparse
+                                      "/usr/include/suitesparse"],
+                        library_dirs=[],
+                        libraries=['cholmod'])],
           )
