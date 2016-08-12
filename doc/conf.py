@@ -59,9 +59,9 @@ author = 'Antony Lee'
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
-from setup import VERSION
+import sksparse
 # The short X.Y version.
-version = VERSION
+version = sksparse.__version__
 # The full version, including alpha/beta/rc tags.
 release = version
 
@@ -119,7 +119,10 @@ html_theme = 'alabaster'
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
-#html_theme_options = {}
+html_theme_options = {
+    "github_user": "scikit-sparse",
+    "github_repo": "scikit-sparse",
+    "github_banner": True}
 
 # Add any paths that contain custom themes here, relative to this directory.
 #html_theme_path = []

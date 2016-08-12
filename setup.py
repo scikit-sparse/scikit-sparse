@@ -21,11 +21,11 @@ MAINTAINER          = 'Antony Lee',
 MAINTAINER_EMAIL    = 'anntzer.lee@gmail.com',
 URL                 = 'https://github.com/scikit-sparse/scikit-sparse/'
 LICENSE             = 'GPL'
-VERSION             = '0.3'
 
 from setuptools import setup, find_packages, Extension
 from Cython.Build import cythonize
 import numpy as np
+import versioneer
 
 if __name__ == "__main__":
     setup(install_requires = ['numpy', 'scipy'],
@@ -35,7 +35,8 @@ if __name__ == "__main__":
               },
           test_suite = "nose.collector",
           name = DISTNAME,
-          version = VERSION,
+          version = versioneer.get_version(),
+          cmdclass = versioneer.get_cmdclass(),
           maintainer = MAINTAINER,
           maintainer_email = MAINTAINER_EMAIL,
           description = DESCRIPTION,

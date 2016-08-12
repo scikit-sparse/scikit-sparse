@@ -1,27 +1,25 @@
+![Python27](https://img.shields.io/badge/python-2.7-blue.svg)
+![Python35](https://img.shields.io/badge/python-3.5-blue.svg)
+[![Documentation Status](https://readthedocs.org/projects/scikit-sparse/badge/?version=latest)](http://scikit-sparse.readthedocs.io/en/latest/?badge=latest)
+[![Travis](https://travis-ci.org/scikit-sparse/scikit-sparse.svg?branch=master)](https://travis-ci.org/scikit-sparse/scikit-sparse)
+
 This is scikit-sparse, a companion to the scipy.sparse library for
 sparse matrix manipulation in Python. It provides routines that are
 not suitable for inclusion in scipy.sparse proper, usually because
 they are GPL'ed.
 
-NOTE:
-  This library is solid and works well, but no longer actively
-  developed. Please let us know if you wish to take over development.
+NOTE:  This library is solid and works well, but no longer actively
+developed. Please let us know if you wish to take over development.
 
 So far it just contains a wrapper for the CHOLMOD library for sparse
-cholesky decomposition. Further contributions are welcome!
-
-Manual:
-  http://pythonhosted.org/scikit-sparse/
-Homepage:
-  https://github.com/scikit-sparse/scikit-sparse
-Bug tracker:
-  https://github.com/scikit-sparse/scikit-sparse/issues
+Cholesky decomposition. Further contributions are welcome!
 
 For more details, including dependencies and installation
-instructions, see doc/overview.rst.
+instructions, see the [docs](http://scikit-sparse.readthedocs.org).
 
 License
 -------
+
 The wrapper code contained in this package is released under a
 2-clause BSD license, as per below. However, this applies only to the
 original code contained in this package, and NOT to the libraries
