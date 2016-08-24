@@ -52,6 +52,7 @@ cdef extern from "cholmod.h":
         CHOLMOD_DOUBLE
         CHOLMOD_AUTO, CHOLMOD_SIMPLICIAL, CHOLMOD_SUPERNODAL
         CHOLMOD_OK, CHOLMOD_NOT_POSDEF
+        CHOLMOD_NOT_INSTALLED, CHOLMOD_OUT_OF_MEMORY, CHOLMOD_TOO_LARGE, CHOLMOD_INVALID, CHOLMOD_GPU_PROBLEM
         CHOLMOD_A, CHOLMOD_LDLt, CHOLMOD_LD, CHOLMOD_DLt, CHOLMOD_L
         CHOLMOD_Lt, CHOLMOD_D, CHOLMOD_P, CHOLMOD_Pt
         CHOLMOD_NATURAL, CHOLMOD_GIVEN, CHOLMOD_AMD, CHOLMOD_METIS, CHOLMOD_NESDIS, CHOLMOD_COLAMD, CHOLMOD_POSTORDERED
@@ -101,6 +102,7 @@ cdef extern from "cholmod.h":
 
     ctypedef struct cholmod_factor:
         size_t n
+        size_t minor
         void * Perm
         int itype
         int xtype
@@ -144,6 +146,37 @@ cdef class Factor
 
 class CholmodError(Exception):
     pass
+
+class CholmodNotPositiveDefiniteError(CholmodError):
+    def __init__(self, message, column=None, factor=None):
+        super().__init__(message)
+        self.column = column
+        self.factor = factor
+
+class CholmodNotInstalledError(CholmodError):
+    def __init__(self, message=""):
+        message = "method not installed: {}".format(message)
+        super().__init__(message)
+
+class CholmoOutOfMemoryError(CholmodError):
+    def __init__(self, message=""):
+        message = "out of memory: {}".format(message)
+        super().__init__(message)
+
+class CholmodTooLargeError(CholmodError):
+    def __init__(self, message=""):
+        message = "integer overflow occured: {}".format(message)
+        super().__init__(message)
+
+class CholmodInvalidError(CholmodError):
+    def __init__(self, message=""):
+        message = "invalid input: {}".format(message)
+        super().__init__(message)
+
+class CholmodGpuProblemError(CholmodError):
+    def __init__(self, message=""):
+        message = "GPU fatal error: {}".format(message)
+        super().__init__(message)
 
 class CholmodWarning(UserWarning):
     pass
@@ -262,6 +295,16 @@ cdef void _error_handler(
     if status > 0:
         # Warning:
         warnings.warn(full_msg, CholmodWarning)
+    elif status == CHOLMOD_NOT_INSTALLED:
+        raise CholmodNotInstalledError(full_msg)
+    elif status == CHOLMOD_OUT_OF_MEMORY:
+        raise CholmoOutOfMemoryError(full_msg)
+    elif status == CHOLMOD_TOO_LARGE:
+        raise CholmodTooLargeError(full_msg)
+    elif status == CHOLMOD_INVALID:
+        raise CholmodInvalidError(full_msg)
+    elif status == CHOLMOD_GPU_PROBLEM:
+        raise CholmodGpuProblemError(full_msg)
     else:
         raise CholmodError(full_msg)
 
@@ -404,7 +447,8 @@ cdef class Factor:
         cholmod_factorize_p(&c_A, [beta, 0], NULL, 0,
                             self._factor, &self._common._common)
         if self._common._common.status == CHOLMOD_NOT_POSDEF:
-            raise CholmodError("Matrix is not positive definite")
+            raise CholmodNotPositiveDefiniteError("Matrix is not positive definite", self._factor.minor, self)
+
 
     def _clone(self):
         cdef cholmod_factor * c_clone = cholmod_copy_factor(self._factor,
