@@ -114,10 +114,11 @@ def test_beta():
     for matrix in [real_matrix(), complex_matrix()]:
         for beta in [0, 1, 3.4]:
             matrix_plus_beta = matrix + beta * sparse.eye(*matrix.shape)
-            for mode in ["auto", "supernodal", "simplicial"]:
-                L = cholesky(matrix, beta=beta).L()
-                assert factor_of(cholesky(matrix, beta=beta),
-                                 matrix_plus_beta)
+            for ordering_method in ("natural", "amd", "metis", "nesdis", "colamd", "default", "best"):
+                for mode in ["auto", "supernodal", "simplicial"]:
+                    f = cholesky(matrix, beta=beta, mode=mode, ordering_method=ordering_method)
+                    L = f.L()
+                    assert factor_of(f, matrix_plus_beta)
 
 def test_update_downdate():
     m = real_matrix()
@@ -245,12 +246,13 @@ def test_convenience():
                              [0, 5, 0, -2],
                              [3, 0, 5, 0],
                              [0, -2, 0, 2]])
-    for mode in ("simplicial", "supernodal"):
-        for dtype in (float, complex):
-            A_dense = np.array(A_dense_seed, dtype=dtype)
-            A_sp = sparse.csc_matrix(A_dense)
-            f = cholesky(A_sp, mode=mode)
-            assert_allclose(f.det(), np.linalg.det(A_dense))
-            assert_allclose(f.logdet(), np.log(np.linalg.det(A_dense)))
-            assert_allclose(f.slogdet(), [1, np.log(np.linalg.det(A_dense))])
-            assert_allclose((f.inv() * A_sp).todense(), np.eye(4))
+    for ordering_method in ("natural", "amd", "metis", "nesdis", "colamd", "default", "best"):
+        for mode in ("simplicial", "supernodal"):
+            for dtype in (float, complex):
+                A_dense = np.array(A_dense_seed, dtype=dtype)
+                A_sp = sparse.csc_matrix(A_dense)
+                f = cholesky(A_sp, mode=mode, ordering_method=ordering_method)
+                assert_allclose(f.det(), np.linalg.det(A_dense))
+                assert_allclose(f.logdet(), np.log(np.linalg.det(A_dense)))
+                assert_allclose(f.slogdet(), [1, np.log(np.linalg.det(A_dense))])
+                assert_allclose((f.inv() * A_sp).todense(), np.eye(4))

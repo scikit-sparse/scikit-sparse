@@ -54,11 +54,18 @@ cdef extern from "cholmod.h":
         CHOLMOD_OK, CHOLMOD_NOT_POSDEF
         CHOLMOD_A, CHOLMOD_LDLt, CHOLMOD_LD, CHOLMOD_DLt, CHOLMOD_L
         CHOLMOD_Lt, CHOLMOD_D, CHOLMOD_P, CHOLMOD_Pt
+        CHOLMOD_NATURAL, CHOLMOD_GIVEN, CHOLMOD_AMD, CHOLMOD_METIS, CHOLMOD_NESDIS, CHOLMOD_COLAMD, CHOLMOD_POSTORDERED
+
+    ctypedef struct cholmod_method_struct:
+        int ordering
 
     ctypedef struct cholmod_common:
         int supernodal
         int status
+        int nmethods
+        int postorder
         int print
+        cholmod_method_struct * method
         void (*error_handler)(int status, const char * file, int line, const char * msg)
 
     int cholmod_start(cholmod_common *) except? 0
@@ -760,7 +767,7 @@ cdef class Factor:
                                dtype=_np_dtype_for(self._factor.xtype),
                                format="csc"))
 
-def analyze(A, mode="auto"):
+def analyze(A, mode="auto", ordering_method="default"):
     """Computes the optimal fill-reducing permutation for the symmetric matrix
     A, but does *not* factor it (i.e., it performs a "symbolic Cholesky
     decomposition"). This function ignores the actual contents of the matrix
@@ -769,19 +776,24 @@ def analyze(A, mode="auto"):
 
     :param A: The matrix to be analyzed.
 
-    :param auto: Specifies which algorithm should be used to (eventually)
+    :param mode: Specifies which algorithm should be used to (eventually)
       compute the Cholesky decomposition -- one of "simplicial", "supernodal",
       or "auto". See the CHOLMOD documentation for details on how "auto" chooses
       the algorithm to be used.
+
+    :param ordering_method: Specifies which ordering algorithm should be used to
+      (eventually) order the matrix A -- one of "natural", "amd", "metis", 
+      "nesdis", "colamd", "default" and "best". See the CHOLMOD documentation 
+      for details.
 
     :returns: A :class:`Factor` object representing the analysis. Many
       operations on this object will fail, because it does not yet hold a full
       decomposition. Use :meth:`Factor.cholesky_inplace` (or similar) to
       actually factor a matrix.
     """
-    return _analyze(A, True, mode=mode)
+    return _analyze(A, True, mode=mode, ordering_method=ordering_method)
 
-def analyze_AAt(A, mode="auto"):
+def analyze_AAt(A, mode="auto", ordering_method="default"):
     """Computes the optimal fill-reducing permutation for the symmetric matrix
     :math:`AA'`, but does *not* factor it (i.e., it performs a "symbolic
     Cholesky decomposition"). This function ignores the actual contents of the
@@ -790,24 +802,38 @@ def analyze_AAt(A, mode="auto"):
 
     :param A: The matrix to be analyzed.
 
-    :param auto: Specifies which algorithm should be used to (eventually)
+    :param mode: Specifies which algorithm should be used to (eventually)
       compute the Cholesky decomposition -- one of "simplicial", "supernodal",
       or "auto". See the CHOLMOD documentation for details on how "auto" chooses
       the algorithm to be used.
+
+    :param ordering_method: Specifies which ordering algorithm should be used to
+      (eventually) order the matrix A -- one of "natural", "amd", "metis", 
+      "nesdis", "colamd", "default" and "best". See the CHOLMOD documentation 
+      for details.
 
     :returns: A :class:`Factor` object representing the analysis. Many
       operations on this object will fail, because it does not yet hold a full
       decomposition. Use :meth:`Factor.cholesky_AAt_inplace` (or similar) to
       actually factor a matrix.
     """
-    return _analyze(A, False, mode=mode)
+    return _analyze(A, False, mode=mode, ordering_method=ordering_method)
 
 _modes = {
     "simplicial": CHOLMOD_SIMPLICIAL,
     "supernodal": CHOLMOD_SUPERNODAL,
     "auto": CHOLMOD_AUTO,
     }
-def _analyze(A, symmetric, mode):
+_ordering_methods = {
+    "natural": CHOLMOD_NATURAL,
+    "amd": CHOLMOD_AMD,
+    "metis": CHOLMOD_METIS,
+    "nesdis": CHOLMOD_NESDIS,
+    "colamd": CHOLMOD_COLAMD,
+    "default": None,
+    "best": None,
+}
+def _analyze(A, symmetric, mode, ordering_method="default"):
     cdef Common common = Common(issubclass(A.dtype.type, np.complexfloating))
     cdef cholmod_sparse c_A
     cdef object ref = common._init_view_sparse(&c_A, A, symmetric)
@@ -819,12 +845,27 @@ def _analyze(A, symmetric, mode):
     cdef cholmod_factor *c_f = cholmod_analyze(&c_A, &common._common)
     if c_f is NULL:
         raise CholmodError("Error in cholmod_analyze")
+
+    if ordering_method in _ordering_methods:
+        if ordering_method == "default":
+            common._common.nmethods = 0
+        elif ordering_method == "best":
+            common._common.nmethods = 9
+        else:
+            common._common.nmethods = 1
+            common._common.method [0].ordering = _ordering_methods[ordering_method]
+            if ordering_method == "natural": 
+                common._common.postorder = False
+    elif ordering_method is not None:
+        raise CholmodError, ("Unknown ordering method '%s', must be one of %s"
+                            % (ordering_method, ", ".join(_ordering_methods.keys())))
+
     cdef Factor f = Factor(factor_secret_handshake)
     f._common = common
     f._factor = c_f
     return f
 
-def cholesky(A, beta=0, mode="auto"):
+def cholesky(A, beta=0, mode="auto", ordering_method="default"):
     """Computes the fill-reducing Cholesky decomposition of
 
       .. math:: A + \\beta I
@@ -837,11 +878,13 @@ def cholesky(A, beta=0, mode="auto"):
 
     ``mode`` is passed to :func:`analyze`.
 
+    ``ordering_method`` is passed to :func:`analyze`.
+
     :returns: A :class:`Factor` object represented the decomposition.
     """
-    return _cholesky(A, True, beta=beta, mode=mode)
+    return _cholesky(A, True, beta=beta, mode=mode, ordering_method=ordering_method)
 
-def cholesky_AAt(A, beta=0, mode="auto"):
+def cholesky_AAt(A, beta=0, mode="auto", ordering_method="default"):
     """Computes the fill-reducing Cholesky decomposition of
 
       .. math:: AA' + \\beta I
@@ -857,12 +900,14 @@ def cholesky_AAt(A, beta=0, mode="auto"):
 
     ``mode`` is passed to :func:`analyze_AAt`.
 
+    ``ordering_method`` is passed to :func:`analyze_AAt`.
+
     :returns: A :class:`Factor` object represented the decomposition.
     """
-    return _cholesky(A, False, beta=beta, mode=mode)
+    return _cholesky(A, False, beta=beta, mode=mode, ordering_method=ordering_method)
 
-def _cholesky(A, symmetric, beta, mode):
-    f = _analyze(A, symmetric, mode=mode)
+def _cholesky(A, symmetric, beta, mode, ordering_method="default"):
+    f = _analyze(A, symmetric, mode=mode, ordering_method=ordering_method)
     f._cholesky_inplace(A, symmetric, beta=beta)
     return f
 
