@@ -45,11 +45,6 @@ np.import_array()
 cdef extern from "numpy/arrayobject.h":
     void PyArray_ENABLEFLAGS(np.ndarray arr, int flags)
 
-# CHOLMOD_GPU_PROBLEM is only defined since version 2.0 of cholmod,
-# so we need to define it here for backward compatibility
-# cdef enum:
-#     CHOLMOD_GPU_PROBLEM = 1
-
 cdef extern from "cholmod_backward_compatible.h":
     cdef enum:
         CHOLMOD_INT
