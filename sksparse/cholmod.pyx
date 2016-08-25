@@ -45,9 +45,11 @@ np.import_array()
 cdef extern from "numpy/arrayobject.h":
     void PyArray_ENABLEFLAGS(np.ndarray arr, int flags)
 
+# CHOLMOD_GPU_PROBLEM is only defined since version 2.0 of cholmod,
+# so we need to define it here for backward compatibility
+CHOLMOD_GPU_PROBLEM = np.nan
+
 cdef extern from "cholmod.h":
-    cdef int CHOLMOD_MAIN_VERSION
-    
     cdef enum:
         CHOLMOD_INT
         CHOLMOD_PATTERN, CHOLMOD_REAL, CHOLMOD_COMPLEX
@@ -142,12 +144,6 @@ cdef extern from "cholmod.h":
                               cholmod_factor *, cholmod_common *) except? 0
     cholmod_sparse * cholmod_factor_to_sparse(cholmod_factor *,
                                               cholmod_common *) except? NULL
-
-# CHOLMOD_GPU_PROBLEM is only defined since version 2.0 of cholmod
-if CHOLMOD_MAIN_VERSION >= 2:
-    CHOLMOD_GPU_PROBLEM_ = CHOLMOD_GPU_PROBLEM
-else:
-    CHOLMOD_GPU_PROBLEM_ = np.nan
 
 cdef class Common
 cdef class Factor
@@ -311,7 +307,7 @@ cdef void _error_handler(
         raise CholmodTooLargeError(full_msg)
     elif status == CHOLMOD_INVALID:
         raise CholmodInvalidError(full_msg)
-    elif status == CHOLMOD_GPU_PROBLEM_:
+    elif status == CHOLMOD_GPU_PROBLEM:
         raise CholmodGpuProblemError(full_msg)
     else:
         raise CholmodError(full_msg)
