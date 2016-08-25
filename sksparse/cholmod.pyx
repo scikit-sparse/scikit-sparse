@@ -47,9 +47,10 @@ cdef extern from "numpy/arrayobject.h":
 
 # CHOLMOD_GPU_PROBLEM is only defined since version 2.0 of cholmod,
 # so we need to define it here for backward compatibility
-CHOLMOD_GPU_PROBLEM = np.nan
+# cdef enum:
+#     CHOLMOD_GPU_PROBLEM = 1
 
-cdef extern from "cholmod.h":
+cdef extern from "cholmod_backward_compatible.h":
     cdef enum:
         CHOLMOD_INT
         CHOLMOD_PATTERN, CHOLMOD_REAL, CHOLMOD_COMPLEX
