@@ -23,7 +23,6 @@ URL                 = 'https://github.com/scikit-sparse/scikit-sparse/'
 LICENSE             = 'GPL'
 
 from setuptools import setup, find_packages, Extension
-from Cython.Build import cythonize
 import numpy as np
 import versioneer
 
@@ -50,9 +49,11 @@ if __name__ == "__main__":
               'Intended Audience :: Science/Research',
               'License :: OSI Approved :: GNU General Public License (GPL)',
               'Topic :: Scientific/Engineering'],
+          setup_requires=['setuptools>=18.0', 'numpy', 'cython'],
           # You may specify the directory where CHOLMOD is installed using the
-          # include_path and library_dirs distutils directives at the top of
-          # cholmod.pyx.
-          ext_modules = cythonize(
-              "sksparse/cholmod.pyx",
-              aliases={"NP_GET_INCLUDE": np.get_include()}))
+          # library_dirs and include_dirs keywords in the lines below.
+          ext_modules = [Extension("sksparse.cholmod", ["sksparse/cholmod.pyx"],
+              include_dirs=[np.get_include(), '/usr/include/suitesparse'],
+              library_dirs=[],
+              libraries=['cholmod'])],
+          )
