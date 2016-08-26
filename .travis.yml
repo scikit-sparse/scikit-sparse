@@ -5,6 +5,6 @@ addons:
         packages:
             - libsuitesparse-dev
 install:
-    - pip install cython scipy
+    - pip install 'setuptools>=18' 'scipy'
     - python setup.py build_ext --inplace
 script: py.test

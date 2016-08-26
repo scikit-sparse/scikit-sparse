@@ -1,7 +1,6 @@
 name: py35
 dependencies:
     - python=3.5.2
-    - cython=0.24.1
     - scipy=0.18.0
     - pip:
         - sphinx==1.4.5

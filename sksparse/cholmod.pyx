@@ -31,8 +31,6 @@
 
 #cython: binding = True
 #cython: language_level = 3
-#distutils: include_dirs = NP_GET_INCLUDE /usr/include/suitesparse
-#distutils: libraries = cholmod
 
 cimport numpy as np
 
