@@ -158,7 +158,7 @@ class CholmodNotInstalledError(CholmodError):
         message = "method not installed: {}".format(message)
         super().__init__(message)
 
-class CholmoOutOfMemoryError(CholmodError):
+class CholmodOutOfMemoryError(CholmodError):
     def __init__(self, message=""):
         message = "out of memory: {}".format(message)
         super().__init__(message)
@@ -298,7 +298,7 @@ cdef void _error_handler(
     elif status == CHOLMOD_NOT_INSTALLED:
         raise CholmodNotInstalledError(full_msg)
     elif status == CHOLMOD_OUT_OF_MEMORY:
-        raise CholmoOutOfMemoryError(full_msg)
+        raise CholmodOutOfMemoryError(full_msg)
     elif status == CHOLMOD_TOO_LARGE:
         raise CholmodTooLargeError(full_msg)
     elif status == CHOLMOD_INVALID:
