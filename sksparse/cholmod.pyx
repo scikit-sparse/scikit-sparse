@@ -292,9 +292,9 @@ cdef void _error_handler(
     if status == CHOLMOD_OK:
         return
     full_msg = "%s:%s: %s (code %s)" % (file, line, msg, status)
-    if status > 0:
-        # Warning:
-        warnings.warn(full_msg, CholmodWarning)
+    ## known errors
+    if status == CHOLMOD_NOT_POSDEF:
+        raise CholmodNotPositiveDefiniteError(full_msg)
     elif status == CHOLMOD_NOT_INSTALLED:
         raise CholmodNotInstalledError(full_msg)
     elif status == CHOLMOD_OUT_OF_MEMORY:
@@ -305,8 +305,11 @@ cdef void _error_handler(
         raise CholmodInvalidError(full_msg)
     elif status == CHOLMOD_GPU_PROBLEM:
         raise CholmodGpuProblemError(full_msg)
-    else:
+    ## unknown errors or warnings
+    if status < 0:
         raise CholmodError(full_msg)
+    else:
+        warnings.warn(full_msg, CholmodWarning)
 
 cdef class Common:
     cdef cholmod_common _common
