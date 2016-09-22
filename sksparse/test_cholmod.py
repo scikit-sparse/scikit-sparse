@@ -262,6 +262,6 @@ def test_convenience():
 def test_CholmodNotPositiveDefiniteError():
     A = - sparse.eye(4).tocsc()
     f = cholesky(A)
-    assert_raises(CholmodNotPositiveDefiniteError, f1.L)
-    assert_raises(CholmodNotPositiveDefiniteError, f1.LD)
-    assert_raises(CholmodNotPositiveDefiniteError, f1.L_D)
+    assert_raises(CholmodNotPositiveDefiniteError, f.L)
+    assert_raises(CholmodNotPositiveDefiniteError, f.LD)
+    assert_raises(CholmodNotPositiveDefiniteError, f.L_D)
