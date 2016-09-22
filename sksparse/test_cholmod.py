@@ -257,8 +257,6 @@ def test_convenience():
                 assert_allclose(f.slogdet(), [1, np.log(np.linalg.det(A_dense))])
                 assert_allclose((f.inv() * A_sp).todense(), np.eye(4))
 
-
-
 def test_CholmodNotPositiveDefiniteError():
     A = - sparse.eye(4).tocsc()
     f = cholesky(A)
