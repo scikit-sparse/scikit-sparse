@@ -155,27 +155,27 @@ class CholmodNotPositiveDefiniteError(CholmodError):
 
 class CholmodNotInstalledError(CholmodError):
     def __init__(self, message=""):
-        message = "method not installed: {}".format(message)
+        message = "Method not installed: {}.".format(message)
         super().__init__(message)
 
 class CholmodOutOfMemoryError(CholmodError):
     def __init__(self, message=""):
-        message = "out of memory: {}".format(message)
+        message = "Out of memory: {}.".format(message)
         super().__init__(message)
 
 class CholmodTooLargeError(CholmodError):
     def __init__(self, message=""):
-        message = "integer overflow occured: {}".format(message)
+        message = "Integer overflow occured: {}.".format(message)
         super().__init__(message)
 
 class CholmodInvalidError(CholmodError):
     def __init__(self, message=""):
-        message = "invalid input: {}".format(message)
+        message = "Invalid input: {}.".format(message)
         super().__init__(message)
 
 class CholmodGpuProblemError(CholmodError):
     def __init__(self, message=""):
-        message = "GPU fatal error: {}".format(message)
+        message = "GPU fatal error: {}.".format(message)
         super().__init__(message)
 
 class CholmodWarning(UserWarning):
