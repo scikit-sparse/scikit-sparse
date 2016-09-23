@@ -291,7 +291,7 @@ cdef void _error_handler(
         int status, const char * file, int line, const char * msg) except * with gil:
     if status == CHOLMOD_OK:
         return
-    full_msg = "%s:%s: %s (code %s)" % (file, line, msg, status)
+    full_msg = "{}:{:d}: {} (code {:d})".format(file.decode(), line, msg.decode(), status)
     ## known errors
     if status == CHOLMOD_NOT_POSDEF:
         raise CholmodNotPositiveDefiniteError(full_msg)
@@ -305,9 +305,10 @@ cdef void _error_handler(
         raise CholmodInvalidError(full_msg)
     elif status == CHOLMOD_GPU_PROBLEM:
         raise CholmodGpuProblemError(full_msg)
-    ## unknown errors or warnings
+    ## unknown errors
     if status < 0:
         raise CholmodError(full_msg)
+    ## warnings
     else:
         warnings.warn(full_msg, CholmodWarning)
 
