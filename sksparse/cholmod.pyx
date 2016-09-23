@@ -69,10 +69,10 @@ cdef extern from "cholmod_backward_compatible.h":
         cholmod_method_struct * method
         void (*error_handler)(int status, const char * file, int line, const char * msg)
 
-    int cholmod_start(cholmod_common *) except? 0
-    int cholmod_finish(cholmod_common *) except? 0
-    int cholmod_check_common(cholmod_common *) except? 0
-    int cholmod_print_common(char *, cholmod_common *) except? 0
+    int cholmod_start(cholmod_common *) except *
+    int cholmod_finish(cholmod_common *) except *
+    int cholmod_check_common(cholmod_common *) except *
+    int cholmod_print_common(char *, cholmod_common *) except *
 
     ctypedef struct cholmod_sparse:
         size_t nrow, ncol, nzmax
@@ -86,9 +86,9 @@ cdef extern from "cholmod_backward_compatible.h":
         int sorted
         int packed
 
-    int cholmod_free_sparse(cholmod_sparse **, cholmod_common *) except? 0
-    int cholmod_check_sparse(cholmod_sparse *, cholmod_common *) except? 0
-    int cholmod_print_sparse(cholmod_sparse *, char *, cholmod_common *) except? 0
+    int cholmod_free_sparse(cholmod_sparse **, cholmod_common *) except *
+    int cholmod_check_sparse(cholmod_sparse *, cholmod_common *) except *
+    int cholmod_print_sparse(cholmod_sparse *, char *, cholmod_common *) except *
 
     ctypedef struct cholmod_dense:
         size_t nrow, ncol, nzmax
@@ -96,9 +96,9 @@ cdef extern from "cholmod_backward_compatible.h":
         void * x
         int xtype, dtype
 
-    int cholmod_free_dense(cholmod_dense **, cholmod_common *) except? 0
-    int cholmod_check_dense(cholmod_dense *, cholmod_common *) except? 0
-    int cholmod_print_dense(cholmod_dense *, char *, cholmod_common *) except? 0
+    int cholmod_free_dense(cholmod_dense **, cholmod_common *) except *
+    int cholmod_check_dense(cholmod_dense *, cholmod_common *) except *
+    int cholmod_print_dense(cholmod_dense *, char *, cholmod_common *) except *
 
     ctypedef struct cholmod_factor:
         size_t n
@@ -113,14 +113,14 @@ cdef extern from "cholmod_backward_compatible.h":
         void * super_ "super"
         void * pi
         void * px
-    int cholmod_free_factor(cholmod_factor **, cholmod_common *) except? 0
+    int cholmod_free_factor(cholmod_factor **, cholmod_common *) except *
     cholmod_factor * cholmod_copy_factor(cholmod_factor *, cholmod_common *) except? NULL
 
     cholmod_factor * cholmod_analyze(cholmod_sparse *, cholmod_common *) except? NULL
     int cholmod_factorize_p(cholmod_sparse *, double beta[2],
                             int * fset, size_t fsize,
                             cholmod_factor *,
-                            cholmod_common *) except? 0
+                            cholmod_common *) except *
 
     cholmod_sparse * cholmod_submatrix(cholmod_sparse *,
                                        int * rset, int rsize,
@@ -128,7 +128,7 @@ cdef extern from "cholmod_backward_compatible.h":
                                        int values, int sorted,
                                        cholmod_common *) except? NULL
     int cholmod_updown(int update, cholmod_sparse *, cholmod_factor *,
-                       cholmod_common *) except? 0
+                       cholmod_common *) except *
 
     cholmod_dense * cholmod_solve(int, cholmod_factor *,
                                   cholmod_dense *, cholmod_common *) except? NULL
@@ -137,7 +137,7 @@ cdef extern from "cholmod_backward_compatible.h":
 
     int cholmod_change_factor(int to_xtype, int to_ll, int to_super,
                               int to_packed, int to_monotonic,
-                              cholmod_factor *, cholmod_common *) except? 0
+                              cholmod_factor *, cholmod_common *) except *
     cholmod_sparse * cholmod_factor_to_sparse(cholmod_factor *,
                                               cholmod_common *) except? NULL
 
