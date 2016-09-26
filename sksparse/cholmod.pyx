@@ -441,7 +441,8 @@ cdef class Factor:
         cholmod_factorize_p(&c_A, [beta, 0], NULL, 0,
                             self._factor, &self._common._common)
         if self._common._common.status == CHOLMOD_NOT_POSDEF:
-            raise CholmodNotPositiveDefiniteError("Matrix is not positive definite.", self._factor.minor, self)
+            raise CholmodNotPositiveDefiniteError(
+            "Matrix is not positive definite.", self._factor.minor, self)
 
 
     def _clone(self):
