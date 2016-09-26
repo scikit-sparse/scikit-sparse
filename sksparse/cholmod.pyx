@@ -154,24 +154,19 @@ class CholmodNotPositiveDefiniteError(CholmodError):
         self.factor = factor
 
 class CholmodNotInstalledError(CholmodError):
-    def __init__(self, message=""):
-        super().__init__(message)
+    pass
 
 class CholmodOutOfMemoryError(CholmodError):
-    def __init__(self, message=""):
-        super().__init__(message)
+    pass
 
 class CholmodTooLargeError(CholmodError):
-    def __init__(self, message=""):
-        super().__init__(message)
+    pass
 
 class CholmodInvalidError(CholmodError):
-    def __init__(self, message=""):
-        super().__init__(message)
+    pass
 
 class CholmodGpuProblemError(CholmodError):
-    def __init__(self, message=""):
-        super().__init__(message)
+    pass
 
 class CholmodWarning(UserWarning):
     pass
