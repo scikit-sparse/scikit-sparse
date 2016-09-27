@@ -282,7 +282,7 @@ cdef void _error_handler(
     if status == CHOLMOD_OK:
         return
     full_msg = "{}:{:d}: {} (code {:d})".format(file.decode(), line, msg.decode(), status)
-    ## known errors
+    # known errors
     if status == CHOLMOD_NOT_POSDEF:
         raise CholmodNotPositiveDefiniteError(full_msg)
     elif status == CHOLMOD_NOT_INSTALLED:
@@ -295,10 +295,10 @@ cdef void _error_handler(
         raise CholmodInvalidError(full_msg)
     elif status == CHOLMOD_GPU_PROBLEM:
         raise CholmodGpuProblemError(full_msg)
-    ## unknown errors
+    # unknown errors
     if status < 0:
         raise CholmodError(full_msg)
-    ## warnings
+    # warnings
     else:
         warnings.warn(full_msg, CholmodWarning)
 
