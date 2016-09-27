@@ -38,7 +38,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 from scipy import sparse
 from sksparse.cholmod import (
-    cholesky, cholesky_AAt, analyze, analyze_AAt, CholmodError)
+    cholesky, cholesky_AAt, analyze, analyze_AAt, CholmodError, CholmodNotPositiveDefiniteError)
 
 # Match defaults of np.allclose, which were used before (and are needed).
 assert_allclose = partial(assert_allclose, rtol=1e-5, atol=1e-8)
@@ -256,3 +256,8 @@ def test_convenience():
                 assert_allclose(f.logdet(), np.log(np.linalg.det(A_dense)))
                 assert_allclose(f.slogdet(), [1, np.log(np.linalg.det(A_dense))])
                 assert_allclose((f.inv() * A_sp).todense(), np.eye(4))
+
+def test_CholmodNotPositiveDefiniteError():
+    A = -sparse.eye(4).tocsc()
+    f = cholesky(A)
+    assert_raises(CholmodNotPositiveDefiniteError, f.L)

@@ -43,13 +43,14 @@ np.import_array()
 cdef extern from "numpy/arrayobject.h":
     void PyArray_ENABLEFLAGS(np.ndarray arr, int flags)
 
-cdef extern from "cholmod.h":
+cdef extern from "cholmod_backward_compatible.h":
     cdef enum:
         CHOLMOD_INT
         CHOLMOD_PATTERN, CHOLMOD_REAL, CHOLMOD_COMPLEX
         CHOLMOD_DOUBLE
         CHOLMOD_AUTO, CHOLMOD_SIMPLICIAL, CHOLMOD_SUPERNODAL
         CHOLMOD_OK, CHOLMOD_NOT_POSDEF
+        CHOLMOD_NOT_INSTALLED, CHOLMOD_OUT_OF_MEMORY, CHOLMOD_TOO_LARGE, CHOLMOD_INVALID, CHOLMOD_GPU_PROBLEM
         CHOLMOD_A, CHOLMOD_LDLt, CHOLMOD_LD, CHOLMOD_DLt, CHOLMOD_L
         CHOLMOD_Lt, CHOLMOD_D, CHOLMOD_P, CHOLMOD_Pt
         CHOLMOD_NATURAL, CHOLMOD_GIVEN, CHOLMOD_AMD, CHOLMOD_METIS, CHOLMOD_NESDIS, CHOLMOD_COLAMD, CHOLMOD_POSTORDERED
@@ -66,10 +67,10 @@ cdef extern from "cholmod.h":
         cholmod_method_struct * method
         void (*error_handler)(int status, const char * file, int line, const char * msg)
 
-    int cholmod_start(cholmod_common *) except? 0
-    int cholmod_finish(cholmod_common *) except? 0
-    int cholmod_check_common(cholmod_common *) except? 0
-    int cholmod_print_common(char *, cholmod_common *) except? 0
+    int cholmod_start(cholmod_common *) except *
+    int cholmod_finish(cholmod_common *) except *
+    int cholmod_check_common(cholmod_common *) except *
+    int cholmod_print_common(char *, cholmod_common *) except *
 
     ctypedef struct cholmod_sparse:
         size_t nrow, ncol, nzmax
@@ -83,9 +84,9 @@ cdef extern from "cholmod.h":
         int sorted
         int packed
 
-    int cholmod_free_sparse(cholmod_sparse **, cholmod_common *) except? 0
-    int cholmod_check_sparse(cholmod_sparse *, cholmod_common *) except? 0
-    int cholmod_print_sparse(cholmod_sparse *, char *, cholmod_common *) except? 0
+    int cholmod_free_sparse(cholmod_sparse **, cholmod_common *) except *
+    int cholmod_check_sparse(cholmod_sparse *, cholmod_common *) except *
+    int cholmod_print_sparse(cholmod_sparse *, char *, cholmod_common *) except *
 
     ctypedef struct cholmod_dense:
         size_t nrow, ncol, nzmax
@@ -93,12 +94,13 @@ cdef extern from "cholmod.h":
         void * x
         int xtype, dtype
 
-    int cholmod_free_dense(cholmod_dense **, cholmod_common *) except? 0
-    int cholmod_check_dense(cholmod_dense *, cholmod_common *) except? 0
-    int cholmod_print_dense(cholmod_dense *, char *, cholmod_common *) except? 0
+    int cholmod_free_dense(cholmod_dense **, cholmod_common *) except *
+    int cholmod_check_dense(cholmod_dense *, cholmod_common *) except *
+    int cholmod_print_dense(cholmod_dense *, char *, cholmod_common *) except *
 
     ctypedef struct cholmod_factor:
         size_t n
+        size_t minor
         void * Perm
         int itype
         int xtype
@@ -109,14 +111,14 @@ cdef extern from "cholmod.h":
         void * super_ "super"
         void * pi
         void * px
-    int cholmod_free_factor(cholmod_factor **, cholmod_common *) except? 0
+    int cholmod_free_factor(cholmod_factor **, cholmod_common *) except *
     cholmod_factor * cholmod_copy_factor(cholmod_factor *, cholmod_common *) except? NULL
 
     cholmod_factor * cholmod_analyze(cholmod_sparse *, cholmod_common *) except? NULL
     int cholmod_factorize_p(cholmod_sparse *, double beta[2],
                             int * fset, size_t fsize,
                             cholmod_factor *,
-                            cholmod_common *) except? 0
+                            cholmod_common *) except *
 
     cholmod_sparse * cholmod_submatrix(cholmod_sparse *,
                                        int * rset, int rsize,
@@ -124,7 +126,7 @@ cdef extern from "cholmod.h":
                                        int values, int sorted,
                                        cholmod_common *) except? NULL
     int cholmod_updown(int update, cholmod_sparse *, cholmod_factor *,
-                       cholmod_common *) except? 0
+                       cholmod_common *) except *
 
     cholmod_dense * cholmod_solve(int, cholmod_factor *,
                                   cholmod_dense *, cholmod_common *) except? NULL
@@ -133,7 +135,7 @@ cdef extern from "cholmod.h":
 
     int cholmod_change_factor(int to_xtype, int to_ll, int to_super,
                               int to_packed, int to_monotonic,
-                              cholmod_factor *, cholmod_common *) except? 0
+                              cholmod_factor *, cholmod_common *) except *
     cholmod_sparse * cholmod_factor_to_sparse(cholmod_factor *,
                                               cholmod_common *) except? NULL
 
@@ -141,6 +143,27 @@ cdef class Common
 cdef class Factor
 
 class CholmodError(Exception):
+    pass
+
+class CholmodNotPositiveDefiniteError(CholmodError):
+    def __init__(self, message, column=None, factor=None):
+        super().__init__(message)
+        self.column = column
+        self.factor = factor
+
+class CholmodNotInstalledError(CholmodError):
+    pass
+
+class CholmodOutOfMemoryError(CholmodError):
+    pass
+
+class CholmodTooLargeError(CholmodError):
+    pass
+
+class CholmodInvalidError(CholmodError):
+    pass
+
+class CholmodGpuProblemError(CholmodError):
     pass
 
 class CholmodWarning(UserWarning):
@@ -256,12 +279,26 @@ cdef void _error_handler(
         int status, const char * file, int line, const char * msg) except * with gil:
     if status == CHOLMOD_OK:
         return
-    full_msg = "%s:%s: %s (code %s)" % (file, line, msg, status)
-    if status > 0:
-        # Warning:
-        warnings.warn(full_msg, CholmodWarning)
-    else:
+    full_msg = "{}:{:d}: {} (code {:d})".format(file.decode(), line, msg.decode(), status)
+    # known errors
+    if status == CHOLMOD_NOT_POSDEF:
+        raise CholmodNotPositiveDefiniteError(full_msg)
+    elif status == CHOLMOD_NOT_INSTALLED:
+        raise CholmodNotInstalledError(full_msg)
+    elif status == CHOLMOD_OUT_OF_MEMORY:
+        raise CholmodOutOfMemoryError(full_msg)
+    elif status == CHOLMOD_TOO_LARGE:
+        raise CholmodTooLargeError(full_msg)
+    elif status == CHOLMOD_INVALID:
+        raise CholmodInvalidError(full_msg)
+    elif status == CHOLMOD_GPU_PROBLEM:
+        raise CholmodGpuProblemError(full_msg)
+    # unknown errors
+    if status < 0:
         raise CholmodError(full_msg)
+    # warnings
+    else:
+        warnings.warn(full_msg, CholmodWarning)
 
 cdef class Common:
     cdef cholmod_common _common
@@ -402,7 +439,9 @@ cdef class Factor:
         cholmod_factorize_p(&c_A, [beta, 0], NULL, 0,
                             self._factor, &self._common._common)
         if self._common._common.status == CHOLMOD_NOT_POSDEF:
-            raise CholmodError("Matrix is not positive definite")
+            raise CholmodNotPositiveDefiniteError(
+            "Matrix is not positive definite.", self._factor.minor, self)
+
 
     def _clone(self):
         cdef cholmod_factor * c_clone = cholmod_copy_factor(self._factor,
