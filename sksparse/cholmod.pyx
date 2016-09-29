@@ -45,7 +45,7 @@ cdef extern from "numpy/arrayobject.h":
 
 cdef extern from "cholmod_backward_compatible.h":
     cdef enum:
-        CHOLMOD_INT
+        CHOLMOD_INT, CHOLMOD_INTLONG, CHOLMOD_LONG
         CHOLMOD_PATTERN, CHOLMOD_REAL, CHOLMOD_COMPLEX
         CHOLMOD_DOUBLE
         CHOLMOD_AUTO, CHOLMOD_SIMPLICIAL, CHOLMOD_SUPERNODAL
@@ -55,22 +55,19 @@ cdef extern from "cholmod_backward_compatible.h":
         CHOLMOD_Lt, CHOLMOD_D, CHOLMOD_P, CHOLMOD_Pt
         CHOLMOD_NATURAL, CHOLMOD_GIVEN, CHOLMOD_AMD, CHOLMOD_METIS, CHOLMOD_NESDIS, CHOLMOD_COLAMD, CHOLMOD_POSTORDERED
 
+    ctypedef int SuiteSparse_long
+    
     ctypedef struct cholmod_method_struct:
         int ordering
 
     ctypedef struct cholmod_common:
         int supernodal
         int status
-        int nmethods
-        int postorder
+        int itype, dtype
         int print
+        int nmethods, postorder
         cholmod_method_struct * method
         void (*error_handler)(int status, const char * file, int line, const char * msg)
-
-    int cholmod_start(cholmod_common *) except *
-    int cholmod_finish(cholmod_common *) except *
-    int cholmod_check_common(cholmod_common *) except *
-    int cholmod_print_common(char *, cholmod_common *) except *
 
     ctypedef struct cholmod_sparse:
         size_t nrow, ncol, nzmax
@@ -78,32 +75,20 @@ cdef extern from "cholmod_backward_compatible.h":
         void * i # row indices
         void * x
         int stype # 0 = regular, >0 = upper triangular, <0 = lower triangular
-        int itype # type of p, i, nz
-        int xtype
-        int dtype
+        int itype, dtype, xtype
         int sorted
         int packed
 
-    int cholmod_free_sparse(cholmod_sparse **, cholmod_common *) except *
-    int cholmod_check_sparse(cholmod_sparse *, cholmod_common *) except *
-    int cholmod_print_sparse(cholmod_sparse *, char *, cholmod_common *) except *
-
     ctypedef struct cholmod_dense:
-        size_t nrow, ncol, nzmax
-        size_t d
+        size_t nrow, ncol, nzmax, d
         void * x
-        int xtype, dtype
-
-    int cholmod_free_dense(cholmod_dense **, cholmod_common *) except *
-    int cholmod_check_dense(cholmod_dense *, cholmod_common *) except *
-    int cholmod_print_dense(cholmod_dense *, char *, cholmod_common *) except *
+        int dtype, xtype
 
     ctypedef struct cholmod_factor:
         size_t n
         size_t minor
         void * Perm
-        int itype
-        int xtype
+        int itype, xtype
         int is_ll, is_super, is_monotonic
         size_t xsize, nzmax, nsuper
         void * x
@@ -111,33 +96,98 @@ cdef extern from "cholmod_backward_compatible.h":
         void * super_ "super"
         void * pi
         void * px
+
+    int cholmod_start(cholmod_common *) except *
+    int cholmod_l_start(cholmod_common *) except *
+
+    int cholmod_finish(cholmod_common *) except *
+    int cholmod_l_finish(cholmod_common *) except *
+
+    int cholmod_check_common(cholmod_common *) except *
+    int cholmod_l_check_common(cholmod_common *) except *
+
+    int cholmod_print_common(const char *, cholmod_common *) except *
+    int cholmod_l_print_common(const char *, cholmod_common *) except *
+
+    int cholmod_free_sparse(cholmod_sparse **, cholmod_common *) except *
+    int cholmod_l_free_sparse(cholmod_sparse **, cholmod_common *) except *
+
+    int cholmod_check_sparse(cholmod_sparse *, cholmod_common *) except *
+    int cholmod_l_check_sparse(cholmod_sparse *, cholmod_common *) except *
+
+    int cholmod_print_sparse(cholmod_sparse *, const char *, cholmod_common *) except *
+    int cholmod_l_print_sparse(cholmod_sparse *, const char *, cholmod_common *) except *
+
+    int cholmod_free_dense(cholmod_dense **, cholmod_common *) except *
+    int cholmod_l_free_dense(cholmod_dense **, cholmod_common *) except *
+
+    int cholmod_check_dense(cholmod_dense *, cholmod_common *) except *
+    int cholmod_l_check_dense(cholmod_dense *, cholmod_common *) except *
+
+    int cholmod_print_dense(cholmod_dense *, const char *, cholmod_common *) except *
+    int cholmod_l_print_dense(cholmod_dense *, const char *, cholmod_common *) except *
+
     int cholmod_free_factor(cholmod_factor **, cholmod_common *) except *
+    int cholmod_l_free_factor(cholmod_factor **, cholmod_common *) except *
+
+    int cholmod_check_factor(cholmod_factor *, cholmod_common *) except *
+    int cholmod_l_check_factor(cholmod_factor *, cholmod_common *) except *
+
+    int cholmod_print_factor(cholmod_factor *, const char *, cholmod_common *) except *
+    int cholmod_l_print_factor(cholmod_factor *, const char *, cholmod_common *) except *
+    
     cholmod_factor * cholmod_copy_factor(cholmod_factor *, cholmod_common *) except? NULL
+    cholmod_factor * cholmod_l_copy_factor(cholmod_factor *, cholmod_common *) except? NULL
 
     cholmod_factor * cholmod_analyze(cholmod_sparse *, cholmod_common *) except? NULL
+    cholmod_factor * cholmod_l_analyze(cholmod_sparse *, cholmod_common *) except? NULL
+
     int cholmod_factorize_p(cholmod_sparse *, double beta[2],
                             int * fset, size_t fsize,
                             cholmod_factor *,
                             cholmod_common *) except *
+    int cholmod_l_factorize_p(cholmod_sparse *, double beta[2],
+                              SuiteSparse_long * fset, size_t fsize,
+                              cholmod_factor *,
+                              cholmod_common *) except *
 
     cholmod_sparse * cholmod_submatrix(cholmod_sparse *,
                                        int * rset, int rsize,
                                        int * cset, int csize,
                                        int values, int sorted,
                                        cholmod_common *) except? NULL
+    cholmod_sparse * cholmod_l_submatrix(cholmod_sparse *,
+                                         SuiteSparse_long * rset, SuiteSparse_long rsize,
+                                         SuiteSparse_long * cset, SuiteSparse_long csize,
+                                         int values, int sorted,
+                                         cholmod_common *) except? NULL
+
     int cholmod_updown(int update, cholmod_sparse *, cholmod_factor *,
                        cholmod_common *) except *
+    int cholmod_l_updown(int update, cholmod_sparse *, cholmod_factor *,
+                         cholmod_common *) except *
 
     cholmod_dense * cholmod_solve(int, cholmod_factor *,
                                   cholmod_dense *, cholmod_common *) except? NULL
+    cholmod_dense * cholmod_l_solve(int, cholmod_factor *,
+                                    cholmod_dense *, cholmod_common *) except? NULL
+
     cholmod_sparse * cholmod_spsolve(int, cholmod_factor *,
                                      cholmod_sparse *, cholmod_common *) except? NULL
+    cholmod_sparse * cholmod_l_spsolve(int, cholmod_factor *,
+                                       cholmod_sparse *, cholmod_common *) except? NULL
 
     int cholmod_change_factor(int to_xtype, int to_ll, int to_super,
                               int to_packed, int to_monotonic,
                               cholmod_factor *, cholmod_common *) except *
+    int cholmod_l_change_factor(int to_xtype, int to_ll, int to_super,
+                                int to_packed, int to_monotonic,
+                                cholmod_factor *, cholmod_common *) except *
+
     cholmod_sparse * cholmod_factor_to_sparse(cholmod_factor *,
                                               cholmod_common *) except? NULL
+    cholmod_sparse * cholmod_l_factor_to_sparse(cholmod_factor *,
+                                                cholmod_common *) except? NULL
 
 cdef class Common
 cdef class Factor
@@ -177,6 +227,10 @@ cdef int _integer_typenum = np.NPY_INT32
 cdef object _integer_py_dtype = np.dtype(np.int32)
 assert sizeof(int) == _integer_py_dtype.itemsize == 4
 
+cdef int _long_typenum = np.NPY_INT64
+cdef object _long_py_dtype = np.dtype(np.int64)
+assert sizeof(SuiteSparse_long) == _long_py_dtype.itemsize == 8
+
 cdef int _real_typenum = np.NPY_FLOAT64
 cdef object _real_py_dtype = np.dtype(np.float64)
 assert sizeof(double) == _real_py_dtype.itemsize == 8
@@ -185,14 +239,17 @@ cdef int _complex_typenum = np.NPY_COMPLEX128
 cdef object _complex_py_dtype = np.dtype(np.complex128)
 assert 2 * sizeof(double) == _complex_py_dtype.itemsize == 16
 
-cdef _require_1d_integer(a):
-    if a.dtype.itemsize != _integer_py_dtype.itemsize:
+cdef _require_1d_integer(a, dtype):
+    dtype = np.dtype(dtype)
+    if a.dtype.itemsize != dtype.itemsize:
         warnings.warn("array contains %s bit integers; "
-                      "this will be slower than using %s bit integers"
+                      "but %s bit integers are needed; "
+                      "slowing down due to converting"
                       % (a.dtype.itemsize * 8,
-                         _integer_py_dtype.itemsize * 8),
+                         dtype.itemsize * 8),
                       CholmodTypeConversionWarning)
-    a = np.ascontiguousarray(a, dtype=_integer_py_dtype)
+    a = np.ascontiguousarray(a, dtype=dtype)
+    assert a.dtype == dtype
     assert a.ndim == 1
     return a
 
@@ -200,7 +257,7 @@ cdef _require_1d_integer(a):
 # Cholmod -> Python conversion:
 ##########
 
-cdef int _np_typenum_for(int xtype):
+cdef int _np_typenum_for_data(int xtype):
     if xtype == CHOLMOD_COMPLEX:
         return _complex_typenum
     elif xtype == CHOLMOD_REAL:
@@ -208,14 +265,29 @@ cdef int _np_typenum_for(int xtype):
     else:
         raise CholmodError("cholmod->numpy type conversion failed")
 
-cdef type _np_dtype_for(int xtype):
-    return np.PyArray_TypeObjectFromType(_np_typenum_for(xtype))
+cdef type _np_dtype_for_data(int xtype):
+    return np.PyArray_TypeObjectFromType(_np_typenum_for_data(xtype))
+
+cdef int _np_typenum_for_index(int itype):
+    if itype == CHOLMOD_INT:
+        return _integer_typenum
+    elif itype == CHOLMOD_LONG:
+        return _long_typenum
+    else:
+        raise CholmodError("cholmod->numpy type conversion failed")
+
+cdef type _np_dtype_for_index(int itype):
+    return np.PyArray_TypeObjectFromType(_np_typenum_for_index(itype))
 
 cdef class _SparseCleanup:
     cdef cholmod_sparse * _sparse
     cdef Common _common
     def __dealloc__(self):
-        cholmod_free_sparse(&self._sparse, &self._common._common)
+        if self._common._use_long:
+            cholmod_c_free_sparse = cholmod_l_free_sparse
+        else:
+            cholmod_c_free_sparse = cholmod_free_sparse
+        cholmod_c_free_sparse(&self._sparse, &self._common._common)
 
 cdef _py_sparse(cholmod_sparse * m, Common common):
     """Build a scipy.sparse.csc_matrix that's a view onto m, with a 'base' with
@@ -233,18 +305,18 @@ cdef _py_sparse(cholmod_sparse * m, Common common):
     cdef _SparseCleanup cleaner = _SparseCleanup()
     cleaner._sparse = m
     cleaner._common = common
-    assert m.itype == CHOLMOD_INT
+    assert m.itype == common._common.itype
 
     cdef np.ndarray indptr = np.PyArray_SimpleNewFromData(
-        1, [m.ncol + 1], _integer_typenum, m.p)
+        1, [m.ncol + 1], _np_typenum_for_index(m.itype), m.p)
     PyArray_ENABLEFLAGS(indptr, np.NPY_WRITEABLE)
     np.set_array_base(indptr, cleaner)
     cdef np.ndarray indices = np.PyArray_SimpleNewFromData(
-        1, [m.nzmax], _integer_typenum, m.i)
+        1, [m.nzmax], _np_typenum_for_index(m.itype), m.i)
     PyArray_ENABLEFLAGS(indices, np.NPY_WRITEABLE)
     np.set_array_base(indices, cleaner)
     cdef np.ndarray data = np.PyArray_SimpleNewFromData(
-        1, [m.nzmax], _np_typenum_for(m.xtype), m.x)
+        1, [m.nzmax], _np_typenum_for_data(m.xtype), m.x)
     PyArray_ENABLEFLAGS(data, np.NPY_WRITEABLE)
     np.set_array_base(data, cleaner)
 
@@ -254,7 +326,11 @@ cdef class _DenseCleanup:
     cdef cholmod_dense * _dense
     cdef Common _common
     def __dealloc__(self):
-        cholmod_free_dense(&self._dense, &self._common._common)
+        if self._common._use_long:
+            cholmod_c_free_dense = cholmod_l_free_dense
+        else:
+            cholmod_c_free_dense = cholmod_free_dense
+        cholmod_c_free_dense(&self._dense, &self._common._common)
 
 cdef _py_dense(cholmod_dense * m, Common common):
     """Build an ndarray that's a view onto m, with a 'base' with appropriate
@@ -269,7 +345,7 @@ cdef _py_dense(cholmod_dense * m, Common common):
     cleaner._common = common
 
     cdef np.ndarray out = np.PyArray_SimpleNewFromData(
-        1, [m.ncol * m.nrow], _np_typenum_for(m.xtype), m.x).reshape((m.ncol, m.nrow)).T
+        1, [m.ncol * m.nrow], _np_typenum_for_data(m.xtype), m.x).reshape((m.ncol, m.nrow)).T
     PyArray_ENABLEFLAGS(out, np.NPY_WRITEABLE)
     np.set_array_base(out, cleaner)
 
@@ -300,42 +376,82 @@ cdef void _error_handler(
     else:
         warnings.warn(full_msg, CholmodWarning)
 
+def _check_for_csc(m):
+    if not sparse.isspmatrix_csc(m):
+        warnings.warn("converting matrix of class %s to CSC format"
+                      % (m.__class__.__name__,),
+                      CholmodTypeConversionWarning)
+        m = m.tocsc()
+    assert sparse.isspmatrix_csc(m)
+    return m
+
 cdef class Common:
     cdef cholmod_common _common
     cdef int _complex
     cdef int _xtype
+    cdef int _use_long
 
-    def __cinit__(self, _complex):
+    def __cinit__(self, _complex, _use_long):
         self._complex = _complex
         if self._complex:
             self._xtype = CHOLMOD_COMPLEX
         else:
             self._xtype = CHOLMOD_REAL
-        cholmod_start(&self._common)
+        self._use_long = _use_long
+        if self._use_long:
+            cholmod_c_start = cholmod_l_start
+        else:
+            cholmod_c_start = cholmod_start
+        cholmod_c_start(&self._common)
+        assert (_use_long == 0 and self._common.itype == CHOLMOD_INT) \
+            or (_use_long == 1 and self._common.itype == CHOLMOD_LONG)
         self._common.print = 0
         self._common.error_handler = (
             <void (*)(int, const char *, int, const char *)>_error_handler)
 
     def __dealloc__(self):
-        cholmod_finish(&self._common)
+        if self._use_long:
+            cholmod_c_finish = cholmod_l_finish
+        else:
+            cholmod_c_finish = cholmod_finish
+        cholmod_c_finish(&self._common)
 
     # Debugging:
     def _print(self):
-        print(cholmod_check_common(&self._common))
+        if self._use_long:
+            cholmod_c_check_common = cholmod_l_check_common
+            cholmod_c_print_common = cholmod_l_print_common
+        else:
+            cholmod_c_check_common = cholmod_check_common
+            cholmod_c_print_common = cholmod_print_common
+        
+        print(cholmod_c_check_common(&self._common))
         name = repr(self)
-        return cholmod_print_common(name, &self._common)
+        return cholmod_c_print_common(name, &self._common)
 
     def _print_sparse(self, name, symmetric, matrix):
+        if self._use_long:
+            cholmod_c_check_sparse = cholmod_l_check_sparse
+            cholmod_c_print_sparse = cholmod_l_print_sparse
+        else:
+            cholmod_c_check_sparse = cholmod_check_sparse
+            cholmod_c_print_sparse = cholmod_print_sparse
         cdef cholmod_sparse m
         cdef object ref = self._init_view_sparse(&m, matrix, symmetric)
-        print(cholmod_check_sparse(&m, &self._common))
-        return cholmod_print_sparse(&m, name, &self._common)
+        print(cholmod_c_check_sparse(&m, &self._common))
+        return cholmod_c_print_sparse(&m, name, &self._common)
 
     def _print_dense(self, name, matrix):
+        if self._use_long:
+            cholmod_c_check_dense = cholmod_l_check_dense
+            cholmod_c_print_dense = cholmod_l_print_dense
+        else:
+            cholmod_c_check_dense = cholmod_check_dense
+            cholmod_c_print_dense = cholmod_print_dense
         cdef cholmod_dense m
         cdef object ref = self._init_view_dense(&m, matrix)
-        print(cholmod_check_dense(&m, &self._common))
-        return cholmod_print_dense(&m, name, &self._common)
+        print(cholmod_c_check_dense(&m, &self._common))
+        return cholmod_c_print_dense(&m, name, &self._common)
 
     ##########
     # Python -> Cholmod conversion:
@@ -357,16 +473,12 @@ cdef class Common:
     # returned object; do not let it be garbage collected as long as you want
     # to use the matrix.
     cdef object _init_view_sparse(self, cholmod_sparse *out, m, symmetric):
-        if not sparse.isspmatrix_csc(m):
-            warnings.warn("converting matrix of class %s to CSC format"
-                          % (m.__class__.__name__,),
-                          CholmodTypeConversionWarning)
-            m = m.tocsc()
         if symmetric and m.shape[0] != m.shape[1]:
             raise CholmodError("supposedly symmetric matrix is not square!")
+        m = _check_for_csc(m)
         m.sort_indices()
-        cdef np.ndarray indptr = _require_1d_integer(m.indptr)
-        cdef np.ndarray indices = _require_1d_integer(m.indices)
+        cdef np.ndarray indptr = _require_1d_integer(m.indptr, _np_dtype_for_index(self._common.itype))
+        cdef np.ndarray indices = _require_1d_integer(m.indices, _np_dtype_for_index(self._common.itype))
         cdef np.ndarray data = self._cast(m.data)
         out.nrow, out.ncol = m.shape
         out.nzmax = m.nnz
@@ -377,7 +489,7 @@ cdef class Common:
             out.stype = -1
         else:
             out.stype = 0
-        out.itype = CHOLMOD_INT
+        out.itype = self._common.itype
         out.dtype = CHOLMOD_DOUBLE
         out.xtype = self._xtype
         out.sorted = 1
@@ -417,7 +529,22 @@ cdef class Factor:
             raise CholmodError("Factor may not be constructed directly; use analyze()")
 
     def __dealloc__(self):
-        cholmod_free_factor(&self._factor, &self._common._common)
+        if self._common._use_long:
+            cholmod_c_free_factor = cholmod_l_free_factor
+        else:
+            cholmod_c_free_factor = cholmod_free_factor
+        cholmod_c_free_factor(&self._factor, &self._common._common)
+
+    def _print(self):
+        if self._common._use_long:
+            cholmod_c_check_factor = cholmod_l_check_factor
+            cholmod_c_print_factor = cholmod_l_print_factor
+        else:
+            cholmod_c_check_factor = cholmod_check_factor
+            cholmod_c_print_factor = cholmod_print_factor
+        print(cholmod_c_check_factor(self._factor, &self._common._common))
+        name = repr(self)
+        return cholmod_c_print_factor(self._factor, name, &self._common._common)
 
     def cholesky_inplace(self, A, beta=0):
         """Updates this Factor so that it represents the Cholesky
@@ -436,20 +563,30 @@ cdef class Factor:
     def _cholesky_inplace(self, A, symmetric, beta=0, **kwargs):
         cdef cholmod_sparse c_A
         cdef object ref = self._common._init_view_sparse(&c_A, A, symmetric)
-        cholmod_factorize_p(&c_A, [beta, 0], NULL, 0,
-                            self._factor, &self._common._common)
+        if self._common._use_long:
+            cholmod_l_factorize_p(&c_A, [beta, 0], NULL, 0,
+                                  self._factor, &self._common._common)
+        else:
+            cholmod_factorize_p(&c_A, [beta, 0], NULL, 0,
+                                self._factor, &self._common._common)
         if self._common._common.status == CHOLMOD_NOT_POSDEF:
             raise CholmodNotPositiveDefiniteError(
             "Matrix is not positive definite.", self._factor.minor, self)
 
-
     def _clone(self):
-        cdef cholmod_factor * c_clone = cholmod_copy_factor(self._factor,
-                                                            &self._common._common)
+        if self._common._use_long:
+            cholmod_c_copy_factor = cholmod_l_copy_factor
+        else:
+            cholmod_c_copy_factor = cholmod_copy_factor
+
+        cdef cholmod_factor * c_clone = cholmod_c_copy_factor(self._factor,
+                                                        &self._common._common)
         assert c_clone
         cdef Factor clone = Factor(factor_secret_handshake)
         clone._common = self._common
         clone._factor = c_clone
+        assert self._factor.itype == clone._factor.itype == self._common._common.itype
+        assert self._factor.xtype == clone._factor.xtype
         return clone
 
     def cholesky(self, A, beta=0):
@@ -490,17 +627,31 @@ cdef class Factor:
         chosen by the initial call to :func:`analyze` will be used regardless
         of the pattern of non-zeros in C."""
         # permute C
+        if self._common._use_long:
+            cholmod_c_updown = cholmod_l_updown
+            cholmod_c_free_sparse = cholmod_l_free_sparse
+        else:
+            cholmod_c_updown = cholmod_updown
+            cholmod_c_free_sparse = cholmod_free_sparse
+
         cdef cholmod_sparse c_C
         cdef object ref = self._common._init_view_sparse(&c_C, C, False)
-        cdef cholmod_sparse * C_perm = cholmod_submatrix(
-            &c_C, <int *> self._factor.Perm, self._factor.n, NULL, -1, True, True,
-            &self._common._common)
+        cdef cholmod_sparse * C_perm
+        
+        if self._common._use_long:
+            C_perm = cholmod_l_submatrix(
+                &c_C, <SuiteSparse_long *> self._factor.Perm, self._factor.n, NULL, -1,
+                True, True, &self._common._common)
+        else:
+            C_perm = cholmod_submatrix(
+                &c_C, <int *> self._factor.Perm, self._factor.n, NULL, -1,
+                True, True, &self._common._common)
         assert C_perm
         try:
-            cholmod_updown(not subtract, C_perm, self._factor,
-                           &self._common._common)
+            cholmod_c_updown(not subtract, C_perm, self._factor,
+                             &self._common._common)
         finally:
-            cholmod_free_sparse(&C_perm, &self._common._common)
+            cholmod_c_free_sparse(&C_perm, &self._common._common)
 
     # Everything below here will fail for matrices that were only analyzed,
     # not factorized.
@@ -514,10 +665,10 @@ cdef class Factor:
         (or similar for AA')."""
         if self._factor.Perm is NULL:
             raise CholmodError("you must analyze a matrix first")
-        assert self._factor.itype == CHOLMOD_INT
+        assert self._factor.itype == self._common._common.itype
 
         cdef np.ndarray out = np.PyArray_SimpleNewFromData(
-            1, [self._factor.n], _integer_typenum, self._factor.Perm)
+            1, [self._factor.n], _np_typenum_for_index(self._factor.itype), self._factor.Perm)
         np.set_array_base(out, self)
 
         return out
@@ -527,21 +678,29 @@ cdef class Factor:
         # to change to a supernodal LDL' factorization, cholmod_change_factor
         # will silently do nothing! So we can only stay supernodal when LL' is
         # requested:
+        if self._common._use_long:
+            cholmod_c_change_factor = cholmod_l_change_factor
+        else:
+            cholmod_c_change_factor = cholmod_change_factor
         want_super = self._factor.is_super and want_L
-        cholmod_change_factor(self._factor.xtype,
-                              want_L, # to_ll
-                              want_super,
-                              True, # to_packed
-                              self._factor.is_monotonic,
-                              self._factor,
-                              &self._common._common)
+        cholmod_c_change_factor(self._factor.xtype,
+                                want_L, # to_ll
+                                want_super,
+                                True, # to_packed
+                                self._factor.is_monotonic,
+                                self._factor,
+                                &self._common._common)
         assert bool(self._factor.is_ll) == want_L
 
     def _L_or_LD(self, want_L):
+        if self._common._use_long:
+            cholmod_c_factor_to_sparse = cholmod_l_factor_to_sparse
+        else:
+            cholmod_c_factor_to_sparse = cholmod_factor_to_sparse
         cdef Factor f = self._clone()
         cdef cholmod_sparse * l
         f._ensure_L_or_LD_inplace(want_L)
-        l = cholmod_factor_to_sparse(f._factor,
+        l = cholmod_c_factor_to_sparse(f._factor,
                                      &f._common._common)
         assert l
         return _py_sparse(l, self._common)
@@ -571,26 +730,36 @@ cdef class Factor:
 
         cdef np.ndarray x = np.PyArray_SimpleNewFromData(
             1, [self._factor.xsize if self._factor.is_super else self._factor.nzmax],
-            _np_typenum_for(self._factor.xtype), self._factor.x)
+            _np_typenum_for_data(self._factor.xtype), self._factor.x)
 
         cdef size_t i
         cdef np.npy_intp n
-        cdef int * super_ = <int *> self._factor.super_
-        cdef int * pi = <int *> self._factor.pi
-        cdef int * px = <int *> self._factor.px
+        cdef SuiteSparse_long * l_super_ = <SuiteSparse_long *> self._factor.super_
+        cdef SuiteSparse_long * l_pi = <SuiteSparse_long *> self._factor.pi
+        cdef SuiteSparse_long * l_px = <SuiteSparse_long *> self._factor.px
+        cdef int * i_super_ = <int *> self._factor.super_
+        cdef int * i_pi = <int *> self._factor.pi
+        cdef int * i_px = <int *> self._factor.px
+        
         if self._factor.is_super:
             # This is a supernodal factorization, which is stored as a bunch
             # of dense, lower-triangular, column-major arrays packed into the
             # x vector. This is not documented in the CHOLMOD user-guide, or
             # anywhere else as far as I can tell; I got the details from
             # CVXOPT's C/cholmod.c.
-            d = np.empty(self._factor.n, dtype=_np_dtype_for(self._factor.xtype))
+            d = np.empty(self._factor.n, dtype=_np_dtype_for_data(self._factor.xtype))
             filled = 0
             for i in xrange(self._factor.nsuper):
-                ncols = super_[i + 1] - super_[i]
-                nrows = pi[i + 1] - pi[i]
-                d[filled:filled + ncols] = x[px[i]
-                                             :px[i] + nrows * ncols
+                if self._common._use_long:
+                    ncols = l_super_[i + 1] - l_super_[i]
+                    nrows = l_pi[i + 1] - l_pi[i]
+                    px_i = l_px[i]
+                else:
+                    ncols = i_super_[i + 1] - i_super_[i]
+                    nrows = i_pi[i + 1] - i_pi[i]
+                    px_i = i_px[i]
+                d[filled:filled + ncols] = x[px_i
+                                             :px_i + nrows * ncols
                                              :nrows + 1]
                 filled += ncols
         else:
@@ -602,8 +771,9 @@ cdef class Factor:
             # The ->p array actually has n+1 entries, but only the first n
             # entries actually point to real columns (the last entry is a
             # sentinel), so we just create a view onto those:
+            assert self._factor.itype == self._common._common.itype
             p = np.PyArray_SimpleNewFromData(
-                1, [self._factor.n], _integer_typenum, self._factor.p)
+                1, [self._factor.n], _np_typenum_for_index(self._factor.itype), self._factor.p)
 
             d = x[p]
         if self._factor.is_ll:
@@ -726,20 +896,29 @@ cdef class Factor:
             return self._solve_dense(b, system)
 
     def _solve_sparse(self, b, system):
+        if self._common._use_long:
+            cholmod_c_spsolve = cholmod_l_spsolve
+        else:
+            cholmod_c_spsolve = cholmod_spsolve
         cdef cholmod_sparse c_b
         cdef object ref = self._common._init_view_sparse(&c_b, b, False)
-        cdef cholmod_sparse *out = cholmod_spsolve(
+        cdef cholmod_sparse *out = cholmod_c_spsolve(
             system, self._factor, &c_b, &self._common._common)
         return _py_sparse(out, self._common)
 
     def _solve_dense(self, b, system):
+        if self._common._use_long:
+            cholmod_c_solve = cholmod_l_solve
+        else:
+            cholmod_c_solve = cholmod_solve
+
         b = np.asarray(b)
         ndim = b.ndim
         if b.ndim == 1:
             b = b[:, np.newaxis]
         cdef cholmod_dense c_b
         cdef object ref = self._common._init_view_dense(&c_b, b)
-        cdef cholmod_dense *out = cholmod_solve(
+        cdef cholmod_dense *out = cholmod_c_solve(
             system, self._factor, &c_b, &self._common._common)
         py_out = _py_dense(out, self._common)
         if ndim == 1:
@@ -799,12 +978,11 @@ cdef class Factor:
 
         .. versionadded:: 0.2
         """
-
         return self(sparse.eye(self._factor.n, self._factor.n,
-                               dtype=_np_dtype_for(self._factor.xtype),
+                               dtype=_np_dtype_for_data(self._factor.xtype),
                                format="csc"))
 
-def analyze(A, mode="auto", ordering_method="default"):
+def analyze(A, mode="auto", ordering_method="default", use_long=None):
     """Computes the optimal fill-reducing permutation for the symmetric matrix
     A, but does *not* factor it (i.e., it performs a "symbolic Cholesky
     decomposition"). This function ignores the actual contents of the matrix
@@ -823,14 +1001,18 @@ def analyze(A, mode="auto", ordering_method="default"):
       "nesdis", "colamd", "default" and "best". See the CHOLMOD documentation 
       for details.
 
+    :param use_long: Specifies if the long type (64 bit) or the int type
+      (32 bit) should be used for the indices of the sparse matrices. If 
+      use_long is None try to estimate if long type is needed. 
+
     :returns: A :class:`Factor` object representing the analysis. Many
       operations on this object will fail, because it does not yet hold a full
       decomposition. Use :meth:`Factor.cholesky_inplace` (or similar) to
       actually factor a matrix.
     """
-    return _analyze(A, True, mode=mode, ordering_method=ordering_method)
+    return _analyze(A, True, mode=mode, ordering_method=ordering_method, use_long=use_long)
 
-def analyze_AAt(A, mode="auto", ordering_method="default"):
+def analyze_AAt(A, mode="auto", ordering_method="default", use_long=None):
     """Computes the optimal fill-reducing permutation for the symmetric matrix
     :math:`AA'`, but does *not* factor it (i.e., it performs a "symbolic
     Cholesky decomposition"). This function ignores the actual contents of the
@@ -849,12 +1031,16 @@ def analyze_AAt(A, mode="auto", ordering_method="default"):
       "nesdis", "colamd", "default" and "best". See the CHOLMOD documentation 
       for details.
 
+    :param use_long: Specifies if the long type (64 bit) or the int type
+      (32 bit) should be used for the indices of the sparse matrices. If 
+      use_long is None try to estimate if long type is needed.
+
     :returns: A :class:`Factor` object representing the analysis. Many
       operations on this object will fail, because it does not yet hold a full
       decomposition. Use :meth:`Factor.cholesky_AAt_inplace` (or similar) to
       actually factor a matrix.
     """
-    return _analyze(A, False, mode=mode, ordering_method=ordering_method)
+    return _analyze(A, False, mode=mode, ordering_method=ordering_method, use_long=use_long)
 
 _modes = {
     "simplicial": CHOLMOD_SIMPLICIAL,
@@ -870,8 +1056,18 @@ _ordering_methods = {
     "default": None,
     "best": None,
 }
-def _analyze(A, symmetric, mode, ordering_method="default"):
-    cdef Common common = Common(issubclass(A.dtype.type, np.complexfloating))
+
+def _analyze(A, symmetric, mode, ordering_method="default", use_long=None):
+    A = _check_for_csc(A)
+    if use_long is None:
+        assert A.indices.dtype == A.indptr.dtype
+        use_long = A.indices.dtype == np.int64
+    elif not use_long:
+        INT_MAX = np.iinfo(np.int32).max
+        if (A.nnz > INT_MAX or np.any(np.array(A.shape) > INT_MAX)):
+            warnings.warn('Problem to large for int, switching to long.')
+            use_long = True
+    cdef Common common = Common(issubclass(A.dtype.type, np.complexfloating), use_long)
     cdef cholmod_sparse c_A
     cdef object ref = common._init_view_sparse(&c_A, A, symmetric)
     if mode in _modes:
@@ -879,7 +1075,12 @@ def _analyze(A, symmetric, mode, ordering_method="default"):
     else:
         raise CholmodError("Unknown mode '%s', must be one of %s" %
                            (mode, ", ".join(_modes.keys())))
-    cdef cholmod_factor *c_f = cholmod_analyze(&c_A, &common._common)
+
+    if common._use_long:
+        cholmod_c_analyze = cholmod_l_analyze
+    else:
+        cholmod_c_analyze = cholmod_analyze
+    cdef cholmod_factor *c_f = cholmod_c_analyze(&c_A, &common._common)
     if c_f is NULL:
         raise CholmodError("Error in cholmod_analyze")
 
@@ -902,7 +1103,7 @@ def _analyze(A, symmetric, mode, ordering_method="default"):
     f._factor = c_f
     return f
 
-def cholesky(A, beta=0, mode="auto", ordering_method="default"):
+def cholesky(A, beta=0, mode="auto", ordering_method="default", use_long=None):
     """Computes the fill-reducing Cholesky decomposition of
 
       .. math:: A + \\beta I
@@ -916,12 +1117,14 @@ def cholesky(A, beta=0, mode="auto", ordering_method="default"):
     ``mode`` is passed to :func:`analyze`.
 
     ``ordering_method`` is passed to :func:`analyze`.
+    
+    ``use_long`` is passed to :func:`analyze`.
 
     :returns: A :class:`Factor` object represented the decomposition.
     """
-    return _cholesky(A, True, beta=beta, mode=mode, ordering_method=ordering_method)
+    return _cholesky(A, True, beta=beta, mode=mode, ordering_method=ordering_method, use_long=use_long)
 
-def cholesky_AAt(A, beta=0, mode="auto", ordering_method="default"):
+def cholesky_AAt(A, beta=0, mode="auto", ordering_method="default", use_long=None):
     """Computes the fill-reducing Cholesky decomposition of
 
       .. math:: AA' + \\beta I
@@ -938,13 +1141,15 @@ def cholesky_AAt(A, beta=0, mode="auto", ordering_method="default"):
     ``mode`` is passed to :func:`analyze_AAt`.
 
     ``ordering_method`` is passed to :func:`analyze_AAt`.
+    
+    ``use_long`` is passed to :func:`analyze`.
 
     :returns: A :class:`Factor` object represented the decomposition.
     """
-    return _cholesky(A, False, beta=beta, mode=mode, ordering_method=ordering_method)
+    return _cholesky(A, False, beta=beta, mode=mode, ordering_method=ordering_method, use_long=use_long)
 
-def _cholesky(A, symmetric, beta, mode, ordering_method="default"):
-    f = _analyze(A, symmetric, mode=mode, ordering_method=ordering_method)
+def _cholesky(A, symmetric, beta, mode, ordering_method="default", use_long=None):
+    f = _analyze(A, symmetric, mode=mode, ordering_method=ordering_method, use_long=use_long)
     f._cholesky_inplace(A, symmetric, beta=beta)
     return f
 
