@@ -43,19 +43,6 @@ from sksparse.cholmod import (
 # Match defaults of np.allclose, which were used before (and are needed).
 assert_allclose = partial(assert_allclose, rtol=1e-5, atol=1e-8)
 
-# At time of writing (scipy 0.7.0), scipy.sparse.csc.csc_matrix explicitly
-# uses 32-bit integers for everything (even on 64-bit machines), and therefore
-# we wrap the 32-bit version of the cholmod API.  If this test ever fails,
-# then it means that scipy.sparse has started using 64-bit integers. That
-# wouldn't actually make our code become incorrect in any way -- so if this
-# test fails, don't panic! -- but it would make it become *inefficient*, so if
-# you see this test fail, then please let us know, and we'll see about
-# wrapping the 64-bit API to cholmod.
-def test_integer_size():
-    m = sparse.eye(10, 10).tocsc()
-    assert m.indices.dtype.itemsize == 4
-    assert m.indptr.dtype.itemsize == 4
-
 def test_cholesky_smoke_test():
     f = cholesky(sparse.eye(10, 10))
     d = np.arange(20).reshape(10, 2)
@@ -93,6 +80,12 @@ def factor_of(factor, matrix):
                        matrix.todense()[factor.P()[:, np.newaxis],
                                         factor.P()[np.newaxis, :]])
 
+def convert_matrix_indices_to_long_indices(matrix):
+    matrix.indices = np.asarray(matrix.indices, dtype=np.int64)
+    matrix.indptr = np.asarray(matrix.indptr, dtype=np.int64)
+    return matrix
+
+
 def test_complex():
     c = complex_matrix()
     fc = cholesky(c)
@@ -114,11 +107,14 @@ def test_beta():
     for matrix in [real_matrix(), complex_matrix()]:
         for beta in [0, 1, 3.4]:
             matrix_plus_beta = matrix + beta * sparse.eye(*matrix.shape)
-            for ordering_method in ("natural", "amd", "metis", "nesdis", "colamd", "default", "best"):
-                for mode in ["auto", "supernodal", "simplicial"]:
-                    f = cholesky(matrix, beta=beta, mode=mode, ordering_method=ordering_method)
-                    L = f.L()
-                    assert factor_of(f, matrix_plus_beta)
+            for use_long in [False, True]:
+                if use_long:
+                    matrix_plus_beta = convert_matrix_indices_to_long_indices(matrix_plus_beta)
+                for ordering_method in ("natural", "amd", "metis", "nesdis", "colamd", "default", "best"):
+                    for mode in ["auto", "supernodal", "simplicial"]:
+                        f = cholesky(matrix, beta=beta, mode=mode, ordering_method=ordering_method)
+                        L = f.L()
+                        assert factor_of(f, matrix_plus_beta)
 
 def test_update_downdate():
     m = real_matrix()
@@ -246,16 +242,27 @@ def test_convenience():
                              [0, 5, 0, -2],
                              [3, 0, 5, 0],
                              [0, -2, 0, 2]])
-    for ordering_method in ("natural", "amd", "metis", "nesdis", "colamd", "default", "best"):
-        for mode in ("simplicial", "supernodal"):
-            for dtype in (float, complex):
-                A_dense = np.array(A_dense_seed, dtype=dtype)
-                A_sp = sparse.csc_matrix(A_dense)
-                f = cholesky(A_sp, mode=mode, ordering_method=ordering_method)
-                assert_allclose(f.det(), np.linalg.det(A_dense))
-                assert_allclose(f.logdet(), np.log(np.linalg.det(A_dense)))
-                assert_allclose(f.slogdet(), [1, np.log(np.linalg.det(A_dense))])
-                assert_allclose((f.inv() * A_sp).todense(), np.eye(4))
+    for dtype in (float, complex):
+        A_dense = np.array(A_dense_seed, dtype=dtype)
+        A_sp = sparse.csc_matrix(A_dense)
+        for use_long in [False, True]:
+            if use_long:
+                A_sp = convert_matrix_indices_to_long_indices(A_sp)
+            for ordering_method in ("natural", "amd", "metis", "nesdis", "colamd", "default", "best"):
+                for mode in ("simplicial", "supernodal"):
+                    print('----')
+                    print(dtype)
+                    print(A_sp.indices.dtype)
+                    print(use_long)
+                    print(ordering_method)
+                    print(mode)
+                    print('----')
+                    f = cholesky(A_sp, mode=mode, ordering_method=ordering_method)
+                    print(f.D())
+                    assert_allclose(f.det(), np.linalg.det(A_dense))
+                    assert_allclose(f.logdet(), np.log(np.linalg.det(A_dense)))
+                    assert_allclose(f.slogdet(), [1, np.log(np.linalg.det(A_dense))])
+                    assert_allclose((f.inv() * A_sp).todense(), np.eye(4))
 
 def test_CholmodNotPositiveDefiniteError():
     A = -sparse.eye(4).tocsc()
