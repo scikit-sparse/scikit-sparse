@@ -3,6 +3,13 @@ Changes
 
 .. module:: sksparse.cholmod
 
+v0.4
+------
+  * 64-bit indices (type long) are now supported.
+  * The ordering method for Cholesky decomposition is now choosable.
+  * Specific exceptions subclasses are now thrown for each error condition
+  * Setup does not rely on an installed Cython anymore.
+
 v0.3.1
 ------
   * Ensure that arrays returned by the :meth:`Factor.solve_...` methods are
