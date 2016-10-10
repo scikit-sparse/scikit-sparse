@@ -1,8 +1,16 @@
 #! /usr/bin/env python
 
-# Copyright (C) 2008 Cournapeau David <cournape@gmail.com>
-# Copyright (C) 2009 Nathaniel Smith <njs@pobox.com>
-# Copyright (C) 2016 Antony Lee <anntzer.lee@gmail.com>
+# Copyright (C) 2008-2016 The scikit-sparse developers:
+# 
+# 2008        David Cournapeau        <cournape@gmail.com>
+# 2009-2015   Nathaniel Smith         <njs@pobox.com>
+# 2010        Dag Sverre Seljebotn    <dagss@student.matnat.uio.no>
+# 2014        Leon Barrett            <lbarrett@climate.com>
+# 2015        Yuri                    <yuri@tsoft.com>
+# 2016        Antony Lee              <anntzer.lee@gmail.com>
+# 2016        Alex Grigorievskiy      <alex.grigorievskiy@gmail.com>
+# 2016        Joscha Reimer           <jor@informatik.uni-kiel.de>
+
 
 """Sparse matrix tools.
 
@@ -43,13 +51,15 @@ if __name__ == "__main__":
           url = URL,
           long_description = LONG_DESCRIPTION,
           classifiers =
-            [ 'Development Status :: 3 - Alpha',
-              'Environment :: Console',
-              'Intended Audience :: Developers',
-              'Intended Audience :: Science/Research',
-              'License :: OSI Approved :: GNU General Public License (GPL)',
-              'Topic :: Scientific/Engineering'],
-          setup_requires=['setuptools>=18.0', 'numpy', 'cython'],
+            ['Development Status :: 3 - Alpha',
+             'Environment :: Console',
+             'Intended Audience :: Developers',
+             'Intended Audience :: Science/Research',
+             'License :: OSI Approved :: BSD License',
+             'Programming Language :: Cython',
+             'Topic :: Scientific/Engineering',
+             'Topic :: Scientific/Engineering :: Mathematics'],
+          setup_requires = ['setuptools>=18.0', 'numpy', 'cython'],
           # You may specify the directory where CHOLMOD is installed using the
           # library_dirs and include_dirs keywords in the lines below.
           ext_modules = [Extension("sksparse.cholmod", ["sksparse/cholmod.pyx"],
