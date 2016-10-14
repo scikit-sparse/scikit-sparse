@@ -1,5 +1,5 @@
 include README
-global-include *.pyx *.mtx.gz
+global-include *.h *.pyx *.mtx.gz
 graft doc
 prune doc/_build
 prune build dist
