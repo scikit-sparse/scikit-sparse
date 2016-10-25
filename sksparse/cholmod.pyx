@@ -563,15 +563,18 @@ cdef class Factor:
     def _cholesky_inplace(self, A, symmetric, beta=0, **kwargs):
         cdef cholmod_sparse c_A
         cdef object ref = self._common._init_view_sparse(&c_A, A, symmetric)
-        if self._common._use_long:
-            cholmod_l_factorize_p(&c_A, [beta, 0], NULL, 0,
-                                  self._factor, &self._common._common)
-        else:
-            cholmod_factorize_p(&c_A, [beta, 0], NULL, 0,
-                                self._factor, &self._common._common)
-        if self._common._common.status == CHOLMOD_NOT_POSDEF:
-            raise CholmodNotPositiveDefiniteError(
-            "Matrix is not positive definite.", self._factor.minor, self)
+        try:
+            if self._common._use_long:
+                cholmod_l_factorize_p(&c_A, [beta, 0], NULL, 0,
+                                    self._factor, &self._common._common)
+            else:
+                cholmod_factorize_p(&c_A, [beta, 0], NULL, 0,
+                                    self._factor, &self._common._common)
+        except CholmodNotPositiveDefiniteError as e:
+            e.factor = self
+            e.column = self._factor.minor
+            raise
+        assert self._common._common.status == CHOLMOD_OK
 
     def _clone(self):
         if self._common._use_long:
