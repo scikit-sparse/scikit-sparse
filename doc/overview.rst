@@ -23,12 +23,12 @@ Download
 
 The current release may be downloaded from the Python Package index at
 
-  http://pypi.python.org/pypi/scikit-sparse/
+  https://pypi.python.org/pypi/scikit-sparse/
 
 Or from the `homepage <https://github.com/scikit-sparse/scikit-sparse>`_
 at
 
-  https://github.com/scikit-sparse/scikit-sparse/downloads
+  https://github.com/scikit-sparse/scikit-sparse/releases
 
 Or the latest *development version* may be found in our `Git
 repository <https://github.com/scikit-sparse/scikit-sparse>`_::
@@ -71,11 +71,11 @@ Post your suggestions and questions directly to our `bug tracker
 Developers
 ----------
 
-2008        David Cournapeau        <cournape@gmail.com>
-2009-2015   Nathaniel Smith         <njs@pobox.com>
-2010        Dag Sverre Seljebotn    <dagss@student.matnat.uio.no>
-2014        Leon Barrett            <lbarrett@climate.com>
-2015        Yuri                    <yuri@tsoft.com>
-2016        Antony Lee              <anntzer.lee@gmail.com>
-2016        Alex Grigorievskiy      <alex.grigorievskiy@gmail.com>
-2016        Joscha Reimer           <jor@informatik.uni-kiel.de>
+* 2008        `David Cournapeau        <cournape@gmail.com>`_
+* 2009-2015   `Nathaniel Smith         <njs@pobox.com>`_
+* 2010        `Dag Sverre Seljebotn    <dagss@student.matnat.uio.no>`_
+* 2014        `Leon Barrett            <lbarrett@climate.com>`_
+* 2015        `Yuri                    <yuri@tsoft.com>`_
+* 2016        `Antony Lee              <anntzer.lee@gmail.com>`_
+* 2016        `Alex Grigorievskiy      <alex.grigorievskiy@gmail.com>`_
+* 2016        `Joscha Reimer           <jor@informatik.uni-kiel.de>`_
