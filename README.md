@@ -15,7 +15,7 @@ So far it just contains a wrapper for the CHOLMOD library for sparse
 Cholesky decomposition. Further contributions are welcome!
 
 For more details, including dependencies and installation
-instructions, see the [docs](http://scikit-sparse.readthedocs.org).
+instructions, see the [docs](https://scikit-sparse.readthedocs.org).
 
 License
 -------
@@ -31,9 +31,10 @@ that if you, for example, buy a license to use CHOLMOD in a commercial
 product, then you can also go ahead and use our wrapper code with your
 commercial license.)
 
-    scikits.sparse
-    Copyright (c) 2009, Nathaniel Smith <njs@pobox.com>
-    Copyright (c) 2016, Antony Lee <anntzer.lee@gmail.com>
+Copyright (c) 2009-2016, the [scikit-sparse developers](https://scikit-sparse.readthedocs.io/en/latest/overview.html#developers)
+
+    scikits-sparse
+    Copyright (c) 2009-2016, the scikit-sparse developers
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
