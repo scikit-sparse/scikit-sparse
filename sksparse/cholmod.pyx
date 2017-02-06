@@ -56,7 +56,7 @@ cdef extern from "cholmod_backward_compatible.h":
         CHOLMOD_NATURAL, CHOLMOD_GIVEN, CHOLMOD_AMD, CHOLMOD_METIS, CHOLMOD_NESDIS, CHOLMOD_COLAMD, CHOLMOD_POSTORDERED
 
     ctypedef int SuiteSparse_long
-    
+
     ctypedef struct cholmod_method_struct:
         int ordering
 
@@ -135,7 +135,7 @@ cdef extern from "cholmod_backward_compatible.h":
 
     int cholmod_print_factor(cholmod_factor *, const char *, cholmod_common *) except *
     int cholmod_l_print_factor(cholmod_factor *, const char *, cholmod_common *) except *
-    
+
     cholmod_factor * cholmod_copy_factor(cholmod_factor *, cholmod_common *) except? NULL
     cholmod_factor * cholmod_l_copy_factor(cholmod_factor *, cholmod_common *) except? NULL
 
@@ -424,7 +424,7 @@ cdef class Common:
         else:
             cholmod_c_check_common = cholmod_check_common
             cholmod_c_print_common = cholmod_print_common
-        
+
         print(cholmod_c_check_common(&self._common))
         name = repr(self)
         return cholmod_c_print_common(name, &self._common)
@@ -640,7 +640,7 @@ cdef class Factor:
         cdef cholmod_sparse c_C
         cdef object ref = self._common._init_view_sparse(&c_C, C, False)
         cdef cholmod_sparse * C_perm
-        
+
         if self._common._use_long:
             C_perm = cholmod_l_submatrix(
                 &c_C, <SuiteSparse_long *> self._factor.Perm, self._factor.n, NULL, -1,
@@ -743,7 +743,7 @@ cdef class Factor:
         cdef int * i_super_ = <int *> self._factor.super_
         cdef int * i_pi = <int *> self._factor.pi
         cdef int * i_px = <int *> self._factor.px
-        
+
         if self._factor.is_super:
             # This is a supernodal factorization, which is stored as a bunch
             # of dense, lower-triangular, column-major arrays packed into the
@@ -1000,13 +1000,13 @@ def analyze(A, mode="auto", ordering_method="default", use_long=None):
       the algorithm to be used.
 
     :param ordering_method: Specifies which ordering algorithm should be used to
-      (eventually) order the matrix A -- one of "natural", "amd", "metis", 
-      "nesdis", "colamd", "default" and "best". See the CHOLMOD documentation 
+      (eventually) order the matrix A -- one of "natural", "amd", "metis",
+      "nesdis", "colamd", "default" and "best". See the CHOLMOD documentation
       for details.
 
     :param use_long: Specifies if the long type (64 bit) or the int type
-      (32 bit) should be used for the indices of the sparse matrices. If 
-      use_long is None try to estimate if long type is needed. 
+      (32 bit) should be used for the indices of the sparse matrices. If
+      use_long is None try to estimate if long type is needed.
 
     :returns: A :class:`Factor` object representing the analysis. Many
       operations on this object will fail, because it does not yet hold a full
@@ -1030,12 +1030,12 @@ def analyze_AAt(A, mode="auto", ordering_method="default", use_long=None):
       the algorithm to be used.
 
     :param ordering_method: Specifies which ordering algorithm should be used to
-      (eventually) order the matrix A -- one of "natural", "amd", "metis", 
-      "nesdis", "colamd", "default" and "best". See the CHOLMOD documentation 
+      (eventually) order the matrix A -- one of "natural", "amd", "metis",
+      "nesdis", "colamd", "default" and "best". See the CHOLMOD documentation
       for details.
 
     :param use_long: Specifies if the long type (64 bit) or the int type
-      (32 bit) should be used for the indices of the sparse matrices. If 
+      (32 bit) should be used for the indices of the sparse matrices. If
       use_long is None try to estimate if long type is needed.
 
     :returns: A :class:`Factor` object representing the analysis. Many
@@ -1095,7 +1095,7 @@ def _analyze(A, symmetric, mode, ordering_method="default", use_long=None):
         else:
             common._common.nmethods = 1
             common._common.method [0].ordering = _ordering_methods[ordering_method]
-            if ordering_method == "natural": 
+            if ordering_method == "natural":
                 common._common.postorder = False
     elif ordering_method is not None:
         raise CholmodError, ("Unknown ordering method '%s', must be one of %s"
@@ -1120,7 +1120,7 @@ def cholesky(A, beta=0, mode="auto", ordering_method="default", use_long=None):
     ``mode`` is passed to :func:`analyze`.
 
     ``ordering_method`` is passed to :func:`analyze`.
-    
+
     ``use_long`` is passed to :func:`analyze`.
 
     :returns: A :class:`Factor` object represented the decomposition.
@@ -1144,7 +1144,7 @@ def cholesky_AAt(A, beta=0, mode="auto", ordering_method="default", use_long=Non
     ``mode`` is passed to :func:`analyze_AAt`.
 
     ``ordering_method`` is passed to :func:`analyze_AAt`.
-    
+
     ``use_long`` is passed to :func:`analyze`.
 
     :returns: A :class:`Factor` object represented the decomposition.
