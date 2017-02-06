@@ -503,10 +503,12 @@ cdef class Common:
         if m.ndim != 2:
             raise CholmodError("array has %s dimensions (expected 2)" % m.ndim)
         m = self._cast(m)
-        out.nrow = m.shape[0]
+        # The leading dimension is equal to m.shape[0] because `_cast` ensures
+        # that m is Fortran-contiguous.  It is not necessarily equal to
+        # `m.strides[1] // m.itemsize` when relaxed stride checking is on.
+        out.nrow = out.d = m.shape[0]
         out.ncol = m.shape[1]
         out.nzmax = m.size
-        out.d = m.strides[1] // m.itemsize
         out.x = m.data
         out.dtype = CHOLMOD_DOUBLE
         out.xtype = self._xtype
