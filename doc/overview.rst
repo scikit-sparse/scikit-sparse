@@ -76,6 +76,6 @@ Developers
 * 2010        `Dag Sverre Seljebotn    <dagss@student.matnat.uio.no>`_
 * 2014        `Leon Barrett            <lbarrett@climate.com>`_
 * 2015        `Yuri                    <yuri@tsoft.com>`_
-* 2016        `Antony Lee              <anntzer.lee@gmail.com>`_
+* 2016-2017   `Antony Lee              <anntzer.lee@gmail.com>`_
 * 2016        `Alex Grigorievskiy      <alex.grigorievskiy@gmail.com>`_
-* 2016        `Joscha Reimer           <jor@informatik.uni-kiel.de>`_
+* 2016-2017   `Joscha Reimer           <jor@informatik.uni-kiel.de>`_

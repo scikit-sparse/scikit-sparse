@@ -32,10 +32,10 @@ that if you, for example, buy a license to use CHOLMOD in a commercial
 product, then you can also go ahead and use our wrapper code with your
 commercial license.)
 
-Copyright (c) 2009-2016, the [scikit-sparse developers](https://scikit-sparse.readthedocs.io/en/latest/overview.html#developers)
+Copyright (c) 2009-2017, the [scikit-sparse developers](https://scikit-sparse.readthedocs.io/en/latest/overview.html#developers)
 
     scikits-sparse
-    Copyright (c) 2009-2016, the scikit-sparse developers
+    Copyright (c) 2009-2017, the scikit-sparse developers
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without

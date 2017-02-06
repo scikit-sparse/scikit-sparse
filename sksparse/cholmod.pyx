@@ -1,7 +1,15 @@
 # CHOLMOD wrapper for scikits.sparse
 
-# Copyright (C) 2009 Nathaniel Smith <njs@pobox.com>
-# Copyright (C) 2016 Antony Lee <anntzer.lee@gmail.com>
+# Copyright (C) 2008-2017 The scikit-sparse developers:
+# 
+# 2008        David Cournapeau        <cournape@gmail.com>
+# 2009-2015   Nathaniel Smith         <njs@pobox.com>
+# 2010        Dag Sverre Seljebotn    <dagss@student.matnat.uio.no>
+# 2014        Leon Barrett            <lbarrett@climate.com>
+# 2015        Yuri                    <yuri@tsoft.com>
+# 2016-2017   Antony Lee              <anntzer.lee@gmail.com>
+# 2016        Alex Grigorievskiy      <alex.grigorievskiy@gmail.com>
+# 2016-2017   Joscha Reimer           <jor@informatik.uni-kiel.de>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
