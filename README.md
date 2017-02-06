@@ -1,5 +1,6 @@
 ![Python27](https://img.shields.io/badge/python-2.7-blue.svg)
 ![Python35](https://img.shields.io/badge/python-3.5-blue.svg)
+![Python36](https://img.shields.io/badge/python-3.6-blue.svg)
 [![Documentation Status](https://readthedocs.org/projects/scikit-sparse/badge/?version=latest)](http://scikit-sparse.readthedocs.io/en/latest/?badge=latest)
 [![Travis](https://travis-ci.org/scikit-sparse/scikit-sparse.svg?branch=master)](https://travis-ci.org/scikit-sparse/scikit-sparse)
 
