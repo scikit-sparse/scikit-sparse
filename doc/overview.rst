@@ -41,7 +41,7 @@ Requirements
 Installing :mod:`scikit-sparse` requires:
 
 * `Python <http://python.org/>`_
-  (2.7 or 3.5 -- older versions may work but are untested)
+  (2.7, 3.5 or 3.6) -- other versions may work but are untested)
 * `NumPy <http://numpy.scipy.org/>`_
 * `SciPy <http://www.scipy.org/>`_
 * `Cython <http://www.cython.org/>`_
