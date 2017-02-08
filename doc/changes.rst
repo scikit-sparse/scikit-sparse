@@ -3,6 +3,11 @@ Changes
 
 .. module:: sksparse.cholmod
 
+v0.4.1
+------
+  * Bug with relaxed stride checking in NumPy 1.12 fixed.
+  * Support extended to Python 2.7 and 3.4 to 3.6 and NumPy 1.8 to 1.12.
+
 v0.4
 ------
   * 64-bit indices (type long) are now supported.
