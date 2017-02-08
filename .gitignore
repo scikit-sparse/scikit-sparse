@@ -63,6 +63,8 @@ _build
 dist
 doc/build
 doc/cdoc/build
+# Eggs
+.eggs
 # Egg metadata
 *.egg-info
 # The shelf plugin uses this dir
