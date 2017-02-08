@@ -1,10 +1,16 @@
 language: python
-python: ['2.7', '3.5', '3.6']
+python: ['2.7', '3.4', '3.5', '3.6']
+env:
+    - NUMPY='numpy>=1.8.0<1.9.0'
+    - NUMPY='numpy>=1.9.0<1.10.0'
+    - NUMPY='numpy>=1.10.0<1.11.0'
+    - NUMPY='numpy>=1.11.0<1.12.0'
+    - NUMPY='numpy>=1.12.0<1.13.0'
 addons:
     apt:
         packages:
             - libsuitesparse-dev
 install:
-    - pip install 'setuptools>=18' 'scipy'
+    - pip install 'setuptools>=18' $NUMPY 'scipy'
     - python setup.py build_ext --inplace
 script: py.test
