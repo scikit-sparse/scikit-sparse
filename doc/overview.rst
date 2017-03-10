@@ -9,7 +9,7 @@ is a companion to the :mod:`scipy.sparse` library for sparse matrix
 manipulation in Python. All :mod:`scikit-sparse` routines expect and
 return :mod:`scipy.sparse` matrices (usually in CSC format). The intent
 of :mod:`scikit-sparse` is to wrap GPL'ed code such as `SuiteSparse
-<http://www.cise.ufl.edu/research/sparse/SuiteSparse/>`_, which cannot be
+<http://www.suitesparse.com>`_, which cannot be
 included in SciPy proper.
 
 Currently our coverage is rather... sparse, with only a wrapper for
@@ -46,7 +46,7 @@ Installing :mod:`scikit-sparse` requires:
   (1.8 to 1.12 -- other versions may work but are untested)
 * `SciPy <http://www.scipy.org/>`_
 * `Cython <http://www.cython.org/>`_
-* `CHOLMOD <http://www.cise.ufl.edu/research/sparse/cholmod/>`_
+* CHOLMOD (included in `SuiteSparse <http://www.suitesparse.com>`_)
 
 On Debian/Ubuntu systems, the following command should suffice::
 
