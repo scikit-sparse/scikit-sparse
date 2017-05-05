@@ -45,7 +45,10 @@ import numpy as np
 from numpy.testing import assert_allclose
 from scipy import sparse
 from sksparse.cholmod import (
-    cholesky, cholesky_AAt, analyze, analyze_AAt, CholmodError, CholmodNotPositiveDefiniteError)
+    cholesky, cholesky_AAt, analyze, analyze_AAt, CholmodError, CholmodNotPositiveDefiniteError, _modes, _ordering_methods)
+
+modes = tuple(_modes.keys())
+ordering_methods = tuple(_ordering_methods.keys())
 
 # Match defaults of np.allclose, which were used before (and are needed).
 assert_allclose = partial(assert_allclose, rtol=1e-5, atol=1e-8)
@@ -117,8 +120,8 @@ def test_beta():
             for use_long in [False, True]:
                 if use_long:
                     matrix_plus_beta = convert_matrix_indices_to_long_indices(matrix_plus_beta)
-                for ordering_method in ("natural", "amd", "metis", "nesdis", "colamd", "default", "best"):
-                    for mode in ["auto", "supernodal", "simplicial"]:
+                for ordering_method in ordering_methods:
+                    for mode in modes:
                         f = cholesky(matrix, beta=beta, mode=mode, ordering_method=ordering_method)
                         L = f.L()
                         assert factor_of(f, matrix_plus_beta)
@@ -174,7 +177,7 @@ def test_cholesky_matrix_market():
         answer = np.linalg.lstsq(X.todense(), y)[0]
         XtX = (X.T * X).tocsc()
         Xty = X.T * y
-        for mode in ("auto", "simplicial", "supernodal"):
+        for mode in modes:
             assert_allclose(cholesky(XtX, mode=mode)(Xty), answer)
             assert_allclose(cholesky_AAt(X.T, mode=mode)(Xty), answer)
             assert_allclose(cholesky(XtX, mode=mode).solve_A(Xty), answer)
@@ -255,8 +258,8 @@ def test_convenience():
         for use_long in [False, True]:
             if use_long:
                 A_sp = convert_matrix_indices_to_long_indices(A_sp)
-            for ordering_method in ("natural", "amd", "metis", "nesdis", "colamd", "default", "best"):
-                for mode in ("simplicial", "supernodal"):
+            for ordering_method in ordering_methods:
+                for mode in modes:
                     print('----')
                     print(dtype)
                     print(A_sp.indices.dtype)
