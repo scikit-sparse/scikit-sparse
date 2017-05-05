@@ -203,14 +203,30 @@ Convenience methods
 
 .. automethod:: Factor.inv()
 
+.. automethod:: Factor.copy()
+
 
 Error handling
 --------------
 
 .. class:: CholmodError
 
+.. class:: CholmodNotPositiveDefiniteError
+
+.. class:: CholmodNotInstalledError
+
+.. class:: CholmodOutOfMemoryError
+
+.. class:: CholmodTooLargeError
+
+.. class:: CholmodNotPositiveDefiniteError
+
+.. class:: CholmodInvalidError
+
+.. class:: CholmodGpuProblemError
+
   Errors detected by CHOLMOD or by our wrapper code are converted into
-  exceptions of type :class:`CholmodError`.
+  exceptions of type :class:`CholmodError` or an appropriated subclass.
 
 .. class:: CholmodWarning
 
