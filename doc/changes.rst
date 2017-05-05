@@ -3,6 +3,11 @@ Changes
 
 .. module:: sksparse.cholmod
 
+v0.4.2
+------
+  * Bug where the ordering method is not taken into account is fixed.
+  * The Factor class has now a (public) copy method.
+
 v0.4.1
 ------
   * Bug with relaxed stride checking in NumPy 1.12 fixed.
