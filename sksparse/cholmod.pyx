@@ -586,7 +586,10 @@ cdef class Factor:
             raise
         assert self._common._common.status == CHOLMOD_OK
 
-    def _clone(self):
+    def copy(self):
+        """Copies the current :class:`Factor`.
+
+        :returns: A new :class:`Factor` object."""
         if self._common._use_long:
             cholmod_c_copy_factor = cholmod_l_copy_factor
         else:
@@ -607,7 +610,7 @@ cdef class Factor:
         a copy of the current :class:`Factor` and modifes the copy.
 
         :returns: The new :class:`Factor` object."""
-        clone = self._clone()
+        clone = self.copy()
         clone.cholesky_inplace(A, beta=beta)
         return clone
 
@@ -616,7 +619,7 @@ cdef class Factor:
         creates a copy of the current :class:`Factor` and modifes the copy.
 
         :returns: The new :class:`Factor` object."""
-        clone = self._clone()
+        clone = self.copy()
         clone.cholesky_AAt_inplace(A, beta=beta)
         return clone
 
@@ -710,7 +713,7 @@ cdef class Factor:
             cholmod_c_factor_to_sparse = cholmod_l_factor_to_sparse
         else:
             cholmod_c_factor_to_sparse = cholmod_factor_to_sparse
-        cdef Factor f = self._clone()
+        cdef Factor f = self.copy()
         cdef cholmod_sparse * l
         f._ensure_L_or_LD_inplace(want_L)
         l = cholmod_c_factor_to_sparse(f._factor,
