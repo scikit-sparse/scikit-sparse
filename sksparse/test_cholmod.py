@@ -42,7 +42,7 @@ import os.path
 
 from nose.tools import assert_raises
 import numpy as np
-from numpy.testing import assert_allclose
+from numpy.testing import assert_allclose, assert_array_equal
 from scipy import sparse
 from sksparse.cholmod import (
     cholesky, cholesky_AAt, analyze, analyze_AAt, CholmodError, CholmodNotPositiveDefiniteError, _modes, _ordering_methods)
@@ -278,3 +278,9 @@ def test_CholmodNotPositiveDefiniteError():
     A = -sparse.eye(4).tocsc()
     f = cholesky(A)
     assert_raises(CholmodNotPositiveDefiniteError, f.L)
+
+def test_natural_ordering_method():
+    A = real_matrix()
+    f = cholesky(A, ordering_method="natural")
+    p = f.P()
+    assert_array_equal(p, np.arange(len(p)))
