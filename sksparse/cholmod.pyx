@@ -1089,14 +1089,6 @@ def _analyze(A, symmetric, mode, ordering_method="default", use_long=None):
         raise CholmodError("Unknown mode '%s', must be one of %s" %
                            (mode, ", ".join(_modes.keys())))
 
-    if common._use_long:
-        cholmod_c_analyze = cholmod_l_analyze
-    else:
-        cholmod_c_analyze = cholmod_analyze
-    cdef cholmod_factor *c_f = cholmod_c_analyze(&c_A, &common._common)
-    if c_f is NULL:
-        raise CholmodError("Error in cholmod_analyze")
-
     if ordering_method in _ordering_methods:
         if ordering_method == "default":
             common._common.nmethods = 0
@@ -1105,11 +1097,18 @@ def _analyze(A, symmetric, mode, ordering_method="default", use_long=None):
         else:
             common._common.nmethods = 1
             common._common.method [0].ordering = _ordering_methods[ordering_method]
-            if ordering_method == "natural":
-                common._common.postorder = False
+        common._common.postorder = ordering_method != "natural"
     elif ordering_method is not None:
         raise CholmodError, ("Unknown ordering method '%s', must be one of %s"
                             % (ordering_method, ", ".join(_ordering_methods.keys())))
+
+    if common._use_long:
+        cholmod_c_analyze = cholmod_l_analyze
+    else:
+        cholmod_c_analyze = cholmod_analyze
+    cdef cholmod_factor *c_f = cholmod_c_analyze(&c_A, &common._common)
+    if c_f is NULL:
+        raise CholmodError("Error in cholmod_analyze")
 
     cdef Factor f = Factor(factor_secret_handshake)
     f._common = common
