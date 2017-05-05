@@ -434,7 +434,7 @@ cdef class Common:
             cholmod_c_print_common = cholmod_print_common
 
         print(cholmod_c_check_common(&self._common))
-        name = repr(self)
+        name = repr(self).encode()
         return cholmod_c_print_common(name, &self._common)
 
     def _print_sparse(self, name, symmetric, matrix):
@@ -553,7 +553,7 @@ cdef class Factor:
             cholmod_c_check_factor = cholmod_check_factor
             cholmod_c_print_factor = cholmod_print_factor
         print(cholmod_c_check_factor(self._factor, &self._common._common))
-        name = repr(self)
+        name = repr(self).encode()
         return cholmod_c_print_factor(self._factor, name, &self._common._common)
 
     def cholesky_inplace(self, A, beta=0):
