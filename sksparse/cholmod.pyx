@@ -1157,7 +1157,7 @@ def cholesky_AAt(A, beta=0, mode="auto", ordering_method="default", use_long=Non
 
     ``ordering_method`` is passed to :func:`analyze_AAt`.
 
-    ``use_long`` is passed to :func:`analyze`.
+    ``use_long`` is passed to :func:`analyze_AAt`.
 
     :returns: A :class:`Factor` object represented the decomposition.
     """
