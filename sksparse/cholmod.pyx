@@ -1014,8 +1014,8 @@ def analyze(A, mode="auto", ordering_method="default", use_long=None):
 
     :param ordering_method: Specifies which ordering algorithm should be used to
       (eventually) order the matrix A -- one of "natural", "amd", "metis",
-      "nesdis", "colamd", "default" and "best". See the CHOLMOD documentation
-      for details.
+      "nesdis", "colamd", "default" and "best". "natural" means no permutation.
+      See the CHOLMOD documentation for more details.
 
     :param use_long: Specifies if the long type (64 bit) or the int type
       (32 bit) should be used for the indices of the sparse matrices. If
@@ -1044,8 +1044,8 @@ def analyze_AAt(A, mode="auto", ordering_method="default", use_long=None):
 
     :param ordering_method: Specifies which ordering algorithm should be used to
       (eventually) order the matrix A -- one of "natural", "amd", "metis",
-      "nesdis", "colamd", "default" and "best". See the CHOLMOD documentation
-      for details.
+      "nesdis", "colamd", "default" and "best". "natural" means no permutation.
+      See the CHOLMOD documentation for more details.
 
     :param use_long: Specifies if the long type (64 bit) or the int type
       (32 bit) should be used for the indices of the sparse matrices. If
