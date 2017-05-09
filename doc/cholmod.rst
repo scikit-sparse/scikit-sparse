@@ -84,17 +84,17 @@ of which return a :class:`Factor` object, documented below.
 Most users will want one of the ``cholesky`` functions, which perform
 a fill-reduction analysis and decomposition together:
 
-.. autofunction:: cholesky(A, beta=0, mode="auto")
+.. autofunction:: cholesky(A, beta=0, mode="auto", ordering_method="default", use_long=None)
 
-.. autofunction:: cholesky_AAt(A, beta=0, mode="auto")
+.. autofunction:: cholesky_AAt(A, beta=0, mode="auto", ordering_method="default", use_long=None)
 
 However, some users may want to break the fill-reduction analysis and
 actual decomposition into separate steps, and instead begin with one
 of the ``analyze`` functions, which perform only fill-reduction:
 
-.. autofunction:: analyze(A, mode="auto")
+.. autofunction:: analyze(A, mode="auto", ordering_method="default", use_long=None)
 
-.. autofunction:: analyze_AAt(A, mode="auto")
+.. autofunction:: analyze_AAt(A, mode="auto", ordering_method="default", use_long=None)
 
 .. note:: Even if you used :func:`cholesky` or :func:`cholesky_AAt`,
   you can still call :meth:`cholesky_inplace()
