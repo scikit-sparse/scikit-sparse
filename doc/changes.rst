@@ -3,6 +3,11 @@ Changes
 
 .. module:: sksparse.cholmod
 
+v0.4.3
+------
+  * The method `solve_L` can now also use the `L` matrix of the LL' decomposition.
+  * Supported versions updated to Python 3.6, 3.5 and 2.7, NumPy 1.14 and 1.13 and SciPy 1.0 and 0.19.
+
 v0.4.2
 ------
   * Bug where the ordering method is not taken into account is fixed.
