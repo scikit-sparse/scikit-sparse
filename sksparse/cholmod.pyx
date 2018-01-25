@@ -1,7 +1,7 @@
 # CHOLMOD wrapper for scikits.sparse
 
 # Copyright (C) 2008-2017 The scikit-sparse developers:
-# 
+#
 # 2008        David Cournapeau        <cournape@gmail.com>
 # 2009-2015   Nathaniel Smith         <njs@pobox.com>
 # 2010        Dag Sverre Seljebotn    <dagss@student.matnat.uio.no>
@@ -9,7 +9,7 @@
 # 2015        Yuri                    <yuri@tsoft.com>
 # 2016-2017   Antony Lee              <anntzer.lee@gmail.com>
 # 2016        Alex Grigorievskiy      <alex.grigorievskiy@gmail.com>
-# 2016-2017   Joscha Reimer           <jor@informatik.uni-kiel.de>
+# 2016-2018   Joscha Reimer           <jor@informatik.uni-kiel.de>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -850,7 +850,11 @@ cdef class Factor:
         return (l, d)
 
     def solve_A(self, b):
-        """Returns :math:`x`, where :math:`Ax = b` (or :math:`AA'x = b`, if
+        """ Solves a linear system.
+
+        :param b: right-hand-side
+
+        :returns: math:`x`, where :math:`Ax = b` (or :math:`AA'x = b`, if
         you used :func:`cholesky_AAt`).
 
         :meth:`__call__` is an alias for this function, i.e., you can simply
@@ -863,30 +867,57 @@ cdef class Factor:
         return self.solve_A(b)
 
     def solve_LDLt(self, b):
-        """Returns :math:`x`, where :math:`LDL'x = b`.
+        """ Solves a linear system.
+
+        :param b: right-hand-side
+
+        :returns: math:`x`, where :math:`LDL'x = b`.
 
         (This is different from :meth:`solve_A` because it does not correct
         for the fill-reducing permutation.)"""
         return self._solve(b, CHOLMOD_LDLt)
 
     def solve_LD(self, b):
-        "Returns :math:`x`, where :math:`LDx = b`."
+        """ Solves a linear system.
+
+        :param b: right-hand-side
+
+        :returns: math:`x`, where :math:`LDx = b`."""
         self._ensure_L_or_LD_inplace(False)
         return self._solve(b, CHOLMOD_LD)
 
     def solve_DLt(self, b):
-        "Returns :math:`x`, where :math:`DL'x = b`."
+        """ Solves a linear system.
+
+        :param b: right-hand-side
+
+        :returns: math:`x`, where :math:`DL'x = b`."""
+
         self._ensure_L_or_LD_inplace(False)
         return self._solve(b, CHOLMOD_DLt)
 
-    def solve_L(self, b):
-        "Returns :math:`x`, where :math:`Lx = b`."
-        self._ensure_L_or_LD_inplace(False)
+    def solve_L(self, b, use_LDLt_decomposition=True):
+        """ Solves a linear system.
+
+        :param b: right-hand-side
+
+        :param use_LDLt_decomposition: If True, use the `L` of the `LDL'`
+          decomposition. If False, use the `L` of the `LL'` decomposition.
+
+        :returns: math:`x`, where :math:`Lx = b`."""
+        self._ensure_L_or_LD_inplace(not use_LDLt_decomposition)
         return self._solve(b, CHOLMOD_L)
 
-    def solve_Lt(self, b):
-        "Returns :math:`x`, where :math:`L'x = b`."
-        self._ensure_L_or_LD_inplace(False)
+    def solve_Lt(self, b, use_LDLt_decomposition=True):
+        """ Solves a linear system.
+
+        :param b: right-hand-side
+
+        :param use_LDLt_decomposition: If True, use the `L` of the `LDL'`
+          decomposition. If False, use the `L` of the `LL'` decomposition.
+
+        :returns: math:`x`, where :math:`L'x = b`."""
+        self._ensure_L_or_LD_inplace(not use_LDLt_decomposition)
         return self._solve(b, CHOLMOD_Lt)
 
     def solve_D(self, b):

@@ -163,14 +163,9 @@ All methods in this section accept both sparse and dense matrices (or
 vectors) ``b``, and return either a sparse or dense ``x``
 accordingly.
 
-All methods in this section act on :math:`LDL'` factorizations; `L`
-always refers to the matrix returned by :meth:`L_D`, not that
-returned by :meth:`L` (though conversion is not performed unless
-necessary).
-
-.. note:: If you need an efficient implementation of :meth:`solve_L`
-   or :meth:`solve_Lt` that works with the :math:`LL'` factorization,
-   then drop us a line, it'd be easy to add.
+All methods in this section act on :math:`LDL'` factorizations by default.
+Thus `L` refers by default to the matrix returned by :meth:`L_D`, not that
+returned by :meth:`L` (though conversion is not performed unless necessary).
 
 .. automethod:: Factor.solve_A(b)
 
