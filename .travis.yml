@@ -12,5 +12,6 @@ addons:
             - libsuitesparse-dev
 install:
     - pip install 'setuptools>=18' 'numpy'$NUMPY_VERSION 'scipy'$SCIPY_VERSION
+    - pip list
     - python setup.py build_ext --inplace
 script: py.test
