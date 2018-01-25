@@ -41,11 +41,11 @@ Requirements
 Installing :mod:`scikit-sparse` requires:
 
 * `Python <http://python.org/>`_
-  (2.7, 3.5 or 3.6 -- other versions may work but are untested)
+  (3.6, 3.5 or 2.7 -- other versions may work but are untested)
 * `NumPy <http://numpy.scipy.org/>`_
-  (1.12 or 1.13 -- other versions may work but are untested)
+  (1.14 or 1.13 -- other versions may work but are untested)
 * `SciPy <http://www.scipy.org/>`_
-  (0.18 or 0.19 -- other versions may work but are untested)
+  (1.0 or 0.19 -- other versions may work but are untested)
 * `Cython <http://www.cython.org/>`_
 * CHOLMOD (included in `SuiteSparse <http://www.suitesparse.com>`_)
 
@@ -80,4 +80,4 @@ Developers
 * 2015        `Yuri                    <yuri@tsoft.com>`_
 * 2016-2017   `Antony Lee              <anntzer.lee@gmail.com>`_
 * 2016        `Alex Grigorievskiy      <alex.grigorievskiy@gmail.com>`_
-* 2016-2017   `Joscha Reimer           <jor@informatik.uni-kiel.de>`_
+* 2016-2018   `Joscha Reimer           <jor@informatik.uni-kiel.de>`_
