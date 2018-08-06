@@ -68,6 +68,10 @@ As usual, ::
 
   $ pip install --user scikit-sparse
 
+or with conda ::
+
+  $ conda install -c conda-forge scikit-sparse
+
 Contact
 -------
 
