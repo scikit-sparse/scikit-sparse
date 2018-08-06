@@ -1,17 +1,43 @@
 language: python
-python: ['3.6', '3.5', '2.7']
 env:
     matrix:
-        - NUMPY_VERSION='==1.14.*' SCIPY_VERSION='==1.0.*'
-        - NUMPY_VERSION='==1.14.*' SCIPY_VERSION='==0.19.*'
-        - NUMPY_VERSION='==1.13.*' SCIPY_VERSION='==1.0.*'
-        - NUMPY_VERSION='==1.13.*' SCIPY_VERSION='==0.19.*'
-addons:
-    apt:
-        packages:
-            - libsuitesparse-dev
+        - PYTHON=3.7 NUMPY=1.15 SCIPY=1.1 SUITESPARSE=5.2
+        - PYTHON=3.7 NUMPY=1.15 SCIPY=1.0 SUITESPARSE=5.2
+        - PYTHON=3.7 NUMPY=1.15 SCIPY=0.19 SUITESPARSE=5.2
+        - PYTHON=3.7 NUMPY=1.14 SCIPY=1.1 SUITESPARSE=5.2
+        - PYTHON=3.7 NUMPY=1.14 SCIPY=1.0 SUITESPARSE=5.2
+        - PYTHON=3.7 NUMPY=1.14 SCIPY=0.19 SUITESPARSE=5.2
+        - PYTHON=3.7 NUMPY=1.13 SCIPY=1.1 SUITESPARSE=5.2
+        - PYTHON=3.7 NUMPY=1.13 SCIPY=1.0 SUITESPARSE=5.2
+        - PYTHON=3.7 NUMPY=1.13 SCIPY=0.19 SUITESPARSE=5.2
+        - PYTHON=3.6 NUMPY=1.15 SCIPY=1.1 SUITESPARSE=5.2
+        - PYTHON=3.6 NUMPY=1.15 SCIPY=1.0 SUITESPARSE=5.2
+        - PYTHON=3.6 NUMPY=1.15 SCIPY=0.19 SUITESPARSE=5.2
+        - PYTHON=3.6 NUMPY=1.14 SCIPY=1.1 SUITESPARSE=5.2
+        - PYTHON=3.6 NUMPY=1.14 SCIPY=1.0 SUITESPARSE=5.2
+        - PYTHON=3.6 NUMPY=1.14 SCIPY=0.19 SUITESPARSE=5.2
+        - PYTHON=3.6 NUMPY=1.13 SCIPY=1.1 SUITESPARSE=5.2
+        - PYTHON=3.6 NUMPY=1.13 SCIPY=1.0 SUITESPARSE=5.2
+        - PYTHON=3.6 NUMPY=1.13 SCIPY=0.19 SUITESPARSE=5.2
 install:
-    - pip install 'setuptools>=18' 'numpy'$NUMPY_VERSION 'scipy'$SCIPY_VERSION
-    - pip list
+    # install conda
+    - wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+    - bash miniconda.sh -b -p $HOME/miniconda
+    - . $HOME/miniconda/etc/profile.d/conda.sh
+    - conda config --set always_yes yes --set changeps1 no
+    - conda update -q conda
+    - conda info -a
+    # create test environment
+    - conda create -q -n test-environment
+    - conda activate test-environment
+    # install needed packages
+    - conda install -q python=$PYTHON
+    - conda install -q numpy=$NUMPY
+    - conda install -q scipy=$SCIPY
+    - conda install -q suitesparse=$SUITESPARSE
+    - conda install -q nose
+    - conda list
+    # install this package
     - python setup.py build_ext --inplace
-script: py.test
+script:
+    - nosetests -sv sksparse
