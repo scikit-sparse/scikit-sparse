@@ -60,7 +60,7 @@ if __name__ == "__main__":
              'Programming Language :: Cython',
              'Topic :: Scientific/Engineering',
              'Topic :: Scientific/Engineering :: Mathematics'],
-          setup_requires = ['setuptools>=18.0', 'numpy', 'cython'],
+          setup_requires = ['setuptools>=18.0', 'numpy', 'cython<0.29'],
           # You may specify the directory where CHOLMOD is installed using the
           # library_dirs and include_dirs keywords in the lines below.
           ext_modules = [
