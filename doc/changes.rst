@@ -6,7 +6,10 @@ Changes
 v0.4.3
 ------
   * The method `solve_L` can now also use the `L` matrix of the LL' decomposition.
-  * Supported versions updated to Python 3.6, 3.5 and 2.7, NumPy 1.14 and 1.13 and SciPy 1.0 and 0.19.
+  * Supported versions updated to:
+    - Python: 3.6, 3.5
+    - NumPy: 1.14, 1.13
+    - SciPy: 1.0, 0.19
 
 v0.4.2
 ------
@@ -16,13 +19,15 @@ v0.4.2
 v0.4.1
 ------
   * Bug with relaxed stride checking in NumPy 1.12 fixed.
-  * Support extended to Python 2.7 and 3.4 to 3.6 and NumPy 1.8 to 1.12.
+  * Supported versions updated to:
+    - Python: 3.6, 3.5, 3.4, 2.7
+    - NumPy: 1.8 to 1.12
 
 v0.4
 ------
   * 64-bit indices (type long) are now supported.
   * The ordering method for Cholesky decomposition is now choosable.
-  * Specific exceptions subclasses are now thrown for each error condition
+  * Specific exceptions subclasses are now thrown for each error condition.
   * Setup does not rely on an installed Cython anymore.
 
 v0.3.1
