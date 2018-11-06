@@ -330,9 +330,19 @@ cdef _py_sparse(cholmod_sparse * m, Common common):
 
     return sparse.csc_matrix((data, indices, indptr), shape=(m.nrow, m.ncol))
 
-cdef class _DenseCleanup:
-    cdef cholmod_dense * _dense
+cdef class _CholmodDenseDestructor:
+    """This is a destructor for NumPy arrays based on dense data of Cholmod.
+    Use this only once for each Cholmod dense array. Otherwise memory will be
+    freed multiple times."""
+    cdef cholmod_dense* _dense
     cdef Common _common
+
+    cdef init(self, cholmod_dense* m, Common common):
+        assert m is not NULL
+        assert common is not None
+        self._dense = m
+        self._common = common
+
     def __dealloc__(self):
         if self._common._use_long:
             cholmod_c_free_dense = cholmod_l_free_dense
@@ -340,24 +350,24 @@ cdef class _DenseCleanup:
             cholmod_c_free_dense = cholmod_free_dense
         cholmod_c_free_dense(&self._dense, &self._common._common)
 
-cdef _py_dense(cholmod_dense * m, Common common):
-    """Build an ndarray that's a view onto m, with a 'base' with appropriate
-    destructor. 'm' must have been allocated by cholmod."""
-
-    assert m is not NULL
-    assert common is not None
-    # Construct cleaner first, so even if we later raise an exception we still
-    # fulfill the contract that we will take care of cleanup:
-    cdef _DenseCleanup cleaner = _DenseCleanup()
-    cleaner._dense = m
-    cleaner._common = common
-
-    cdef np.ndarray out = np.PyArray_SimpleNewFromData(
-        1, [m.ncol * m.nrow], _np_typenum_for_data(m.xtype), m.x).reshape((m.ncol, m.nrow)).T
-    PyArray_ENABLEFLAGS(out, np.NPY_WRITEABLE)
-    np.set_array_base(out, cleaner)
-
-    return out
+cdef _cholmod_dense_to_numpy_array(cholmod_dense* m, Common common):
+    """Converts Cholmod dense array to NumPy array.
+    Use this only once for each Cholmod dense array. Otherwise memory will be
+    freed multiple times."""
+    # init destructor for cholmod data
+    cdef _CholmodDenseDestructor base = _CholmodDenseDestructor()
+    base.init(m, common)
+    # convert cholmod array to numpy array
+    cdef np.ndarray array = np.PyArray_SimpleNewFromData(
+        1, [m.ncol * m.nrow], _np_typenum_for_data(m.xtype), m.x)
+    # set destructor that frees the memory as base
+    np.set_array_base(array, base)
+    # reshape array
+    array = array.reshape((m.ncol, m.nrow)).T
+    # check if array is writeable
+    assert np.PyArray_ISWRITEABLE(array)
+    # return array
+    return array
 
 cdef void _error_handler(
         int status, const char * file, int line, const char * msg) except * with gil:
@@ -967,7 +977,7 @@ cdef class Factor:
         cdef object ref = self._common._init_view_dense(&c_b, b)
         cdef cholmod_dense *out = cholmod_c_solve(
             system, self._factor, &c_b, &self._common._common)
-        py_out = _py_dense(out, self._common)
+        py_out = _cholmod_dense_to_numpy_array(out, self._common)
         if ndim == 1:
             py_out = py_out[:, 0]
         return py_out
