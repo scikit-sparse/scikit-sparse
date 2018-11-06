@@ -3,6 +3,16 @@ Changes
 
 .. module:: sksparse.cholmod
 
+v0.4.4
+------
+  * Bug in solve with dense array, where base of result is not set correctly, fixed.
+  * Travis tests are using conda now.
+  * Supported versions updated to:
+    - Python: 3.7, 3.6
+    - NumPy: 1.15, 1.14, 1.13
+    - SciPy: 1.1, 1.0, 0.19
+    - SuiteSparse: 5.2
+
 v0.4.3
 ------
   * The method `solve_L` can now also use the `L` matrix of the LL' decomposition.
