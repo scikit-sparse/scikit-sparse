@@ -287,9 +287,19 @@ cdef int _np_typenum_for_index(int itype):
 cdef type _np_dtype_for_index(int itype):
     return np.PyArray_TypeObjectFromType(_np_typenum_for_index(itype))
 
-cdef class _SparseCleanup:
-    cdef cholmod_sparse * _sparse
+cdef class _CholmodSparseDestructor:
+    """This is a destructor for NumPy arrays based on sparse data of Cholmod.
+    Use this only once for each Cholmod sparse array. Otherwise memory will be
+    freed multiple times."""
+    cdef cholmod_sparse* _sparse
     cdef Common _common
+
+    cdef init(self, cholmod_sparse* m, Common common):
+        assert m is not NULL
+        assert common is not None
+        self._sparse = m
+        self._common = common
+
     def __dealloc__(self):
         if self._common._use_long:
             cholmod_c_free_sparse = cholmod_l_free_sparse
@@ -297,37 +307,34 @@ cdef class _SparseCleanup:
             cholmod_c_free_sparse = cholmod_free_sparse
         cholmod_c_free_sparse(&self._sparse, &self._common._common)
 
-cdef _py_sparse(cholmod_sparse * m, Common common):
+cdef _cholmod_sparse_to_scipy_sparse(cholmod_sparse * m, Common common):
     """Build a scipy.sparse.csc_matrix that's a view onto m, with a 'base' with
     appropriate destructor. 'm' must have been allocated by cholmod."""
 
-    # This is a little tricky -- we build 3 arrays, views on each part of the
-    # cholmod_dense object -- and they all have the same _SparseCleanup object
-    # as base. So none of them will be deallocated until they have all become
-    # unused. Then those are built into a csc_matrix.
+    # This is a little tricky: We build 3 arrays, views on each part of the
+    # cholmod_dense object. They all have the same _CholmodSparseDestructor
+    # object as base. So none of them will be deallocated until they have all
+    # become unused. Then those are built into a csc_matrix.
 
-    assert m is not NULL
-    assert common is not None
-    # Construct cleaner first, so even if we later raise an exception we still
-    # fulfill the contract that we will take care of cleanup:
-    cdef _SparseCleanup cleaner = _SparseCleanup()
-    cleaner._sparse = m
-    cleaner._common = common
+    # init destructor for cholmod data
+    cdef _CholmodSparseDestructor base = _CholmodSparseDestructor()
+    base.init(m, common)
+
+    # convert to NumPy arrays
     assert m.itype == common._common.itype
-
     cdef np.ndarray indptr = np.PyArray_SimpleNewFromData(
         1, [m.ncol + 1], _np_typenum_for_index(m.itype), m.p)
-    PyArray_ENABLEFLAGS(indptr, np.NPY_WRITEABLE)
-    np.set_array_base(indptr, cleaner)
     cdef np.ndarray indices = np.PyArray_SimpleNewFromData(
         1, [m.nzmax], _np_typenum_for_index(m.itype), m.i)
-    PyArray_ENABLEFLAGS(indices, np.NPY_WRITEABLE)
-    np.set_array_base(indices, cleaner)
     cdef np.ndarray data = np.PyArray_SimpleNewFromData(
         1, [m.nzmax], _np_typenum_for_data(m.xtype), m.x)
-    PyArray_ENABLEFLAGS(data, np.NPY_WRITEABLE)
-    np.set_array_base(data, cleaner)
 
+    # set destructor and check if writeable
+    for array in (indptr, indices, data):
+        np.set_array_base(array, base)
+        assert np.PyArray_ISWRITEABLE(indptr)
+
+    # return sparse matrix
     return sparse.csc_matrix((data, indices, indptr), shape=(m.nrow, m.ncol))
 
 cdef class _CholmodDenseDestructor:
@@ -729,7 +736,7 @@ cdef class Factor:
         l = cholmod_c_factor_to_sparse(f._factor,
                                      &f._common._common)
         assert l
-        return _py_sparse(l, self._common)
+        return _cholmod_sparse_to_scipy_sparse(l, self._common)
 
     def D(self):
         """Converts this factorization to the style
@@ -961,7 +968,7 @@ cdef class Factor:
         cdef object ref = self._common._init_view_sparse(&c_b, b, False)
         cdef cholmod_sparse *out = cholmod_c_spsolve(
             system, self._factor, &c_b, &self._common._common)
-        return _py_sparse(out, self._common)
+        return _cholmod_sparse_to_scipy_sparse(out, self._common)
 
     def _solve_dense(self, b, system):
         if self._common._use_long:
