@@ -24,8 +24,8 @@ decomposition. Further contributions are welcome!
 DISTNAME            = 'scikit-sparse'
 DESCRIPTION         = 'Scikits sparse matrix package'
 LONG_DESCRIPTION    = __doc__
-MAINTAINER          = 'Antony Lee',
-MAINTAINER_EMAIL    = 'anntzer.lee@gmail.com',
+MAINTAINER          = 'Joscha Reimer',
+MAINTAINER_EMAIL    = 'jor@informatik.uni-kiel.de',
 URL                 = 'https://github.com/scikit-sparse/scikit-sparse/'
 LICENSE             = 'GPL'
 
