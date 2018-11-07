@@ -28,6 +28,7 @@ MAINTAINER          = 'Joscha Reimer',
 MAINTAINER_EMAIL    = 'jor@informatik.uni-kiel.de',
 URL                 = 'https://github.com/scikit-sparse/scikit-sparse/'
 LICENSE             = 'GPL'
+KEYWORDS            = 'sparse matrix Cholesky decomposition'
 
 import sys
 
