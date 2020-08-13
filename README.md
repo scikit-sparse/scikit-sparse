@@ -20,13 +20,13 @@ instructions, see the [docs](https://scikit-sparse.readthedocs.org).
 
 Windows installation
 -------
-This was testes with a Anaconda 3 installation
+This was tested with a Anaconda 3 installation and Python 3.7
 
 0. Install requirements
-	- `conda install -c conda-forge numpy`
-	- `conda install -c anaconda scipy`
-	- `conda install -c conda-forge cython`
-	- `conda install -c conda-forge suitesparse`
+	- `conda install -c conda-forge numpy` - tested with v1.19.1
+	- `conda install -c anaconda scipy` - tested with v1.5.0
+	- `conda install -c conda-forge cython` - tested with v0.29.21
+	- `conda install -c conda-forge suitesparse` - tested with v5.4.0
 
 1. Download Microsoft Build Tools for C++ from https://visualstudio.microsoft.com/de/visual-cpp-build-tools/ (tested with 2019, should work with 2015 or newer)
 2. Install Visual Studio Build Tools
