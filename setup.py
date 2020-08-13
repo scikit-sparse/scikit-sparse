@@ -67,9 +67,10 @@ if __name__ == "__main__":
               Extension("sksparse.cholmod", ["sksparse/cholmod.pyx"],
                         include_dirs=[np.get_include(),
                                       sys.prefix + "/include",
+                                      sys.prefix + "/Library/include/suitesparse",
                                       # Debian's suitesparse-dev installs to
                                       # /usr/include/suitesparse
                                       "/usr/include/suitesparse"],
-                        library_dirs=[],
+                        library_dirs=[sys.prefix + "/Library/lib"],
                         libraries=['cholmod'])],
           )

@@ -18,6 +18,24 @@ Cholesky decomposition. Further contributions are welcome!
 For more details, including dependencies and installation
 instructions, see the [docs](https://scikit-sparse.readthedocs.org).
 
+Windows installation
+-------
+This was testes with a Anaconda 3 installation
+
+0. Install requirements
+	- `conda install -c conda-forge numpy`
+	- `conda install -c anaconda scipy`
+	- `conda install -c conda-forge cython`
+	- `conda install -c conda-forge suitesparse`
+
+1. Download Microsoft Build Tools for C++ from https://visualstudio.microsoft.com/de/visual-cpp-build-tools/ (tested with 2019, should work with 2015 or newer)
+2. Install Visual Studio Build Tools
+	1. Choose Workloads
+	2. Check "C++ Buildtools"
+	3. Keep standard settings
+3. Run `pip install git+https://github.com/EmJay276/scikit-sparse`
+4. Test `from sksparse.cholmod import cholesky`
+
 License
 -------
 
