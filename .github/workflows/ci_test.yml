@@ -68,7 +68,7 @@ jobs:
         sudo apt-get install libsuitesparse-dev
     - name: Build
       run: |
-        python -m pip install --upgrade pip setuptools wheel
+        pip install --upgrade pip setuptools wheel
         pip install numpy
         python setup.py sdist
     - name: Test the sdist
@@ -77,7 +77,7 @@ jobs:
         cd tmp
         python -m venv venv-sdist
         venv-sdist/bin/python -m pip install --upgrade pip setuptools wheel
-        venv-sdist/bin/python -m pip install numpy nose pytest
+        venv-sdist/bin/python -m pip install nose pytest
         venv-sdist/bin/python -m pip install ../dist/scikit-sparse*.tar.gz
         venv-sdist/bin/python -c "import sksparse;print(sksparse.__version__)"
         venv-sdist/bin/python -m pytest -v ../sksparse
