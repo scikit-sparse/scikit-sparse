@@ -6,5 +6,6 @@ prune doc/_build
 prune build
 prune dist
 global-exclude *~ *.so *.pyc
+exclude sksparse/cholmod.c
 include versioneer.py
 include sksparse/_version.py

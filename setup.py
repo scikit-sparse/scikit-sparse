@@ -36,7 +36,8 @@ from setuptools import setup, find_packages, Extension
 import versioneer
 
 if __name__ == "__main__":
-    setup(install_requires = ['numpy', 'scipy'],
+    setup(install_requires = ['numpy>=1.13.3', 'scipy>=0.19'],
+          python_requires=">=3.6, <=3.9",
           packages = find_packages(),
           package_data = {
               "": ["test_data/*.mtx.gz"],
@@ -60,7 +61,6 @@ if __name__ == "__main__":
              'Programming Language :: Cython',
              'Topic :: Scientific/Engineering',
              'Topic :: Scientific/Engineering :: Mathematics'],
-          setup_requires = ['setuptools>=18.0', 'numpy', 'cython'],
           # You may specify the directory where CHOLMOD is installed using the
           # library_dirs and include_dirs keywords in the lines below.
           ext_modules = [
