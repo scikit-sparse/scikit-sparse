@@ -69,7 +69,7 @@ jobs:
     - name: Build
       run: |
         pip install --upgrade pip setuptools wheel
-        pip install numpy
+        pip install numpy cython
         python setup.py sdist
     - name: Test the sdist
       run: |

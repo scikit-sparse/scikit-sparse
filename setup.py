@@ -33,6 +33,7 @@ import sys
 
 import numpy as np
 from setuptools import setup, find_packages, Extension
+from Cython.Build import cythonize
 import versioneer
 
 if __name__ == "__main__":
@@ -65,7 +66,7 @@ if __name__ == "__main__":
         ],
         # You may specify the directory where CHOLMOD is installed using the
         # library_dirs and include_dirs keywords in the lines below.
-        ext_modules=[
+        ext_modules=cythonize(
             Extension(
                 "sksparse.cholmod",
                 ["sksparse/cholmod.pyx"],
@@ -79,5 +80,5 @@ if __name__ == "__main__":
                 library_dirs=[],
                 libraries=["cholmod"],
             )
-        ],
+        ),
     )
