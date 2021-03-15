@@ -79,7 +79,7 @@ jobs:
         venv-sdist/bin/python -m pip install --upgrade pip setuptools wheel
         venv-sdist/bin/python -m pip install numpy nose pytest
         venv-sdist/bin/python -m pip install ../dist/scikit-sparse*.tar.gz
-        venv-sdist/bin/python -c "import skspsare;print(sksparse.__version__)"
+        venv-sdist/bin/python -c "import sksparse;print(sksparse.__version__)"
         venv-sdist/bin/python -m pytest -v ../sksparse
     - uses: actions/upload-artifact@v2
       with:
