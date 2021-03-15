@@ -45,13 +45,22 @@ import numpy as np
 from numpy.testing import assert_allclose, assert_array_equal
 from scipy import sparse
 from sksparse.cholmod import (
-    cholesky, cholesky_AAt, analyze, analyze_AAt, CholmodError, CholmodNotPositiveDefiniteError, _modes, _ordering_methods)
+    cholesky,
+    cholesky_AAt,
+    analyze,
+    analyze_AAt,
+    CholmodError,
+    CholmodNotPositiveDefiniteError,
+    _modes,
+    _ordering_methods,
+)
 
 modes = tuple(_modes.keys())
 ordering_methods = tuple(_ordering_methods.keys())
 
 # Match defaults of np.allclose, which were used before (and are needed).
 assert_allclose = partial(assert_allclose, rtol=1e-5, atol=1e-8)
+
 
 def test_cholesky_smoke_test():
     f = cholesky(sparse.eye(10, 10))
@@ -69,26 +78,25 @@ def test_cholesky_smoke_test():
     print("extract")
     assert np.all(f.P() == np.arange(10))
 
+
 def test_writeability():
     t = cholesky(sparse.eye(10, 10))(np.arange(10))
     assert t.flags["WRITEABLE"]
 
+
 def real_matrix():
-    return sparse.csc_matrix([[10, 0, 3, 0],
-                              [0, 5, 0, -2],
-                              [3, 0, 5, 0],
-                              [0, -2, 0, 2]])
+    return sparse.csc_matrix([[10, 0, 3, 0], [0, 5, 0, -2], [3, 0, 5, 0], [0, -2, 0, 2]])
+
 
 def complex_matrix():
-    return sparse.csc_matrix([[10, 0, 3 - 1j, 0],
-                              [0, 5, 0, -2],
-                              [3 + 1j, 0, 5, 0],
-                              [0, -2, 0, 2]])
+    return sparse.csc_matrix([[10, 0, 3 - 1j, 0], [0, 5, 0, -2], [3 + 1j, 0, 5, 0], [0, -2, 0, 2]])
+
 
 def factor_of(factor, matrix):
-    return np.allclose((factor.L() * factor.L().H).todense(),
-                       matrix.todense()[factor.P()[:, np.newaxis],
-                                        factor.P()[np.newaxis, :]])
+    return np.allclose(
+        (factor.L() * factor.L().H).todense(), matrix.todense()[factor.P()[:, np.newaxis], factor.P()[np.newaxis, :]]
+    )
+
 
 def convert_matrix_indices_to_long_indices(matrix):
     matrix.indices = np.asarray(matrix.indices, dtype=np.int64)
@@ -104,14 +112,12 @@ def test_complex():
 
     assert factor_of(fc, c)
 
-    assert_allclose(fc(np.arange(4))[:, None],
-                    c.todense().I * np.arange(4)[:, None])
-    assert_allclose(fc(np.arange(4) * 1j)[:, None],
-                    c.todense().I * (np.arange(4) * 1j)[:, None])
-    assert_allclose(fr(np.arange(4))[:, None],
-                    r.todense().I * np.arange(4)[:, None])
+    assert_allclose(fc(np.arange(4))[:, None], c.todense().I * np.arange(4)[:, None])
+    assert_allclose(fc(np.arange(4) * 1j)[:, None], c.todense().I * (np.arange(4) * 1j)[:, None])
+    assert_allclose(fr(np.arange(4))[:, None], r.todense().I * np.arange(4)[:, None])
     # If we did a real factorization, we can't do solves on complex arrays:
     assert_raises(CholmodError, fr, np.arange(4) * 1j)
+
 
 def test_beta():
     for matrix in [real_matrix(), complex_matrix()]:
@@ -126,6 +132,7 @@ def test_beta():
                         L = f.L()
                         assert factor_of(f, matrix_plus_beta)
 
+
 def test_update_downdate():
     m = real_matrix()
     f = cholesky(m)
@@ -139,6 +146,7 @@ def test_update_downdate():
     assert factor_of(f, 2 * m)
     f.update_inplace(L, subtract=True)
     assert factor_of(f, m)
+
 
 def test_solve_edge_cases():
     m = real_matrix()
@@ -159,16 +167,20 @@ def test_solve_edge_cases():
     # And ditto for the sparse version:
     assert_raises(CholmodError, f, sparse.eye(m.shape[0] + 1, m.shape[1]).tocsc())
 
+
 def mm_matrix(name):
     from scipy.io import mmread
+
     # Supposedly, it is better to use resource_stream and pass the resulting
     # open file object to mmread()... but for some reason this fails?
     from pkg_resources import resource_filename
+
     filename = resource_filename(__name__, "test_data/%s.mtx.gz" % name)
     matrix = mmread(filename)
     if sparse.issparse(matrix):
         matrix = matrix.tocsc()
     return matrix
+
 
 def test_cholesky_matrix_market():
     for problem in ("well1033", "illc1033", "well1850", "illc1850"):
@@ -212,33 +224,21 @@ def test_cholesky_matrix_market():
 
             print(problem, mode)
             for f in (f1, f2, f3, f4):
-                pXtX = XtX.todense()[f.P()[:, np.newaxis],
-                                     f.P()[np.newaxis, :]]
-                assert_allclose(np.prod(f.D()),
-                                np.linalg.det(XtX.todense()))
-                assert_allclose((f.L() * f.L().T).todense(),
-                                pXtX)
+                pXtX = XtX.todense()[f.P()[:, np.newaxis], f.P()[np.newaxis, :]]
+                assert_allclose(np.prod(f.D()), np.linalg.det(XtX.todense()))
+                assert_allclose((f.L() * f.L().T).todense(), pXtX)
                 L, D = f.L_D()
-                assert_allclose((L * D * L.T).todense(),
-                                pXtX)
+                assert_allclose((L * D * L.T).todense(), pXtX)
 
                 b = np.arange(XtX.shape[0])[:, np.newaxis]
-                assert_allclose(f.solve_A(b),
-                                np.dot(XtX.todense().I, b))
-                assert_allclose(f(b),
-                                np.dot(XtX.todense().I, b))
-                assert_allclose(f.solve_LDLt(b),
-                                np.dot((L * D * L.T).todense().I, b))
-                assert_allclose(f.solve_LD(b),
-                                np.dot((L * D).todense().I, b))
-                assert_allclose(f.solve_DLt(b),
-                                np.dot((D * L.T).todense().I, b))
-                assert_allclose(f.solve_L(b),
-                                np.dot(L.todense().I, b))
-                assert_allclose(f.solve_Lt(b),
-                                np.dot(L.T.todense().I, b))
-                assert_allclose(f.solve_D(b),
-                                np.dot(D.todense().I, b))
+                assert_allclose(f.solve_A(b), np.dot(XtX.todense().I, b))
+                assert_allclose(f(b), np.dot(XtX.todense().I, b))
+                assert_allclose(f.solve_LDLt(b), np.dot((L * D * L.T).todense().I, b))
+                assert_allclose(f.solve_LD(b), np.dot((L * D).todense().I, b))
+                assert_allclose(f.solve_DLt(b), np.dot((D * L.T).todense().I, b))
+                assert_allclose(f.solve_L(b), np.dot(L.todense().I, b))
+                assert_allclose(f.solve_Lt(b), np.dot(L.T.todense().I, b))
+                assert_allclose(f.solve_D(b), np.dot(D.todense().I, b))
 
                 assert_allclose(f.apply_P(b), b[f.P(), :])
                 assert_allclose(f.apply_P(b), b[f.P(), :])
@@ -247,11 +247,9 @@ def test_cholesky_matrix_market():
                 assert_allclose(f.apply_Pt(b), b[np.argsort(f.P()), :])
                 assert_allclose(f.apply_Pt(b), b[np.argsort(f.P()), :])
 
+
 def test_convenience():
-    A_dense_seed = np.array([[10, 0, 3, 0],
-                             [0, 5, 0, -2],
-                             [3, 0, 5, 0],
-                             [0, -2, 0, 2]])
+    A_dense_seed = np.array([[10, 0, 3, 0], [0, 5, 0, -2], [3, 0, 5, 0], [0, -2, 0, 2]])
     for dtype in (float, complex):
         A_dense = np.array(A_dense_seed, dtype=dtype)
         A_sp = sparse.csc_matrix(A_dense)
@@ -260,13 +258,13 @@ def test_convenience():
                 A_sp = convert_matrix_indices_to_long_indices(A_sp)
             for ordering_method in ordering_methods:
                 for mode in modes:
-                    print('----')
+                    print("----")
                     print(dtype)
                     print(A_sp.indices.dtype)
                     print(use_long)
                     print(ordering_method)
                     print(mode)
-                    print('----')
+                    print("----")
                     f = cholesky(A_sp, mode=mode, ordering_method=ordering_method)
                     print(f.D())
                     assert_allclose(f.det(), np.linalg.det(A_dense))
@@ -274,10 +272,12 @@ def test_convenience():
                     assert_allclose(f.slogdet(), [1, np.log(np.linalg.det(A_dense))])
                     assert_allclose((f.inv() * A_sp).todense(), np.eye(4))
 
+
 def test_CholmodNotPositiveDefiniteError():
     A = -sparse.eye(4).tocsc()
     f = cholesky(A)
     assert_raises(CholmodNotPositiveDefiniteError, f.L)
+
 
 def test_natural_ordering_method():
     A = real_matrix()
