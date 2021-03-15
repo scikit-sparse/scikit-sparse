@@ -38,7 +38,7 @@ import versioneer
 if __name__ == "__main__":
     setup(
         install_requires=["numpy>=1.13.3", "scipy>=0.19"],
-        python_requires=">=3.6, <=3.9",
+        python_requires=">=3.6, <3.10",
         packages=find_packages(),
         package_data={
             "": ["test_data/*.mtx.gz"],
