@@ -1,25 +1,35 @@
-![Python27](https://img.shields.io/badge/python-2.7-blue.svg)
-![Python35](https://img.shields.io/badge/python-3.5-blue.svg)
-![Python36](https://img.shields.io/badge/python-3.6-blue.svg)
-[![Documentation Status](https://readthedocs.org/projects/scikit-sparse/badge/?version=latest)](http://scikit-sparse.readthedocs.io/en/latest/?badge=latest)
-[![Travis](https://travis-ci.org/scikit-sparse/scikit-sparse.svg?branch=master)](https://travis-ci.org/scikit-sparse/scikit-sparse)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/scikit-sparse/scikit-sparse)](https://github.com/scikit-sparse/scikit-sparse/releases/latest)
+[![PyPI](https://img.shields.io/pypi/v/scikit-sparse)](https://pypi.org/project/scikit-sparse/)
+[![GitHub Workflow Status (event)](https://img.shields.io/github/workflow/status/scikit-sparse/scikit-sparse/CI%20targets?label=CI%20Tests)](https://github.com/scikit-sparse/scikit-sparse/actions/workflows/ci_test.yml) 
+[![Python Versions](https://img.shields.io/badge/python-3.6%2C%203.7%2C%203.8%2C%203.9-blue.svg)]()
+[![GitHub license](https://img.shields.io/github/license/scikit-sparse/scikit-sparse)](https://github.com/scikit-sparse/scikit-sparse/blob/master/LICENSE.txt)
 
-This is scikit-sparse, a companion to the scipy.sparse library for
+# scikit-sparse
+
+This `scikit-sparse` a companion to the scipy.sparse library for
 sparse matrix manipulation in Python. It provides routines that are
 not suitable for inclusion in scipy.sparse proper, usually because
 they are GPL'ed.
 
-NOTE:  This library is solid and works well, but no longer actively
-developed. Please let us know if you wish to take over development.
+For more details on usage see the [docs](https://scikit-sparse.readthedocs.org).
 
-So far it just contains a wrapper for the CHOLMOD library for sparse
-Cholesky decomposition. Further contributions are welcome!
+## Installation
 
-For more details, including dependencies and installation
-instructions, see the [docs](https://scikit-sparse.readthedocs.org).
+For pip installs  of `scikit-sparse` depend on the suite-sparse library which can be installed via:
+```bash
+# mac
+brew install suite-sparse
 
-License
--------
+# debian
+sudo apt-get install libsuitesparse-dev
+```
+
+Then, `scikit-sparse` can be installed via pip:
+```bash
+pip install scikit-sparse
+```
+
+## License
 
 The wrapper code contained in this package is released under a
 2-clause BSD license, as per below. However, this applies only to the
