@@ -1,21 +1,21 @@
-[![GitHub release (latest by date)](https://img.shields.io/github/v/release/jellis18/sksparse)](https://github.com/jellis18/sksparse/releases/latest)
-[![PyPI](https://img.shields.io/pypi/v/sksparse)](https://pypi.org/project/sksparse/)
-[![GitHub Workflow Status (event)](https://img.shields.io/github/workflow/status/jellis18/sksparse/CI%20targets?label=CI%20Tests)](https://github.com/jellis18/sksparse/actions/workflows/ci_test.yml) 
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/scikit-sparse/scikit-sparse)](https://github.com/scikit-sparse/scikit-sparse/releases/latest)
+[![PyPI](https://img.shields.io/pypi/v/scikit-sparse)](https://pypi.org/project/scikit-sparse/)
+[![GitHub Workflow Status (event)](https://img.shields.io/github/workflow/status/scikit-sparse/scikit-sparse/CI%20targets?label=CI%20Tests)](https://github.com/scikit-sparse/scikit-sparse/actions/workflows/ci_test.yml) 
 [![Python Versions](https://img.shields.io/badge/python-3.6%2C%203.7%2C%203.8%2C%203.9-blue.svg)]()
-[![GitHub license](https://img.shields.io/github/license/jellis18/sksparse)](https://github.com/jellis18/sksparse/blob/master/LICENSE.txt)
+[![GitHub license](https://img.shields.io/github/license/scikit-sparse/scikit-sparse)](https://github.com/scikit-sparse/scikit-sparse/blob/master/LICENSE.txt)
 
-# sksparse
+# scikit-sparse
 
-This is a semi-maintained fork of [scikit-sparse](https://github.com/scikit-sparse/scikit-sparse), a companion to the scipy.sparse library for
+This `scikit-sparse` a companion to the scipy.sparse library for
 sparse matrix manipulation in Python. It provides routines that are
 not suitable for inclusion in scipy.sparse proper, usually because
 they are GPL'ed.
 
-For more details on usage see the original [docs](https://scikit-sparse.readthedocs.org).
+For more details on usage see the [docs](https://scikit-sparse.readthedocs.org).
 
 ## Installation
 
-For pip installs `sksparse` depends on the suite-sparse library which can be installed via:
+For pip installs  of `scikit-sparse` depend on the suite-sparse library which can be installed via:
 ```bash
 # mac
 brew install suite-sparse
@@ -24,9 +24,9 @@ brew install suite-sparse
 sudo apt-get install libsuitesparse-dev
 ```
 
-Then, `skparse` can be installed via pip:
+Then, `scikit-sparse` can be installed via pip:
 ```bash
-pip install sksparse
+pip install scikit-sparse
 ```
 
 ## License
