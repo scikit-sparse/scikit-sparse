@@ -76,8 +76,14 @@ setup(
                 # Debian's suitesparse-dev installs to
                 # /usr/include/suitesparse
                 "/usr/include/suitesparse",
+                # macOS's suitesparse installs to
+                # /usr/local/include/suitesparse
+                "/usr/local/include/suitesparse",
             ],
-            library_dirs=[],
+            library_dirs=[
+                # macOS's suitesparse installs to /usr/local/lib
+                "/usr/local/lib",
+            ],
             libraries=["cholmod"],
         )
     ),
