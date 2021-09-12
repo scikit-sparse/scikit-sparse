@@ -86,3 +86,7 @@ Thumbs.db
 
 # virtual environments
 venv
+
+# vscode
+.devcontainer/
+.vscode/
