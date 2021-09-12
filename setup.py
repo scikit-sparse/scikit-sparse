@@ -10,7 +10,7 @@
 # 2016-2017   Joscha Reimer           <jor@informatik.uni-kiel.de>
 # 2021-       Justin Ellis            <justin.ellis18@gmail.com>
 
-"""Sparse matrix tools. 
+"""Sparse matrix tools.
 
 This is a home for sparse matrix code in Python that plays well with
 scipy.sparse, but that is somehow unsuitable for inclusion in scipy
@@ -20,6 +20,13 @@ So far we have a wrapper for the CHOLMOD library for sparse Cholesky
 decomposition. Further contributions are welcome!
 """
 
+import os
+import sys
+
+import numpy as np
+from Cython.Build import cythonize
+from setuptools import Extension, find_packages, setup
+
 DISTNAME = "scikit-sparse"
 DESCRIPTION = "Scikit sparse matrix package"
 LONG_DESCRIPTION = __doc__
@@ -28,11 +35,23 @@ MAINTAINER_EMAIL = "justin.ellis18@gmail.com"
 URL = "https://github.com/scikit-sparse/scikit-sparse"
 LICENSE = "BSD"
 
-import sys
 
-import numpy as np
-from Cython.Build import cythonize
-from setuptools import Extension, find_packages, setup
+INCLUDE_DIRS = [
+    np.get_include(),
+    sys.prefix + "/include",
+    # Debian's suitesparse-dev installs to
+    # /usr/include/suitesparse
+    "/usr/include/suitesparse",
+]
+LIBRARY_DIRS = []
+
+user_include_dir = os.getenv("SUITESPARSE_INCLUDE_DIR")
+user_library_dir = os.getenv("SUITESPARSE_LIBRARY_DIR")
+if user_include_dir:
+    INCLUDE_DIRS.append(user_include_dir)
+
+if user_library_dir:
+    LIBRARY_DIRS.append(user_library_dir)
 
 setup(
     install_requires=["numpy>=1.13.3", "scipy>=0.19"],
@@ -70,14 +89,8 @@ setup(
         Extension(
             "sksparse.cholmod",
             ["sksparse/cholmod.pyx"],
-            include_dirs=[
-                np.get_include(),
-                sys.prefix + "/include",
-                # Debian's suitesparse-dev installs to
-                # /usr/include/suitesparse
-                "/usr/include/suitesparse",
-            ],
-            library_dirs=[],
+            include_dirs=INCLUDE_DIRS,
+            library_dirs=LIBRARY_DIRS,
             libraries=["cholmod"],
         )
     ),

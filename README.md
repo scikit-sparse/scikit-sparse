@@ -1,7 +1,7 @@
 [![GitHub release (latest by date)](https://img.shields.io/github/v/release/scikit-sparse/scikit-sparse)](https://github.com/scikit-sparse/scikit-sparse/releases/latest)
 [![PyPI](https://img.shields.io/pypi/v/scikit-sparse)](https://pypi.org/project/scikit-sparse/)
 [![Conda Version](https://img.shields.io/conda/vn/conda-forge/scikit-sparse.svg)](https://anaconda.org/conda-forge/scikit-sparse)
-[![GitHub Workflow Status (event)](https://img.shields.io/github/workflow/status/scikit-sparse/scikit-sparse/CI%20targets?label=CI%20Tests)](https://github.com/scikit-sparse/scikit-sparse/actions/workflows/ci_test.yml) 
+[![GitHub Workflow Status (event)](https://img.shields.io/github/workflow/status/scikit-sparse/scikit-sparse/CI%20targets?label=CI%20Tests)](https://github.com/scikit-sparse/scikit-sparse/actions/workflows/ci_test.yml)
 [![Python Versions](https://img.shields.io/badge/python-3.6%2C%203.7%2C%203.8%2C%203.9-blue.svg)]()
 [![GitHub license](https://img.shields.io/github/license/scikit-sparse/scikit-sparse)](https://github.com/scikit-sparse/scikit-sparse/blob/master/LICENSE.txt)
 
@@ -30,6 +30,16 @@ sudo apt-get install libsuitesparse-dev
 Then, `scikit-sparse` can be installed via pip:
 ```bash
 pip install scikit-sparse
+```
+
+If you suite-sparse library is installed in a non-standard place and you get errors when installing with `pip` you can use the environment
+variables:
+* `SUITESPARSE_INCLUDE_DIR`
+* `SUITESPARSE_LIBRARY_DIR`
+
+at runtime so the compiler can find them. For example, lets say your suite-sparse installation is in `/opt/local` then you can run
+```bash
+SUITESPARSE_INCLUDE_DIR=/opt/local/include SUITESPARSE_LIBRARY_DIR=/opt/local/lib pip install scikit-sparse
 ```
 
 ### With `conda`
