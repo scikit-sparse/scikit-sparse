@@ -624,7 +624,7 @@ cdef class Factor:
 
     def cholesky(self, A, beta=0):
         """The same as :meth:`cholesky_inplace` except that it first creates
-        a copy of the current :class:`Factor` and modifes the copy.
+        a copy of the current :class:`Factor` and modifies the copy.
 
         :returns: The new :class:`Factor` object."""
         clone = self.copy()
@@ -633,7 +633,7 @@ cdef class Factor:
 
     def cholesky_AAt(self, A, beta=0):
         """The same as :meth:`cholesky_AAt_inplace` except that it first
-        creates a copy of the current :class:`Factor` and modifes the copy.
+        creates a copy of the current :class:`Factor` and modifies the copy.
 
         :returns: The new :class:`Factor` object."""
         clone = self.copy()
