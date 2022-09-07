@@ -1,43 +1,80 @@
-![Python27](https://img.shields.io/badge/python-2.7-blue.svg)
-![Python35](https://img.shields.io/badge/python-3.5-blue.svg)
-![Python36](https://img.shields.io/badge/python-3.6-blue.svg)
-[![Documentation Status](https://readthedocs.org/projects/scikit-sparse/badge/?version=latest)](http://scikit-sparse.readthedocs.io/en/latest/?badge=latest)
-[![Travis](https://travis-ci.org/scikit-sparse/scikit-sparse.svg?branch=master)](https://travis-ci.org/scikit-sparse/scikit-sparse)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/scikit-sparse/scikit-sparse)](https://github.com/scikit-sparse/scikit-sparse/releases/latest)
+[![PyPI](https://img.shields.io/pypi/v/scikit-sparse)](https://pypi.org/project/scikit-sparse/)
+[![Conda Version](https://img.shields.io/conda/vn/conda-forge/scikit-sparse.svg)](https://anaconda.org/conda-forge/scikit-sparse)
+[![GitHub Workflow Status (event)](https://img.shields.io/github/workflow/status/scikit-sparse/scikit-sparse/CI%20targets?label=CI%20Tests)](https://github.com/scikit-sparse/scikit-sparse/actions/workflows/ci_test.yml)
+[![Python Versions](https://img.shields.io/badge/python-3.6%2C%203.7%2C%203.8%2C%203.9-blue.svg)]()
+[![GitHub license](https://img.shields.io/github/license/scikit-sparse/scikit-sparse)](https://github.com/scikit-sparse/scikit-sparse/blob/master/LICENSE.txt)
 
-This is scikit-sparse, a companion to the scipy.sparse library for
+# scikit-sparse
+
+This `scikit-sparse` a companion to the scipy.sparse library for
 sparse matrix manipulation in Python. It provides routines that are
 not suitable for inclusion in scipy.sparse proper, usually because
 they are GPL'ed.
 
-NOTE:  This library is solid and works well, but no longer actively
-developed. Please let us know if you wish to take over development.
+For more details on usage see the [docs](https://scikit-sparse.readthedocs.org).
 
-So far it just contains a wrapper for the CHOLMOD library for sparse
-Cholesky decomposition. Further contributions are welcome!
+## Installation
 
-For more details, including dependencies and installation
-instructions, see the [docs](https://scikit-sparse.readthedocs.org).
+### With `pip`
 
-Windows installation
--------
-This was tested with a Anaconda 3 installation and Python 3.7
+For pip installs  of `scikit-sparse` depend on the suite-sparse library which can be installed via:
+```bash
+# mac
+brew install suite-sparse
+
+# debian
+sudo apt-get install libsuitesparse-dev
+```
+
+Then, `scikit-sparse` can be installed via pip:
+```bash
+pip install scikit-sparse
+```
+
+If you suite-sparse library is installed in a non-standard place and you get errors when installing with `pip` you can use the environment
+variables:
+* `SUITESPARSE_INCLUDE_DIR`
+* `SUITESPARSE_LIBRARY_DIR`
+
+at runtime so the compiler can find them. For example, lets say your suite-sparse installation is in `/opt/local` then you can run
+```bash
+SUITESPARSE_INCLUDE_DIR=/opt/local/include SUITESPARSE_LIBRARY_DIR=/opt/local/lib pip install scikit-sparse
+```
+
+### With `conda`
+The `conda` package comes with `suite-sparse` packaged as a dependency so all you need to do is:
+
+```bash
+conda install -c conda-forge scikit-sparse
+```
+
+### Windows installation
+This was tested with a Anaconda 3 installation and Python 3.8
 
 0. Install requirements
-	- `conda install -c conda-forge numpy` - tested with v1.19.1
-	- `conda install -c anaconda scipy` - tested with v1.5.0
-	- `conda install -c conda-forge cython` - tested with v0.29.21
+	- `conda install -c conda-forge cython` - tested with v0.29.32
 	- `conda install -c conda-forge suitesparse` - tested with v5.4.0
+	- optional (included in the build dependencies of `scikit-sparse`):
+		- `conda install -c conda-forge numpy` - tested with v1.23.2
+		- `conda install -c conda-forge scipy` - tested with v1.9.1
 
-1. Download Microsoft Build Tools for C++ from https://visualstudio.microsoft.com/de/visual-cpp-build-tools/ (tested with 2019, should work with 2015 or newer)
+1. Download Microsoft Build Tools for C++ from https://visualstudio.microsoft.com/de/visual-cpp-build-tools/ (tested with 2022, should work with 2015 or newer)
+
 2. Install Visual Studio Build Tools
 	1. Choose Workloads
-	2. Check "C++ Buildtools"
+	2. Check "Desktop development with C++"
 	3. Keep standard settings
-3. Run `pip install git+https://github.com/EmJay276/scikit-sparse`
+	
+3. Run in a Powershell
+	- `$env:SUITESPARSE_INCLUDE_DIR='C:/Anaconda3/envs/<YOUR ENVIRONMENT NAME HERE>/Library/include/suitesparse'`
+	- `$env:SUITESPARSE_LIBRARY_DIR='C:/Anaconda3/envs/<YOUR ENVIRONMENT NAME HERE>/Library/lib'`
+	- `pip install scikit-sparse`
+
 4. Test `from sksparse.cholmod import cholesky`
 
-License
--------
+
+## License
 
 The wrapper code contained in this package is released under a
 2-clause BSD license, as per below. However, this applies only to the

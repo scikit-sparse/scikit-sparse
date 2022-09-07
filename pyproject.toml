@@ -1,0 +1,33 @@
+[tool.black]
+line-length = 120
+target_version = ['py36']
+include = '\.pyi?$'
+exclude = '''
+
+(
+  /(
+      \.eggs         # exclude a few common directories in the
+    | \.git          # root of the project
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | _build
+    | buck-out
+    | build
+    | dist
+    | doc
+    | venv
+  )/
+)
+'''
+[build-system]
+requires = [
+    "setuptools>=40.8.0",
+    "wheel", 
+    "Cython>=0.22",
+    'numpy==1.13.3; python_version=="3.6"',
+    'numpy==1.14.5; python_version=="3.7"',
+    'numpy==1.17.3; python_version=="3.8"',
+    'numpy==1.19.3; python_version=="3.9"',
+]
+build-backend = "setuptools.build_meta"

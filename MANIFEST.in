@@ -1,10 +1,6 @@
 include LICENSE.txt
 include README.md
-global-include *.h *.pyx *.mtx.gz
-graft doc
-prune doc/_build
-prune build
-prune dist
-global-exclude *~ *.so *.pyc
-include versioneer.py
-include sksparse/_version.py
+include sksparse/cholmod_backward_compatible.h
+include sksparse/cholmod.pyx
+include sksparse/test_data/*
+exclude sksparse/cholmod.c

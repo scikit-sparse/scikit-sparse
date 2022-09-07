@@ -83,3 +83,10 @@ doc/cdoc/build
 ehthumbs.db
 Icon?
 Thumbs.db
+
+# virtual environments
+venv
+
+# vscode
+.devcontainer/
+.vscode/

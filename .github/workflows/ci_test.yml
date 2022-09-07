@@ -1,0 +1,114 @@
+name: CI targets
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  release: 
+    types:
+      - published
+
+
+jobs:
+  tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: [3.6, 3.7, 3.8, 3.9]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install non-python dependencies on mac
+      if: runner.os == 'macOS'
+      run: |
+        brew install suite-sparse
+    - name: Install non-python dependencies on linux
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get install libsuitesparse-dev
+    - name: Install dependencies and package
+      run: |
+        pip install --upgrade pip setuptools wheel
+        pip install pytest black nose
+        pip install -e .
+    - name: Display Python, pip, setuptools, and all installed versions
+      run: |
+        python -c "import sys; print(f'Python {sys.version}')"
+        python -c "import pip; print(f'pip {pip.__version__}')"
+        python -c "import setuptools; print(f'setuptools {setuptools.__version__}')"
+        python -m pip freeze
+    - name: Run lint
+      run:  black .
+    - name: Test with pytest
+      run: pytest -v tests
+
+
+  build:
+    needs: [tests]
+    name: Build source distribution
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 
+      uses: actions/setup-python@v2
+      with:
+        python-version: "3.7"
+    - name: Install non-python dependencies on linux
+      run: |
+        sudo apt-get install libsuitesparse-dev
+    - name: Build
+      run: |
+        pip install --upgrade pip setuptools wheel
+        pip install numpy cython
+        python setup.py sdist
+    - name: Test the sdist
+      run: |
+        mkdir tmp  
+        cd tmp
+        python -m venv venv-sdist
+        venv-sdist/bin/python -m pip install --upgrade pip setuptools wheel
+        venv-sdist/bin/python -m pip install pytest
+        venv-sdist/bin/python -m pip install ../dist/scikit-sparse*.tar.gz
+        venv-sdist/bin/python -c "import sksparse;print(sksparse.__version__)"
+        venv-sdist/bin/python -m pytest -v ../tests
+    - uses: actions/upload-artifact@v2
+      with:
+        name: dist
+        path: dist/*
+
+
+  deploy:
+    needs: [tests, build]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.7'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install setuptools wheel twine
+    - name: Download wheel/dist from build
+      uses: actions/download-artifact@v2
+      with:
+        name: dist
+        path: dist
+    - name: Build and publish
+      env:
+        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      run: |
+        twine upload dist/*
