@@ -49,6 +49,30 @@ The `conda` package comes with `suite-sparse` packaged as a dependency so all yo
 conda install -c conda-forge scikit-sparse
 ```
 
+### Windows installation
+This was tested with a Anaconda 3 installation and Python 3.8
+
+0. Install requirements
+	- `conda install -c conda-forge cython` - tested with v0.29.32
+	- `conda install -c conda-forge suitesparse` - tested with v5.4.0
+	- optional (included in the build dependencies of `scikit-sparse`):
+		- `conda install -c conda-forge numpy` - tested with v1.23.2
+		- `conda install -c conda-forge scipy` - tested with v1.9.1
+
+1. Download Microsoft Build Tools for C++ from https://visualstudio.microsoft.com/de/visual-cpp-build-tools/ (tested with 2022, should work with 2015 or newer)
+
+2. Install Visual Studio Build Tools
+	1. Choose Workloads
+	2. Check "Desktop development with C++"
+	3. Keep standard settings
+	
+3. Run in a Powershell
+	- `$env:SUITESPARSE_INCLUDE_DIR='C:/Anaconda3/envs/<YOUR ENVIRONMENT NAME HERE>/Library/include/suitesparse'`
+	- `$env:SUITESPARSE_LIBRARY_DIR='C:/Anaconda3/envs/<YOUR ENVIRONMENT NAME HERE>/Library/lib'`
+	- `pip install scikit-sparse`
+
+4. Test `from sksparse.cholmod import cholesky`
+
 
 ## License
 
