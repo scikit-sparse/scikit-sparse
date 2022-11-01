@@ -55,7 +55,7 @@ if user_library_dir:
 
 setup(
     install_requires=["numpy>=1.13.3", "scipy>=0.19"],
-    python_requires=">=3.6, <3.10",
+    python_requires=">=3.6, <3.11",
     packages=find_packages(),
     package_data={
         "": ["test_data/*.mtx.gz"],
@@ -82,6 +82,7 @@ setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
     ],
     # You may specify the directory where CHOLMOD is installed using the
     # library_dirs and include_dirs keywords in the lines below.
