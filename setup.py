@@ -24,8 +24,8 @@ import os
 import sys
 
 import numpy as np
-from setuptools import Extension, find_packages, setup
 from Cython.Build import cythonize
+from setuptools import Extension, find_packages, setup
 
 DISTNAME = "scikit-sparse"
 DESCRIPTION = "Scikit sparse matrix package"
@@ -61,7 +61,7 @@ setup(
         "": ["test_data/*.mtx.gz"],
     },
     name=DISTNAME,
-    version="0.4.7",  # remember to update __init__.py
+    version="0.4.8",  # remember to update __init__.py
     maintainer=MAINTAINER,
     maintainer_email=MAINTAINER_EMAIL,
     description=DESCRIPTION,
