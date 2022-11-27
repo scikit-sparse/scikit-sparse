@@ -24,8 +24,8 @@ import os
 import sys
 
 import numpy as np
-from Cython.Build import cythonize
 from setuptools import Extension, find_packages, setup
+from Cython.Build import cythonize
 
 DISTNAME = "scikit-sparse"
 DESCRIPTION = "Scikit sparse matrix package"
