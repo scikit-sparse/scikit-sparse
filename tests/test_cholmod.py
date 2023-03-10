@@ -284,3 +284,25 @@ def test_natural_ordering_method():
     f = cholesky(A, ordering_method="natural")
     p = f.P()
     assert_array_equal(p, np.arange(len(p)))
+
+
+def test_rowdel():
+    N = 100
+    B = sparse.random(N, N, density=0.1, format='csc')
+    A = B @ B.T + sparse.eye(N)
+    f = cholesky(A)
+    P = f.P()
+
+    for k in range(N):
+        f1 = f.copy()
+        f1.rowdel_inplace(k)
+
+        A1 = A.copy()
+        Pk = P[k]
+        # set P[k]th row to 0
+        A1[Pk, A[Pk,:].tocsr().indices] = 0.0
+        # set P[k]th col to 0
+        A1.data[A.indptr[Pk]:A.indptr[Pk+1]] = 0.0
+        A1[Pk,Pk] = 1.0
+
+        assert factor_of(f1, A1)

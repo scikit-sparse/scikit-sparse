@@ -175,6 +175,11 @@ cdef extern from "cholmod_backward_compatible.h":
     int cholmod_l_updown(int update, cholmod_sparse *, cholmod_factor *,
                          cholmod_common *) except *
 
+    int cholmod_rowdel(size_t k, cholmod_sparse *, cholmod_factor *,
+                       cholmod_common *) except *
+    int cholmod_l_rowdel(size_t k, cholmod_sparse *, cholmod_factor *,
+                       cholmod_common *) except *
+
     cholmod_dense * cholmod_solve(int, cholmod_factor *,
                                   cholmod_dense *, cholmod_common *) except? NULL
     cholmod_dense * cholmod_l_solve(int, cholmod_factor *,
@@ -685,6 +690,18 @@ cdef class Factor:
                              &self._common._common)
         finally:
             cholmod_c_free_sparse(&C_perm, &self._common._common)
+
+    def rowdel_inplace(self, k):
+        """
+        Sets the kth row and column of L to be the kth row and column of the identity
+        matrix, and updates L(k+1:n,k+1:n) accordingly."""
+
+        if self._common._use_long:
+            cholmod_c_rowdel = cholmod_l_rowdel
+        else:
+            cholmod_c_rowdel = cholmod_rowdel
+
+        cholmod_c_rowdel(k, NULL, self._factor, &self._common._common)
 
     # Everything below here will fail for matrices that were only analyzed,
     # not factorized.
