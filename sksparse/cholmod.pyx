@@ -175,6 +175,11 @@ cdef extern from "cholmod_backward_compatible.h":
     int cholmod_l_updown(int update, cholmod_sparse *, cholmod_factor *,
                          cholmod_common *) except *
 
+    int cholmod_rowadd(size_t k, cholmod_sparse *, cholmod_factor *,
+                       cholmod_common *) except *
+    int cholmod_l_rowadd(size_t k, cholmod_sparse *, cholmod_factor *,
+                       cholmod_common *) except *
+
     int cholmod_rowdel(size_t k, cholmod_sparse *, cholmod_factor *,
                        cholmod_common *) except *
     int cholmod_l_rowdel(size_t k, cholmod_sparse *, cholmod_factor *,
@@ -690,6 +695,24 @@ cdef class Factor:
                              &self._common._common)
         finally:
             cholmod_c_free_sparse(&C_perm, &self._common._common)
+
+    def rowadd_inplace(self, k, C):
+        """Adds a row to the LDL' factorization.  It computes the kth
+	    row and kth column of L, and then updates the submatrix L (k+1:n,k+1:n)
+	    accordingly.  The kth row and column of L must originally be equal to the
+	    kth row and column of the identity matrix.  The kth row/column of L is
+	    computed as the factorization of the kth row/column of the matrix to
+	    factorize, which is provided as a single n-by-1 sparse matrix C."""
+
+        if self._common._use_long:
+            cholmod_c_rowadd = cholmod_l_rowadd
+        else:
+            cholmod_c_rowadd = cholmod_rowadd
+
+        cdef cholmod_sparse c_C
+        cdef object ref = self._common._init_view_sparse(&c_C, C, False)
+
+        cholmod_c_rowadd(k, &c_C, self._factor, &self._common._common)
 
     def rowdel_inplace(self, k):
         """
