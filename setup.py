@@ -55,7 +55,7 @@ if user_library_dir:
 
 setup(
     install_requires=["numpy>=1.13.3", "scipy>=0.19"],
-    python_requires=">=3.6, <3.11",
+    python_requires=">=3.6, <4.0",
     packages=find_packages(),
     package_data={
         "": ["test_data/*.mtx.gz"],
