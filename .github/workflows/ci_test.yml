@@ -17,13 +17,13 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-20.04, macos-latest]
-        python-version: [3.6, 3.7, 3.8, 3.9, '3.10']
+                python-version: ['3.6', '3.7', '3.8', '3.9', '3.10', '3.11']
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install non-python dependencies on mac
@@ -37,14 +37,11 @@ jobs:
     - name: Install dependencies and package
       run: |
         pip install --upgrade pip setuptools wheel
-        pip install pytest black nose
+        pip install pytest black
         pip install -e .
-    - name: Display Python, pip, setuptools, and all installed versions
+    - name: Display installed packages
       run: |
-        python -c "import sys; print(f'Python {sys.version}')"
-        python -c "import pip; print(f'pip {pip.__version__}')"
-        python -c "import setuptools; print(f'setuptools {setuptools.__version__}')"
-        python -m pip freeze
+        python -m pip list
     - name: Run lint
       run:  black .
     - name: Test with pytest
@@ -58,11 +55,11 @@ jobs:
     if: github.event_name == 'release'
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Python 
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
-        python-version: "3.7"
+        python-version: '3.8'
     - name: Install non-python dependencies on linux
       run: |
         sudo apt-get install libsuitesparse-dev
@@ -92,11 +89,11 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'release'
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
-        python-version: '3.7'
+        python-version: '3.8'
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
