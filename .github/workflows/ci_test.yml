@@ -66,7 +66,7 @@ jobs:
     - name: Build
       run: |
         pip install --upgrade pip setuptools wheel
-        pip install numpy cython
+        pip install numpy "cython<3.0"
         python setup.py sdist
     - name: Test the sdist
       run: |
