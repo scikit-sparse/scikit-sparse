@@ -39,6 +39,7 @@
 
 #cython: binding = True
 #cython: language_level = 3
+#cython: legacy_implicit_noexcept = True
 
 cimport numpy as np
 
