@@ -39,7 +39,7 @@ variables:
 
 at runtime so the compiler can find them. For example, lets say your suite-sparse installation is in `/opt/local` then you can run
 ```bash
-SUITESPARSE_INCLUDE_DIR=/opt/local/include SUITESPARSE_LIBRARY_DIR=/opt/local/lib pip install scikit-sparse
+SUITESPARSE_INCLUDE_DIR=/opt/local/include/suitesparse SUITESPARSE_LIBRARY_DIR=/opt/local/lib pip install scikit-sparse
 ```
 
 ### With `conda`
