@@ -9,6 +9,7 @@
 # 2016        Alex Grigorievskiy      <alex.grigorievskiy@gmail.com>
 # 2016-2017   Joscha Reimer           <jor@informatik.uni-kiel.de>
 # 2021-       Justin Ellis            <justin.ellis18@gmail.com>
+# 2022-       Aaron Johnson           <aaron9035@gmail.com>
 
 """Sparse matrix tools.
 
@@ -30,7 +31,7 @@ from setuptools import Extension, find_packages, setup
 DISTNAME = "scikit-sparse"
 DESCRIPTION = "Scikit sparse matrix package"
 LONG_DESCRIPTION = __doc__
-MAINTAINER = "Justin Ellis"
+MAINTAINER = "Aaron Johnson"
 MAINTAINER_EMAIL = "justin.ellis18@gmail.com"
 URL = "https://github.com/scikit-sparse/scikit-sparse"
 LICENSE = "BSD"
@@ -40,10 +41,13 @@ INCLUDE_DIRS = [
     np.get_include(),
     sys.prefix + "/include",
     # Debian's suitesparse-dev installs to
-    # /usr/include/suitesparse
     "/usr/include/suitesparse",
+    # Homebrew macos-latest installs to
+    '/usr/local/opt/suite-sparse/include/suitesparse/',
 ]
-LIBRARY_DIRS = []
+LIBRARY_DIRS = [# Homebrew macos-latest installs to
+                '/usr/local/opt/suite-sparse/lib'
+]
 
 user_include_dir = os.getenv("SUITESPARSE_INCLUDE_DIR")
 user_library_dir = os.getenv("SUITESPARSE_LIBRARY_DIR")
