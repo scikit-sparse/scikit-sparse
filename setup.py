@@ -65,7 +65,7 @@ setup(
         "": ["test_data/*.mtx.gz"],
     },
     name=DISTNAME,
-    version="0.4.12",  # remember to update __init__.py
+    version="0.4.13",  # remember to update __init__.py
     maintainer=MAINTAINER,
     maintainer_email=MAINTAINER_EMAIL,
     description=DESCRIPTION,
@@ -88,6 +88,7 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
     ],
     # You may specify the directory where CHOLMOD is installed using the
     # library_dirs and include_dirs keywords in the lines below.
