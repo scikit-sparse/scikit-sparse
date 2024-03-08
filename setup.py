@@ -8,7 +8,7 @@
 # 2016-2017   Antony Lee              <anntzer.lee@gmail.com>
 # 2016        Alex Grigorievskiy      <alex.grigorievskiy@gmail.com>
 # 2016-2017   Joscha Reimer           <jor@informatik.uni-kiel.de>
-# 2021-2022   Justin Ellis            <justin.ellis18@gmail.com>
+# 2021-       Justin Ellis            <justin.ellis18@gmail.com>
 # 2022-       Aaron Johnson           <aaron9035@gmail.com>
 
 """Sparse matrix tools.
@@ -43,6 +43,7 @@ INCLUDE_DIRS = [
     # Debian's suitesparse-dev installs to
     # /usr/include/suitesparse
     "/usr/include/suitesparse",
+
 ]
 LIBRARY_DIRS = []
 
