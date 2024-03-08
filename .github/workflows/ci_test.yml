@@ -35,9 +35,6 @@ jobs:
       run: |
         sudo apt-get install libsuitesparse-dev
     - name: Install dependencies and package
-      env:
-        SUITESPARSE_INCLUDE_DIR: "/usr/local/opt/suite-sparse/include/suitesparse/"
-        SUITESPARSE_LIBRARY_DIR: "/usr/local/opt/suite-sparse/lib"
       run: |
         pip install --upgrade pip setuptools wheel
         pip install pytest black
