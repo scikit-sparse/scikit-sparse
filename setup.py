@@ -41,11 +41,13 @@ INCLUDE_DIRS = [
     np.get_include(),
     sys.prefix + "/include",
     # Debian's suitesparse-dev installs to
-    # /usr/include/suitesparse
     "/usr/include/suitesparse",
-
+    # Homebrew installs to
+    '/usr/local/opt/suite-sparse/include/suitesparse/',
 ]
-LIBRARY_DIRS = []
+LIBRARY_DIRS = [# Homebrew installs to
+                '/usr/local/opt/suite-sparse/lib'
+]
 
 user_include_dir = os.getenv("SUITESPARSE_INCLUDE_DIR")
 user_library_dir = os.getenv("SUITESPARSE_LIBRARY_DIR")
