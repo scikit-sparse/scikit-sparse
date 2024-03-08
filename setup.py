@@ -8,7 +8,8 @@
 # 2016-2017   Antony Lee              <anntzer.lee@gmail.com>
 # 2016        Alex Grigorievskiy      <alex.grigorievskiy@gmail.com>
 # 2016-2017   Joscha Reimer           <jor@informatik.uni-kiel.de>
-# 2021-       Justin Ellis            <justin.ellis18@gmail.com>
+# 2021-2022   Justin Ellis            <justin.ellis18@gmail.com>
+# 2022-       Aaron Johnson           <aaron9035@gmail.com>
 
 """Sparse matrix tools.
 
@@ -30,7 +31,7 @@ from setuptools import Extension, find_packages, setup
 DISTNAME = "scikit-sparse"
 DESCRIPTION = "Scikit sparse matrix package"
 LONG_DESCRIPTION = __doc__
-MAINTAINER = "Justin Ellis"
+MAINTAINER = "Aaron Johnson"
 MAINTAINER_EMAIL = "justin.ellis18@gmail.com"
 URL = "https://github.com/scikit-sparse/scikit-sparse"
 LICENSE = "BSD"
