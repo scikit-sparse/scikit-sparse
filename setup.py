@@ -84,6 +84,7 @@ setup(
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
     ],
     # You may specify the directory where CHOLMOD is installed using the
     # library_dirs and include_dirs keywords in the lines below.
