@@ -42,10 +42,10 @@ INCLUDE_DIRS = [
     sys.prefix + "/include",
     # Debian's suitesparse-dev installs to
     "/usr/include/suitesparse",
-    # Homebrew installs to
+    # Homebrew macos-latest installs to
     '/usr/local/opt/suite-sparse/include/suitesparse/',
 ]
-LIBRARY_DIRS = [# Homebrew installs to
+LIBRARY_DIRS = [# Homebrew macos-latest installs to
                 '/usr/local/opt/suite-sparse/lib'
 ]
 
