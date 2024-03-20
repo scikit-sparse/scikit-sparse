@@ -47,7 +47,6 @@ jobs:
     - name: Test with pytest
       run: pytest -v tests
 
-
   build:
     needs: [tests]
     name: Build source distribution
@@ -83,10 +82,13 @@ jobs:
         name: dist
         path: dist/*
 
-
   deploy:
     needs: [tests, build]
     runs-on: ubuntu-latest
+    environment: deploy
+    permissions:
+      # IMPORTANT: this permission is mandatory for trusted publishing
+      id-token: write
     if: github.event_name == 'release'
     steps:
     - uses: actions/checkout@v3
@@ -104,8 +106,4 @@ jobs:
         name: dist
         path: dist
     - name: Build and publish
-      env:
-        TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-        TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-      run: |
-        twine upload dist/*
+      uses: pypa/gh-action-pypi-publish@release/v1
