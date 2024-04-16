@@ -48,7 +48,7 @@ LIBRARY_DIRS = []
 # check if suitesparse is installed via homebrew
 homebrew_suitesparse_dir = (
     subprocess.run(
-        "brew info suitesparse | sed -n 4p | awk '{print $1}'",
+        "readlink -f $(brew --prefix suitesparse)",
         shell=True,
         stdout=subprocess.PIPE,
     )
