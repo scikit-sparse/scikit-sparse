@@ -50,7 +50,7 @@ homebrew_suitesparse_dir = (
     subprocess.run(
         "brew info suitesparse | sed -n 4p | awk '{print $1}'",
         shell=True,
-        capture_output=True,
+        stdout=subprocess.PIPE,
     )
     .stdout.decode()
     .strip()
