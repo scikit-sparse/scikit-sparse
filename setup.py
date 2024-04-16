@@ -22,6 +22,7 @@ decomposition. Further contributions are welcome!
 """
 
 import os
+import subprocess
 import sys
 
 import numpy as np
@@ -36,18 +37,35 @@ MAINTAINER_EMAIL = "justin.ellis18@gmail.com"
 URL = "https://github.com/scikit-sparse/scikit-sparse"
 LICENSE = "BSD"
 
-
 INCLUDE_DIRS = [
     np.get_include(),
     sys.prefix + "/include",
     # Debian's suitesparse-dev installs to
     "/usr/include/suitesparse",
-    # Homebrew macos-latest installs to
-    '/usr/local/opt/suite-sparse/include/suitesparse/',
 ]
-LIBRARY_DIRS = [# Homebrew macos-latest installs to
-                '/usr/local/opt/suite-sparse/lib'
-]
+LIBRARY_DIRS = []
+
+# check if suitesparse is installed via homebrew
+homebrew_suitesparse_dir = (
+    subprocess.run(
+        "readlink -f $(brew --prefix suitesparse)",
+        shell=True,
+        stdout=subprocess.PIPE,
+    )
+    .stdout.decode()
+    .strip()
+)
+if homebrew_suitesparse_dir:  # empty string if not found (because error is printed to stderr)
+    INCLUDE_DIRS.append(
+        # Include directory for homebrew-installed suitesparse
+        homebrew_suitesparse_dir
+        + "/include/suitesparse/",
+    )
+    LIBRARY_DIRS.append(
+        # Library directory for homebrew-installed suitesparse
+        homebrew_suitesparse_dir
+        + "/lib"
+    )
 
 user_include_dir = os.getenv("SUITESPARSE_INCLUDE_DIR")
 user_library_dir = os.getenv("SUITESPARSE_LIBRARY_DIR")
