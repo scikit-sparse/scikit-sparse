@@ -16,8 +16,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, macos-latest]
-        python-version: ['3.6', '3.7', '3.8', '3.9', '3.10', '3.11', '3.12']
+        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
+        os: [ubuntu-latest, macos-latest]
+        exclude:  # Python < v3.8 does not support Apple Silicon ARM64.
+          - python-version: "3.6"
+            os: macos-latest
+          - python-version: "3.7"
+            os: macos-latest
+          - python-version: "3.6"
+            os: ubuntu-latest
+        include:  # So run those legacy versions on Intel CPUs.
+          - python-version: "3.6"
+            os: macos-13
+          - python-version: "3.7"
+            os: macos-13
+          - python-version: "3.6"
+            os: ubuntu-20.04
 
     steps:
     - name: Checkout repository
