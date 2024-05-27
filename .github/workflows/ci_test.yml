@@ -23,11 +23,15 @@ jobs:
             os: macos-latest
           - python-version: "3.7"
             os: macos-latest
+          - python-version: "3.6"
+            os: ubuntu-latest
         include:  # So run those legacy versions on Intel CPUs.
           - python-version: "3.6"
             os: macos-13
           - python-version: "3.7"
             os: macos-13
+          - python-version: "3.6"
+            os: ubuntu-20.04
 
     steps:
     - name: Checkout repository
