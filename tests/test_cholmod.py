@@ -94,7 +94,7 @@ def complex_matrix():
 
 def factor_of(factor, matrix):
     return np.allclose(
-        (factor.L() * factor.L().H).todense(), matrix.todense()[factor.P()[:, np.newaxis], factor.P()[np.newaxis, :]]
+        (factor.L() * factor.L().T.conjugate()).todense(), matrix.todense()[factor.P()[:, np.newaxis], factor.P()[np.newaxis, :]]
     )
 
 
