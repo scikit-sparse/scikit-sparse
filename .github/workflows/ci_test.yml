@@ -83,12 +83,12 @@ jobs:
         python setup.py sdist
     - name: Test the sdist
       run: |
-        mkdir tmp  
+        mkdir tmp
         cd tmp
         python -m venv venv-sdist
         venv-sdist/bin/python -m pip install --upgrade pip setuptools wheel
         venv-sdist/bin/python -m pip install pytest
-        venv-sdist/bin/python -m pip install ../dist/scikit-sparse*.tar.gz
+        venv-sdist/bin/python -m pip install ../dist/scikit_sparse*.tar.gz
         venv-sdist/bin/python -c "import sksparse;print(sksparse.__version__)"
         venv-sdist/bin/python -m pytest -v ../tests
     - uses: actions/upload-artifact@v2
@@ -118,6 +118,6 @@ jobs:
       uses: actions/download-artifact@v2
       with:
         name: dist
-        path: dist/*
+        path: dist
     - name: Build and publish
       uses: pypa/gh-action-pypi-publish@release/v1
