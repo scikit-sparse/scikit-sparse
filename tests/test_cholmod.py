@@ -87,6 +87,9 @@ def test_writeability():
 def real_matrix():
     return sparse.csc_matrix([[10, 0, 3, 0], [0, 5, 0, -2], [3, 0, 5, 0], [0, -2, 0, 2]])
 
+def random_real_positive_definite_matrix(N, density=0.1):
+    B = sparse.random(N, N, density=density, format='csc')
+    return B @ B.T + sparse.eye(N)
 
 def complex_matrix():
     return sparse.csc_matrix([[10, 0, 3 - 1j, 0], [0, 5, 0, -2], [3 + 1j, 0, 5, 0], [0, -2, 0, 2]])
@@ -284,3 +287,44 @@ def test_natural_ordering_method():
     f = cholesky(A, ordering_method="natural")
     p = f.P()
     assert_array_equal(p, np.arange(len(p)))
+
+
+def test_rowadd():
+    N = 100
+    A = random_real_positive_definite_matrix(N)
+
+    for k in range(N):
+        A1 = A.copy()
+        # set kth row to 0
+        A1[k, A[k,:].tocsr().indices] = 0.0
+        # set kth col to 0
+        A1.data[A.indptr[k]:A.indptr[k+1]] = 0.0
+        A1[k,k] = 1.0
+        A1.eliminate_zeros()
+
+        f = cholesky(A1)
+        Pinvk = np.flatnonzero(f.P() == k)[0]
+        f.rowadd_inplace(Pinvk, A[f.P(),k])
+
+        assert factor_of(f, A)
+
+
+def test_rowdel():
+    N = 100
+    A = random_real_positive_definite_matrix(N)
+    f = cholesky(A)
+    P = f.P()
+
+    for k in range(N):
+        f1 = f.copy()
+        f1.rowdel_inplace(k)
+
+        A1 = A.copy()
+        Pk = P[k]
+        # set P[k]th row to 0
+        A1[Pk, A[Pk,:].tocsr().indices] = 0.0
+        # set P[k]th col to 0
+        A1.data[A.indptr[Pk]:A.indptr[Pk+1]] = 0.0
+        A1[Pk,Pk] = 1.0
+
+        assert factor_of(f1, A1)

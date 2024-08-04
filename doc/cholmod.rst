@@ -35,6 +35,9 @@ including:
   columns of `A` become available incrementally (e.g., due to memory
   constraints), or when many matrices with similar but non-identical
   columns must be factored.
+* In-place 'rowdel' and 'rowadd' operation, for computing the Cholesky
+  decomposition of :math:`A` with a row and column becomes the row and
+  column of an identity matrix or vice versa.
 * Convenience functions for computing the (log) determinant of the
   matrix that has been factored.
 * A convenience function for explicitly computing the inverse of the
@@ -138,6 +141,13 @@ Updating/Downdating
 +++++++++++++++++++
 
 .. automethod:: Factor.update_inplace(C, subtract=False)
+
+Adding/Deleting row and column
++++++++++++++++++++
+
+.. automethod:: Factor.rowadd_inplace(k, C)
+
+.. automethod:: Factor.rowdel_inplace(k)
 
 Accessing Cholesky factors explicitly
 +++++++++++++++++++++++++++++++++++++
