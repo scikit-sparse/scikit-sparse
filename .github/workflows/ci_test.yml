@@ -65,6 +65,7 @@ jobs:
     needs: [tests]
     name: Build source distribution
     runs-on: ubuntu-latest
+    if: github.event_name == 'release'
 
     steps:
     - uses: actions/checkout@v3
