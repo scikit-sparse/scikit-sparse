@@ -55,16 +55,16 @@ homebrew_suitesparse_dir = (
     .stdout.decode()
     .strip()
 )
-if (
-    homebrew_suitesparse_dir
-):  # empty string if not found (because error is printed to stderr)
+if homebrew_suitesparse_dir:  # empty string if not found (because error is printed to stderr)
     INCLUDE_DIRS.append(
         # Include directory for homebrew-installed suitesparse
-        homebrew_suitesparse_dir + "/include/suitesparse/",
+        homebrew_suitesparse_dir
+        + "/include/suitesparse/",
     )
     LIBRARY_DIRS.append(
         # Library directory for homebrew-installed suitesparse
-        homebrew_suitesparse_dir + "/lib"
+        homebrew_suitesparse_dir
+        + "/lib"
     )
 
 user_include_dir = os.getenv("SUITESPARSE_INCLUDE_DIR")
@@ -83,7 +83,7 @@ setup(
         "": ["test_data/*.mtx.gz"],
     },
     name=DISTNAME,
-    version="0.4.15",  # remember to update __init__.py
+    version="0.4.14",  # remember to update __init__.py
     maintainer=MAINTAINER,
     maintainer_email=MAINTAINER_EMAIL,
     description=DESCRIPTION,
