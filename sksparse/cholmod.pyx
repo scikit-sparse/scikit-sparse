@@ -403,12 +403,12 @@ cdef void _error_handler(
         warnings.warn(full_msg, CholmodWarning)
 
 def _check_for_csc(m):
-    if not sparse.isspmatrix_csc(m) or (hasattr(sparse, "csc_array") and isinstance(m, sparse.csc_array)):
+    if not (sparse.issparse(m) and m.format == "csc"):
         warnings.warn("converting matrix of class %s to CSC format"
                       % (m.__class__.__name__,),
                       CholmodTypeConversionWarning)
         m = m.tocsc()
-    assert sparse.isspmatrix_csc(m) or (hasattr(sparse, "csc_array") and isinstance(m, sparse.csc_array))
+    assert sparse.issparse(m) and m.format == "csc"
     return m
 
 cdef class Common:
