@@ -71,6 +71,10 @@ def test_cholesky_smoke_test():
     s_csc = sparse.csc_matrix(np.eye(10)[:, :2])
     assert sparse.issparse(f(s_csc))
     assert_allclose(f(s_csc).todense(), s_csc.todense())
+    print("csc_array")
+    sa_csc = sparse.csc_array(s_csc)
+    assert sparse.issparse(f(sa_csc))
+    assert_allclose(f(sa_csc).todense(), sa_csc.todense())
     print("csr")
     s_csr = s_csc.tocsr()
     assert sparse.issparse(f(s_csr))
@@ -94,7 +98,7 @@ def complex_matrix():
 
 def factor_of(factor, matrix):
     return np.allclose(
-        (factor.L() * factor.L().H).todense(), matrix.todense()[factor.P()[:, np.newaxis], factor.P()[np.newaxis, :]]
+        (factor.L() * factor.L().T.conjugate()).todense(), matrix.todense()[factor.P()[:, np.newaxis], factor.P()[np.newaxis, :]]
     )
 
 
