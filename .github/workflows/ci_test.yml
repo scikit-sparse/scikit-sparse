@@ -24,6 +24,8 @@ jobs:
       uses: actions/checkout@v3
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
+      env:
+        PIP_DISABLE_PIP_VERSION_CHECK: 1
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install non-python dependencies on mac
