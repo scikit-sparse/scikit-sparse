@@ -61,10 +61,6 @@ if user_library_dir:
     LIBRARY_DIRS.append(user_library_dir)
 
 setup(
-    packages=find_packages(),
-    package_data={
-        "": ["test_data/*.mtx.gz"],
-    },
     # You may specify the directory where CHOLMOD is installed using the
     # library_dirs and include_dirs keywords in the lines below.
     ext_modules=cythonize(
