@@ -22,11 +22,7 @@ def is_valid_permutation(p):
 
 
 def generate_random_matrices(
-    seed=565656,
-    N_trials=100,
-    N_max=10,
-    square_only=True,
-    d_scale=1
+    seed=565656, N_trials=100, N_max=10, square_only=True, d_scale=1
 ):
     """Generate a list of random sparse matrices of maximum size N x N.
 
@@ -59,12 +55,7 @@ def generate_random_matrices(
 
         d = d_scale * rng.random()  # density
 
-        A = sparse.random_array(
-            (M, N),
-            density=d,
-            format='csc',
-            rng=rng
-        )
+        A = sparse.random_array((M, N), density=d, format="csc", rng=rng)
 
         yield pytest.param(A, id=f"random_{trial:02d}::{A.shape}::{A.nnz}")
 
@@ -109,22 +100,21 @@ def test_singleton_matrix():
 
 @pytest.mark.parametrize(
     "A",
-    list(generate_random_matrices(
-        N_trials=100,
-        N_max=200,
-        d_scale=0.05,
-        square_only=True
-    )),
+    list(
+        generate_random_matrices(
+            N_trials=100, N_max=200, d_scale=0.05, square_only=True
+        )
+    ),
 )
 class TestRandomSquareMatrices:
-    @pytest.mark.parametrize("matrix_type", ['dense', 'csc', 'coo'])
+    @pytest.mark.parametrize("matrix_type", ["dense", "csc", "coo"])
     def test_input_type(self, A, matrix_type):
         match matrix_type:
-            case 'dense':
+            case "dense":
                 A = A.toarray()
-            case 'csc':
+            case "csc":
                 A = A.tocsc()
-            case 'coo':
+            case "coo":
                 A = A.tocoo()
             case _:
                 raise ValueError(f"Unknown matrix type: {matrix_type}")
@@ -154,7 +144,7 @@ DENSE_THRESHOLDS = [None, 5, 2]
 def test_amd_with_dense_rows(dense_thresh):
     N = 1000
     rng = np.random.default_rng(56)
-    A = sparse.random_array((N, N), density=0.001, format='lil', rng=rng)
+    A = sparse.random_array((N, N), density=0.001, format="lil", rng=rng)
 
     # Create a known number of dense rows above the threshold
     # thresh is actually dense_thresh * sqrt(N) == dense_thresh * 10
