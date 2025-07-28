@@ -28,5 +28,28 @@ def test_empty_input(itype):
     empty_A.indices = empty_A.indices.astype(itype)
     assert_array_equal(amd(empty_A), np.array([], dtype=itype), strict=True)
 
+
+def test_1D_input():
+    """Test that an invalid input raises a ValueError."""
+    with pytest.raises(ValueError, match="Input must be square"):
+        amd(np.arange(10))
+
+
+def test_ND_input():
+    """Test that an invalid input raises a ValueError."""
+    rng = np.random.default_rng(565656)
+    with pytest.raises(ValueError, match="Input must be convertible to CSC format"):
+        amd(rng.random((2, 3, 4)))
+
+
+@pytest.mark.parametrize("itype", [np.int32, np.int64])
+def test_zero_input(itype):
+    """Test that a matrix of all zeros returns the identity permutation."""
+    N = 10  # arbitrary
+    zero_A = sparse.csc_matrix((N, N))
+    zero_A.indptr = zero_A.indptr.astype(itype)
+    zero_A.indices = zero_A.indices.astype(itype)
+    assert_array_equal(amd(zero_A), np.arange(N, dtype=itype), strict=True)
+
 # =============================================================================
 # =============================================================================
