@@ -85,16 +85,21 @@ except Exception:
 INCLUDE_DIRS.append(str(Path(sys.prefix) / "include"))
 INCLUDE_DIRS.append("/usr/include/suitesparse")  # Linux default path
 
-setup(
-    # You may specify the directory where CHOLMOD is installed using the
-    # library_dirs and include_dirs keywords in the lines below.
-    ext_modules=cythonize(
-        Extension(
-            "sksparse.cholmod",
-            ["sksparse/cholmod.pyx"],
-            include_dirs=INCLUDE_DIRS,
-            library_dirs=LIBRARY_DIRS,
-            libraries=["cholmod"],
-        )
+extensions = [
+    Extension(
+        "sksparse.cholmod",
+        ["sksparse/cholmod.pyx"],
+        include_dirs=INCLUDE_DIRS,
+        library_dirs=LIBRARY_DIRS,
+        libraries=["cholmod"],
     ),
-)
+    Extension(
+        "sksparse.amd",
+        ["sksparse/amd.pyx"],
+        include_dirs=INCLUDE_DIRS,
+        library_dirs=LIBRARY_DIRS,
+        libraries=["amd"],
+    )
+]
+
+setup(ext_modules=cythonize(extensions, language_level=3))
