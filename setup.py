@@ -15,42 +15,29 @@ import os
 import subprocess
 import sys
 
-import numpy as np
 from Cython.Build import cythonize
-from setuptools import Extension, find_packages, setup
+from pathlib import Path
+from setuptools import Extension, setup
 
-INCLUDE_DIRS = [
-    np.get_include(),
-    sys.prefix + "/include",
-    # Debian's suitesparse-dev installs to
-    "/usr/include/suitesparse",
-]
+
+def get_numpy_include():
+    """Get the include directory for NumPy."""
+    try:
+        import numpy as np  # noqa: PLC0415
+
+        return np.get_include()
+    except ImportError:
+        return []
+
+
+INCLUDE_DIRS = []
 LIBRARY_DIRS = []
 
-# check if suitesparse is installed via homebrew
-homebrew_suitesparse_dir = (
-    subprocess.run(
-        "readlink -f $(brew --prefix suitesparse)",
-        shell=True,
-        stdout=subprocess.PIPE,
-    )
-    .stdout.decode()
-    .strip()
-)
+numpy_include = get_numpy_include()
+if numpy_include:
+    INCLUDE_DIRS.append(numpy_include)
 
-# empty string if not found (because error is printed to stderr)
-if homebrew_suitesparse_dir:
-    INCLUDE_DIRS.append(
-        # Include directory for homebrew-installed suitesparse
-        homebrew_suitesparse_dir
-        + "/include/suitesparse/",
-    )
-    LIBRARY_DIRS.append(
-        # Library directory for homebrew-installed suitesparse
-        homebrew_suitesparse_dir
-        + "/lib"
-    )
-
+# Check user SuiteSparse directories first
 user_include_dir = os.getenv("SUITESPARSE_INCLUDE_DIR")
 user_library_dir = os.getenv("SUITESPARSE_LIBRARY_DIR")
 
@@ -59,6 +46,43 @@ if user_include_dir:
 
 if user_library_dir:
     LIBRARY_DIRS.append(user_library_dir)
+
+# Check if suitesparse is installed via conda
+conda_prefix = os.getenv("CONDA_PREFIX")
+
+if conda_prefix:
+    conda_include = Path(conda_prefix) / "include" / "suitesparse"
+    conda_lib = Path(conda_prefix) / "lib"
+    if conda_include.is_dir():
+        INCLUDE_DIRS.append(str(conda_include))
+    if conda_lib.is_dir():
+        LIBRARY_DIRS.append(str(conda_lib))
+
+# Check if suitesparse is installed via homebrew
+try:
+    homebrew_prefix = (
+        subprocess.run(
+            "readlink -f $(brew --prefix suitesparse)",
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=True,  # raise an error if command fails
+        )
+        .stdout.decode()
+        .strip()
+    )
+    brew_include = Path(homebrew_prefix) / "include" / "suitesparse"
+    brew_lib = Path(homebrew_prefix) / "lib"
+    if brew_include.is_dir():
+        INCLUDE_DIRS.append(str(brew_include))
+    if brew_lib.is_dir():
+        LIBRARY_DIRS.append(str(brew_lib))
+except Exception:
+    pass
+
+# Check system-wide directories
+INCLUDE_DIRS.append(str(Path(sys.prefix) / "include"))
+INCLUDE_DIRS.append("/usr/include/suitesparse")  # Linux default path
 
 setup(
     # You may specify the directory where CHOLMOD is installed using the
