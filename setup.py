@@ -75,6 +75,8 @@ if user_include_dir:
 if user_library_dir:
     LIBRARY_DIRS.append(user_library_dir)
 
+extension_names = ["cholmod", "amd"]
+
 setup(
     install_requires=["numpy>=1.13.3", "scipy>=0.19"],
     python_requires=">=3.6",
@@ -83,7 +85,7 @@ setup(
         "": ["test_data/*.mtx.gz"],
     },
     name=DISTNAME,
-    version="0.4.16",  # remember to update __init__.py
+    version="0.5.0",  # remember to update __init__.py
     maintainer=MAINTAINER,
     maintainer_email=MAINTAINER_EMAIL,
     description=DESCRIPTION,
@@ -111,12 +113,15 @@ setup(
     # You may specify the directory where CHOLMOD is installed using the
     # library_dirs and include_dirs keywords in the lines below.
     ext_modules=cythonize(
-        Extension(
-            "sksparse.cholmod",
-            ["sksparse/cholmod.pyx"],
-            include_dirs=INCLUDE_DIRS,
-            library_dirs=LIBRARY_DIRS,
-            libraries=["cholmod"],
-        )
+        [
+            Extension(
+                f"sksparse.{name}",
+                [f"sksparse/{name}.pyx"],
+                include_dirs=INCLUDE_DIRS,
+                library_dirs=LIBRARY_DIRS,
+                libraries=[name],
+            )
+            for name in extension_names
+        ],
     ),
 )
