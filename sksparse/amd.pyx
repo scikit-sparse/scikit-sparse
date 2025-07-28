@@ -180,6 +180,8 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
     the SuiteSparse by Timothy A. Davis. For details, see the SuiteSparse
     repository [2]_.
 
+    .. versionadded:: 0.5.0
+
     References
     ----------
     .. [0] `amd.h` - Source header file from SuiteSparse.
@@ -276,7 +278,7 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
         raise ValueError(f"amd: input matrix A is invalid:\n{dump_info}")
 
     if return_info:
-        return p, info
+        return p, AMDInfo.from_array(info)
     else:
         return p
 
