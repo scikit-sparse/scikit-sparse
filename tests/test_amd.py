@@ -11,8 +11,9 @@ import numpy as np
 import pytest
 
 from numpy.testing import assert_array_equal
+from pathlib import Path
 from scipy import sparse
-from sksparse.amd import amd
+from sksparse.amd import AMDInfo, amd
 
 
 def is_valid_permutation(p):
@@ -179,6 +180,40 @@ def test_amd_with_dense_rows(dense_thresh):
 
     # Expect dense row at the end of the permutation, but maybe not in order
     assert_array_equal(np.sort(p[-N_dense_rows:]), np.sort(dense_row_idx))
+
+
+def test_info_can_24():
+    # The can_24 matrix is used in the SuiteSparse AMD MATLAB/amd_demo.m file.
+    expect_info = AMDInfo.from_array(
+        np.array([
+            0,     # status
+            24,    # N
+            160,   # nz
+            1,     # symmetry
+            24,    # nzdiag
+            136,   # nz_A_plus_AT
+            0,     # Ndense
+            3032,  # memory
+            0,     # Ncmpa
+            97,    # Lnz
+            97,    # Ndiv
+            275,   # Nmultsubs_LDL
+            453,   # Nmultsubs_LU
+            8,     # dmax
+        ]
+        )
+    )
+
+    # Load the can_24 matrix from a file
+    can_24_path = Path("tests") / "test_data" / "can_24"
+    with can_24_path.open() as fp:
+        can_24 = np.genfromtxt(fp, dtype=int)
+
+    A = sparse.csc_array((can_24[:, 2], (can_24[:, 0] - 1, can_24[:, 1] - 1)))
+    p, info = amd(A, return_info=True)
+
+    assert is_valid_permutation(p)
+    assert info == expect_info
 
 
 # =============================================================================
