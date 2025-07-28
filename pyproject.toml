@@ -11,12 +11,24 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "BSD-2-Clause"
 license-files = ["LICENSE.txt"]
-# TODO authors = [
-#     { name = "Aaron Johnson", email = "aaron9035@gmail.com" },
-# ]
+
+authors = [
+    { name = "David Cournapeau", email = "cournape@gmail.com" },
+    { name = "Nathaniel Smith", email = "njs@pobox.com" },
+    { name = "Dag Sverre Seljebotn", email = "dagss@student.matnat.uio.no" },
+    { name = "Leon Barrett", email = "lbarrett@climate.com" },
+    { name = "Yuri", email = "yuri@tsoft.com" },
+    { name = "Antony Lee", email = "anntzer.lee@gmail.com" },
+    { name = "Alex Grigorievskiy", email = "alex.grigorievskiy@gmail.com" },
+    { name = "Joscha Reimer", email = "jor@informatik.uni-kiel.de" },
+    { name = "Justin Ellis", email = "justin.ellis18@gmail.com" },
+    { name = "Aaron Johnson", email = "aaron9035@gmail.com" },
+    { name = "Bernard Roesler", email = "bernard.roesler@gmail.com" },
+]
 maintainers = [
     { name = "Aaron Johnson", email = "aaron9035@gmail.com" }
 ]
+
 keywords = ["sparse", "matrix", "linear algebra", "scipy", "numpy"]
 classifiers = [
     "Development Status :: 3 - Alpha",
