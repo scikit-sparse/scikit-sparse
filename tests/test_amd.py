@@ -10,7 +10,7 @@
 import numpy as np
 import pytest
 
-from numpy.testing import assert_allclose, assert_array_equal
+from numpy.testing import assert_array_equal
 from scipy import sparse
 from sksparse.amd import amd
 
@@ -62,7 +62,7 @@ def generate_random_matrices(
             (M, N),
             density=d,
             format='csc',
-            random_state=rng
+            rng=rng
         )
 
         yield pytest.param(A, id=f"random_{trial:02d}::{A.shape}::{A.nnz}")
@@ -139,6 +139,47 @@ class TestRandomSquareMatrices:
         assert p.dtype == itype
         assert p.shape == (A.shape[0],)
         assert is_valid_permutation(p)
+
+    @pytest.mark.parametrize("aggressive", [True, False])
+    def test_aggressive(self, A, aggressive):
+        p = amd(A, aggressive=aggressive)
+        assert is_valid_permutation(p)
+
+
+DENSE_THRESHOLDS = [None, 5, 2]
+
+
+@pytest.mark.parametrize("dense_thresh", DENSE_THRESHOLDS)
+def test_amd_with_dense_rows(dense_thresh):
+    N = 1000
+    rng = np.random.default_rng(56)
+    A = sparse.random_array((N, N), density=0.001, format='lil', rng=rng)
+
+    # Create a known number of dense rows above the threshold
+    # thresh is actually dense_thresh * sqrt(N) == dense_thresh * 10
+    # max(A[i] for i in range(N)) is ~ 5 for N = 1000, density = 0.001
+    AMD_DEFAULT_DENSE = 10
+    thresh = int(
+        (dense_thresh if dense_thresh is not None else AMD_DEFAULT_DENSE) * np.sqrt(N)
+    )
+
+    N_dense_rows = 10  # arbitrary choice for number of dense rows
+    N_elems = min(2 * thresh, N)  # arbitrary choice to ensure enough elements
+
+    dense_row_idx = rng.choice(N, size=N_dense_rows, replace=False)
+    col_idx = rng.choice(N, size=N_elems, replace=False)
+    for i in dense_row_idx:
+        # Ensure the row is dense enough
+        A[i, col_idx] = rng.random(size=len(col_idx))
+
+    A = A + A.T
+    p = amd(A, dense_thresh=dense_thresh)
+
+    assert is_valid_permutation(p)
+
+    # Expect dense row at the end of the permutation, but maybe not in order
+    assert_array_equal(np.sort(p[-N_dense_rows:]), np.sort(dense_row_idx))
+
 
 # =============================================================================
 # =============================================================================
