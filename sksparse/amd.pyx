@@ -41,10 +41,10 @@ def amd(A, control=None, return_info=False):
     try: 
         A = csc_array(A)
     except ValueError:
-        raise ValueError("amd: input must be convertible to CSC format")
+        raise ValueError("Input must be convertible to CSC format.")
 
     if A.shape[0] != A.shape[1]:
-        raise ValueError("amd: A must be square")
+        raise ValueError("Input must be square.")
 
     N = A.shape[0]
 
@@ -53,6 +53,9 @@ def amd(A, control=None, return_info=False):
 
     if N == 0:
         return np.empty(0, dtype=np.int32 if use_int32 else np.int64)
+
+    if A.nnz == 0:
+        return np.arange(N, dtype=np.int32 if use_int32 else np.int64)
 
     # Declare typed memory views for Cython
     cdef int[::1] Ap_mv_int32
