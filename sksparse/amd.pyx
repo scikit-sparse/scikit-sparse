@@ -3,13 +3,124 @@
 import numpy as np
 cimport numpy as np
 
+from dataclasses import dataclass
 from scipy.sparse import issparse, csc_array
 
 DEF CONTROL_SIZE = 5
 DEF INFO_SIZE = 20
 
-# TODO create python objects for control and info with more readable attributes
-# than just an array
+
+@dataclass(frozen=True)
+class AMDInfo:
+    """Information statistics returned by the AMD algorithm.
+
+    This class wraps the contents of the `Info` array output by `amd_order()`
+    into a Python dataclass.
+
+    Attributes
+    ----------
+    status : int
+        Return status: 
+          - 0 = OK,
+          - 1 = OK but jumbled,
+          - -1 = out of memory,
+          - -2 = invalid matrix.
+    N : int
+        Number of rows and columns of the input matrix ``A``.
+    nz : int
+        Number of nonzeros in the input matrix ``A``.
+    symmetry : float in [0, 1]
+        Symmetry of pattern of ``A``. The symmetry is the number of "matched"
+        off-diagonal entries divided by the total number of off-diagonal
+        entries. An entry ``A[i, j]`` is matched if ``A[j, i]`` is also an
+        entry, for any pair ``[i, j]`` where ``i != j``. In python code:
+
+        .. code::
+            S = A.astype(bool)
+            B = sparse.tril(S, -1) + sparse.triu(S, 1)
+            symmetry = (B * B.T).nnz / B.nnz
+
+    nzdiag : int
+        Number of entries on the diagonal of ``A``.
+    nz_A_plus_AT : int
+        Number of nonzeros in ``A + A.T`` (excluding diagonal).
+        If ``A`` is perfectly symmetric (``symmetry = 1``), with a fully
+        non-zero diagonal, then ``nz_A_plus_AT = nz - N`` (the smallest
+        possible value).
+        If ``A`` is perfectly unsymmetric (``symmetry = 0``, for an upper
+        triangular matrix, *e.g.*) with no diagonal, 
+        then ``nz_A_plus_AT = 2 * nz`` (the largest possible value).
+    Ndense : int
+        Number of dense rows/columns ignored during ordering. These
+        rows/columns are placed last in the output order ``p``.
+    memory : float
+        Memory used, in bytes. This is equal to:
+        ``(1.2 * nz_A_plus_AT + 9 * N) * sizeof(int)``. This coefficient is at
+        most ``2.4 * nz + 9 * N``. This accounting excludes the size of the
+        input arguments ``Ap``, ``Ai``, and ``p``, which have a total size of
+        ``nz + 2 * N + 1`` integers.
+    Ncmpa : int
+        Number of components in the matrix (excluding dense rows/columns).
+    Lnz : int
+        Number of nonzeros in the Cholesky factor ``L`` of ``A``, excluding
+        the diagonal. This is a slight upper bound because of the approximate
+        degree algorithm. It is a rough upper bound if there are many dense
+        rows/columns. The remaining statistics are also slight or rough upper
+        bounds for the same reason.
+    Ndiv : int
+        Number of division operations for LU or Cholesky factorization of the
+        permuted matrix ``A[p][:, p]``.
+    Nmultsubs_LDL : int
+        Number of multiply-subtract pairs for ``LDL.T`` factorization.
+    Nmultsubs_LU : int
+        Number of multiply-subtract pairs for LU factorization, assuming that
+        no numerical pivoting is required.
+    dmax : int
+        Maximum number of nonzeros in any column of ``L``, including the
+        diagonal.
+
+    Notes
+    -----
+    Field descriptions are adapted from SuiteSparse `amd.h` [0]_.
+
+    References
+    ----------
+    .. [0]: `amd.h` - SuiteSparse AMD header file.
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/AMD/Include/amd.h
+    """
+    status: int
+    N: int
+    nz: int
+    symmetry: float
+    nzdiag: int
+    nz_A_plus_AT: int
+    Ndense: int
+    memory: float
+    Ncmpa: int
+    Lnz: int
+    Ndiv: int
+    Nmultsubs_LDL: int
+    Nmultsubs_LU: int
+    dmax: int
+
+    @classmethod
+    def from_array(cls, info: "np.ndarray") -> "AMDInfo":
+        return cls(
+            status=int(info[AMD_STATUS]),
+            N=int(info[AMD_N]),
+            nz=int(info[AMD_NZ]),
+            symmetry=float(info[AMD_SYMMETRY]),
+            nzdiag=int(info[AMD_NZDIAG]),
+            nz_A_plus_AT=int(info[AMD_NZ_A_PLUS_AT]),
+            Ndense=int(info[AMD_NDENSE]),
+            memory=float(info[AMD_MEMORY]),
+            Ncmpa=int(info[AMD_NCMPA]),
+            Lnz=int(info[AMD_LNZ]),
+            Ndiv=int(info[AMD_NDIV]),
+            Nmultsubs_LDL=int(info[AMD_NMULTSUBS_LDL]),
+            Nmultsubs_LU=int(info[AMD_NMULTSUBS_LU]),
+            dmax=int(info[AMD_DMAX]),
+        )
 
 
 def amd(A, dense_thresh=None, aggressive=None, return_info=False):
@@ -161,7 +272,8 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
     if status == AMD_OUT_OF_MEMORY:
         raise MemoryError("amd: out of memory")
     elif status == AMD_INVALID:
-        raise ValueError("amd: input matrix A is corrupted")
+        dump_info = AMDInfo.from_array(info)
+        raise ValueError(f"amd: input matrix A is invalid:\n{dump_info}")
 
     if return_info:
         return p, info
