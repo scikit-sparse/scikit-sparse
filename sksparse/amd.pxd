@@ -7,6 +7,9 @@ cdef extern from "amd.h":
     int AMD_CONTROL
     int AMD_INFO
 
+    int AMD_DENSE
+    int AMD_AGGRESSIVE
+
     int AMD_OUT_OF_MEMORY
     int AMD_INVALID
 

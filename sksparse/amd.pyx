@@ -12,15 +12,44 @@ DEF INFO_SIZE = 20
 # than just an array
 
 
-def amd(A, control=None, return_info=False):
+def amd(A, dense_thresh=None, aggressive=None, return_info=False):
     """Compute the approximate minimum degree ordering of a sparse matrix.
 
     Parameters
     ----------
     A : (N, N) array_like or sparse matrix
         A square matrix in CSC format or convertible to CSC.
-    control : array_like, optional
-        Control parameters for AMD. If not provided, default control is used.
+    dense_thresh : float, optional
+        Threshold number of entries for considering a row/column dense. If
+        None, use the default value from AMD. The default value is 10.
+
+        From the SuiteSparse `amd.h` documentation [0]_:
+
+            A dense row/column in ``A + A.T`` can cause AMD to spend a lot of
+            time in ordering the matrix. If ``dense_thresh >= 0``, rows/columns
+            with more than ``dense_thresh * sqrt(N)`` entries are ignored
+            during the ordering, and placed last in the output order. The
+            default value of ``dense_thresh`` is 10. If negative, no
+            rows/columns are treated as "dense". Rows/columns with 16 or fewer
+            off-diagonal entries are never considered "dense".
+
+        For more details, see the SuiteSparse homepage [1]_.
+    aggressive : bool, optional
+        If True, use aggressive absorption. If None, uses the default value
+        from AMD. The default value is True.
+
+        From the SuiteSparse `amd.h` documentation [0]_:
+
+            Controls whether or not to use aggressive absorption, in which
+            a prior element is absorbed into the current element if is a subset
+            of the current element, even if it is not adjacent to the current
+            pivot element (refer to Amestoy, Davis, & Duff, 1996, for more
+            details). The default value is ``True``, which means to perform
+            aggressive absorption. This nearly always leads to a better
+            ordering (because the approximate degrees are more accurate) and
+            a lower execution time. There are cases where it can lead to
+            a slightly worse ordering, however.
+
     return_info : bool, optional
         If True, returns additional information about the ordering process.
         Default is False.
@@ -33,6 +62,21 @@ def amd(A, control=None, return_info=False):
     info : ndarray, optional
         Additional information about the ordering process, returned if
         ``return_info`` is True. Contains various statistics and status codes.
+
+    Notes
+    -----
+    This function wraps the AMD (Approximate Minimum Degree) algorithm from
+    the SuiteSparse by Timothy A. Davis. For details, see the SuiteSparse
+    repository [2]_.
+
+    References
+    ----------
+    .. [0] `amd.h` - Source header file from SuiteSparse.
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/AMD/Include/amd.h
+    .. [1] SuiteSparse homepage.
+        https://people.engr.tamu.edu/davis/suitesparse.html
+    .. [2] SuiteSparse GitHub repository.
+        https://github.com/DrTimothyAldenDavis/SuiteSparse
     """
     # Convert dense to sparse CSC
     if not issparse(A):
@@ -85,12 +129,11 @@ def amd(A, control=None, return_info=False):
         amd_l_defaults(<double*>&ctrl_mv[0])
 
     # Update the defaults with user control parameters
-    if control is not None:
-        user_ctrl = np.ascontiguousarray(control, dtype=np.float64)
+    if dense_thresh is not None:
+        ctrl[AMD_DENSE] = float(dense_thresh)
 
-        for i in range(CONTROL_SIZE):
-            if i < user_ctrl.shape[0]:
-                ctrl[i] = user_ctrl[i]
+    if aggressive is not None:
+        ctrl[AMD_AGGRESSIVE] = 1.0 if aggressive else 0.0
 
     info = np.zeros(INFO_SIZE, dtype=np.float64)
     cdef double[::1] info_mv = info
