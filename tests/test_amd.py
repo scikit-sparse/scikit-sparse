@@ -18,6 +18,7 @@ import pytest
 from numpy.testing import assert_array_equal
 from pathlib import Path
 from scipy import sparse
+from scipy.sparse import SparseEfficiencyWarning
 from sksparse.amd import AMDInfo, amd
 
 
@@ -67,39 +68,41 @@ def generate_random_matrices(
 
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
 def test_empty_input(itype):
-    empty_A = sparse.csc_matrix((0, 0))
+    empty_A = sparse.csc_array((0, 0))
     empty_A.indptr = empty_A.indptr.astype(itype)
     empty_A.indices = empty_A.indices.astype(itype)
     assert_array_equal(amd(empty_A), np.array([], dtype=itype), strict=True)
 
 
 def test_1D_input():
-    with pytest.raises(ValueError, match="Input must be square"):
-        amd(np.arange(10))
+    with pytest.warns(SparseEfficiencyWarning, match="not in CSC format"):
+        with pytest.raises(ValueError, match="Input must be square"):
+            amd(np.arange(10))
 
 
 def test_nonsquare_input():
     with pytest.raises(ValueError, match="Input must be square"):
-        amd(sparse.csc_matrix((3, 4)))
+        amd(sparse.csc_array((3, 4)))
 
 
 def test_ND_input():
     rng = np.random.default_rng(565656)
-    with pytest.raises(ValueError, match="Input must be convertible to CSC format"):
-        amd(rng.random((2, 3, 4)))
+    with pytest.warns(SparseEfficiencyWarning, match="not in CSC format"):
+        with pytest.raises(ValueError, match="Input must be convertible to CSC format"):
+            amd(rng.random((2, 3, 4)))
 
 
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
 def test_zero_input(itype):
     N = 10  # arbitrary
-    zero_A = sparse.csc_matrix((N, N))
+    zero_A = sparse.csc_array((N, N))
     zero_A.indptr = zero_A.indptr.astype(itype)
     zero_A.indices = zero_A.indices.astype(itype)
     assert_array_equal(amd(zero_A), np.arange(N, dtype=itype), strict=True)
 
 
 def test_singleton_matrix():
-    singleton_A = sparse.csc_matrix([[1]])
+    singleton_A = sparse.csc_array([[1]])
     assert_array_equal(amd(singleton_A), np.array([0], dtype=np.int32), strict=True)
 
 
@@ -124,7 +127,12 @@ class TestRandomSquareMatrices:
             case _:
                 raise ValueError(f"Unknown matrix type: {matrix_type}")
 
-        p = amd(A)
+        if matrix_type != "csc":
+            with pytest.warns(SparseEfficiencyWarning, match="not in CSC format"):
+                p = amd(A)
+        else:
+            p = amd(A)
+
         assert is_valid_permutation(p)
 
     @pytest.mark.parametrize("itype", [np.int32, np.int64])
@@ -169,6 +177,7 @@ def test_amd_with_dense_rows(dense_thresh):
         A[i, col_idx] = rng.random(size=len(col_idx))
 
     A = A + A.T
+    A = A.tocsc()
     p = amd(A, dense_thresh=dense_thresh)
 
     assert is_valid_permutation(p)
