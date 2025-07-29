@@ -1,3 +1,8 @@
+.. Copyright (C) 2025, Bernard Roesler. All rights reserved.
+   Part of the scikit-sparse project.
+   See pyproject.toml for full author list and LICENSE.txt for license details.
+   SPDX-License-Identifier: BSD-2-Clause
+
 Approximate Minimum Degree (AMD) Ordering (:mod:`sksparse.amd`)
 ===============================================================
 
