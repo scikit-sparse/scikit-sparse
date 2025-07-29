@@ -41,8 +41,10 @@ References
 import numpy as np
 cimport numpy as np
 
+import warnings
+
 from dataclasses import dataclass
-from scipy.sparse import issparse, csc_array
+from scipy.sparse import csc_array, issparse, SparseEfficiencyWarning
 
 DEF CONTROL_SIZE = 5
 DEF INFO_SIZE = 20
@@ -238,6 +240,19 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
         Additional information about the ordering process, returned if
         ``return_info`` is True. Contains various statistics and status codes.
 
+    Raises
+    ------
+    SparseEfficiencyWarning
+        If the input matrix is not in CSC format, a warning is raised and the
+        matrix is converted to CSC format.
+    ValueError
+        If the input matrix is not square or cannot be converted to CSC format.
+    AMDInvalidMatrixError
+        If the input matrix is invalid for AMD, such as having unsupported
+        data types or formats.
+    AMDMemoryError
+        If the AMD algorithm runs out of memory during execution.
+
     Notes
     -----
     This function wraps the AMD (Approximate Minimum Degree) algorithm from
@@ -260,7 +275,13 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
         A = np.atleast_2d(np.asarray(A))
 
     try: 
-        A = csc_array(A)
+        if not isinstance(A, csc_array):
+            warnings.warn(
+                "Input matrix is not in CSC format. Converting to CSC.",
+                SparseEfficiencyWarning,
+                stacklevel=2
+            )
+            A = csc_array(A)
     except ValueError:
         raise ValueError("Input must be convertible to CSC format.")
 
