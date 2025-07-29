@@ -48,6 +48,21 @@ DEF CONTROL_SIZE = 5
 DEF INFO_SIZE = 20
 
 
+class AMDError(Exception):
+    """Base class for AMD-related errors."""
+    pass
+
+
+class AMDInvalidMatrixError(AMDError):
+    """Raised when the input matrix is invalid for AMD."""
+    pass
+
+
+class AMDMemoryError(AMDError):
+    """Raised when AMD runs out of memory."""
+    pass
+
+
 @dataclass(frozen=True)
 class AMDInfo:
     """Information statistics returned by the AMD algorithm.
@@ -321,10 +336,10 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
         )
 
     if status == AMD_OUT_OF_MEMORY:
-        raise MemoryError("amd: out of memory")
+        raise AMDMemoryError("amd: out of memory")
     elif status == AMD_INVALID:
         dump_info = AMDInfo.from_array(info)
-        raise ValueError(f"amd: input matrix A is invalid:\n{dump_info}")
+        raise AMDInvalidMatrixError(f"amd: input matrix A is invalid:\n{dump_info}")
 
     if return_info:
         return p, AMDInfo.from_array(info)
