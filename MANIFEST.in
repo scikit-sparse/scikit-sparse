@@ -1,3 +1,4 @@
 include LICENSE.txt
 include README.md
+include sksparse/cholmod_backward_compatible.h
 recursive-include sksparse *.pyx *.pxd
