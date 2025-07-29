@@ -20,19 +20,19 @@ Cholesky or LU factorization and subsequent linear algebra operations.
 
 Interfaces
 ----------
-- `amd`: Main function to compute the AMD ordering.
-- `AMDInfo`: Dataclass to hold information statistics returned by the AMD
+* `amd`: Main function to compute the AMD ordering.
+* `AMDInfo`: Dataclass to hold information statistics returned by the AMD
   algorithm.
-- `print_amd_default_control`: Print the default control parameters for AMD.
+* `amd_default_control`: Get the default control parameters for AMD.
 
 This wrapper handles both 32-bit and 64-bit integer indices, depending on the
 input matrix format.
 
 References
 ----------
-- SuiteSparse AMD:
+* SuiteSparse AMD:
   https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/AMD
-- AMD Algorithm Documentation:
+* AMD Algorithm Documentation:
   Amestoy, P. R., Davis, T. A., & Duff, I. S. (1996). An approximate
     minimum degree ordering algorithm. SIAM Journal on Matrix Analysis and
     Applications, 17(4), 886-905.
@@ -75,11 +75,11 @@ class AMDInfo:
     Attributes
     ----------
     status : int
-        Return status: 
-          - 0 = OK,
-          - 1 = OK but jumbled,
-          - -1 = out of memory,
-          - -2 = invalid matrix.
+        Return status:
+          * 0 = OK,
+          * 1 = OK but jumbled,
+          * -1 = out of memory,
+          * -2 = invalid matrix.
     N : int
         Number of rows and columns of the input matrix ``A``.
     nz : int
@@ -90,7 +90,8 @@ class AMDInfo:
         entries. An entry ``A[i, j]`` is matched if ``A[j, i]`` is also an
         entry, for any pair ``[i, j]`` where ``i != j``. In python code:
 
-        .. code::
+        .. code:: python
+
             S = A.astype(bool)
             B = sparse.tril(S, -1) + sparse.triu(S, 1)
             symmetry = (B * B.T).nnz / B.nnz
@@ -103,7 +104,7 @@ class AMDInfo:
         non-zero diagonal, then ``nz_A_plus_AT = nz - N`` (the smallest
         possible value).
         If ``A`` is perfectly unsymmetric (``symmetry = 0``, for an upper
-        triangular matrix, *e.g.*) with no diagonal, 
+        triangular matrix, *e.g.*) with no diagonal,
         then ``nz_A_plus_AT = 2 * nz`` (the largest possible value).
     Ndense : int
         Number of dense rows/columns ignored during ordering. These
@@ -181,8 +182,8 @@ class AMDInfo:
 def amd(A, dense_thresh=None, aggressive=None, return_info=False):
     """Compute the approximate minimum degree ordering of a sparse matrix.
 
-    From the SuiteSparse `amd.h` documentation [0]_:
-    
+    Adapted from the SuiteSparse `amd.h` documentation [0]_:
+
         AMD finds a fill-reducing ordering of a sparse matrix ``A``,
         using the approximate minimum degree algorithm. The output is
         a permutation vector ``p`` such that the Cholesky factor of
@@ -201,13 +202,13 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
         Threshold number of entries for considering a row/column dense. If
         None, use the default value from AMD. The default value is 10.
 
-        From the SuiteSparse `amd.h` documentation [0]_:
+        Adapted from the SuiteSparse `amd.h` documentation [0]_:
 
             A dense row/column in ``A + A.T`` can cause AMD to spend a lot of
             time in ordering the matrix. If ``dense_thresh >= 0``, rows/columns
-            with more than ``dense_thresh * sqrt(N)`` entries are ignored
-            during the ordering, and placed last in the output order. The
-            default value of ``dense_thresh`` is 10. If negative, no
+            with more than ``max(dense_thresh * sqrt(N), 16)`` entries are
+            ignored during the ordering, and placed last in the output order.
+            The default value of ``dense_thresh`` is 10. If negative, no
             rows/columns are treated as "dense". Rows/columns with 16 or fewer
             off-diagonal entries are never considered "dense".
 
@@ -215,7 +216,7 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
         If True, use aggressive absorption. If None, uses the default value
         from AMD. The default value is True.
 
-        From the SuiteSparse `amd.h` documentation [0]_:
+        Adapted from the SuiteSparse `amd.h` documentation [0]_:
 
             Controls whether or not to use aggressive absorption, in which
             a prior element is absorbed into the current element if is a subset
@@ -274,7 +275,7 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
     if not issparse(A):
         A = np.atleast_2d(np.asarray(A))
 
-    try: 
+    try:
         if not isinstance(A, csc_array):
             warnings.warn(
                 "Input matrix is not in CSC format. Converting to CSC.",

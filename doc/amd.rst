@@ -1,22 +1,25 @@
 Approximate Minimum Degree (AMD) Ordering (:mod:`sksparse.amd`)
-=======================================================
+===============================================================
 
 .. module:: sksparse.amd
    :synopsis: Approximate Minimum Degree (AMD) Ordering
 
-.. versionadded:: 0.5
+.. versionadded:: 0.5.0
 
 Overview
 --------
 
 This module provides efficient implementations of the `Approximate Minimum
-Degree (AMD)`_ ordering algorithm for sparse, square matrices.
+Degree (AMD) <https://epubs.siam.org/doi/abs/10.1137/S0895479894278952>`_
+ordering algorithm for sparse, square matrices.
 
-It exposes the main function of the `AMD package`_, which computes a symmetric
-ordering of a sparse matrix that minimizes the fill-in of the Cholesky
-decomposition. The AMD function accepts both real and complex matrices, in any
-format supported by :mod:`scipy.sparse` (CSC format is most
+It exposes the main function of the `AMD package
+<https://github.com/DrTimothyAldenDavis/SuiteSparse/tree/dev/AMD>`_, which
+computes a symmetric ordering of a sparse matrix that minimizes the fill-in of
+the Cholesky decomposition. The AMD function accepts both real and complex
+matrices, in any format supported by :mod:`scipy.sparse` (CSC format is most
 efficient).
+
 
 Quickstart
 ----------
@@ -24,8 +27,10 @@ Quickstart
 If :math:`A` is a sparse, square matrix, then the
 following code computes the AMD ordering of :math:`A`:
 
-.. code-block:: python
+.. code:: python
+
     from sksparse.amd import amd
+    A = ...  # some sparse matrix
     p = amd(A)
     PAPT = A[p][:, p]
 
@@ -34,10 +39,11 @@ matrix corresponding to the ordering :math:`p`. If :math:`A` is not symmetric,
 then this is the same as AMD computes the ordering of the symbolically
 symmetric matrix :math:`A + A^T`.
 
-We can then compute the Cholesky decompositions of the original and permuted
-matrix, and compare the number of non-zeros in each:
+We can then continue from above to compute the Cholesky decompositions of the
+original and permuted matrix, and compare the number of non-zeros in each:
 
-.. code-block:: python
+.. code:: python
+
     from sksparse.cholmod import cholesky
     A_factor = cholesky(A)
     PAPT_factor = cholesky(PAPT)
@@ -56,7 +62,7 @@ Top-level Function
 
 The main function this module provides is :func:`amd`.
 
-.. autofunction:: amd(A, dense_thresh=None, aggressive=None, return_info=False)
+.. autofunction:: amd
 
 
 :class:`AMDInfo` Objects
@@ -72,7 +78,8 @@ the Cholesky factorization, and others.
 We can use :class:`AMDInfo` objects to compare the number of non-zeros in the
 Cholesky factorization of the original matrix, without computing it directly:
 
-.. code-block:: python
+.. code:: python
+
     from sksparse.amd import amd
     from sksparse.cholmod import amd
     A = ...  # some sparse matrix
@@ -89,10 +96,10 @@ just use the permutation vector returned by :func:`amd`.
 Convenience Methods
 -------------------
 
-The AMD package also provides a convenience function to print the default
-control parameters in the AMD package:
+The AMD package also provides a convenience function to get the default
+control parameters from the AMD package:
 
-.. autofunction:: print_amd_default_control()
+.. autofunction:: amd_default_control
 
 
 Error Handling
@@ -106,7 +113,7 @@ following exceptions are available:
     A base class for all exceptions raised by the AMD package.
 
 .. class:: AMDMemoryError
-   
+
     Raised when the AMD package runs out of memory during the ordering process.
 
 .. class:: AMDInvalidMatrixError
@@ -120,9 +127,6 @@ following exceptions are available:
 
 References
 ----------
-.. _AMD package: https://github.com/DrTimothyAldenDavis/SuiteSparse/tree/dev/AMD
-    `AMD ordering algorithm`_: Timothy A. Davis. *AMD: Approximate Minimum Degree Ordering*. SuiteSparse project.
-.. _Approximate Minimum Degree (AMD): https://people.engr.tamu.edu/davis/publications_files/An_Approximate_Minimum_Degree_Ordering_Algorithm.pdf
-    Amestoy, P. R., Davis, T. A., & Duff, I. S. (1996). *An approximate minimum
-    degree ordering algorithm*. SIAM Journal on Matrix Analysis and
-    Applications, 17(4), 886-905.
+* Amestoy, P. R., Davis, T. A., & Duff, I. S. (1996). *An approximate minimum
+  degree ordering algorithm*. SIAM Journal on Matrix Analysis and Applications,
+  17(4), 886-905. <https://epubs.siam.org/doi/abs/10.1137/S0895479894278952>.
