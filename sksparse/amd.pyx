@@ -369,7 +369,21 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
 
 
 def amd_default_control():
-    """Get the default control parameters for AMD."""
+    """Get the default control parameters for AMD.
+
+    Returns
+    -------
+    control : dict
+        A dictionary containing the default control parameters for AMD.
+
+        The keys are:
+
+        * 'dense_thresh': Threshold for considering a row/column dense. Rows or
+          columns with more than ``max(dense_thresh * sqrt(N), 16)`` entries
+          are permuted to the end of the matrix.
+        * 'aggressive': Whether to use aggressive absorption.
+
+    """
     cdef double[::1] ctrl_mv = np.empty(CONTROL_SIZE, dtype=np.float64)
     amd_l_defaults(<double*>&ctrl_mv[0])
     return dict(
