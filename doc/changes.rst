@@ -3,6 +3,16 @@ Changes
 
 .. module:: sksparse.cholmod
 
+v0.5.0
+------
+  * Remove support for the following versions:
+    - Python < 3.10
+    - NumPy < 2.0
+    - SciPy < 1.14
+    Python 3.9 will reach its end of life in October 2025, so remove support
+    for it now. Numpy will end support for all 1.x versions by September 2025.
+    SciPy v1.14 (released June 2024) will be supported until the end of 2026.
+
 v0.4.4
 ------
   * Bug in solve with dense array, where base of result is not set correctly, fixed.
