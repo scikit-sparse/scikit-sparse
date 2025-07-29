@@ -368,8 +368,11 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
         return p
 
 
-def print_amd_default_control():
-    """Print the default control parameters for AMD."""
+def amd_default_control():
+    """Get the default control parameters for AMD."""
     cdef double[::1] ctrl_mv = np.empty(CONTROL_SIZE, dtype=np.float64)
     amd_l_defaults(<double*>&ctrl_mv[0])
-    amd_l_control(<double*>&ctrl_mv[0])
+    return dict(
+        dense_thresh=ctrl_mv[AMD_DENSE],
+        aggressive=bool(ctrl_mv[AMD_AGGRESSIVE]),
+    )

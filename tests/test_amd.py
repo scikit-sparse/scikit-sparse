@@ -19,7 +19,7 @@ from numpy.testing import assert_array_equal
 from pathlib import Path
 from scipy import sparse
 from scipy.sparse import SparseEfficiencyWarning
-from sksparse.amd import AMDInfo, amd
+from sksparse.amd import AMDInfo, amd, amd_default_control
 
 
 def is_valid_permutation(p):
@@ -220,5 +220,21 @@ def test_info_can_24():
     assert info == expect_info
 
 
+def test_amd_default_control():
+    """Test that AMD uses the default control settings."""
+    # The default control settings are (from amd.h):
+    # - AMD_DEFAULT_DENSE      -> dense_thresh: 10.0
+    # - AMD_DEFAULT_AGGRESSIVE ->   aggressive: True
+    expect_control = dict(
+        dense_thresh=10.0,
+        aggressive=True,
+    )
+    control = amd_default_control()
+    assert control == expect_control
+
+    A = sparse.csc_array([[1, 2], [3, 4]])
+    p = amd(A, **control)
+    assert is_valid_permutation(p)
+    
 # =============================================================================
 # =============================================================================
