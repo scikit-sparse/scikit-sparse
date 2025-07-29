@@ -1,11 +1,16 @@
-#!/usr/bin/env python3
+# Test cases for the sksparse.amd module.
+#
+# Part of the scikit-sparse project.
+# Copyright (C) 2025 Bernard Roesler
+# See pyproject.toml for full author list and LICENSE.txt for license details.
+# SPDX-License-Identifier: BSD-2-Clause
+#
 # =============================================================================
 #     File: test_amd.py
 #  Created: 2025-07-28 13:34
-#   Author: Bernie Roesler
-#
-"""Test code for the sksparse.amd module."""
 # =============================================================================
+
+"""Test cases for the sksparse.amd module."""
 
 import numpy as np
 import pytest
