@@ -49,6 +49,13 @@ dependencies = [
     "scipy>=1.14",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+    "sphinx",
+]
+
 [project.urls]
 "Homepage" = "https://github.com/scikit-sparse/scikit-sparse"
 "Bug Tracker" = "https://github.com/scikit-sparse/scikit-sparse/issues"
