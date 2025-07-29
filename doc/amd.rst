@@ -125,6 +125,26 @@ following exceptions are available:
     not occur in practice.
 
 
+Example
+-------
+
+This figure shows the effect of AMD ordering that reduces the fill-in of the
+Cholesky factorization of a sparse matrix.
+
+.. figure:: examples/amd_example.svg
+   :alt: AMD Example
+   :align: center
+   :width: 90%
+
+   The number of non-zeros in the Cholesky factorization of the original matrix
+   (left) and the permuted matrix (right) using AMD ordering.
+
+The source code for this example is:
+
+.. literalinclude:: examples/amd_example.py
+   :language: python
+
+
 References
 ----------
 * Amestoy, P. R., Davis, T. A., & Duff, I. S. (1996). *An approximate minimum
