@@ -174,6 +174,8 @@ Developers
 * 2016–2017   `Antony Lee              <anntzer.lee@gmail.com>`_
 * 2016        `Alex Grigorievskiy      <alex.grigorievskiy@gmail.com>`_
 * 2016–2018   `Joscha Reimer           <jor@informatik.uni-kiel.de>`_
+* 2021-       `Justin Ellis            <justin.ellis18@gmail.com>`_
+* 2022-       `Aaron Johnson           <aaron9035@gmail.com>`_
 * 2025–       `Bernard Roesler         <bernard.roesler@gmail.com>`_
 
 .. _suitesparse_website: https://people.engr.tamu.edu/davis/suitesparse.html

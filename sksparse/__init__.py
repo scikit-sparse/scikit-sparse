@@ -1,4 +1,4 @@
-# Copyright (C) 2008-2017 The scikit-sparse developers:
+# Copyright (C) 2008-2025 The scikit-sparse developers:
 #
 # 2008        David Cournapeau        <cournape@gmail.com>
 # 2009-2015   Nathaniel Smith         <njs@pobox.com>
@@ -10,6 +10,7 @@
 # 2016-2017   Joscha Reimer           <jor@informatik.uni-kiel.de>
 # 2021-       Justin Ellis            <justin.ellis18@gmail.com>
 # 2022-       Aaron Johnson           <aaron9035@gmail.com>
+# 2025-       Bernard Roesler         <bernard.roesler@gmail.com>
 
 """Sparse matrix tools.
 

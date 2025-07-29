@@ -1,4 +1,4 @@
-# Copyright (C) 2008-2017 The scikit-sparse developers:
+# Copyright (C) 2008-2025 The scikit-sparse developers:
 #
 # 2008        David Cournapeau        <cournape@gmail.com>
 # 2009-2015   Nathaniel Smith         <njs@pobox.com>
