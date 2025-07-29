@@ -1,4 +1,42 @@
+# Cython AMD public Python interface
+#
+# Part of the scikit-sparse project.
+# Copyright (C) 2025 Bernard Roesler
+# See pyproject.toml for full author list and LICENSE.txt for license details.
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# =============================================================================
+#     File: amd.pyx
+#  Created: 2025-07-28 11:12
+# =============================================================================
 # cython: language_level=3
+
+"""Python interface to the Approximate Minimum Degree (AMD) ordering algorithm.
+
+This module provides a Cython interface to the AMD algorithm from the
+SuiteSparse library by Timothy A. Davis. The algorithm computes a fill-reducing
+ordering of a sparse matrix, which is useful for improving the performance of
+Cholesky or LU factorization and subsequent linear algebra operations.
+
+Interfaces
+----------
+- `amd`: Main function to compute the AMD ordering.
+- `AMDInfo`: Dataclass to hold information statistics returned by the AMD
+  algorithm.
+- `print_amd_default_control`: Print the default control parameters for AMD.
+
+This wrapper handles both 32-bit and 64-bit integer indices, depending on the
+input matrix format.
+
+References
+----------
+- SuiteSparse AMD:
+  https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/AMD
+- AMD Algorithm Documentation:
+  Amestoy, P. R., Davis, T. A., & Duff, I. S. (1996). An approximate
+    minimum degree ordering algorithm. SIAM Journal on Matrix Analysis and
+    Applications, 17(4), 886-905.
+"""
 
 import numpy as np
 cimport numpy as np
@@ -126,6 +164,18 @@ class AMDInfo:
 def amd(A, dense_thresh=None, aggressive=None, return_info=False):
     """Compute the approximate minimum degree ordering of a sparse matrix.
 
+    From the SuiteSparse `amd.h` documentation [0]_:
+    
+        AMD finds a fill-reducing ordering of a sparse matrix ``A``,
+        using the approximate minimum degree algorithm. The output is
+        a permutation vector ``p`` such that the Cholesky factor of
+        ``A[p][:, p]`` has fewer nonzeros than the Cholesky factor of ``A``.
+        If ``A`` is not symmetric, the algorithm computes an ordering of
+        ``A + A.T``.
+
+    For more details on the entire package, see the SuiteSparse homepage [1]_
+    and Github repository [2]_.
+
     Parameters
     ----------
     A : (N, N) array_like or sparse matrix
@@ -144,7 +194,6 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
             rows/columns are treated as "dense". Rows/columns with 16 or fewer
             off-diagonal entries are never considered "dense".
 
-        For more details, see the SuiteSparse homepage [1]_.
     aggressive : bool, optional
         If True, use aggressive absorption. If None, uses the default value
         from AMD. The default value is True.

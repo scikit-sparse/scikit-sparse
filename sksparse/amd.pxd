@@ -1,5 +1,14 @@
-# AMD wrapper for sksparse
-
+# Cython AMD header interface
+#
+# Part of the scikit-sparse project.
+# Copyright (C) 2025 Bernard Roesler
+# See pyproject.toml for full author list and LICENSE.txt for license details.
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# =============================================================================
+#     File: amd.pxd
+#  Created: 2025-07-28 10:27
+# =============================================================================
 # distutils: language = c
 # cython: language_level=3
 
