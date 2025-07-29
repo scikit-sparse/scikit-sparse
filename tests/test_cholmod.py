@@ -40,6 +40,7 @@
 from functools import partial
 import os.path
 
+from pathlib import Path
 from pytest import raises as assert_raises
 import numpy as np
 from numpy.testing import assert_allclose, assert_array_equal
@@ -175,14 +176,15 @@ def test_solve_edge_cases():
 def mm_matrix(name):
     from scipy.io import mmread
 
-    # Supposedly, it is better to use resource_stream and pass the resulting
-    # open file object to mmread()... but for some reason this fails?
-    from pkg_resources import resource_filename
+    filename = Path(__file__).parent / "test_data" / f"{name}.mtx.gz"
+    if not filename.exists():
+        raise FileNotFoundError(f"Matrix Market file {filename} not found.")
 
-    filename = resource_filename(__name__, "test_data/%s.mtx.gz" % name)
     matrix = mmread(filename)
+
     if sparse.issparse(matrix):
         matrix = matrix.tocsc()
+
     return matrix
 
 
