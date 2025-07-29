@@ -10,6 +10,7 @@
 # 2016-2017   Joscha Reimer           <jor@informatik.uni-kiel.de>
 # 2021-       Justin Ellis            <justin.ellis18@gmail.com>
 # 2022-       Aaron Johnson           <aaron9035@gmail.com>
+# 2025-       Bernard Roesler         <bernard.roesler@gmail.com>
 
 import os
 import subprocess
