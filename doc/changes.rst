@@ -15,7 +15,7 @@ v0.4.4
 
 v0.4.3
 ------
-  * The method `solve_L` can now also use the `L` matrix of the LL' decomposition.
+  * The method :meth:`.Factor.solve_L` can now also use the `L` matrix of the LL' decomposition.
   * Supported versions updated to:
     - Python: 3.6, 3.5
     - NumPy: 1.14, 1.13
@@ -42,26 +42,26 @@ v0.4
 
 v0.3.1
 ------
-  * Ensure that arrays returned by the :meth:`Factor.solve_...` methods are
+  * Ensure that arrays returned by the :code:`Factor.solve_...` methods are
     writeable.
 
 v0.3
 ----
-  * Dropped deprecated :meth:`Factor.solve_P` and :meth:`Factor.solve_P`.
-  * Fixed a memory leak upon garbage collection of :class:`Factor`.
+  * Dropped deprecated :code:`Factor.solve_P` and :code:`Factor.solve_P`.
+  * Fixed a memory leak upon garbage collection of :class:`.Factor`.
 
 v0.2
 ----
-  * :class:`Factor` solve methods now return 1d output for 1d input
-    (just like ``np.dot`` does).
-  * :meth:`Factor.solve_P` and :meth:`Factor.solve_P` deprecated; use
-    :meth:`Factor.apply_P` and :meth:`Factor.apply_Pt` instead.
+  * :class:`.Factor` solve methods now return 1d output for 1d input
+    (just like :func:`numpy.dot` does).
+  * :code:`Factor.solve_P` and :code:`Factor.solve_P` deprecated; use
+    :meth:`.Factor.apply_P` and :meth:`.Factor.apply_Pt` instead.
   * New methods for computing determinants of positive-definite
-    matrices: :meth:`Factor.det`, :meth:`Factor.logdet`,
-    :meth:`Factor.slogdet`.
+    matrices: :meth:`.Factor.det`, :meth:`.Factor.logdet`,
+    :meth:`.Factor.slogdet`.
   * New method for explicitly computing inverse of a positive-definite
-    matrix: :meth:`Factor.inv`.
-  * :meth:`Factor.D` has much better implementation.
+    matrix: :meth:`.Factor.inv`.
+  * :meth:`.Factor.D` has much better implementation.
   * Build system improvements.
   * Wrapper code re-licensed under BSD terms.
 

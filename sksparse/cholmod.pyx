@@ -868,16 +868,17 @@ cdef class Factor:
         return (l, d)
 
     def solve_A(self, b):
-        """ Solves a linear system.
+        """Solves a linear system.
 
         :param b: right-hand-side
 
         :returns: math:`x`, where :math:`Ax = b` (or :math:`AA'x = b`, if
-        you used :func:`cholesky_AAt`).
+            you used :func:`cholesky_AAt`).
 
         :meth:`__call__` is an alias for this function, i.e., you can simply
         call the :class:`Factor` object like a function to solve :math:`Ax =
-        b`."""
+        b`.
+        """
         return self._solve(b, CHOLMOD_A)
 
     def __call__(self, b):
@@ -992,7 +993,7 @@ cdef class Factor:
 
     def slogdet(self):
         """Computes the log-determinant of the matrix A, with the same API as
-        :meth:`numpy.linalg.slogdet`.
+        :func:`numpy.linalg.slogdet`.
 
         This returns a tuple `(sign, logdet)`, where `sign` is always the
         number 1.0 (because the determinant of a positive-definite matrix is
@@ -1027,7 +1028,7 @@ cdef class Factor:
     def inv(self):
         """Returns the inverse of the matrix A, as a sparse (CSC) matrix.
 
-          .. warning:: For most purposes, it is better to use :meth:`solve`
+          .. warning:: For most purposes, it is better to use :code:`solve`
              instead of computing the inverse explicitly. That is, the
              following two pieces of code produce identical results::
 

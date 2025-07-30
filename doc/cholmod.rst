@@ -1,4 +1,4 @@
-Sparse Cholesky decomposition (:mod:`sksparse.cholmod`)
+Sparse Cholesky Decomposition (:mod:`sksparse.cholmod`)
 =======================================================
 
 .. module:: sksparse.cholmod
@@ -57,8 +57,7 @@ If we just want to compute its determinant::
   ld = factor.logdet()
 
 (This returns the log of the determinant, rather than the determinant
-itself, to avoid issues with underflow/overflow. See :meth:`logdet`,
-:meth:`log`.)
+itself, to avoid issues with underflow/overflow. See :meth:`Factor.logdet`)
 
 If you have a least-squares problem to solve, minimizing :math:`||Mx -
 b||^2`, and :math:`M` is a sparse matrix, the `solution
@@ -106,7 +105,7 @@ of the ``analyze`` functions, which perform only fill-reduction:
 :class:`Factor` objects
 -----------------------
 
-.. class:: Factor
+.. autoclass:: Factor
 
   A :class:`Factor` object represents the Cholesky decomposition of some
   matrix :math:`A` (or :math:`AA'`). Each :class:`Factor` fixes:
@@ -163,9 +162,9 @@ All methods in this section accept both sparse and dense matrices (or
 vectors) ``b``, and return either a sparse or dense ``x``
 accordingly.
 
-All methods in this section act on :math:`LDL'` factorizations by default.
-Thus `L` refers by default to the matrix returned by :meth:`L_D`, not that
-returned by :meth:`L` (though conversion is not performed unless necessary).
+All methods in this section act on `LDL'` factorizations by default.
+Thus `L` refers by default to the matrix returned by :meth:`Factor.L_D`, not that
+returned by :meth:`Factor.L` (though conversion is not performed unless necessary).
 
 .. automethod:: Factor.solve_A(b)
 
@@ -204,31 +203,30 @@ Convenience methods
 Error handling
 --------------
 
-.. class:: CholmodError
+.. autoclass:: CholmodError
 
-.. class:: CholmodNotPositiveDefiniteError
+.. autoclass:: CholmodNotPositiveDefiniteError
 
-.. class:: CholmodNotInstalledError
+.. autoclass:: CholmodNotInstalledError
 
-.. class:: CholmodOutOfMemoryError
+.. autoclass:: CholmodOutOfMemoryError
 
-.. class:: CholmodTooLargeError
+.. autoclass:: CholmodTooLargeError
 
-.. class:: CholmodNotPositiveDefiniteError
+.. autoclass:: CholmodInvalidError
 
-.. class:: CholmodInvalidError
-
-.. class:: CholmodGpuProblemError
+.. autoclass:: CholmodGpuProblemError
 
   Errors detected by CHOLMOD or by our wrapper code are converted into
   exceptions of type :class:`CholmodError` or an appropriated subclass.
 
-.. class:: CholmodWarning
+.. autoclass:: CholmodWarning
 
   Warnings issued by CHOLMOD are converted into Python warnings of
   type :class:`CholmodWarning`.
 
-.. class:: CholmodTypeConversionWarning
+.. autoclass:: CholmodTypeConversionWarning
+  :show-inheritance:
 
   CHOLMOD itself supports matrices in CSC form with 32-bit integer
   indices and 'double' precision floats (64-bits, or 128-bits total
@@ -240,5 +238,3 @@ Error handling
 
   .. warning:: Not all conversions currently produce warnings. This is
     a bug.
-
-  Child of :class:`CholmodWarning`.
