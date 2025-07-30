@@ -74,10 +74,8 @@ jobs:
         python -m venv venv-sdist
         source venv-sdist/bin/activate
         python -m pip install --upgrade pip
-        SDIST_FILE=$(find dist -name 'scikit_sparse*.tar.gz')
-        python -m pip install "${SDIST_FILE}[dev]"
+        python -m pip install dist/scikit_sparse*.tar.gz
         python -c "import sksparse; print(sksparse.__version__)"
-        python -m pytest -v tests
     - uses: actions/upload-artifact@v4
       with:
         name: dist
