@@ -3,6 +3,9 @@ name: CI Dev Code
 on:
   workflow_dispatch:
   pull_request:
+  push:
+    branches:
+      - "**"
 
 jobs:
   tests:
@@ -44,18 +47,16 @@ jobs:
         run: |
           python -m pip list
 
-      # TODO: update existing code to pass linting checks
-      # - name: Run lint
-      #   run:  ruff check
+      - name: Run lint
+        run:  ruff check
 
       - name: Test with pytest
         run: pytest
 
       - name: Build Docs
-        # TODO update existing docs so "make SPHINXOPTS=-nW html" passes
         run: |
           cd doc
-          make html
+          make SPHINXOPTS=-nW html
 
       - name: Upload docs as artifact
         uses: actions/upload-artifact@v4
