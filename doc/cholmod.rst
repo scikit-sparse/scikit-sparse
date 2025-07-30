@@ -203,29 +203,29 @@ Convenience methods
 Error handling
 --------------
 
-.. autoclass:: CholmodError
+.. autoexception:: CholmodError
 
-.. autoclass:: CholmodNotPositiveDefiniteError
+.. autoexception:: CholmodNotPositiveDefiniteError
 
-.. autoclass:: CholmodNotInstalledError
+.. autoexception:: CholmodNotInstalledError
 
-.. autoclass:: CholmodOutOfMemoryError
+.. autoexception:: CholmodOutOfMemoryError
 
-.. autoclass:: CholmodTooLargeError
+.. autoexception:: CholmodTooLargeError
 
-.. autoclass:: CholmodInvalidError
+.. autoexception:: CholmodInvalidError
 
-.. autoclass:: CholmodGpuProblemError
+.. autoexception:: CholmodGpuProblemError
 
   Errors detected by CHOLMOD or by our wrapper code are converted into
-  exceptions of type :class:`CholmodError` or an appropriated subclass.
+  exceptions of type :exc:`CholmodError` or an appropriated subclass.
 
-.. autoclass:: CholmodWarning
+.. autoexception:: CholmodWarning
 
   Warnings issued by CHOLMOD are converted into Python warnings of
-  type :class:`CholmodWarning`.
+  type :exc:`CholmodWarning`.
 
-.. autoclass:: CholmodTypeConversionWarning
+.. autoexception:: CholmodTypeConversionWarning
   :show-inheritance:
 
   CHOLMOD itself supports matrices in CSC form with 32-bit integer
@@ -233,7 +233,7 @@ Error handling
   for complex numbers). If you pass some other sort of matrix, then
   the wrapper code will convert it for you before passing it to
   CHOLMOD, and issue a warning of type
-  :class:`CholmodTypeConversionWarning` to let you know that your
+  :exc:`CholmodTypeConversionWarning` to let you know that your
   efficiency is not as high as it might be.
 
   .. warning:: Not all conversions currently produce warnings. This is
