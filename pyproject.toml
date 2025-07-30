@@ -60,6 +60,11 @@ dev = [
 "Homepage" = "https://github.com/scikit-sparse/scikit-sparse"
 "Bug Tracker" = "https://github.com/scikit-sparse/scikit-sparse/issues"
 
+# This data is excluded from the wheel package, but not necessarily from the
+# sdist (for sdist, see: MANIFEST.in)
+[tool.setuptools.exclude-package-data]
+sksparse = ["*.c", "*.pyx"]
+
 [tool.ruff]
 line-length = 88
 target-version = "py310"
