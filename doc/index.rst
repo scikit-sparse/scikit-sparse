@@ -17,6 +17,10 @@ Contents:
 
    changes.rst
 
+   Python Module Index <modindex>
+
+   Search <search>
+
 Indices and tables
 ==================
 
