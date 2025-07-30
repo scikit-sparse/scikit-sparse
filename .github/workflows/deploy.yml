@@ -16,14 +16,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
         os: [ubuntu-latest, macos-latest]
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       env:
         PIP_DISABLE_PIP_VERSION_CHECK: 1
       with:
@@ -38,14 +38,14 @@ jobs:
         sudo apt-get install libsuitesparse-dev
     - name: Install dependencies and package
       run: |
-        pip install --upgrade pip setuptools wheel
-        pip install pytest black
-        pip install -e .
+        pip install --upgrade pip
+        pip install -e .[dev]
     - name: Display installed packages
       run: |
         python -m pip list
-    - name: Run lint
-      run:  black .
+    # TODO: update existing code to pass linting checks
+    # - name: Run lint
+    #   run:  ruff check
     - name: Test with pytest
       run: pytest -v tests
 
@@ -56,29 +56,28 @@ jobs:
     if: github.event_name == 'release'
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up Python 
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.8'
+        python-version: '3.10'
     - name: Install non-python dependencies on linux
       run: |
         sudo apt-get install libsuitesparse-dev
-    - name: Build
+    - name: Build wheel and sdist
       run: |
-        pip install --upgrade pip setuptools wheel
-        pip install numpy cython
-        python setup.py sdist
+        pip install --upgrade pip
+        pip install build
+        python -m build
     - name: Test the sdist
       run: |
-        mkdir tmp
-        cd tmp
         python -m venv venv-sdist
-        venv-sdist/bin/python -m pip install --upgrade pip setuptools wheel
-        venv-sdist/bin/python -m pip install pytest
-        venv-sdist/bin/python -m pip install ../dist/scikit_sparse*.tar.gz
-        venv-sdist/bin/python -c "import sksparse;print(sksparse.__version__)"
-        venv-sdist/bin/python -m pytest -v ../tests
+        source venv-sdist/bin/activate
+        python -m pip install --upgrade pip
+        SDIST_FILE=$(find dist -name 'scikit_sparse*.tar.gz')
+        python -m pip install "${SDIST_FILE}[dev]"
+        python -c "import sksparse; print(sksparse.__version__)"
+        python -m pytest -v tests
     - uses: actions/upload-artifact@v4
       with:
         name: dist
@@ -93,11 +92,11 @@ jobs:
       id-token: write
     if: github.event_name == 'release'
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.8'
+        python-version: '3.10'
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
