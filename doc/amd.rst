@@ -126,7 +126,7 @@ following exceptions are available:
     Raised when the input matrix is not valid for the AMD ordering algorithm.
     This error is only raised if the internal format of the input matrix is
     corrupted in some way. The Python wrapper that :mod:`sksparse.amd` provides
-    converts its input to :func:`scipy.sparse.csc_array`, so this error should
+    converts its input to :class:`scipy.sparse.csc_array`, so this error should
     not occur in practice.
 
 

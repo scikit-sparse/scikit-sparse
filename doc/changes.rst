@@ -5,7 +5,8 @@ Changes
 
 v0.5.0
 ------
-  * Create the :mod:`amd` module, which provides the AMD ordering method.
+  * Create the :mod:`sksparse.amd` module, which provides the AMD ordering
+    method.
   * Remove support for the following versions:
     - Python < 3.10
     - NumPy < 2.0
