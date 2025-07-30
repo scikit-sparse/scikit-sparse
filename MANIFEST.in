@@ -4,6 +4,3 @@ include LICENSE.txt
 include README.md
 include sksparse/cholmod_backward_compatible.h
 recursive-include sksparse *.pyx *.pxd *.c
-recursive-include tests *.py
-graft doc
-prune doc/_build
