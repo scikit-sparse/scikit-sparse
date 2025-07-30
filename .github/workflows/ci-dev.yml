@@ -44,6 +44,7 @@ jobs:
         run: |
           python -m pip list
 
+      # TODO: update existing code to pass linting checks
       # - name: Run lint
       #   run:  ruff check
 
@@ -51,8 +52,13 @@ jobs:
         run: pytest
 
       - name: Build Docs
+        # TODO update existing docs so "make SPHINXOPTS=-nW html" passes
         run: |
           cd doc
           make html
 
-      # TODO upload docs as artifact
+      - name: Upload docs as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: scikit-sparse-doc-${{ matrix.os }}-${{ matrix.python-version }}
+          path: doc/_build/html
