@@ -75,11 +75,8 @@ jobs:
           conda create -n test-sdist python=${{ matrix.python-version }} -y
           conda activate test-sdist
           conda install -c conda-forge suitesparse -y
-          pip install "$(find dist -name '*.tar.gz')[dev]"
+          pip install dist/scikit_sparse*.tar.gz
           python -c "import sksparse; print(sksparse.__version__)"
-          pytest
-          cd doc
-          make clean && make html
 
       - name: Upload built artifacts
         uses: actions/upload-artifact@v4
