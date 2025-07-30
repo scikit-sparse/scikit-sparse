@@ -1,10 +1,8 @@
-name: CI Manual Run
+name: CI Dev Code
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - build-system
+  pull_request:
 
 jobs:
   tests:
