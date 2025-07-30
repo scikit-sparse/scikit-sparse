@@ -36,15 +36,16 @@
 # TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 # THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
+"""Tests for the scikits.sparse CHOLMOD wrapper."""
 
 from functools import partial
-import os.path
 
 from pathlib import Path
 from pytest import raises as assert_raises
 import numpy as np
 from numpy.testing import assert_allclose, assert_array_equal
 from scipy import sparse
+from scipy.io import mmread
 from sksparse.cholmod import (
     cholesky,
     cholesky_AAt,
@@ -90,16 +91,27 @@ def test_writeability():
 
 
 def real_matrix():
-    return sparse.csc_matrix([[10, 0, 3, 0], [0, 5, 0, -2], [3, 0, 5, 0], [0, -2, 0, 2]])
+    return sparse.csc_matrix(
+        [[10,  0, 3,  0],
+         [ 0,  5, 0, -2],
+         [ 3,  0, 5,  0],
+         [ 0, -2, 0,  2]]
+    )
 
 
 def complex_matrix():
-    return sparse.csc_matrix([[10, 0, 3 - 1j, 0], [0, 5, 0, -2], [3 + 1j, 0, 5, 0], [0, -2, 0, 2]])
+    return sparse.csc_matrix(
+        [[    10,  0, 3 - 1j,  0],
+         [     0,  5,      0, -2],
+         [3 + 1j,  0,      5,  0],
+         [     0, -2,      0,  2]]
+    )
 
 
 def factor_of(factor, matrix):
     return np.allclose(
-        (factor.L() * factor.L().T.conjugate()).todense(), matrix.todense()[factor.P()[:, np.newaxis], factor.P()[np.newaxis, :]]
+        (factor.L() * factor.L().T.conjugate()).todense(),
+        matrix.todense()[factor.P()[:, np.newaxis], factor.P()[np.newaxis, :]],
     )
 
 
@@ -118,7 +130,9 @@ def test_complex():
     assert factor_of(fc, c)
 
     assert_allclose(fc(np.arange(4))[:, None], c.todense().I * np.arange(4)[:, None])
-    assert_allclose(fc(np.arange(4) * 1j)[:, None], c.todense().I * (np.arange(4) * 1j)[:, None])
+    assert_allclose(
+        fc(np.arange(4) * 1j)[:, None], c.todense().I * (np.arange(4) * 1j)[:, None]
+    )
     assert_allclose(fr(np.arange(4))[:, None], r.todense().I * np.arange(4)[:, None])
     # If we did a real factorization, we can't do solves on complex arrays:
     assert_raises(CholmodError, fr, np.arange(4) * 1j)
@@ -130,11 +144,18 @@ def test_beta():
             matrix_plus_beta = matrix + beta * sparse.eye(*matrix.shape)
             for use_long in [False, True]:
                 if use_long:
-                    matrix_plus_beta = convert_matrix_indices_to_long_indices(matrix_plus_beta)
+                    matrix_plus_beta = convert_matrix_indices_to_long_indices(
+                        matrix_plus_beta
+                    )
                 for ordering_method in ordering_methods:
                     for mode in modes:
-                        f = cholesky(matrix, beta=beta, mode=mode, ordering_method=ordering_method)
-                        L = f.L()
+                        f = cholesky(
+                            matrix,
+                            beta=beta,
+                            mode=mode,
+                            ordering_method=ordering_method,
+                        )
+                        # L = f.L()
                         assert factor_of(f, matrix_plus_beta)
 
 
@@ -174,8 +195,6 @@ def test_solve_edge_cases():
 
 
 def mm_matrix(name):
-    from scipy.io import mmread
-
     filename = Path(__file__).parent / "test_data" / f"{name}.mtx.gz"
     if not filename.exists():
         raise FileNotFoundError(f"Matrix Market file {filename} not found.")

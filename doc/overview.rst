@@ -4,13 +4,12 @@ Overview
 Introduction
 ------------
 
-The :mod:`scikit-sparse` package (previously known as :mod:`scikits.sparse`)
+The :code:`scikit-sparse` package (previously known as :code:`scikits.sparse`)
 is a companion to the :mod:`scipy.sparse` library for sparse matrix
-manipulation in Python. All :mod:`scikit-sparse` routines expect and
-return :mod:`scipy.sparse` matrices (usually in CSC format). The intent
-of :mod:`scikit-sparse` is to wrap GPL'ed code such as `SuiteSparse
-<suitesparse_website_>`_, which cannot be
-included in SciPy proper.
+manipulation in Python. All :code:`scikit-sparse` routines expect and return
+:mod:`scipy.sparse` matrices (usually in CSC format). The intent of
+:code:`scikit-sparse` is to wrap GPL'ed code such as `SuiteSparse
+<suitesparse_website_>`_, which cannot be included in SciPy proper.
 
 Currently our coverage is rather... sparse, with only a wrapper for
 the CHOLMOD routines for sparse Cholesky decomposition, but we hope
@@ -39,7 +38,7 @@ repository <https://github.com/scikit-sparse/scikit-sparse>`_::
 Requirements
 ------------
 
-Installing :mod:`scikit-sparse` requires:
+Installing :code:`scikit-sparse` requires:
 
 * `Python <http://python.org/>`_
 * `NumPy <http://numpy.scipy.org/>`_
@@ -63,7 +62,7 @@ Installation
 Installing SuiteSparse
 ++++++++++++++++++++++
 
-To install :mod:`scikit-sparse`, you need to have the `SuiteSparse
+To install :code:`scikit-sparse`, you need to have the `SuiteSparse
 <suitesparse_website_>`_ library installed on your system.
 
 It is recommended that you install SuiteSparse and the scikit-sparse
@@ -92,7 +91,7 @@ On Arch Linux, run::
 Installing Scikit-Sparse
 ++++++++++++++++++++++++
 
-Once you have SuiteSparse installed, you can install :mod:`scikit-sparse` with::
+Once you have SuiteSparse installed, you can install :code:`scikit-sparse` with::
 
   $ conda install -c conda-forge scikit-sparse
 

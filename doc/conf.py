@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 #
 # scikit-sparse documentation build configuration file, created by
 # sphinx-quickstart on Wed Feb 10 23:17:16 2016.
