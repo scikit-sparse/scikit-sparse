@@ -56,6 +56,8 @@ jobs:
           cd doc
           make html
 
+      # TODO upload docs as artifact
+
   build-check:
     name: Build and Inspect Wheel
     runs-on: ${{ matrix.os }}
@@ -73,6 +75,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+
+      - name: Install non-python dependencies on mac
+        if: runner.os == 'macOS'
+        run: |
+          brew install suite-sparse
+
+      - name: Install non-python dependencies on linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install libsuitesparse-dev
 
       - name: Install build tools
         run: |
@@ -105,11 +117,22 @@ jobs:
         run: |
           conda create -n testwheel python=${{ matrix.python-version }} -y
           conda activate testwheel
+          conda install -c conda-forge suitesparse
           pip install dist/*.whl
           python -c "import sksparse; print(sksparse.__version__)"
+
+      - name: Create new conda env and install sdist
+        shell: bash -l {0}  # use bash as a login shell for conda activation
+        run: |
+          conda create -n testsdist python=${{ matrix.python-version }} -y
+          conda activate testsdist
+          conda install -c conda-forge suitesparse
+          pip install "$(find dist -name '*.tar.gz')[dev]"
+          python -c "import sksparse; print(sksparse.__version__)"
+          pytest
 
       - name: Upload built artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: scikit-sparse-dist
+          name: scikit-sparse-dist-${{ matrix.os }}-${{ matrix.python-version }}
           path: dist/
