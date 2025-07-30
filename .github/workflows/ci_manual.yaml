@@ -130,6 +130,8 @@ jobs:
           pip install "$(find dist -name '*.tar.gz')[dev]"
           python -c "import sksparse; print(sksparse.__version__)"
           pytest
+          cd doc
+          make clean && make html
 
       - name: Upload built artifacts
         uses: actions/upload-artifact@v4
