@@ -30,6 +30,4 @@ except PackageNotFoundError:
     # package is not installed, so we set a default version
     __version__ = "0.0.0.dev0"
 
-from . import cholmod
-
-__all__ = [x for x in dir() if not x.startswith("_")]
+__all__ = ["cholmod"]
