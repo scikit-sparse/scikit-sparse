@@ -46,6 +46,7 @@ cimport numpy as np
 
 import warnings
 
+from dataclasses import dataclass
 from scipy.sparse import csc_array, issparse, SparseEfficiencyWarning
 
 
@@ -70,21 +71,96 @@ class COLAMDInternalError(COLAMDError, RuntimeError):
 
 
 # Define COLAMD error codes
-COLAMD_ERROR_CODES = dict({
+_COLAMD_ERROR_CODES = dict({
     COLAMD_OK: "ok",
-    COLAMD_OK_BUT_JUMBLED: "ok but jumbled",
-    COLAMD_ERROR_A_not_present: "A not present",
-    COLAMD_ERROR_p_not_present: "p not present",
-    COLAMD_ERROR_nrow_negative: "nrow negative",
-    COLAMD_ERROR_ncol_negative: "ncol negative",
-    COLAMD_ERROR_nnz_negative: "nnz negative",
-    COLAMD_ERROR_p0_nonzero: "p[0] nonzero",
-    COLAMD_ERROR_A_too_small: "A too small",
-    COLAMD_ERROR_col_length_negative: "col length negative",
+    COLAMD_OK_BUT_JUMBLED: "ok but A has unsorted columns or duplicate entries",
+    COLAMD_ERROR_A_not_present: "A is a null pointer",
+    COLAMD_ERROR_p_not_present: "p is a null pointer",
+    COLAMD_ERROR_nrow_negative: "nrow is negative",
+    COLAMD_ERROR_ncol_negative: "ncol is negative",
+    COLAMD_ERROR_nnz_negative: "nnz is negative",
+    COLAMD_ERROR_p0_nonzero: "p[0] is nonzero",
+    COLAMD_ERROR_A_too_small: "A is too small",
+    COLAMD_ERROR_col_length_negative: "column has a negative number of entries",
     COLAMD_ERROR_row_index_out_of_bounds: "row index out of bounds",
     COLAMD_ERROR_out_of_memory: "out of memory",
     COLAMD_ERROR_internal_error: "internal error"
 })
+
+
+@dataclass(frozen=True)
+class COLAMDStats:
+    """Information statistics returned by the COLAMD algorithm.
+
+    This class wraps the contents of the ``stats`` array returned by
+    C ``colamd()`` into a Python dataclass.
+
+    Attributes
+    ----------
+    Ndenserows : int
+        The number of dense or empty rows ignored in the ordering.
+    Ndensecols : int
+        The number of dense or empty columns ignored in the ordering.
+    Ncmpa : int
+        The number of garbage collections performed.
+    status : int
+        Status code indicating the result of the COLAMD operation. If non-zero,
+        ``colamd`` will throw an appropriate exception that interprets this
+        status code.
+
+    The following fields take on different meanings depending on the value of
+    ``status``:
+
+    info1 : int
+        Value of ``status``:
+        * 0: the highest numbered column that is unsorted or has
+          duplicate entries.
+        * -3: the value of ``n_row``.
+        * -4: the value of ``n_col``.
+        * -5: the value of ``nnz == p[n_col]``.
+        * -6: the value of ``p[0]``.
+        * -7: the required ``Alen`` value.
+        * -8: the column with negative entries.
+        * -9: the column with a row index out of bounds.
+    info2 : int
+        Value of ``status``:
+        * 0: the last seen duplicate or unsorted row index.
+        * -7: the actual ``Alen`` value.
+        * -9: the bad row index.
+    info3 : int
+        Value of ``status``:
+        * 0: the number of duplicates or unsorted row indices.
+        * -9: ``n_row``.
+
+    Notes
+    -----
+    Field descriptions are adapted from SuiteSparse ``colamd.c`` [0]_.
+
+    References
+    ----------
+    .. [0]: ``colamd.c`` - SuiteSparse AMD source file.
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/COLAMD/Source/colamd.c
+    """
+    Ndenserows : int
+    Ndensecols : int
+    Ncmpa : int
+    status : int
+    info1 : int
+    info2 : int
+    info3 : int
+
+    @classmethod
+    def from_array(cls, stats: "np.ndarray[int]") -> "COLAMDStats":
+        """Create a COLAMDStats instance from an array."""
+        return cls(
+            Ndenserows=stats[COLAMD_DENSE_ROW],
+            Ndensecols=stats[COLAMD_DENSE_COL],
+            Ncmpa=stats[COLAMD_DEFRAG_COUNT],
+            status=stats[COLAMD_STATUS],
+            info1=stats[COLAMD_INFO1],
+            info2=stats[COLAMD_INFO2],
+            info3=stats[COLAMD_INFO3],
+        )
 
 
 def colamd(A, return_info=False):
@@ -227,12 +303,10 @@ def colamd(A, return_info=False):
             raise COLAMDInternalError("COLAMD encountered an internal error.")
         else:
             raise COLAMDValueError(
-                f"COLAMD returned an error:{COLAMD_ERROR_CODES[stats[COLAMD_STATUS]]}."
+                f"COLAMD returned an error:{_COLAMD_ERROR_CODES[stats[COLAMD_STATUS]]}."
             )
 
     if return_info:
-        # TODO create a COLAMDStats dataclass
-        # return q, COLAMDStats.from_array(stats)
-        return q, stats
+        return q, COLAMDStats.from_array(stats)
     else:
         return q
