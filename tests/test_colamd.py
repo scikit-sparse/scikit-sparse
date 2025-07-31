@@ -21,7 +21,7 @@ from scipy import sparse
 from scipy.sparse import SparseEfficiencyWarning
 from sksparse.colamd import colamd, COLAMDStats
 
-# from .helpers import is_valid_permutation, generate_random_matrices
+from .helpers import is_valid_permutation, generate_random_matrices
 
 
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
@@ -40,15 +40,15 @@ def test_1D_row_input():
 def test_2D_row_input():
     with pytest.warns(SparseEfficiencyWarning, match="not in CSC format"):
         N = 10
-        p = colamd(np.arange(N)[np.newaxis, :])  # (1, N)
-        assert_array_equal(p, np.arange(N, dtype=np.int32), strict=True)
+        q = colamd(np.arange(N)[np.newaxis, :])  # (1, N)
+        assert_array_equal(q, np.arange(N, dtype=np.int32), strict=True)
 
 
 def test_2D_col_input():
     with pytest.warns(SparseEfficiencyWarning, match="not in CSC format"):
         N = 10
-        p = colamd(np.arange(N)[:, np.newaxis])  # (N, 1)
-        assert_array_equal(p, np.zeros(1, dtype=np.int32), strict=True)
+        q = colamd(np.arange(N)[:, np.newaxis])  # (N, 1)
+        assert_array_equal(q, np.zeros(1, dtype=np.int32), strict=True)
 
 
 def test_ND_input():
@@ -71,43 +71,43 @@ def test_singleton_matrix():
     assert_array_equal(colamd(singleton_A), np.array([0], dtype=np.int32), strict=True)
 
 
-# @pytest.mark.parametrize(
-#     "A", list(generate_random_matrices(N_trials=100, N_max=200, d_scale=0.05)),
-# )
-# class TestRandomSquareMatrices:
-#     @pytest.mark.parametrize("matrix_type", ["dense", "csc", "coo"])
-#     def test_input_type(self, A, matrix_type):
-#         match matrix_type:
-#             case "dense":
-#                 A = A.toarray()
-#             case "csc":
-#                 A = A.tocsc()
-#             case "coo":
-#                 A = A.tocoo()
-#             case _:
-#                 raise ValueError(f"Unknown matrix type: {matrix_type}")
+@pytest.mark.parametrize(
+    "A", list(generate_random_matrices(N_trials=100, N_max=200, d_scale=0.05)),
+)
+class TestRandomSquareMatrices:
+    @pytest.mark.parametrize("matrix_type", ["dense", "csc", "coo"])
+    def test_input_type(self, A, matrix_type):
+        match matrix_type:
+            case "dense":
+                A = A.toarray()
+            case "csc":
+                A = A.tocsc()
+            case "coo":
+                A = A.tocoo()
+            case _:
+                raise ValueError(f"Unknown matrix type: {matrix_type}")
 
-#         if matrix_type != "csc":
-#             with pytest.warns(SparseEfficiencyWarning, match="not in CSC format"):
-#                 p = colamd(A)
-#         else:
-#             p = colamd(A)
+        if matrix_type != "csc":
+            with pytest.warns(SparseEfficiencyWarning, match="not in CSC format"):
+                q = colamd(A)
+        else:
+            q = colamd(A)
 
-#         assert is_valid_permutation(p)
+        assert is_valid_permutation(q)
 
-#     @pytest.mark.parametrize("itype", [np.int32, np.int64])
-#     def test_itype(self, A, itype):
-#         A.indptr = A.indptr.astype(itype)
-#         A.indices = A.indices.astype(itype)
-#         p = colamd(A)
-#         assert p.dtype == itype
-#         assert p.shape == (A.shape[0],)
-#         assert is_valid_permutation(p)
+    @pytest.mark.parametrize("itype", [np.int32, np.int64])
+    def test_itype(self, A, itype):
+        A.indptr = A.indptr.astype(itype)
+        A.indices = A.indices.astype(itype)
+        q = colamd(A)
+        assert q.dtype == itype
+        assert q.shape == (A.shape[0],)
+        assert is_valid_permutation(q)
 
-#     @pytest.mark.parametrize("aggressive", [True, False])
-#     def test_aggressive(self, A, aggressive):
-#         p = colamd(A, aggressive=aggressive)
-#         assert is_valid_permutation(p)
+    # @pytest.mark.parametrize("aggressive", [True, False])
+    # def test_aggressive(self, A, aggressive):
+    #     q = colamd(A, aggressive=aggressive)
+    #     assert is_valid_permutation(q)
 
 
 # DENSE_THRESHOLDS = [None, 5, 2]
@@ -138,12 +138,13 @@ def test_singleton_matrix():
 
 #     A = A + A.T
 #     A = A.tocsc()
-#     p = colamd(A, dense_thresh=dense_thresh)
+#     q = colamd(A, dense_thresh=dense_thresh)
 
-#     assert is_valid_permutation(p)
+#     assert is_valid_permutation(q)
 
 #     # Expect dense row at the end of the permutation, but maybe not in order
-#     assert_array_equal(np.sort(p[-N_dense_rows:]), np.sort(dense_row_idx))
+#     assert_array_equal(np.sort(q[-N_dense_rows:]), np.sort(dense_row_idx))
+
 
 def test_info_can_24():
     # The can_24 matrix is used in the SuiteSparse AMD MATLAB/amd_demo.m file.
