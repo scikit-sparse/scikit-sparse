@@ -47,20 +47,20 @@ cdef extern from "amd.h":
     # 32-bit AMD interface
     int amd_order(
         int32_t n,
-        const int32_t* Ap,
-        const int32_t* Ai,
-        int32_t* P,
-        double* Control,
-        double* Info
+        const int32_t Ap[],
+        const int32_t Ai[],
+        int32_t P[],
+        double Control[],
+        double Info[]
     )
-    void amd_defaults(double* Control)
+    void amd_defaults(double Control[])
 
     # 64-bit AMD interface
     int amd_l_order(
         int64_t n,
-        const int64_t* Ap,
-        const int64_t* Ai,
-        int64_t* P,
-        double* Control,
-        double* Info
+        const int64_t Ap[],
+        const int64_t Ai[],
+        int64_t P[],
+        double Control[],
+        double Info[]
     )
