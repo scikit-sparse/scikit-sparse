@@ -99,6 +99,13 @@ extensions = [
         include_dirs=INCLUDE_DIRS,
         library_dirs=LIBRARY_DIRS,
         libraries=["amd"],
+    ),
+    Extension(
+        "sksparse.colamd",
+        ["sksparse/colamd.pyx"],
+        include_dirs=INCLUDE_DIRS,
+        library_dirs=LIBRARY_DIRS,
+        libraries=["colamd"],
     )
 ]
 
