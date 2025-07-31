@@ -150,16 +150,16 @@ class COLAMDStats:
     info3 : int
 
     @classmethod
-    def from_array(cls, stats: "np.ndarray[int]") -> "COLAMDStats":
+    def from_array(cls, stats: "np.ndarray") -> "COLAMDStats":
         """Create a COLAMDStats instance from an array."""
         return cls(
-            Ndenserows=stats[COLAMD_DENSE_ROW],
-            Ndensecols=stats[COLAMD_DENSE_COL],
-            Ncmpa=stats[COLAMD_DEFRAG_COUNT],
-            status=stats[COLAMD_STATUS],
-            info1=stats[COLAMD_INFO1],
-            info2=stats[COLAMD_INFO2],
-            info3=stats[COLAMD_INFO3],
+            Ndenserows=int(stats[COLAMD_DENSE_ROW]),
+            Ndensecols=int(stats[COLAMD_DENSE_COL]),
+            Ncmpa=int(stats[COLAMD_DEFRAG_COUNT]),
+            status=int(stats[COLAMD_STATUS]),
+            info1=int(stats[COLAMD_INFO1]),
+            info2=int(stats[COLAMD_INFO2]),
+            info3=int(stats[COLAMD_INFO3]),
         )
 
 
