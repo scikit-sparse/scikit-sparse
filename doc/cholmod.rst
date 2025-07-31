@@ -18,18 +18,18 @@ including:
   <http://en.wikipedia.org/wiki/Cholesky_decomposition>`_ :math:`LL^{\top} =
   A` or :math:`LDL^{\top} = A` (with fill-reducing permutation) for both
   real and complex sparse matrices :math:`A`, in any format supported
-  by :mod:`scipy.sparse`. (However, CSC matrices will be most
+  by :mod:`scipy.sparse`. (CSC matrices will be most
   efficient.)
 * A convenient and efficient interface for using this decomposition to
   solve problems of the form :math:`Ax = b`.
 * The ability to perform the costly fill-reduction analysis once, and
   then re-use it to efficiently decompose many matrices with the same
   pattern of non-zero entries.
-* In-place 'update' and 'downdate' operations, for computing the
+* In-place "update" and "downdate" operations, for computing the
   Cholesky decomposition of a rank-k update of :math:`A` and of
   product :math:`AA^{\top}`. So, the result is the Cholesky decomposition of
   :math:`A + CC^{\top}` (or :math:`AA^{\top} + CC^{\top}`). The last case is useful when the
-  columns of `A` become available incrementally (e.g., due to memory
+  columns of `A` become available incrementally (*e.g.*, due to memory
   constraints), or when many matrices with similar but non-identical
   columns must be factored.
 * Convenience functions for computing the (log) determinant of the
@@ -68,7 +68,7 @@ as::
   factor = cholesky_AAt(M.T)
   x = factor(M.T * b)
 
-However, you should be aware that for least squares problems, the
+You should be aware that for least squares problems, the
 Cholesky method is usually faster but somewhat less numerically stable
 than QR- or SVD-based techniques.
 
@@ -85,7 +85,7 @@ a fill-reduction analysis and decomposition together:
 
 .. autofunction:: cholesky_AAt
 
-However, some users may want to break the fill-reduction analysis and
+Some users may want to break the fill-reduction analysis and
 actual decomposition into separate steps, and instead begin with one
 of the ``analyze`` functions, which perform only fill-reduction:
 
@@ -116,7 +116,7 @@ of the ``analyze`` functions, which perform only fill-reduction:
 
   * Compute new Cholesky decompositions of matrices that have the same
     pattern of non-zeros
-  * Perform 'updates' or 'downdates'
+  * Perform "updates" or "downdates"
   * Access the various Cholesky factors
   * Solve equations involving those factors
 
@@ -227,7 +227,7 @@ Error handling
   :show-inheritance:
 
   CHOLMOD itself supports matrices in CSC form with 32-bit integer
-  indices and 'double' precision floats (64-bits, or 128-bits total
+  indices and double precision floats (64-bits, or 128-bits total
   for complex numbers). If you pass some other sort of matrix, then
   the wrapper code will convert it for you before passing it to
   CHOLMOD, and issue a warning of type

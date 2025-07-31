@@ -646,16 +646,16 @@ cdef class Factor:
 
         Updates this factor so that instead of representing the decomposition
         of :math:`A` (:math:`AA^{\\top}`), it computes the decomposition of
-        :math:`A + CC^{\\top}` (:math:`AA^{\\top} + CC^{\\top}`) for ``subtract=False`` which is the
-        default, or :math:`A - CC^{\\top}` (:math:`AA^{\\top} - CC^{\\top}`) for
-        ``subtract=True``. This method does not require that the
-        :class:`Factor` was created with :func:`cholesky_AAt`, though that
-        is the common case.
+        :math:`A + CC^{\\top}` (:math:`AA^{\\top} + CC^{\\top}`) for
+        ``subtract=False`` which is the default, or :math:`A - CC^{\\top}`
+        (:math:`AA^{\\top} - CC^{\\top}`) for ``subtract=True``. This method
+        does not require that the :class:`Factor` was created with
+        :func:`cholesky_AAt`, though that is the common case.
 
-        The usual use for this is to factor :math:`AA^{\\top}` when A has a large number of
-        columns, or those columns become available incrementally. Instead of
-        loading all of A into memory, one can load in 'strips' of columns and
-        pass them to this method one at a time.
+        The usual use for this is to factor :math:`AA^{\\top}` when `A` has
+        a large number of columns, or those columns become available
+        incrementally. Instead of loading all of `A` into memory, one can load
+        in 'strips' of columns and pass them to this method one at a time.
 
         Note that no fill-reduction analysis is done; whatever permutation was
         chosen by the initial call to :func:`analyze` will be used regardless
@@ -748,10 +748,10 @@ cdef class Factor:
 
           .. math:: LDL^{\\top} = PAA^{\\top}P^{\\top}
 
-        and then returns the diagonal matrix D *as a 1d vector*.
+        and then returns the diagonal matrix `D` *as a 1d vector*.
 
           .. note:: This method uses an efficient implementation that extracts
-             the diagonal D directly from CHOLMOD's internal
+             the diagonal `D` directly from CHOLMOD's internal
              representation. It never makes a copy of the factor matrices, or
              actually converts a full :math:`LL^{\\top}` factorization into an
              :math:`LDL^{\\top}` factorization just to extract `D`.
@@ -824,10 +824,10 @@ cdef class Factor:
 
           .. math:: LL^{\\top} = PAA^{\\top}P^{\\top}
 
-        and then returns the sparse lower-triangular matrix L.
+        and then returns the sparse lower-triangular matrix `L`.
 
-        .. warning:: The L matrix returned by this method and the one returned
-           by :meth:`L_D` are different!
+        .. warning:: The `L` matrix returned by this method and the one
+           returned by :meth:`L_D` are different!
         """
         return self._L_or_LD(True)
 
@@ -840,9 +840,9 @@ cdef class Factor:
 
           .. math:: LDL^{\\top} = PAA^{\\top}P^{\\top}
 
-        and then returns a sparse lower-triangular matrix "LD", which contains
-        the D matrix on its diagonal, plus the below-diagonal part of L (the
-        actual diagonal of L is all-ones).
+        and then returns a sparse lower-triangular matrix `LD`, which contains
+        the `D` matrix on its diagonal, plus the below-diagonal part of `L`
+        (the actual diagonal of `L` is all-ones).
 
         See :meth:`L_D` for a more convenient interface."""
         return self._L_or_LD(False)
@@ -856,11 +856,11 @@ cdef class Factor:
 
           .. math:: LDL^{\\top} = PAA^{\\top}P^{\\top}
 
-        and then returns the pair (L, D) where L is a sparse lower-triangular
-        matrix and D is a sparse diagonal matrix.
+        and then returns the pair (`L`, `D`) where `L` is a sparse
+        lower-triangular matrix and `D` is a sparse diagonal matrix.
 
-        .. warning:: The L matrix returned by this method and the one returned
-           by :meth:`L` are different!
+        .. warning:: The `L` matrix returned by this method and the one
+           returned by :meth:`L` are different!
         """
         ld = self.LD()
         l = sparse.tril(ld, -1) + sparse.eye(*ld.shape)
@@ -872,12 +872,13 @@ cdef class Factor:
 
         :param b: right-hand-side
 
-        :returns: math:`x`, where :math:`Ax = b` (or :math:`AA^{\\top}x = b`, if
-            you used :func:`cholesky_AAt`).
+        :returns: :math:`x`, where :math:`Ax = b` (or :math:`AA^{\\top}x = b`,
+            if you used :func:`cholesky_AAt`).
 
-        :meth:`__call__` is an alias for this function, i.e., you can simply
-        call the :class:`Factor` object like a function to solve :math:`Ax =
-        b`."""
+        :meth:`__call__` is an alias for this function, *i.e.*, you can simply
+        call the :class:`Factor` object like a function to solve
+        :math:`Ax = b`.
+        """
         return self._solve(b, CHOLMOD_A)
 
     def __call__(self, b):
@@ -889,18 +890,18 @@ cdef class Factor:
 
         :param b: right-hand-side
 
-        :returns: math:`x`, where :math:`LDL^{\\top}x = b`.
+        :returns: :math:`x`, where :math:`LDL^{\\top}x = b`.
 
-        (This is different from :meth:`solve_A` because it does not correct
-        for the fill-reducing permutation.)"""
+        This is different from :meth:`solve_A` because it does not correct
+        for the fill-reducing permutation."""
         return self._solve(b, CHOLMOD_LDLt)
 
     def solve_LD(self, b):
-        """ Solves a linear system.
+        """Solves a linear system.
 
         :param b: right-hand-side
 
-        :returns: math:`x`, where :math:`LDx = b`."""
+        :returns: :math:`x`, where :math:`LDx = b`."""
         self._ensure_L_or_LD_inplace(False)
         return self._solve(b, CHOLMOD_LD)
 
@@ -909,7 +910,7 @@ cdef class Factor:
 
         :param b: right-hand-side
 
-        :returns: math:`x`, where :math:`DL^{\\top}x = b`."""
+        :returns: :math:`x`, where :math:`DL^{\\top}x = b`."""
 
         self._ensure_L_or_LD_inplace(False)
         return self._solve(b, CHOLMOD_DLt)
@@ -923,7 +924,7 @@ cdef class Factor:
             :math:`LDL^{\\top}` decomposition. If False, use the `L` of the
             :math:`LL^{\\top}` decomposition.
 
-        :returns: math:`x`, where :math:`Lx = b`."""
+        :returns: :math:`x`, where :math:`Lx = b`."""
         self._ensure_L_or_LD_inplace(not use_LDLt_decomposition)
         return self._solve(b, CHOLMOD_L)
 
@@ -935,7 +936,7 @@ cdef class Factor:
         :param use_LDLt_decomposition: If True, use the `L` of the :math:`LDL^{\\top}`
           decomposition. If False, use the `L` of the :math:`LL^{\\top}` decomposition.
 
-        :returns: math:`x`, where :math:`L^{\\top}x = b`."""
+        :returns: :math:`x`, where :math:`L^{\\top}x = b`."""
         self._ensure_L_or_LD_inplace(not use_LDLt_decomposition)
         return self._solve(b, CHOLMOD_Lt)
 
@@ -992,12 +993,12 @@ cdef class Factor:
         return py_out
 
     def slogdet(self):
-        """Computes the log-determinant of the matrix A, with the same API as
-        :meth:`numpy.linalg.slogdet`.
+        """Computes the log-determinant of the matrix `A`, with the same API as
+        :func:`numpy.linalg.slogdet`.
 
-        This returns a tuple `(sign, logdet)`, where `sign` is always the
+        This returns a tuple ``(sign, logdet)``, where ``sign`` is always the
         number 1.0 (because the determinant of a positive-definite matrix is
-        always a positive real number), and `logdet` is the (natural)
+        always a positive real number), and ``logdet`` is the (natural)
         logarithm of the determinant of the matrix A.
 
         .. versionadded:: 0.2
@@ -1005,17 +1006,17 @@ cdef class Factor:
         return (1.0, self.logdet())
 
     def logdet(self):
-        """Computes the (natural) log of the determinant of the matrix A.
+        """Computes the (natural) log of the determinant of the matrix `A`.
 
-        If `f` is a factor, then `f.logdet()` is equivalent to
-        `np.sum(np.log(f.D()))`.
+        If ``f`` is a factor, then ``f.logdet()`` is equivalent to
+        ``np.sum(np.log(f.D()))``.
 
         .. versionadded:: 0.2
         """
         return np.sum(np.log(self.D()))
 
     def det(self):
-        """Computes the determinant of the matrix A.
+        """Computes the determinant of the matrix `A`.
 
         Consider using :meth:`logdet` instead, for improved numerical
         stability. (In particular, determinants are often prone to problems
@@ -1026,7 +1027,7 @@ cdef class Factor:
         return np.exp(self.logdet())
 
     def inv(self):
-        """Returns the inverse of the matrix A, as a sparse (CSC) matrix.
+        """Returns the inverse of the matrix `A`, as a sparse (CSC) matrix.
 
           .. warning:: For most purposes, it is better to use :meth:`solve`
              instead of computing the inverse explicitly. That is, the
@@ -1038,7 +1039,7 @@ cdef class Factor:
              But the first line is both faster and produces more accurate
              results.
 
-        Sometimes, though, you really do need the inverse explicitly (e.g.,
+        Sometimes, though, you really do need the inverse explicitly (*e.g.*,
         for calculating standard errors in least squares regression), so if
         that's your situation, here you go.
 
@@ -1050,10 +1051,10 @@ cdef class Factor:
 
 def analyze(A, mode="auto", ordering_method="default", use_long=None):
     """Computes the optimal fill-reducing permutation for the symmetric matrix
-    A, but does *not* factor it (i.e., it performs a "symbolic Cholesky
+    ``A``, but does *not* factor it (*i.e.*, it performs a "symbolic Cholesky
     decomposition"). This function ignores the actual contents of the matrix
-    A. All it cares about are (1) which entries are non-zero, and (2) whether
-    A has real or complex type.
+    ``A``. All it cares about are (1) which entries are non-zero, and (2)
+    whether ``A`` has real or complex type.
 
     :param A: The matrix to be analyzed.
 
@@ -1063,7 +1064,7 @@ def analyze(A, mode="auto", ordering_method="default", use_long=None):
       the algorithm to be used.
 
     :param ordering_method: Specifies which ordering algorithm should be used to
-      (eventually) order the matrix A -- one of "natural", "amd", "metis",
+      (eventually) order the matrix ``A`` -- one of "natural", "amd", "metis",
       "nesdis", "colamd", "default" and "best". "natural" means no permutation.
       See the CHOLMOD documentation for more details.
 
@@ -1080,10 +1081,10 @@ def analyze(A, mode="auto", ordering_method="default", use_long=None):
 
 def analyze_AAt(A, mode="auto", ordering_method="default", use_long=None):
     """Computes the optimal fill-reducing permutation for the symmetric matrix
-    :math:`AA^{\\top}`, but does *not* factor it (i.e., it performs a "symbolic
+    :math:`AA^{\\top}`, but does *not* factor it (*i.e.*, it performs a "symbolic
     Cholesky decomposition"). This function ignores the actual contents of the
     matrix A. All it cares about are (1) which entries are non-zero, and (2)
-    whether A has real or complex type.
+    whether ``A`` has real or complex type.
 
     :param A: The matrix to be analyzed.
 
@@ -1093,7 +1094,7 @@ def analyze_AAt(A, mode="auto", ordering_method="default", use_long=None):
       the algorithm to be used.
 
     :param ordering_method: Specifies which ordering algorithm should be used to
-      (eventually) order the matrix A -- one of "natural", "amd", "metis",
+      (eventually) order the matrix ``A`` -- one of "natural", "amd", "metis",
       "nesdis", "colamd", "default" and "best". "natural" means no permutation.
       See the CHOLMOD documentation for more details.
 
@@ -1174,8 +1175,8 @@ def cholesky(A, beta=0, mode="auto", ordering_method="default", use_long=None):
       .. math:: A + \\beta I
 
     where ``A`` is a sparse, symmetric, positive-definite matrix, preferably
-    in CSC format, and ``beta`` is any real scalar (usually 0 or 1). (And
-    :math:`I` denotes the identity matrix.)
+    in CSC format, and ``beta`` is any real scalar (usually 0 or 1). 
+    :math:`I` denotes the identity matrix.
 
     Only the lower triangular part of ``A`` is used.
 
@@ -1195,8 +1196,8 @@ def cholesky_AAt(A, beta=0, mode="auto", ordering_method="default", use_long=Non
       .. math:: AA^{\\top} + \\beta I
 
     where ``A`` is a sparse matrix, preferably in CSC format, and ``beta`` is
-    any real scalar (usually 0 or 1). (And :math:`I` denotes the identity
-    matrix.)
+    any real scalar (usually 0 or 1). :math:`I` denotes the identity
+    matrix.
 
     Note that if you are solving a conventional least-squares problem, you
     will need to transpose your matrix before calling this function, and
