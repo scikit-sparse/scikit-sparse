@@ -46,9 +46,6 @@ import warnings
 from dataclasses import dataclass
 from scipy.sparse import csc_array, issparse, SparseEfficiencyWarning
 
-DEF CONTROL_SIZE = 5
-DEF INFO_SIZE = 20
-
 
 class AMDError(Exception):
     """Base class for AMD-related errors."""
@@ -301,12 +298,12 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
         return np.arange(N, dtype=np.int32 if use_int32 else np.int64)
 
     # Declare typed memory views for Cython
-    cdef int[::1] Ap_mv_int32
-    cdef int[::1] Ai_mv_int32
-    cdef int[::1] p_mv_int32
-    cdef long long[::1] Ap_mv_int64
-    cdef long long[::1] Ai_mv_int64
-    cdef long long[::1] p_mv_int64
+    cdef const int32_t[::1] Ap_mv_int32
+    cdef const int32_t[::1] Ai_mv_int32
+    cdef int32_t[::1] p_mv_int32
+    cdef const int64_t[::1] Ap_mv_int64
+    cdef const int64_t[::1] Ai_mv_int64
+    cdef int64_t[::1] p_mv_int64
 
     # Always ensure arrays are contiguous and correct dtype
     if use_int32:
@@ -319,13 +316,10 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
         p = p_mv_int64 = np.empty(N, dtype=np.int64)
 
     # Prepare control parameters
-    ctrl = np.empty(CONTROL_SIZE, dtype=np.float64)
+    ctrl = np.empty(AMD_CONTROL, dtype=np.float64)
     cdef double[::1] ctrl_mv = ctrl
 
-    if use_int32:
-        amd_defaults(<double*>&ctrl_mv[0])
-    else:
-        amd_l_defaults(<double*>&ctrl_mv[0])
+    amd_defaults(<double*>&ctrl_mv[0])
 
     # Update the defaults with user control parameters
     if dense_thresh is not None:
@@ -334,27 +328,27 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
     if aggressive is not None:
         ctrl[AMD_AGGRESSIVE] = 1.0 if aggressive else 0.0
 
-    info = np.zeros(INFO_SIZE, dtype=np.float64)
+    info = np.zeros(AMD_INFO, dtype=np.float64)
     cdef double[::1] info_mv = info
 
     # AMD ordering
     if use_int32:
         status = amd_order(
             N,
-            <int*>&Ap_mv_int32[0],
-            <int*>&Ai_mv_int32[0],
-            <int*>&p_mv_int32[0],
-            <double*>&ctrl_mv[0],
-            <double*>&info_mv[0]
+            &Ap_mv_int32[0],
+            &Ai_mv_int32[0],
+            &p_mv_int32[0],
+            &ctrl_mv[0],
+            &info_mv[0]
         )
     else:
         status = amd_l_order(
             N,
-            <long long*>&Ap_mv_int64[0],
-            <long long*>&Ai_mv_int64[0],
-            <long long*>&p_mv_int64[0],
-            <double*>&ctrl_mv[0],
-            <double*>&info_mv[0]
+            &Ap_mv_int64[0],
+            &Ai_mv_int64[0],
+            &p_mv_int64[0],
+            &ctrl_mv[0],
+            &info_mv[0]
         )
 
     if status == AMD_OUT_OF_MEMORY:
@@ -385,8 +379,8 @@ def amd_default_control():
         * 'aggressive': Whether to use aggressive absorption.
 
     """
-    cdef double[::1] ctrl_mv = np.empty(CONTROL_SIZE, dtype=np.float64)
-    amd_l_defaults(<double*>&ctrl_mv[0])
+    cdef double[::1] ctrl_mv = np.empty(AMD_CONTROL, dtype=np.float64)
+    amd_defaults(&ctrl_mv[0])
     return dict(
         dense_thresh=ctrl_mv[AMD_DENSE],
         aggressive=bool(ctrl_mv[AMD_AGGRESSIVE]),
