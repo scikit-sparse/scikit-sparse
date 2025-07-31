@@ -113,6 +113,7 @@ class COLAMDStats:
 
     info1 : int
         Value of ``status``:
+
         * 0: the highest numbered column that is unsorted or has
           duplicate entries.
         * -3: the value of ``n_row``.
@@ -124,21 +125,23 @@ class COLAMDStats:
         * -9: the column with a row index out of bounds.
     info2 : int
         Value of ``status``:
+
         * 0: the last seen duplicate or unsorted row index.
         * -7: the actual ``Alen`` value.
         * -9: the bad row index.
     info3 : int
         Value of ``status``:
+
         * 0: the number of duplicates or unsorted row indices.
         * -9: ``n_row``.
 
     Notes
     -----
-    Field descriptions are adapted from SuiteSparse ``colamd.c`` [0]_.
+    Field descriptions are adapted from SuiteSparse ``colamd.c`` [#colamd_c]_.
 
     References
     ----------
-    .. [0]: ``colamd.c`` - SuiteSparse AMD source file.
+    .. [#colamd_c] ``colamd.c`` - SuiteSparse AMD source file.
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/COLAMD/Source/colamd.c
     """
     Ndenserows : int
@@ -166,7 +169,7 @@ class COLAMDStats:
 def colamd(A, return_info=False):
     """Compute the column approximate minimum degree ordering of a sparse matrix.
 
-    Adapted from the COLAMD documentation [0]_:
+    Adapted from the COLAMD documentation [#colamd_h]_:
 
         This function computes a column ordering for a sparse matrix `A` that
         is appropriate for LU factorization of symmetric or unsymmetric
@@ -174,8 +177,8 @@ def colamd(A, return_info=False):
         linear programming problems, and other related problems.
 
         COLAMD computes a permutation `Q` such that the Cholesky factorization
-        of :math:`(AQ)^{\top}(AQ)` has less fill-in and requires fewer floating
-        point operations than :math:`A^{\top}A`.  This also provides a good
+        of :math:`(AQ)^{\\top}(AQ)` has less fill-in and requires fewer floating
+        point operations than :math:`A^{\\top}A`.  This also provides a good
         ordering for sparse partial pivoting methods, :math:`P(AQ) = LU`, where
         `Q` is computed prior to numerical factorization, and `P` is computed
         during numerical factorization via conventional partial pivoting with
@@ -192,15 +195,15 @@ def colamd(A, return_info=False):
     Returns
     -------
     q : ndarray
-        The permutation array such that `A[:, q]` is the column ordered matrix.
+        The permutation array such that ``A[:, q]`` is the column ordered matrix.
     stats : ndarray, optional
-        If `return_info` is True, returns an array containing COLAMD statistics.
+        If ``return_info`` is True, returns an array containing COLAMD statistics.
         The contents of this array depend on the COLAMD implementation and may
         include information such as the number of nonzeros, memory usage, etc.
 
     References
     ----------
-    .. [0] `colamd.h` - Source header file from SuiteSparse.
+    .. [#colamd_h] ``colamd.h`` - Source header file from SuiteSparse.
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/COLAMD/Include/colamd.h
     """
     # Convert dense to sparse CSC

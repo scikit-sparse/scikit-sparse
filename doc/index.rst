@@ -15,6 +15,8 @@ Contents:
 
    amd.rst
 
+   colamd.rst
+
    cholmod.rst
 
    changes.rst
