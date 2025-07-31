@@ -246,18 +246,18 @@ def colamd(A, return_info=False):
         raise ValueError("Recommended Alen is zero: one of {A.nnz, M, N} is erroneous.")
 
     # Set the default knobs
-    knobs = np.empty(COLAMD_KNOBS, dtype=np.double)
+    knobs = np.zeros(COLAMD_KNOBS, dtype=np.double)
     cdef double[::1] knobs_mv = knobs
     colamd_set_defaults(&knobs_mv[0])
 
     # TODO override with user knobs if provided
 
     # Declare typed memory views for Cython
-    cdef int32_t[::1] Ap_mv_int32
-    cdef int64_t[::1] Ap_mv_int64
-
     cdef int32_t[::1] Ai_mv_int32
     cdef int64_t[::1] Ai_mv_int64
+
+    cdef int32_t[::1] p_mv_int32
+    cdef int64_t[::1] p_mv_int64
 
     cdef int32_t[::1] stats_mv_int32
     cdef int64_t[::1] stats_mv_int64
@@ -265,29 +265,33 @@ def colamd(A, return_info=False):
     # Compute the ordering
     if use_int32:
         # Copy the arrays, since they are altered in the C function
-        Ai_mv_int32 = np.array(A.indices, dtype=np.int32, copy=True, order='C')
-        q = Ap_mv_int32 = np.array(A.indptr, dtype=np.int32, copy=True, order='C')
-        stats = stats_mv_int32 = np.empty(COLAMD_STATS, dtype=np.int32)
+        workspace = np.zeros(Alen, dtype=np.int32, order='C')
+        workspace[:A.nnz] = A.indices.copy()
+        Ai_mv_int32 = workspace
+        p_mv_int32 = np.array(A.indptr, dtype=np.int32, copy=True, order='C')
+        stats = stats_mv_int32 = np.zeros(COLAMD_STATS, dtype=np.int32)
         ok = c_colamd(
             M, 
 			N, 
 			Alen, 
 			&Ai_mv_int32[0], 
-			&Ap_mv_int32[0], 
+			&p_mv_int32[0], 
 			&knobs_mv[0], 
 			&stats_mv_int32[0]
         )
     else:
         # Copy the arrays, since they are altered in the C function
-        Ai_mv_int64 = np.array(A.indices, dtype=np.int64, copy=True, order='C')
-        q = Ap_mv_int64 = np.array(A.indptr, dtype=np.int64, copy=True, order='C')
-        stats = stats_mv_int64 = np.empty(COLAMD_STATS, dtype=np.int64)
+        workspace = np.zeros(Alen, dtype=np.int64, order='C')
+        workspace[:A.nnz] = A.indices.copy()
+        Ai_mv_int64 = workspace
+        p_mv_int64 = np.array(A.indptr, dtype=np.int64, copy=True, order='C')
+        stats = stats_mv_int64 = np.zeros(COLAMD_STATS, dtype=np.int64)
         ok = c_colamd_l(
             M, 
 			N, 
 			Alen, 
 			&Ai_mv_int64[0], 
-			&Ap_mv_int64[0], 
+			&p_mv_int64[0], 
 			&knobs_mv[0], 
 			&stats_mv_int64[0]
         )
@@ -305,6 +309,14 @@ def colamd(A, return_info=False):
             raise COLAMDValueError(
                 f"COLAMD returned an error:{_COLAMD_ERROR_CODES[stats[COLAMD_STATUS]]}."
             )
+
+    # Only take the first N entries of the permutation array
+    if use_int32:
+        q_slice = p_mv_int32[:N]
+    else:
+        q_slice = p_mv_int64[:N]
+
+    q = np.asarray(q_slice)
 
     if return_info:
         return q, COLAMDStats.from_array(stats)
