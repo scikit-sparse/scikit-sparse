@@ -12,6 +12,9 @@
 # distutils: language = c
 # cython: language_level=3
 
+from libc.stdint cimport int32_t, int64_t
+
+
 cdef extern from "amd.h":
     # sizes of Control and Info
     int AMD_CONTROL
@@ -43,10 +46,10 @@ cdef extern from "amd.h":
 
     # 32-bit AMD interface
     int amd_order(
-        int n,
-        int* Ap,
-        int* Ai,
-        int* P,
+        int32_t n,
+        const int32_t* Ap,
+        const int32_t* Ai,
+        int32_t* P,
         double* Control,
         double* Info
     )
@@ -54,12 +57,10 @@ cdef extern from "amd.h":
 
     # 64-bit AMD interface
     int amd_l_order(
-        long long n,
-        long long* Ap,
-        long long* Ai,
-        long long* P,
+        int64_t n,
+        const int64_t* Ap,
+        const int64_t* Ai,
+        int64_t* P,
         double* Control,
         double* Info
     )
-    void amd_l_defaults(double* Control)
-    void amd_l_control(double* Control)
