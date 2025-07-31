@@ -16,10 +16,10 @@ import numpy as np
 import pytest
 
 from numpy.testing import assert_array_equal
-# from pathlib import Path
+from pathlib import Path
 from scipy import sparse
 from scipy.sparse import SparseEfficiencyWarning
-from sksparse.colamd import colamd
+from sksparse.colamd import colamd, COLAMDStats
 
 # from .helpers import is_valid_permutation, generate_random_matrices
 
@@ -144,6 +144,31 @@ def test_singleton_matrix():
 
 #     # Expect dense row at the end of the permutation, but maybe not in order
 #     assert_array_equal(np.sort(p[-N_dense_rows:]), np.sort(dense_row_idx))
+
+def test_info_can_24():
+    # The can_24 matrix is used in the SuiteSparse AMD MATLAB/amd_demo.m file.
+    expect_info = COLAMDStats.from_array(
+        np.array([
+            0,   # Ndenserows
+            0,   # Ndensecols
+            1,   # Ncmpa
+            0,   # status
+            -1,  # info1
+            -1,  # info2
+            0,   # info3
+        ])
+    )
+
+    # Load the can_24 matrix from a file
+    can_24_path = Path("tests") / "test_data" / "can_24"
+    with can_24_path.open() as fp:
+        can_24 = np.genfromtxt(fp, dtype=int)
+
+    A = sparse.csc_array((can_24[:, 2], (can_24[:, 0] - 1, can_24[:, 1] - 1)))
+    q, info = colamd(A, return_info=True)
+
+    assert is_valid_permutation(q)
+    assert info == expect_info
 
 # # =============================================================================
 # # =============================================================================

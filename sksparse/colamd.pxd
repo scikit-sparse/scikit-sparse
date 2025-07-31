@@ -29,9 +29,9 @@ cdef extern from "colamd.h":
     # indices of stats
     int COLAMD_DEFRAG_COUNT
     int COLAMD_STATUS
-    int COLAMDINFO1
-    int COLAMDINFO2
-    int COLAMDINFO3
+    int COLAMD_INFO1
+    int COLAMD_INFO2
+    int COLAMD_INFO3
 
     # return values of colamd
     int COLAMD_OK
