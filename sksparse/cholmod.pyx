@@ -1,6 +1,6 @@
 # CHOLMOD wrapper for scikits.sparse
 
-# Copyright (C) 2008-2017 The scikit-sparse developers:
+# Copyright (C) 2008-2025 The scikit-sparse developers:
 #
 # 2008        David Cournapeau        <cournape@gmail.com>
 # 2009-2015   Nathaniel Smith         <njs@pobox.com>
@@ -584,7 +584,7 @@ cdef class Factor:
         return self._cholesky_inplace(A, True, beta=beta)
 
     def cholesky_AAt_inplace(self, A, beta=0):
-        """The same as :meth:`cholesky_inplace`, except it factors :math:`AA'
+        """The same as :meth:`cholesky_inplace`, except it factors :math:`AA^{\\top}
         + \\beta I` instead of :math:`A + \\beta I`."""
         return self._cholesky_inplace(A, False, beta=beta)
 
@@ -642,17 +642,17 @@ cdef class Factor:
         return clone
 
     def update_inplace(self, C, bint subtract=False):
-        """Incremental building of :math:`AA'` decompositions.
+        """Incremental building of :math:`AA^{\\top}` decompositions.
 
         Updates this factor so that instead of representing the decomposition
-        of :math:`A` (:math:`AA'`), it computes the decomposition of
-        :math:`A + CC'` (:math:`AA' + CC'`) for ``subtract=False`` which is the
-        default, or :math:`A - CC'` (:math:`AA' - CC'`) for
+        of :math:`A` (:math:`AA^{\\top}`), it computes the decomposition of
+        :math:`A + CC^{\\top}` (:math:`AA^{\\top} + CC^{\\top}`) for ``subtract=False`` which is the
+        default, or :math:`A - CC^{\\top}` (:math:`AA^{\\top} - CC^{\\top}`) for
         ``subtract=True``. This method does not require that the
         :class:`Factor` was created with :func:`cholesky_AAt`, though that
         is the common case.
 
-        The usual use for this is to factor AA' when A has a large number of
+        The usual use for this is to factor :math:`AA^{\\top}` when A has a large number of
         columns, or those columns become available incrementally. Instead of
         loading all of A into memory, one can load in 'strips' of columns and
         pass them to this method one at a time.
@@ -692,11 +692,11 @@ cdef class Factor:
     def P(self):
         """Returns the fill-reducing permutation P, as a vector of indices.
 
-        The decomposition :math:`LL'` or :math:`LDL'` is of::
+        The decomposition :math:`LL^{\\top}` or :math:`LDL^{\\top}` is of::
 
           A[P[:, np.newaxis], P[np.newaxis, :]]
 
-        (or similar for AA')."""
+        (or similar for :math:`AA^{\\top}`)."""
         if self._factor.Perm is NULL:
             raise CholmodError("you must analyze a matrix first")
         assert self._factor.itype == self._common._common.itype
@@ -708,9 +708,9 @@ cdef class Factor:
         return out
 
     def _ensure_L_or_LD_inplace(self, want_L):
-        # In CHOLMOD, supernodal factorizations are always LL'. If we request
-        # to change to a supernodal LDL' factorization, cholmod_change_factor
-        # will silently do nothing! So we can only stay supernodal when LL' is
+        # In CHOLMOD, supernodal factorizations are always LL.T. If we request
+        # to change to a supernodal LDL.T factorization, cholmod_change_factor
+        # will silently do nothing! So we can only stay supernodal when LL.T is
         # requested:
         if self._common._use_long:
             cholmod_c_change_factor = cholmod_l_change_factor
@@ -742,19 +742,19 @@ cdef class Factor:
     def D(self):
         """Converts this factorization to the style
 
-          .. math:: LDL' = PAP'
+          .. math:: LDL^{\\top} = PAP^{\\top}
 
         or
 
-          .. math:: LDL' = PAA'P'
+          .. math:: LDL^{\\top} = PAA^{\\top}P^{\\top}
 
         and then returns the diagonal matrix D *as a 1d vector*.
 
           .. note:: This method uses an efficient implementation that extracts
              the diagonal D directly from CHOLMOD's internal
              representation. It never makes a copy of the factor matrices, or
-             actually converts a full `LL'` factorization into an `LDL'`
-             factorization just to extract `D`.
+             actually converts a full :math:`LL^{\\top}` factorization into an
+             :math:`LDL^{\\top}` factorization just to extract `D`.
 
         """
 
@@ -818,11 +818,11 @@ cdef class Factor:
     def L(self):
         """If necessary, converts this factorization to the style
 
-          .. math:: LL' = PAP'
+          .. math:: LL^{\\top} = PAP^{\\top}
 
         or
 
-          .. math:: LL' = PAA'P'
+          .. math:: LL^{\\top} = PAA^{\\top}P^{\\top}
 
         and then returns the sparse lower-triangular matrix L.
 
@@ -834,11 +834,11 @@ cdef class Factor:
     def LD(self):
         """If necessary, converts this factorization to the style
 
-          .. math:: LDL' = PAP'
+          .. math:: LDL^{\\top} = PAP^{\\top}
 
         or
 
-          .. math:: LDL' = PAA'P'
+          .. math:: LDL^{\\top} = PAA^{\\top}P^{\\top}
 
         and then returns a sparse lower-triangular matrix "LD", which contains
         the D matrix on its diagonal, plus the below-diagonal part of L (the
@@ -850,11 +850,11 @@ cdef class Factor:
     def L_D(self):
         """If necessary, converts this factorization to the style
 
-          .. math:: LDL' = PAP'
+          .. math:: LDL^{\\top} = PAP^{\\top}
 
         or
 
-          .. math:: LDL' = PAA'P'
+          .. math:: LDL^{\\top} = PAA^{\\top}P^{\\top}
 
         and then returns the pair (L, D) where L is a sparse lower-triangular
         matrix and D is a sparse diagonal matrix.
@@ -872,7 +872,7 @@ cdef class Factor:
 
         :param b: right-hand-side
 
-        :returns: math:`x`, where :math:`Ax = b` (or :math:`AA'x = b`, if
+        :returns: math:`x`, where :math:`Ax = b` (or :math:`AA^{\\top}x = b`, if
             you used :func:`cholesky_AAt`).
 
         :meth:`__call__` is an alias for this function, i.e., you can simply
@@ -890,7 +890,7 @@ cdef class Factor:
 
         :param b: right-hand-side
 
-        :returns: math:`x`, where :math:`LDL'x = b`.
+        :returns: math:`x`, where :math:`LDL^{\\top}x = b`.
 
         (This is different from :meth:`solve_A` because it does not correct
         for the fill-reducing permutation.)"""
@@ -910,7 +910,7 @@ cdef class Factor:
 
         :param b: right-hand-side
 
-        :returns: math:`x`, where :math:`DL'x = b`."""
+        :returns: math:`x`, where :math:`DL^{\\top}x = b`."""
 
         self._ensure_L_or_LD_inplace(False)
         return self._solve(b, CHOLMOD_DLt)
@@ -920,8 +920,9 @@ cdef class Factor:
 
         :param b: right-hand-side
 
-        :param use_LDLt_decomposition: If True, use the `L` of the `LDL'`
-          decomposition. If False, use the `L` of the `LL'` decomposition.
+        :param use_LDLt_decomposition: If True, use the `L` of the
+            :math:`LDL^{\\top}` decomposition. If False, use the `L` of the
+            :math:`LL^{\\top}` decomposition.
 
         :returns: math:`x`, where :math:`Lx = b`."""
         self._ensure_L_or_LD_inplace(not use_LDLt_decomposition)
@@ -932,10 +933,10 @@ cdef class Factor:
 
         :param b: right-hand-side
 
-        :param use_LDLt_decomposition: If True, use the `L` of the `LDL'`
-          decomposition. If False, use the `L` of the `LL'` decomposition.
+        :param use_LDLt_decomposition: If True, use the `L` of the :math:`LDL^{\\top}`
+          decomposition. If False, use the `L` of the :math:`LL^{\\top}` decomposition.
 
-        :returns: math:`x`, where :math:`L'x = b`."""
+        :returns: math:`x`, where :math:`L^{\\top}x = b`."""
         self._ensure_L_or_LD_inplace(not use_LDLt_decomposition)
         return self._solve(b, CHOLMOD_Lt)
 
@@ -952,7 +953,7 @@ cdef class Factor:
         return self._solve(b, CHOLMOD_P)
 
     def apply_Pt(self, b):
-        "Returns :math:`x`, where :math:`x = P'b`."
+        "Returns :math:`x`, where :math:`x = P^{\\top}b`."
         return self._solve(b, CHOLMOD_Pt)
 
     def _solve(self, b, system):
@@ -1028,7 +1029,7 @@ cdef class Factor:
     def inv(self):
         """Returns the inverse of the matrix A, as a sparse (CSC) matrix.
 
-          .. warning:: For most purposes, it is better to use :code:`solve`
+          .. warning:: For most purposes, it is better to use :meth:`solve`
              instead of computing the inverse explicitly. That is, the
              following two pieces of code produce identical results::
 
@@ -1080,7 +1081,7 @@ def analyze(A, mode="auto", ordering_method="default", use_long=None):
 
 def analyze_AAt(A, mode="auto", ordering_method="default", use_long=None):
     """Computes the optimal fill-reducing permutation for the symmetric matrix
-    :math:`AA'`, but does *not* factor it (i.e., it performs a "symbolic
+    :math:`AA^{\\top}`, but does *not* factor it (i.e., it performs a "symbolic
     Cholesky decomposition"). This function ignores the actual contents of the
     matrix A. All it cares about are (1) which entries are non-zero, and (2)
     whether A has real or complex type.
@@ -1192,7 +1193,7 @@ def cholesky(A, beta=0, mode="auto", ordering_method="default", use_long=None):
 def cholesky_AAt(A, beta=0, mode="auto", ordering_method="default", use_long=None):
     """Computes the fill-reducing Cholesky decomposition of
 
-      .. math:: AA' + \\beta I
+      .. math:: AA^{\\top} + \\beta I
 
     where ``A`` is a sparse matrix, preferably in CSC format, and ``beta`` is
     any real scalar (usually 0 or 1). (And :math:`I` denotes the identity

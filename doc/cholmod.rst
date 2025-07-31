@@ -15,8 +15,8 @@ Specifically, it exposes most of the capabilities of the `CHOLMOD
 including:
 
 * Computation of the `Cholesky decomposition
-  <http://en.wikipedia.org/wiki/Cholesky_decomposition>`_ :math:`LL' =
-  A` or :math:`LDL' = A` (with fill-reducing permutation) for both
+  <http://en.wikipedia.org/wiki/Cholesky_decomposition>`_ :math:`LL^{\top} =
+  A` or :math:`LDL^{\top} = A` (with fill-reducing permutation) for both
   real and complex sparse matrices :math:`A`, in any format supported
   by :mod:`scipy.sparse`. (However, CSC matrices will be most
   efficient.)
@@ -27,8 +27,8 @@ including:
   pattern of non-zero entries.
 * In-place 'update' and 'downdate' operations, for computing the
   Cholesky decomposition of a rank-k update of :math:`A` and of
-  product :math:`AA'`. So, the result is the Cholesky decomposition of
-  :math:`A + CC'` (or :math:`AA' + CC'`). The last case is useful when the
+  product :math:`AA^{\top}`. So, the result is the Cholesky decomposition of
+  :math:`A + CC^{\top}` (or :math:`AA^{\top} + CC^{\top}`). The last case is useful when the
   columns of `A` become available incrementally (e.g., due to memory
   constraints), or when many matrices with similar but non-identical
   columns must be factored.
@@ -59,11 +59,11 @@ itself, to avoid issues with underflow/overflow. See :meth:`Factor.logdet`)
 If you have a least-squares problem to solve, minimizing :math:`||Mx -
 b||^2`, and :math:`M` is a sparse matrix, the `solution
 <http://en.wikipedia.org/wiki/Linear_least_squares_(mathematics)#Derivation_of_the_normal_equations>`_
-is :math:`x = (M'M)^{-1} M'b`, which can be efficiently calculated
+is :math:`x = (M^{\top}M)^{-1} M^{\top}b`, which can be efficiently calculated
 as::
 
   from sksparse.cholmod import cholesky_AAt
-  # Notice that CHOLMOD computes AA' and we want M'M, so we must set A = M'!
+  # Notice that CHOLMOD computes AA.T and we want M.T M, so we must set A = M.T!
   factor = cholesky_AAt(M.T)
   x = factor(M.T * b)
 
@@ -105,7 +105,7 @@ of the ``analyze`` functions, which perform only fill-reduction:
 .. autoclass:: Factor
 
   A :class:`Factor` object represents the Cholesky decomposition of some
-  matrix :math:`A` (or :math:`AA'`). Each :class:`Factor` fixes:
+  matrix :math:`A` (or :math:`AA^{\top}`). Each :class:`Factor` fixes:
 
   * A specific fill-reducing permutation
   * A choice of which Cholesky algorithm to use (see :func:`analyze`)
@@ -159,7 +159,7 @@ All methods in this section accept both sparse and dense matrices (or
 vectors) ``b``, and return either a sparse or dense ``x``
 accordingly.
 
-All methods in this section act on `LDL'` factorizations by default.
+All methods in this section act on :math:`LDL^{\top}` factorizations by default.
 Thus `L` refers by default to the matrix returned by :meth:`Factor.L_D`, not that
 returned by :meth:`Factor.L` (though conversion is not performed unless necessary).
 
