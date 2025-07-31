@@ -80,17 +80,17 @@ of which return a :class:`Factor` object, documented below.
 Most users will want one of the ``cholesky`` functions, which perform
 a fill-reduction analysis and decomposition together:
 
-.. autofunction:: cholesky(A, beta=0, mode="auto", ordering_method="default", use_long=None)
+.. autofunction:: cholesky
 
-.. autofunction:: cholesky_AAt(A, beta=0, mode="auto", ordering_method="default", use_long=None)
+.. autofunction:: cholesky_AAt
 
 However, some users may want to break the fill-reduction analysis and
 actual decomposition into separate steps, and instead begin with one
 of the ``analyze`` functions, which perform only fill-reduction:
 
-.. autofunction:: analyze(A, mode="auto", ordering_method="default", use_long=None)
+.. autofunction:: analyze
 
-.. autofunction:: analyze_AAt(A, mode="auto", ordering_method="default", use_long=None)
+.. autofunction:: analyze_AAt
 
 .. note:: Even if you used :func:`cholesky` or :func:`cholesky_AAt`,
   you can still call :meth:`cholesky_inplace()
@@ -122,18 +122,18 @@ of the ``analyze`` functions, which perform only fill-reduction:
 Factoring new matrices
 ++++++++++++++++++++++
 
-.. automethod:: Factor.cholesky_inplace(A, beta=0)
+.. automethod:: Factor.cholesky_inplace
 
-.. automethod:: Factor.cholesky_AAt_inplace(A, beta=0)
+.. automethod:: Factor.cholesky_AAt_inplace
 
-.. automethod:: Factor.cholesky(A, beta=0)
+.. automethod:: Factor.cholesky
 
-.. automethod:: Factor.cholesky_AAt(A, beta=0)
+.. automethod:: Factor.cholesky_AAt
 
 Updating/Downdating
 +++++++++++++++++++
 
-.. automethod:: Factor.update_inplace(C, subtract=False)
+.. automethod:: Factor.update_inplace
 
 Accessing Cholesky factors explicitly
 +++++++++++++++++++++++++++++++++++++
@@ -163,38 +163,38 @@ All methods in this section act on :math:`LDL^{\top}` factorizations by default.
 Thus `L` refers by default to the matrix returned by :meth:`Factor.L_D`, not that
 returned by :meth:`Factor.L` (though conversion is not performed unless necessary).
 
-.. automethod:: Factor.solve_A(b)
+.. automethod:: Factor.solve_A
 
-.. automethod:: Factor.__call__(b)
+.. automethod:: Factor.__call__
 
-.. automethod:: Factor.solve_LDLt(b)
+.. automethod:: Factor.solve_LDLt
 
-.. automethod:: Factor.solve_LD(b)
+.. automethod:: Factor.solve_LD
 
-.. automethod:: Factor.solve_DLt(b)
+.. automethod:: Factor.solve_DLt
 
-.. automethod:: Factor.solve_L(b)
+.. automethod:: Factor.solve_L
 
-.. automethod:: Factor.solve_Lt(b)
+.. automethod:: Factor.solve_Lt
 
-.. automethod:: Factor.solve_D(b)
+.. automethod:: Factor.solve_D
 
-.. automethod:: Factor.apply_P(b)
+.. automethod:: Factor.apply_P
 
-.. automethod:: Factor.apply_Pt(b)
+.. automethod:: Factor.apply_Pt
 
 Convenience methods
 -------------------
 
-.. automethod:: Factor.logdet()
+.. automethod:: Factor.logdet
 
-.. automethod:: Factor.det()
+.. automethod:: Factor.det
 
-.. automethod:: Factor.slogdet()
+.. automethod:: Factor.slogdet
 
-.. automethod:: Factor.inv()
+.. automethod:: Factor.inv
 
-.. automethod:: Factor.copy()
+.. automethod:: Factor.copy
 
 
 Error handling
