@@ -35,7 +35,7 @@ cdef extern from "colamd.h":
 
     # return values of colamd
     int COLAMD_OK
-    # int COLAMD_OK_BUT_JUMBLED  # not used in scikit-sparse
+    int COLAMD_OK_BUT_JUMBLED
     int COLAMD_ERROR_A_not_present
     int COLAMD_ERROR_p_not_present
     int COLAMD_ERROR_nrow_negative

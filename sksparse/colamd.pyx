@@ -49,6 +49,44 @@ import warnings
 from scipy.sparse import csc_array, issparse, SparseEfficiencyWarning
 
 
+class COLAMDError(Exception):
+    """Base class for COLAMD errors."""
+    pass
+
+
+class COLAMDValueError(COLAMDError, ValueError):
+    """Raised when COLAMD encounters a value error."""
+    pass
+
+
+class COLAMDMemoryError(COLAMDError, MemoryError):
+    """Raised when COLAMD runs out of memory."""
+    pass
+
+
+class COLAMDInternalError(COLAMDError, RuntimeError):
+    """Raised when COLAMD encounters an internal error."""
+    pass
+
+
+# Define COLAMD error codes
+COLAMD_ERROR_CODES = dict({
+    COLAMD_OK: "ok",
+    COLAMD_OK_BUT_JUMBLED: "ok but jumbled",
+    COLAMD_ERROR_A_not_present: "A not present",
+    COLAMD_ERROR_p_not_present: "p not present",
+    COLAMD_ERROR_nrow_negative: "nrow negative",
+    COLAMD_ERROR_ncol_negative: "ncol negative",
+    COLAMD_ERROR_nnz_negative: "nnz negative",
+    COLAMD_ERROR_p0_nonzero: "p[0] nonzero",
+    COLAMD_ERROR_A_too_small: "A too small",
+    COLAMD_ERROR_col_length_negative: "col length negative",
+    COLAMD_ERROR_row_index_out_of_bounds: "row index out of bounds",
+    COLAMD_ERROR_out_of_memory: "out of memory",
+    COLAMD_ERROR_internal_error: "internal error"
+})
+
+
 def colamd(A, return_info=False):
     """Compute the column approximate minimum degree ordering of a sparse matrix.
 
@@ -178,9 +216,19 @@ def colamd(A, return_info=False):
 			&stats_mv_int64[0]
         )
 
-    if not ok:
-        # TODO raise appropriate error
-        raise ValueError(f"COLAMD failed with error code: {stats[COLAMD_STATUS]}")
+    # Check the return status
+    if ok:
+        assert stats[COLAMD_STATUS] == COLAMD_OK, \
+            "COLAMD returned OK but status is not COLAMD_OK."
+    else:
+        if stats[COLAMD_STATUS] == COLAMD_ERROR_out_of_memory:
+            raise COLAMDMemoryError("COLAMD ran out of memory.")
+        elif stats[COLAMD_STATUS] == COLAMD_ERROR_internal_error:
+            raise COLAMDInternalError("COLAMD encountered an internal error.")
+        else:
+            raise COLAMDValueError(
+                f"COLAMD returned an error:{COLAMD_ERROR_CODES[stats[COLAMD_STATUS]]}."
+            )
 
     if return_info:
         # TODO create a COLAMDStats dataclass
