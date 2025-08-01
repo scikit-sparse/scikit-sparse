@@ -1,12 +1,17 @@
-Cholesky Decomposition
-======================
+.. Copyright (C) 2025, The scikit-sparse developers. All rights reserved.
+   Part of the scikit-sparse project.
+   See pyproject.toml for full author list and LICENSE.txt for license details.
+   SPDX-License-Identifier: BSD-2-Clause
+
+Cholesky Decomposition (:mod:`sksparse.cholmod`)
+================================================
 
 .. module:: sksparse.cholmod
-   :synopsis: Sparse Cholesky decomposition using CHOLMOD
+   :synopsis: Cholesky decomposition using CHOLMOD
 
 .. versionadded:: 0.1
 
-This module (:mod:`sksparse.cholmod`) provides efficient implementations of all
+The :mod:`sksparse.cholmod` module provides efficient implementations of all
 the basic linear algebra operations for sparse, symmetric, positive-definite
 matrices (as, for instance, commonly arise in least squares problems).
 
