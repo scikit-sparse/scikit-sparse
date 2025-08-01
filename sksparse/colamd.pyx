@@ -168,11 +168,11 @@ class COLAMDStats:
 
 
 def _colamd_base(
-    A, 
+    A,
     is_symmetric=False,
-    dense_row_thresh=None, 
-    dense_col_thresh=None, 
-    aggressive=None, 
+    dense_row_thresh=None,
+    dense_col_thresh=None,
+    aggressive=None,
     return_info=False
 ):
     """A common base function for colamd and symamd."""
@@ -258,11 +258,11 @@ def _colamd_base(
             p_mv_int32 = np.array(A.indptr, dtype=np.int32, order='C')
             perm_mv_int32 = np.zeros(N + 1, dtype=np.int32, order='C')
             ok = c_symamd(
-                N, 
-                &Ai_mv_int32[0], 
-                &p_mv_int32[0], 
+                N,
+                &Ai_mv_int32[0],
+                &p_mv_int32[0],
                 &perm_mv_int32[0],
-                &knobs_mv[0], 
+                &knobs_mv[0],
                 &stats_mv_int32[0],
                 calloc,
                 free
@@ -276,12 +276,12 @@ def _colamd_base(
             Ai_mv_int32 = workspace
             p_mv_int32 = np.array(A.indptr, dtype=np.int32, copy=True, order='C')
             ok = c_colamd(
-                M, 
-                N, 
-                Alen, 
-                &Ai_mv_int32[0], 
-                &p_mv_int32[0], 
-                &knobs_mv[0], 
+                M,
+                N,
+                Alen,
+                &Ai_mv_int32[0],
+                &p_mv_int32[0],
+                &knobs_mv[0],
                 &stats_mv_int32[0]
             )
             q_slice = p_mv_int32[:N]
@@ -293,11 +293,11 @@ def _colamd_base(
             p_mv_int64 = np.array(A.indptr, dtype=np.int64, order='C')
             perm_mv_int64 = np.zeros(N + 1, dtype=np.int64, order='C')
             ok = c_symamd_l(
-                N, 
-                &Ai_mv_int64[0], 
-                &p_mv_int64[0], 
+                N,
+                &Ai_mv_int64[0],
+                &p_mv_int64[0],
                 &perm_mv_int64[0],
-                &knobs_mv[0], 
+                &knobs_mv[0],
                 &stats_mv_int64[0],
                 calloc,
                 free
@@ -310,12 +310,12 @@ def _colamd_base(
             Ai_mv_int64 = workspace
             p_mv_int64 = np.array(A.indptr, dtype=np.int64, copy=True, order='C')
             ok = c_colamd_l(
-                M, 
-                N, 
-                Alen, 
-                &Ai_mv_int64[0], 
-                &p_mv_int64[0], 
-                &knobs_mv[0], 
+                M,
+                N,
+                Alen,
+                &Ai_mv_int64[0],
+                &p_mv_int64[0],
+                &knobs_mv[0],
                 &stats_mv_int64[0]
             )
             q_slice = p_mv_int64[:N]
@@ -343,145 +343,135 @@ def _colamd_base(
         return q
 
 
-
 def colamd(
-    A, 
-    dense_row_thresh=None, 
-    dense_col_thresh=None, 
-    aggressive=None, 
+    A,
+    dense_row_thresh=None,
+    dense_col_thresh=None,
+    aggressive=None,
     return_info=False
 ):
-    """Compute the column approximate minimum degree ordering of a sparse matrix.
-
-    Adapted from the COLAMD documentation [#colamd]_:
-
-        This function computes a column ordering for a sparse matrix `A` that
-        is appropriate for LU factorization of symmetric or unsymmetric
-        matrices, QR factorization, least squares, interior point methods for
-        linear programming problems, and other related problems.
-
-        COLAMD computes a permutation `Q` such that the Cholesky factorization
-        of :math:`(AQ)^{\\top}(AQ)` has less fill-in and requires fewer floating
-        point operations than :math:`A^{\\top}A`.  This also provides a good
-        ordering for sparse partial pivoting methods, :math:`P(AQ) = LU`, where
-        `Q` is computed prior to numerical factorization, and `P` is computed
-        during numerical factorization via conventional partial pivoting with
-        row interchanges.
-
-    Parameters
-    ----------
-    A : (M, N) {array_like, sparse matrix}
-        The input matrix for which to compute the column ordering.
-        Must be 2D and convertible to CSC format. Need not be square.
-    dense_row_thresh, dense_col_thresh : float, optional
-        Threshold for considering a row/column dense. If
-        None, use the default value from COLAMD. The default value is 10.
-        The actual number of entries in a row/column is to be considered
-        "dense" is ``max(dense_row_thresh * sqrt(M), 16)`` where ``M`` is the
-        number of rows (or ``N`` for columns). Dense rows/columns are ignored
-        during ordering and moved to the end of the matrix.
-    aggressive : bool, optional
-        If True, use aggressive absorption. If None, uses the default value
-        from COLAMD. The default value is True. 
-
-        See the :func:`sksparse.amd.amd` documentation for more details on
-        aggressive absorption.
-    return_info : bool, optional
-        If True, also return the COLAMD statistics.
-
-    Returns
-    -------
-    q : (N,) ndarray
-        The permutation array such that ``A[:, q]`` is the column ordered matrix.
-    stats : COLAMDStats, optional
-        If ``return_info`` is True, returns an object containing statistics
-        about the ordering.
-
-    References
-    ----------
-    .. [#colamd] ``colamd.c`` - SuiteSparse AMD source file.
-        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/COLAMD/Source/colamd.c
-    """
     return _colamd_base(
-        A, 
+        A,
         is_symmetric=False,
-        dense_row_thresh=dense_row_thresh, 
-        dense_col_thresh=dense_col_thresh, 
-        aggressive=aggressive, 
+        dense_row_thresh=dense_row_thresh,
+        dense_col_thresh=dense_col_thresh,
+        aggressive=aggressive,
         return_info=return_info
     )
 
 
 def symamd(
-    A, 
-    dense_row_thresh=None, 
-    dense_col_thresh=None, 
-    aggressive=None, 
+    A,
+    dense_row_thresh=None,
+    dense_col_thresh=None,
+    aggressive=None,
     return_info=False
 ):
-    """Compute the column approximate minimum degree ordering of a sparse
-    symmetric matrix.
-
-    Adapted from the COLAMD documentation [#symamd]_:
-
-        This function computes an approximate minimum degree ordering for
-        Cholesky factorization of symmetric matrices.
-
-        Symamd computes a permutation `P` of a symmetric matrix `A` such that
-        the Cholesky factorization of :math:`PAP^{\\top}` has less fill-in and
-        requires fewer floating point operations than `A`.  Symamd constructs
-        a matrix `M` such that :math:`M^{\\top}M` has the same nonzero pattern
-        of `A`, and then orders the columns of `M` using colamd.  The column
-        ordering of `M` is then returned as the row and column ordering `P` of
-        `A`. 
-
-    Parameters
-    ----------
-    A : (N, N) {array_like, sparse matrix}
-        The input matrix for which to compute the column ordering.
-        Must be 2D, square, and convertible to CSC format.
-
-        .. note::
-            This routine only accesses the lower triangular part of ``A``,
-            which is *assumed* to be symmetric. If it is not, the results may
-            be incorrect or undefined.
-    dense_row_thresh, dense_col_thresh : float, optional
-        Threshold for considering a row/column dense. If
-        None, use the default value from COLAMD. The default value is 10.
-        The actual number of entries in a row/column is to be considered
-        "dense" is ``max(dense_row_thresh * sqrt(M), 16)`` where ``M`` is the
-        number of rows (or ``N`` for columns). Dense rows/columns are ignored
-        during ordering and moved to the end of the matrix.
-    aggressive : bool, optional
-        If True, use aggressive absorption. If None, uses the default value
-        from COLAMD. The default value is True. 
-
-        See the :func:`sksparse.amd.amd` documentation for more details on
-        aggressive absorption.
-    return_info : bool, optional
-        If True, also return the COLAMD statistics.
-
-    Returns
-    -------
-    p : (N,) ndarray
-        The permutation array such that ``A[p][:, p]`` is the ordered matrix.
-    stats : COLAMDStats, optional
-        If ``return_info`` is True, returns an array containing statistics
-        about the ordering.
-
-    References
-    ----------
-    .. [#symamd] ``colamd.c`` - SuiteSparse AMD source file.
-        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/COLAMD/Source/colamd.c
-    """
     return _colamd_base(
-        A, 
+        A,
         is_symmetric=True,
-        dense_row_thresh=dense_row_thresh, 
-        dense_col_thresh=dense_col_thresh, 
-        aggressive=aggressive, 
+        dense_row_thresh=dense_row_thresh,
+        dense_col_thresh=dense_col_thresh,
+        aggressive=aggressive,
         return_info=return_info
     )
+
+
+_COLAMD_DOC_TEMPLATE = """
+{intro}
+Parameters
+----------
+{A_param}
+dense_row_thresh, dense_col_thresh : float, optional
+    Threshold for considering a row/column dense. If
+    None, use the default value from COLAMD. The default value is 10.
+    The actual number of entries in a row/column is to be considered
+    "dense" is ``max(dense_row_thresh * sqrt(M), 16)`` where ``M`` is the
+    number of rows (or ``N`` for columns). Dense rows/columns are ignored
+    during ordering and moved to the end of the matrix.
+aggressive : bool, optional
+    If True, use aggressive absorption. If None, uses the default value
+    from COLAMD. The default value is True.
+
+Returns
+-------
+q : (N,) ndarray
+    The permutation vector.
+stats : COLAMDStats, optional
+    If ``return_info`` is True, returns an object containing statistics
+    about the ordering.
+
+References
+----------
+.. {reftag} ``colamd.c`` - SuiteSparse AMD source file.
+    https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/COLAMD/Source/colamd.c
+"""
+
+# Define the docstrings
+colamd_reftag = "[#colamd_c]"
+
+colamd_intro = f"""Compute the column approximate minimum degree ordering of
+a sparse matrix.
+
+Adapted from the COLAMD documentation {colamd_reftag}_:
+
+    This function computes a column ordering for a sparse matrix `A` that
+    is appropriate for LU factorization of symmetric or unsymmetric
+    matrices, QR factorization, least squares, interior point methods for
+    linear programming problems, and other related problems.
+
+    COLAMD computes a permutation `Q` such that the Cholesky factorization
+    of :math:`(AQ)^{{\\top}}(AQ)` has less fill-in and requires fewer floating
+    point operations than :math:`A^{{\\top}}A`.  This also provides a good
+    ordering for sparse partial pivoting methods, :math:`P(AQ) = LU`, where
+    `Q` is computed prior to numerical factorization, and `P` is computed
+    during numerical factorization via conventional partial pivoting with
+    row interchanges.
+"""
+
+colamd_A_param = """A : (M, N) {array_like, sparse matrix}
+    The input matrix for which to compute the column ordering.
+    Must be 2D and convertible to CSC format. Need not be square."""
+
+colamd.__doc__ = _COLAMD_DOC_TEMPLATE.format(
+    intro=colamd_intro, A_param=colamd_A_param, reftag=colamd_reftag,
+)
+
+
+# Define the docstring for symamd
+symamd_reftag = "[#symamd_c]"
+
+symamd_intro = f"""Compute the column approximate minimum degree ordering of
+a sparse symmetric matrix.
+
+Adapted from the COLAMD documentation {symamd_reftag}_:
+
+    This function computes an approximate minimum degree ordering for
+    Cholesky factorization of symmetric matrices.
+
+    Symamd computes a permutation `P` of a symmetric matrix `A` such that
+    the Cholesky factorization of :math:`PAP^{{\\top}}` has less fill-in and
+    requires fewer floating point operations than `A`.  Symamd constructs
+    a matrix `M` such that :math:`M^{{\\top}}M` has the same nonzero pattern
+    of `A`, and then orders the columns of `M` using colamd.  The column
+    ordering of `M` is then returned as the row and column ordering `P` of
+    `A`.
+"""
+
+symamd_A_param = """A : (N, N) {array_like, sparse matrix}
+    The input matrix for which to compute the column ordering.
+    Must be 2D, square, and convertible to CSC format.
+
+    .. note::
+        This routine only accesses the lower triangular part of ``A``,
+        which is *assumed* to be symmetric. If it is not, the results may
+        be incorrect or undefined.
+"""
+
+symamd.__doc__ = _COLAMD_DOC_TEMPLATE.format(
+    intro=symamd_intro, A_param=symamd_A_param, reftag=symamd_reftag,
+)
+
 
 def colamd_get_defaults():
     """Get the default knobs for COLAMD.
