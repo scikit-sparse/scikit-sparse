@@ -19,7 +19,7 @@ from numpy.testing import assert_array_equal
 from pathlib import Path
 from scipy import sparse
 from scipy.sparse import SparseEfficiencyWarning
-from sksparse.colamd import colamd, COLAMDStats
+from sksparse.colamd import COLAMDStats, colamd, colamd_get_defaults
 
 from .helpers import is_valid_permutation, generate_random_matrices
 
@@ -171,5 +171,24 @@ def test_info_can_24():
     assert is_valid_permutation(q)
     assert info == expect_info
 
+
+def test_colamd_defaults():
+    """Test that COLAMD uses the default control settings."""
+    # The default control settings are (from colamd.c:1095-1097):
+    # knobs[COLAMD_DENSE_ROW] = 10 ;
+    # knobs[COLAMD_DENSE_COL] = 10 ;
+    # knobs[COLAMD_AGGRESSIVE] = TRUE ;
+    expect_knobs = dict(
+        dense_row_thresh=10,
+        dense_col_thresh=10,
+        aggressive=True,
+    )
+    knobs = colamd_get_defaults()
+    assert knobs == expect_knobs
+
+    # A = sparse.csc_array([[1, 2], [3, 4]])
+    # p = amd(A, **knobs)
+    # assert is_valid_permutation(p)
+    
 # # =============================================================================
 # # =============================================================================
