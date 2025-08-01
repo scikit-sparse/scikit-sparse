@@ -13,15 +13,15 @@ Contents:
 
    overview.rst
 
-   amd.rst
+   sksparse.amd <amd.rst>
 
-   camd.rst
+   sksparse.camd <camd.rst>
 
-   colamd.rst
+   sksparse.colamd <colamd.rst>
 
-   ccolamd.rst
+   sksparse.ccolamd <ccolamd.rst>
 
-   cholmod.rst
+   sksparse.cholmod <cholmod.rst>
 
    changes.rst
 

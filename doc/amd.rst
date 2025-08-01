@@ -11,12 +11,10 @@ Approximate Minimum Degree (AMD) Ordering (:mod:`sksparse.amd`)
 
 .. versionadded:: 0.5.0
 
-Overview
---------
-
-This module provides efficient implementations of the `Approximate Minimum
-Degree (AMD) <https://epubs.siam.org/doi/abs/10.1137/S0895479894278952>`_
-ordering algorithm for sparse, square matrices.
+The :mod:`sksparse.amd` module provides efficient implementations of the
+`Approximate Minimum Degree (AMD)
+<https://epubs.siam.org/doi/abs/10.1137/S0895479894278952>`_ ordering algorithm
+for sparse, square matrices.
 
 It exposes the main function of the `AMD package
 <https://github.com/DrTimothyAldenDavis/SuiteSparse/tree/dev/AMD>`_, which
