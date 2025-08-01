@@ -225,16 +225,17 @@ def test_amd_default_control():
     # The default control settings are (from amd.h):
     # - AMD_DEFAULT_DENSE      -> dense_thresh: 10.0
     # - AMD_DEFAULT_AGGRESSIVE ->   aggressive: True
-    expect_control = dict(
-        dense_thresh=10.0,
-        aggressive=True,
-    )
+    expect_control = {
+        "dense_thresh": 10.0,
+        "aggressive": True,
+    }
     control = amd_default_control()
     assert control == expect_control
 
     A = sparse.csc_array([[1, 2], [3, 4]])
     p = amd(A, **control)
     assert is_valid_permutation(p)
-    
+
+
 # =============================================================================
 # =============================================================================
