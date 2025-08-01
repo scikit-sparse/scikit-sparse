@@ -101,6 +101,13 @@ extensions = [
         libraries=["amd"],
     ),
     Extension(
+        "sksparse.camd",
+        ["sksparse/camd.pyx"],
+        include_dirs=INCLUDE_DIRS,
+        library_dirs=LIBRARY_DIRS,
+        libraries=["camd"],
+    ),
+    Extension(
         "sksparse.colamd",
         ["sksparse/colamd.pyx"],
         include_dirs=INCLUDE_DIRS,

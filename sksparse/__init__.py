@@ -31,7 +31,8 @@ except PackageNotFoundError:
     __version__ = "0.0.0.dev0"
 
 from . import amd
+from . import camd
 from . import colamd
 from . import cholmod
 
-__all__ = ["amd", "colamd", "cholmod"]
+__all__ = ["amd", "camd", "colamd", "cholmod"]
