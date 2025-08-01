@@ -325,3 +325,30 @@ def colamd(A, return_info=False):
         return q, COLAMDStats.from_array(stats)
     else:
         return q
+
+
+def colamd_get_defaults():
+    """Get the default knobs for COLAMD.
+
+    Returns
+    -------
+    knobs : dict
+        A dictionary containing the default knobs for COLAMD.
+
+        The keys are:
+
+        * 'dense_row_thresh': Threshold for considering a row/column dense.
+          Rows with more than ``max(dense_row_thresh * sqrt(M), 16)`` entries
+          are permuted to the end of the matrix.
+        * 'dense_col_thresh': Like `dense_row_thresh`, but for columns.
+        * 'aggressive': Default value for the aggressive knob.
+
+    """
+    knobs = np.zeros(COLAMD_KNOBS, dtype=np.double)
+    cdef double[::1] knobs_mv = knobs
+    colamd_set_defaults(&knobs_mv[0])
+    return dict(
+        dense_row_thresh=knobs[COLAMD_DENSE_ROW],
+        dense_col_thresh=knobs[COLAMD_DENSE_COL],
+        aggressive=knobs[COLAMD_AGGRESSIVE]
+    )
