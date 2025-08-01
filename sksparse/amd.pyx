@@ -52,12 +52,12 @@ class AMDError(Exception):
     pass
 
 
-class AMDInvalidMatrixError(AMDError):
+class AMDInvalidMatrixError(AMDError, ValueError):
     """Raised when the input matrix is invalid for AMD."""
     pass
 
 
-class AMDMemoryError(AMDError):
+class AMDMemoryError(AMDError, MemoryError):
     """Raised when AMD runs out of memory."""
     pass
 
