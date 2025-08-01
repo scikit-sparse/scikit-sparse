@@ -166,7 +166,7 @@ class COLAMDStats:
         )
 
 
-def colamd(A, return_info=False):
+def colamd(A, aggressive=None, return_info=False):
     """Compute the column approximate minimum degree ordering of a sparse matrix.
 
     Adapted from the COLAMD documentation [#colamd_h]_:
@@ -189,6 +189,12 @@ def colamd(A, return_info=False):
     A : {array_like, sparse matrix}
         The input matrix for which to compute the column ordering.
         Must be 2D and convertible to CSC format. Need not be square.
+    aggressive : bool, optional
+        If True, use aggressive absorption. If None, uses the default value
+        from COLAMD. The default value is True. 
+
+        See the :func:`sksparse.amd.amd` documentation for more details on
+        aggressive absorption.
     return_info : bool, optional
         If True, also return the COLAMD statistics.
 
@@ -253,7 +259,9 @@ def colamd(A, return_info=False):
     cdef double[::1] knobs_mv = knobs
     colamd_set_defaults(&knobs_mv[0])
 
-    # TODO override with user knobs if provided
+    # Override with user knobs if provided
+    if aggressive is not None:
+        knobs_mv[COLAMD_AGGRESSIVE] = 1.0 if aggressive else 0.0
 
     # Declare typed memory views for Cython
     cdef int32_t[::1] Ai_mv_int32

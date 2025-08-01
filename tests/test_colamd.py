@@ -104,10 +104,10 @@ class TestRandomSquareMatrices:
         assert q.shape == (A.shape[0],)
         assert is_valid_permutation(q)
 
-    # @pytest.mark.parametrize("aggressive", [True, False])
-    # def test_aggressive(self, A, aggressive):
-    #     q = colamd(A, aggressive=aggressive)
-    #     assert is_valid_permutation(q)
+    @pytest.mark.parametrize("aggressive", [True, False])
+    def test_aggressive(self, A, aggressive):
+        q = colamd(A, aggressive=aggressive)
+        assert is_valid_permutation(q)
 
 
 # DENSE_THRESHOLDS = [None, 5, 2]
