@@ -316,7 +316,7 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
         p = p_mv_int64 = np.empty(N, dtype=np.int64)
 
     # Prepare control parameters
-    ctrl = np.empty(AMD_CONTROL, dtype=np.float64)
+    ctrl = np.empty(AMD_CONTROL, dtype=np.double)
     cdef double[::1] ctrl_mv = ctrl
 
     amd_defaults(<double*>&ctrl_mv[0])
@@ -328,7 +328,7 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
     if aggressive is not None:
         ctrl[AMD_AGGRESSIVE] = 1.0 if aggressive else 0.0
 
-    info = np.zeros(AMD_INFO, dtype=np.float64)
+    info = np.zeros(AMD_INFO, dtype=np.double)
     cdef double[::1] info_mv = info
 
     # AMD ordering
