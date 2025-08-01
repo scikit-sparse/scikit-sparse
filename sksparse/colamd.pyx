@@ -193,7 +193,7 @@ def colamd(
 
     Parameters
     ----------
-    A : {array_like, sparse matrix}
+    A : (M, N) {array_like, sparse matrix}
         The input matrix for which to compute the column ordering.
         Must be 2D and convertible to CSC format. Need not be square.
     dense_row_thresh, dense_col_thresh : float, optional
@@ -214,12 +214,11 @@ def colamd(
 
     Returns
     -------
-    q : ndarray
+    q : (N,) ndarray
         The permutation array such that ``A[:, q]`` is the column ordered matrix.
-    stats : ndarray, optional
-        If ``return_info`` is True, returns an array containing COLAMD statistics.
-        The contents of this array depend on the COLAMD implementation and may
-        include information such as the number of nonzeros, memory usage, etc.
+    stats : COLAMDStats, optional
+        If ``return_info`` is True, returns an object containing statistics
+        about the ordering.
 
     References
     ----------
@@ -355,7 +354,7 @@ def colamd(
         return q
 
 
-# TODO implement, but then refactor the generic code
+# TODO refactor the generic code
 def symamd(
     A, 
     dense_row_thresh=None, 
@@ -363,7 +362,8 @@ def symamd(
     aggressive=None, 
     return_info=False
 ):
-    """Compute the column approximate minimum degree ordering of a sparse matrix.
+    """Compute the column approximate minimum degree ordering of a sparse
+    symmetric matrix.
 
     Adapted from the COLAMD documentation [#symamd]_:
 
@@ -380,9 +380,14 @@ def symamd(
 
     Parameters
     ----------
-    A : {array_like, sparse matrix}
+    A : (N, N) {array_like, sparse matrix}
         The input matrix for which to compute the column ordering.
-        Must be 2D and convertible to CSC format. Need not be square.
+        Must be 2D, square, and convertible to CSC format.
+
+        .. note::
+            This routine only accesses the lower triangular part of ``A``,
+            which is *assumed* to be symmetric. If it is not, the results may
+            be incorrect or undefined.
     dense_row_thresh, dense_col_thresh : float, optional
         Threshold for considering a row/column dense. If
         None, use the default value from COLAMD. The default value is 10.
@@ -401,12 +406,11 @@ def symamd(
 
     Returns
     -------
-    p : ndarray
+    p : (N,) ndarray
         The permutation array such that ``A[p][:, p]`` is the ordered matrix.
-    stats : ndarray, optional
-        If ``return_info`` is True, returns an array containing COLAMD statistics.
-        The contents of this array depend on the COLAMD implementation and may
-        include information such as the number of nonzeros, memory usage, etc.
+    stats : COLAMDStats, optional
+        If ``return_info`` is True, returns an array containing statistics
+        about the ordering.
 
     References
     ----------
