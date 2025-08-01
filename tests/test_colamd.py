@@ -12,6 +12,7 @@
 
 """Test cases for the sksparse.colamd module."""
 
+# import matplotlib.pyplot as plt  # DEBUG only
 import numpy as np
 import pytest
 
@@ -110,48 +111,64 @@ class TestRandomSquareMatrices:
         assert is_valid_permutation(q)
 
 
-# DENSE_THRESHOLDS = [None, 5, 2]
+COLAMD_DEFAULT_DENSE = 10  # NOTE depends on the default in colamd.c
+DENSE_THRESHOLDS = [None, 5, 2]
 
+@pytest.mark.parametrize("row_or_col", ["row", "col"])
+@pytest.mark.parametrize("dense_thresh", DENSE_THRESHOLDS)
+def test_colamd_with_dense(dense_thresh, row_or_col):
+    N = 1000
+    rng = np.random.default_rng(56)
+    A = sparse.random_array((N, N), density=0.001, format="lil", rng=rng)
 
-# @pytest.mark.parametrize("dense_thresh", DENSE_THRESHOLDS)
-# def test_amd_with_dense_rows(dense_thresh):
-#     N = 1000
-#     rng = np.random.default_rng(56)
-#     A = sparse.random_array((N, N), density=0.001, format="lil", rng=rng)
+    # Create a known number of dense rows above the threshold
+    # thresh is actually dense_thresh * sqrt(N) == dense_thresh * 10
+    # max(A[i] for i in range(N)) is ~ 5 for N = 1000, density = 0.001
+    thresh = int(
+        (dense_thresh if dense_thresh is not None else COLAMD_DEFAULT_DENSE) * np.sqrt(N)
+    )
 
-#     # Create a known number of dense rows above the threshold
-#     # thresh is actually dense_thresh * sqrt(N) == dense_thresh * 10
-#     # max(A[i] for i in range(N)) is ~ 5 for N = 1000, density = 0.001
-#     AMD_DEFAULT_DENSE = 10
-#     thresh = int(
-#         (dense_thresh if dense_thresh is not None else AMD_DEFAULT_DENSE) * np.sqrt(N)
-#     )
+    N_dense = 10  # arbitrary choice for number of dense rows
+    N_elems = min(2 * thresh, N)  # arbitrary choice to ensure enough elements
 
-#     N_dense_rows = 10  # arbitrary choice for number of dense rows
-#     N_elems = min(2 * thresh, N)  # arbitrary choice to ensure enough elements
+    dense_idx = rng.choice(N, size=N_dense, replace=False)
+    other_idx = rng.choice(N, size=N_elems, replace=False)
+    for i in dense_idx:
+        if row_or_col == "row":
+            A[i, other_idx] = rng.random(size=len(other_idx))
+        else:
+            A[other_idx, i] = rng.random(size=len(other_idx))
 
-#     dense_row_idx = rng.choice(N, size=N_dense_rows, replace=False)
-#     col_idx = rng.choice(N, size=N_elems, replace=False)
-#     for i in dense_row_idx:
-#         # Ensure the row is dense enough
-#         A[i, col_idx] = rng.random(size=len(col_idx))
+    A = A.tocsc()
+    if row_or_col == "row":
+        q, stats = colamd(A, dense_row_thresh=dense_thresh, return_info=True)
+    else:
+        q, stats = colamd(A, dense_col_thresh=dense_thresh, return_info=True)
 
-#     A = A + A.T
-#     A = A.tocsc()
-#     q = colamd(A, dense_thresh=dense_thresh)
+    assert is_valid_permutation(q)
 
-#     assert is_valid_permutation(q)
+    # DEBUG: plot the matrix before and after permutation
+    # fig, axs = plt.subplots(num=1, ncols=2, clear=True)
+    # axs[0].spy(A, markersize=1)
+    # axs[1].spy(A[:, q], markersize=1)
+    # plt.show()
 
-#     # Expect dense row at the end of the permutation, but maybe not in order
-#     assert_array_equal(np.sort(q[-N_dense_rows:]), np.sort(dense_row_idx))
+    # Expect dense cols at the end of the permutation, but maybe not in order
+    # NOTE *empty* columns are also moved to the end of the matrix,
+    # so we need to check the stats.N_cols_ignored value
+    if row_or_col == "col":
+        assert_array_equal(
+            np.sort(q[-stats.N_cols_ignored:-(stats.N_cols_ignored - N_dense)]),
+            np.sort(dense_idx)
+        )
 
 
 def test_info_can_24():
     # The can_24 matrix is used in the SuiteSparse AMD MATLAB/amd_demo.m file.
     expect_info = COLAMDStats.from_array(
         np.array([
-            0,   # Ndenserows
-            0,   # Ndensecols
+            0,   # N_rows_ignored
+            0,   # N_cols_ignored
             1,   # Ncmpa
             0,   # status
             -1,  # info1
@@ -178,17 +195,17 @@ def test_colamd_defaults():
     # knobs[COLAMD_DENSE_ROW] = 10 ;
     # knobs[COLAMD_DENSE_COL] = 10 ;
     # knobs[COLAMD_AGGRESSIVE] = TRUE ;
-    expect_knobs = dict(
-        dense_row_thresh=10,
-        dense_col_thresh=10,
-        aggressive=True,
-    )
+    expect_knobs = {
+        "dense_row_thresh": 10,
+        "dense_col_thresh": 10,
+        "aggressive": True,
+    }
     knobs = colamd_get_defaults()
     assert knobs == expect_knobs
 
     # A = sparse.csc_array([[1, 2], [3, 4]])
     # p = amd(A, **knobs)
     # assert is_valid_permutation(p)
-    
+
 # # =============================================================================
 # # =============================================================================
