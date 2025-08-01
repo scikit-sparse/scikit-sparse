@@ -11,17 +11,27 @@ Column Approximate Minimum Degree (COLAMD) Ordering
 
 .. versionadded:: 0.5.0
 
-The :mod:`sksparse.amd` module provides efficient an implementation of the
+The :mod:`sksparse.colamd` module provides efficient an implementation of the
 `Column Approximate Minimum Degree (COLAMD)
 <https://dl.acm.org/doi/abs/10.1145/1024074.1024079>`_
 ordering algorithm for sparse matrices.
 
-It exposes the main function of the `COLAMD package
+It exposes the main functions of the `COLAMD package
 <https://github.com/DrTimothyAldenDavis/SuiteSparse/tree/dev/COLAMD>`_, which
 computes a column ordering :math:`Q` of a sparse matrix that minimizes the
 fill-in of the Cholesky decomposition of :math:`(AQ)^{\top}(AQ)`. The
-:func:`.colamd` function accepts both real and complex matrices, in any format
-supported by :mod:`scipy.sparse` (CSC format is most efficient).
+:func:`.colamd` function is appropriate for use with non-symmetric and
+non-square matrices, for LU factorization, QR factorization, and other
+decompositions that require a column ordering.
+
+This module also provides a symmetric variant, :func:`.symamd`, which computes a
+permutation `P` of a symmetric matrix `A` such that the Cholesky factorization
+of :math:`PAP^{\\top}` has less fill-in and requires fewer floating point
+operations than `A`. This function assumes that its input is symmetric.
+
+The :func:`.colamd` and :func:`.symamd` functions accept both real and complex
+matrices, in any format supported by :mod:`scipy.sparse` (CSC format is most
+efficient).
 
 
 Quickstart
@@ -61,9 +71,11 @@ factorization of the original matrix, but this is not guaranteed.
 Top-level Functions
 -------------------
 
-The main function this module provides is :func:`colamd`.
+The main functions this module provides are :func:`colamd` and :func:`symamd`.
 
 .. autofunction:: colamd
+
+.. autofunction:: symamd
 
 
 :class:`COLAMDStats` Objects
