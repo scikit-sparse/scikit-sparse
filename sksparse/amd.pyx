@@ -11,7 +11,8 @@
 # =============================================================================
 # cython: language_level=3
 
-"""Python interface to the Approximate Minimum Degree (AMD) ordering algorithm.
+"""sksparse.amd: Python interface to the Approximate Minimum Degree (AMD)
+ordering algorithm.
 
 This module provides a Cython interface to the AMD algorithm from the
 SuiteSparse library by Timothy A. Davis. The algorithm computes a fill-reducing
@@ -30,9 +31,11 @@ input matrix format.
 
 References
 ----------
+* SuiteSparse homepage:
+  https://people.engr.tamu.edu/davis/suitesparse.html
 * SuiteSparse AMD:
   https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/AMD
-* AMD Algorithm Documentation:
+* AMD Algorithm Publication:
   Amestoy, P. R., Davis, T. A., & Duff, I. S. (1996). An approximate
     minimum degree ordering algorithm. SIAM Journal on Matrix Analysis and
     Applications, 17(4), 886-905.
@@ -66,8 +69,8 @@ class AMDMemoryError(AMDError, MemoryError):
 class AMDInfo:
     """Information statistics returned by the AMD algorithm.
 
-    This class wraps the contents of the `Info` array output by `amd_order()`
-    into a Python dataclass.
+    This class wraps the contents of the ``Info`` array output by
+    ``amd_order()`` into a Python dataclass.
 
     Attributes
     ----------
@@ -134,11 +137,11 @@ class AMDInfo:
 
     Notes
     -----
-    Field descriptions are adapted from SuiteSparse `amd.h` [0]_.
+    Field descriptions are adapted from SuiteSparse ``amd.h`` [#amd_h]_.
 
     References
     ----------
-    .. [0]: `amd.h` - SuiteSparse AMD header file.
+    .. [#amd_h] ``amd.h`` - SuiteSparse AMD header file.
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/AMD/Include/amd.h
     """
     status: int
