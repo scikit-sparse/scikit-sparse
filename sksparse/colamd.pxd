@@ -14,9 +14,13 @@
 
 from libc.stddef cimport size_t
 from libc.stdint cimport int32_t, int64_t
+from libc.stdlib cimport calloc, free
 
 
 cdef extern from "colamd.h":
+    ctypedef void* (*alloc_func)(size_t, size_t)
+    ctypedef void (*free_func)(void *)
+
     # sizes of input and output arrays
     int COLAMD_KNOBS
     int COLAMD_STATS
@@ -74,25 +78,24 @@ cdef extern from "colamd.h":
         int64_t stats[]
     )
 
-    # int symamd(
-    #     int32_t n,
-    #     int32_t A[],
-    #     int32_t p[],
-    #     int32_t perm[],
-    #     double knobs[COLAMD_KNOBS],
-    #     int32_t stats[COLAMD_STATS],
-    #     void * (*allocate) (size_t, size_t),
-    #     void (*release) (void *)
-    # )
+    int c_symamd "symamd"(
+        int32_t n,
+        int32_t A[],
+        int32_t p[],
+        int32_t perm[],
+        double knobs[],
+        int32_t stats[],
+        alloc_func allocate,
+        free_func release
+    )
 
-    # int symamd_l
-    # (
-    #     int64_t n,
-    #     int64_t A[],
-    #     int64_t p[],
-    #     int64_t perm[],
-    #     double knobs[COLAMD_KNOBS],
-    #     int64_t stats[COLAMD_STATS],
-    #     void * (*allocate) (size_t, size_t),
-    #     void (*release) (void *)
-    # )
+    int c_symamd_l "symamd_l"(
+        int64_t n,
+        int64_t A[],
+        int64_t p[],
+        int64_t perm[],
+        double knobs[],
+        int64_t stats[],
+        alloc_func allocate,
+        free_func release
+    )

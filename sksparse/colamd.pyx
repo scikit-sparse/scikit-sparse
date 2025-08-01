@@ -137,11 +137,12 @@ class COLAMDStats:
 
     Notes
     -----
-    Field descriptions are adapted from SuiteSparse ``colamd.c`` [#colamd_c]_.
+    Field descriptions are adapted from SuiteSparse ``colamd.c``
+    [#colamd_fields]_.
 
     References
     ----------
-    .. [#colamd_c] ``colamd.c`` - SuiteSparse AMD source file.
+    .. [#colamd_fields] ``colamd.c`` - SuiteSparse AMD source file.
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/COLAMD/Source/colamd.c
     """
     N_rows_ignored : int
@@ -175,7 +176,7 @@ def colamd(
 ):
     """Compute the column approximate minimum degree ordering of a sparse matrix.
 
-    Adapted from the COLAMD documentation [#colamd_h]_:
+    Adapted from the COLAMD documentation [#colamd]_:
 
         This function computes a column ordering for a sparse matrix `A` that
         is appropriate for LU factorization of symmetric or unsymmetric
@@ -222,8 +223,8 @@ def colamd(
 
     References
     ----------
-    .. [#colamd_h] ``colamd.h`` - Source header file from SuiteSparse.
-        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/COLAMD/Include/colamd.h
+    .. [#colamd] ``colamd.c`` - SuiteSparse AMD source file.
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/COLAMD/Source/colamd.c
     """
     # Convert dense to sparse CSC
     if not issparse(A):
@@ -345,6 +346,199 @@ def colamd(
         q_slice = p_mv_int32[:N]
     else:
         q_slice = p_mv_int64[:N]
+
+    q = np.asarray(q_slice)
+
+    if return_info:
+        return q, COLAMDStats.from_array(stats)
+    else:
+        return q
+
+
+# TODO implement, but then refactor the generic code
+def symamd(
+    A, 
+    dense_row_thresh=None, 
+    dense_col_thresh=None, 
+    aggressive=None, 
+    return_info=False
+):
+    """Compute the column approximate minimum degree ordering of a sparse matrix.
+
+    Adapted from the COLAMD documentation [#symamd]_:
+
+        This function computes an approximate minimum degree ordering for
+        Cholesky factorization of symmetric matrices.
+
+        Symamd computes a permutation `P` of a symmetric matrix `A` such that
+        the Cholesky factorization of :math:`PAP^{\\top}` has less fill-in and
+        requires fewer floating point operations than `A`.  Symamd constructs
+        a matrix `M` such that :math:`M^{\\top}M` has the same nonzero pattern
+        of `A`, and then orders the columns of `M` using colamd.  The column
+        ordering of `M` is then returned as the row and column ordering `P` of
+        `A`. 
+
+    Parameters
+    ----------
+    A : {array_like, sparse matrix}
+        The input matrix for which to compute the column ordering.
+        Must be 2D and convertible to CSC format. Need not be square.
+    dense_row_thresh, dense_col_thresh : float, optional
+        Threshold for considering a row/column dense. If
+        None, use the default value from COLAMD. The default value is 10.
+        The actual number of entries in a row/column is to be considered
+        "dense" is ``max(dense_row_thresh * sqrt(M), 16)`` where ``M`` is the
+        number of rows (or ``N`` for columns). Dense rows/columns are ignored
+        during ordering and moved to the end of the matrix.
+    aggressive : bool, optional
+        If True, use aggressive absorption. If None, uses the default value
+        from COLAMD. The default value is True. 
+
+        See the :func:`sksparse.amd.amd` documentation for more details on
+        aggressive absorption.
+    return_info : bool, optional
+        If True, also return the COLAMD statistics.
+
+    Returns
+    -------
+    p : ndarray
+        The permutation array such that ``A[p][:, p]`` is the ordered matrix.
+    stats : ndarray, optional
+        If ``return_info`` is True, returns an array containing COLAMD statistics.
+        The contents of this array depend on the COLAMD implementation and may
+        include information such as the number of nonzeros, memory usage, etc.
+
+    References
+    ----------
+    .. [#symamd] ``colamd.c`` - SuiteSparse AMD source file.
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/COLAMD/Source/colamd.c
+    """
+    # Convert dense to sparse CSC
+    if not issparse(A):
+        A = np.asarray(A)
+
+    if A.ndim != 2:
+        raise ValueError("Input must be 2D.")
+
+    M, N = A.shape
+
+    if M != N:
+        raise ValueError("Input matrix must be square.")
+
+    try:
+        if not isinstance(A, csc_array):
+            warnings.warn(
+                "Input matrix is not in CSC format. Converting to CSC.",
+                SparseEfficiencyWarning,
+                stacklevel=2
+            )
+            A = csc_array(A)
+    except ValueError:
+        raise ValueError("Input must be convertible to CSC format.")
+
+    # Choose index width: int32 or int64
+    use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
+    out_dtype = np.int32 if use_int32 else np.int64
+
+    if N == 0:
+        return np.empty(0, dtype=out_dtype)
+
+    if A.nnz == 0:
+        return np.arange(N, dtype=out_dtype)
+
+    if N == 1:
+        return np.zeros(N, dtype=out_dtype)
+
+    # Get the recommended size for the Alen array
+    if use_int32:
+        Alen = colamd_recommended(A.nnz, M, N)
+    else:
+        Alen = colamd_l_recommended(A.nnz, M, N)
+
+    if Alen == 0:
+        raise ValueError("Recommended Alen is zero: one of {A.nnz, M, N} is erroneous.")
+
+    # Set the default knobs
+    knobs = np.zeros(COLAMD_KNOBS, dtype=np.double)
+    cdef double[::1] knobs_mv = knobs
+    colamd_set_defaults(&knobs_mv[0])
+
+    # Override with user knobs if provided
+    if dense_row_thresh is not None:
+        knobs[COLAMD_DENSE_ROW] = float(dense_row_thresh)
+
+    if dense_col_thresh is not None:
+        knobs[COLAMD_DENSE_COL] = float(dense_col_thresh)
+
+    if aggressive is not None:
+        knobs[COLAMD_AGGRESSIVE] = 1.0 if aggressive else 0.0
+
+    # Declare typed memory views for Cython
+    cdef int32_t[::1] Ai_mv_int32
+    cdef int64_t[::1] Ai_mv_int64
+
+    cdef int32_t[::1] p_mv_int32
+    cdef int64_t[::1] p_mv_int64
+
+    cdef int32_t[::1] perm_mv_int32
+    cdef int64_t[::1] perm_mv_int64
+
+    cdef int32_t[::1] stats_mv_int32
+    cdef int64_t[::1] stats_mv_int64
+
+    # Compute the ordering
+    if use_int32:
+        # Copy the arrays, since they are altered in the C function
+        Ai_mv_int32  = np.array(A.indices, dtype=np.int32, copy=True, order='C')
+        p_mv_int32 = np.array(A.indptr, dtype=np.int32, copy=True, order='C')
+        perm_mv_int32 = np.zeros(N + 1, dtype=np.int32, order='C')
+        stats = stats_mv_int32 = np.zeros(COLAMD_STATS, dtype=np.int32)
+        ok = c_symamd(
+			N, 
+			&Ai_mv_int32[0], 
+			&p_mv_int32[0], 
+            &perm_mv_int32[0],
+			&knobs_mv[0], 
+			&stats_mv_int32[0],
+            calloc,
+            free
+        )
+    else:
+        # Copy the arrays, since they are altered in the C function
+        Ai_mv_int64  = np.array(A.indices, dtype=np.int64, copy=True, order='C')
+        p_mv_int64 = np.array(A.indptr, dtype=np.int64, copy=True, order='C')
+        perm_mv_int64 = np.zeros(N + 1, dtype=np.int64, order='C')
+        stats = stats_mv_int64 = np.zeros(COLAMD_STATS, dtype=np.int64)
+        ok = c_symamd_l(
+			N, 
+			&Ai_mv_int64[0], 
+			&p_mv_int64[0], 
+            &perm_mv_int64[0],
+			&knobs_mv[0], 
+			&stats_mv_int64[0],
+            calloc,
+            free
+        )
+
+    # Check the return status
+    if ok:
+        assert stats[COLAMD_STATUS] == COLAMD_OK, \
+            "COLAMD returned OK but status is not COLAMD_OK."
+    else:
+        if stats[COLAMD_STATUS] == COLAMD_ERROR_out_of_memory:
+            raise COLAMDMemoryError("COLAMD ran out of memory.")
+        elif stats[COLAMD_STATUS] == COLAMD_ERROR_internal_error:
+            raise COLAMDInternalError("COLAMD encountered an internal error.")
+        else:
+            raise COLAMDValueError(
+                f"COLAMD returned an error:{_COLAMD_ERROR_CODES[stats[COLAMD_STATUS]]}."
+            )
+
+    # Only take the first N entries of the permutation array
+    if use_int32:
+        q_slice = perm_mv_int32[:N]
+    else:
+        q_slice = perm_mv_int64[:N]
 
     q = np.asarray(q_slice)
 
