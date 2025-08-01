@@ -97,9 +97,9 @@ class COLAMDStats:
 
     Attributes
     ----------
-    Ndenserows : int
+    N_rows_ignored : int
         The number of dense or empty rows ignored in the ordering.
-    Ndensecols : int
+    N_cols_ignored : int
         The number of dense or empty columns ignored in the ordering.
     Ncmpa : int
         The number of garbage collections performed.
@@ -144,8 +144,8 @@ class COLAMDStats:
     .. [#colamd_c] ``colamd.c`` - SuiteSparse AMD source file.
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/COLAMD/Source/colamd.c
     """
-    Ndenserows : int
-    Ndensecols : int
+    N_rows_ignored : int
+    N_cols_ignored : int
     Ncmpa : int
     status : int
     info1 : int
@@ -156,8 +156,8 @@ class COLAMDStats:
     def from_array(cls, stats: "np.ndarray") -> "COLAMDStats":
         """Create a COLAMDStats instance from an array."""
         return cls(
-            Ndenserows=int(stats[COLAMD_DENSE_ROW]),
-            Ndensecols=int(stats[COLAMD_DENSE_COL]),
+            N_rows_ignored=int(stats[COLAMD_DENSE_ROW]),
+            N_cols_ignored=int(stats[COLAMD_DENSE_COL]),
             Ncmpa=int(stats[COLAMD_DEFRAG_COUNT]),
             status=int(stats[COLAMD_STATUS]),
             info1=int(stats[COLAMD_INFO1]),
@@ -166,7 +166,13 @@ class COLAMDStats:
         )
 
 
-def colamd(A, aggressive=None, return_info=False):
+def colamd(
+    A, 
+    dense_row_thresh=None, 
+    dense_col_thresh=None, 
+    aggressive=None, 
+    return_info=False
+):
     """Compute the column approximate minimum degree ordering of a sparse matrix.
 
     Adapted from the COLAMD documentation [#colamd_h]_:
@@ -189,6 +195,13 @@ def colamd(A, aggressive=None, return_info=False):
     A : {array_like, sparse matrix}
         The input matrix for which to compute the column ordering.
         Must be 2D and convertible to CSC format. Need not be square.
+    dense_row_thresh, dense_col_thresh : float, optional
+        Threshold for considering a row/column dense. If
+        None, use the default value from COLAMD. The default value is 10.
+        The actual number of entries in a row/column is to be considered
+        "dense" is ``max(dense_row_thresh * sqrt(M), 16)`` where ``M`` is the
+        number of rows (or ``N`` for columns). Dense rows/columns are ignored
+        during ordering and moved to the end of the matrix.
     aggressive : bool, optional
         If True, use aggressive absorption. If None, uses the default value
         from COLAMD. The default value is True. 
@@ -260,8 +273,14 @@ def colamd(A, aggressive=None, return_info=False):
     colamd_set_defaults(&knobs_mv[0])
 
     # Override with user knobs if provided
+    if dense_row_thresh is not None:
+        knobs[COLAMD_DENSE_ROW] = float(dense_row_thresh)
+
+    if dense_col_thresh is not None:
+        knobs[COLAMD_DENSE_COL] = float(dense_col_thresh)
+
     if aggressive is not None:
-        knobs_mv[COLAMD_AGGRESSIVE] = 1.0 if aggressive else 0.0
+        knobs[COLAMD_AGGRESSIVE] = 1.0 if aggressive else 0.0
 
     # Declare typed memory views for Cython
     cdef int32_t[::1] Ai_mv_int32
