@@ -12,11 +12,12 @@
 to find a fill-reducing ordering of a sparse matrix.
 """
 
-import matplotlib.pyplot as plt
-
 from pathlib import Path
+
+import matplotlib.pyplot as plt
 from scipy.io import mmread
 from scipy.sparse.linalg import splu
+
 from sksparse.colamd import colamd
 
 # from numpy.testing import assert_allclose, assert_array_equal

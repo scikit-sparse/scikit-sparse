@@ -111,24 +111,22 @@ def test_camd_with_dense_rows(dense_thresh):
 def test_info_can_24():
     # The can_24 matrix is used in the SuiteSparse CAMD MATLAB/camd_demo.m file.
     expect_info = CAMDInfo.from_array(
-        np.array(
-            [
-                0,  # status
-                24,  # N
-                160,  # nz
-                1,  # symmetry
-                24,  # nzdiag
-                136,  # nz_A_plus_AT
-                0,  # Ndense
-                3288,  # memory
-                0,  # Ncmpa
-                97,  # Lnz
-                97,  # Ndiv
-                275,  # Nmultsubs_LDL
-                453,  # Nmultsubs_LU
-                8,  # dmax
-            ]
-        )
+        np.array([
+            0,     # status
+            24,    # N
+            160,   # nz
+            1,     # symmetry
+            24,    # nzdiag
+            136,   # nz_A_plus_AT
+            0,     # Ndense
+            3288,  # memory
+            0,     # Ncmpa
+            97,    # Lnz
+            97,    # Ndiv
+            275,   # Nmultsubs_LDL
+            453,   # Nmultsubs_LU
+            8,     # dmax
+        ])
     )
 
     # Load the can_24 matrix from a file
@@ -183,15 +181,15 @@ class TestConstraints:
         C = np.full(N, 2, dtype=int)
         all_idx = rng.permutation(N)
         C[all_idx[:k]] = 0
-        C[all_idx[k : 2 * k]] = 1
+        C[all_idx[k:2*k]] = 1
 
         p = camd(A, constraints=C)
 
         assert is_valid_permutation(p)
         # Check that the constraints are respected
         assert all(C[p][:k] == 0)
-        assert all(C[p][k : 2 * k] == 1)
-        assert all(C[p][2 * k :] == 2)
+        assert all(C[p][k:2*k] == 1)
+        assert all(C[p][2*k:] == 2)
 
 
 # =============================================================================

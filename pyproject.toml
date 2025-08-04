@@ -81,7 +81,7 @@ extend-select = [
     'D',    # docstring errors
     'E',    # pycodestyle errors
     'F',    # pyflakes errors
-    # 'I',    # TODO isort errors (import sorting)
+    'I',    # isort errors (import sorting)
     'ISC',  # flake8-implicit-str-concat
     'NPY',  # numpy-specific checks
     'PD',   # pandas-vet
@@ -100,13 +100,16 @@ ignore = [
     'D105',     # Missing docstring in magic method
     'D205',     # 1 blank line required between summary line and description
     'E741',     # ambiguous variable name (l, O, I)
-    'PD901',    # Avoid using the generic variable name `df` for DataFrames
     'PIE790',   # Unnecessary `pass` statement
     'PLC2401',  # non-ASCII characters
     'PLR0912',  # too many branches (max-branches)
+    'PLR0913',  # too many arguments (max-args)
     'PLR0915',  # too many statements (max-statements)
     'PLR2004',  # magic value used in comparison
 ]
+
+[tool.ruff.lint.isort]
+known-first-party = ["sksparse"]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ['I001', 'F403', 'F405']  # ignore import sorting, wildcard imports, and undefined names

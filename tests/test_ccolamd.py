@@ -309,7 +309,7 @@ class TestConstraints:
         C = np.full(N, 2, dtype=int)
         all_idx = rng.permutation(N)
         C[all_idx[:k]] = 0
-        C[all_idx[k : 2 * k]] = 1
+        C[all_idx[k:2*k]] = 1
 
         q = ccolamd(A, constraints=C)
 
@@ -319,8 +319,8 @@ class TestConstraints:
         print(C)
         print(C[q])  # should be [0, 0, 0, 1, 1, 1, 2, 2, ...]
         assert all(C[q][:k] == 0)
-        assert all(C[q][k : 2 * k] == 1)
-        assert all(C[q][2 * k :] == 2)
+        assert all(C[q][k:2*k] == 1)
+        assert all(C[q][2*k:] == 2)
 
 
 # =============================================================================

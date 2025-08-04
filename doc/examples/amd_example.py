@@ -13,10 +13,11 @@
 a fill-reducing ordering of a sparse matrix.
 """
 
-import matplotlib.pyplot as plt
-
 from pathlib import Path
+
+import matplotlib.pyplot as plt
 from scipy.io import mmread
+
 from sksparse.amd import amd
 from sksparse.cholmod import cholesky
 
