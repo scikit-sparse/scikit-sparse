@@ -197,29 +197,39 @@ def test_camd_default_control():
     assert is_valid_permutation(p)
 
 
-def test_constraints():
+@pytest.fixture(scope="class")
+def rand_matrix_A():
     N = 10
     rng = np.random.default_rng(56)
     A = sparse.random_array((N, N), density=0.4, format="lil", rng=rng)
     A.setdiag(N)
     A = A.tocsc()
-
-    # Set some constraints
-    k = 3
-    C = np.full(N, 2, dtype=int)
-    all_idx = rng.permutation(N)
-    C[all_idx[:k]] = 0
-    C[all_idx[k:2*k]] = 1
-
-    p = camd(A, constraints=C)
-
-    assert is_valid_permutation(p)
-    # Check that the constraints are respected
-    assert all(C[p][:k] == 0)
-    assert all(C[p][k:2*k] == 1)
-    assert all(C[p][2*k:] == 2)
+    return A, N, rng
 
 
+class TestConstraints:
+    def test_complete_constraints(self, rand_matrix_A):
+        A, N, _ = rand_matrix_A
+        C = np.arange(N)
+        q = camd(A, constraints=C)
+        assert_array_equal(q, C)
+
+    def test_general_constraints(self, rand_matrix_A):
+        A, N, rng = rand_matrix_A
+        # Set some constraints
+        k = 3
+        C = np.full(N, 2, dtype=int)
+        all_idx = rng.permutation(N)
+        C[all_idx[:k]] = 0
+        C[all_idx[k:2*k]] = 1
+
+        p = camd(A, constraints=C)
+
+        assert is_valid_permutation(p)
+        # Check that the constraints are respected
+        assert all(C[p][:k] == 0)
+        assert all(C[p][k:2*k] == 1)
+        assert all(C[p][2*k:] == 2)
 
 
 # =============================================================================
