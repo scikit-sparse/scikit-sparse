@@ -19,6 +19,8 @@ Contents:
 
    colamd.rst
 
+   ccolamd.rst
+
    cholmod.rst
 
    changes.rst
