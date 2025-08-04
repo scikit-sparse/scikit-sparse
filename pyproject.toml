@@ -52,6 +52,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "build",
+    "pre-commit",
     "pytest",
     "ruff",
     "sphinx",
