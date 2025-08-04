@@ -35,7 +35,7 @@ References
   https://people.engr.tamu.edu/davis/suitesparse.html
 * SuiteSparse CAMD:
   https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CAMD
-* CAMD Algorithm Publication:
+* AMD Algorithm Publication:
   Amestoy, P. R., Davis, T. A., & Duff, I. S. (1996). An approximate
     minimum degree ordering algorithm. SIAM Journal on Matrix Analysis and
     Applications, 17(4), 886-905.
@@ -204,7 +204,7 @@ def camd(A, constraints=None, dense_thresh=None, aggressive=None, return_info=Fa
         nodes with ``constraints[i] = 0`` are ordered first, followed by nodes
         with `C(i) = 1`, and so on. Thus, ``constraints[p]`` is monotonically
         non-decreasing. If None, no constraints are applied, and the ordering
-        will be similar to :func:``~sksparse.amd.amd``, except that the
+        will be similar to :func:`~sksparse.amd.amd`, except that the
         post-ordering is different.
     dense_thresh : float, optional
         Threshold number of entries for considering a row/column dense. If
