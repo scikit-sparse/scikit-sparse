@@ -12,7 +12,7 @@
 
 """Test cases for the sksparse.colamd module."""
 
-import matplotlib.pyplot as plt  # DEBUG only
+# import matplotlib.pyplot as plt  # DEBUG only
 import numpy as np
 import pytest
 
