@@ -182,7 +182,6 @@ def test_info_can_24():
 
 
 def test_camd_default_control():
-    """Test that CAMD uses the default control settings."""
     # The default control settings are (from camd.h):
     # - CAMD_DEFAULT_DENSE      -> dense_thresh: 10.0
     # - CAMD_DEFAULT_AGGRESSIVE ->   aggressive: True
@@ -196,6 +195,31 @@ def test_camd_default_control():
     A = sparse.csc_array([[1, 2], [3, 4]])
     p = camd(A, **control)
     assert is_valid_permutation(p)
+
+
+def test_constraints():
+    N = 10
+    rng = np.random.default_rng(56)
+    A = sparse.random_array((N, N), density=0.4, format="lil", rng=rng)
+    A.setdiag(N)
+    A = A.tocsc()
+
+    # Set some constraints
+    k = 3
+    C = np.full(N, 2, dtype=int)
+    all_idx = rng.permutation(N)
+    C[all_idx[:k]] = 0
+    C[all_idx[k:2*k]] = 1
+
+    p = camd(A, constraints=C)
+
+    assert is_valid_permutation(p)
+    # Check that the constraints are respected
+    assert all(C[p][:k] == 0)
+    assert all(C[p][k:2*k] == 1)
+    assert all(C[p][2*k:] == 2)
+
+
 
 
 # =============================================================================
