@@ -3,8 +3,8 @@
    See pyproject.toml for full author list and LICENSE.txt for license details.
    SPDX-License-Identifier: BSD-2-Clause
 
-Column Approximate Minimum Degree (COLAMD) Ordering
-===================================================
+Column Approximate Minimum Degree (COLAMD) Ordering (:mod:`sksparse.colamd`)
+============================================================================
 
 .. module:: sksparse.colamd
    :synopsis: Column Approximate Minimum Degree (COLAMD) Ordering
@@ -26,7 +26,7 @@ decompositions that require a column ordering.
 
 This module also provides a symmetric variant, :func:`.symamd`, which computes a
 permutation `P` of a symmetric matrix `A` such that the Cholesky factorization
-of :math:`PAP^{\\top}` has less fill-in and requires fewer floating point
+of :math:`PAP^{\top}` has less fill-in and requires fewer floating point
 operations than `A`. This function assumes that its input is symmetric.
 
 The :func:`.colamd` and :func:`.symamd` functions accept both real and complex
