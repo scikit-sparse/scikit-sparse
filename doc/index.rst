@@ -15,6 +15,8 @@ Contents:
 
    amd.rst
 
+   camd.rst
+
    colamd.rst
 
    cholmod.rst
