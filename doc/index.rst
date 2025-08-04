@@ -13,6 +13,8 @@ Contents:
 
    overview.rst
 
+   ccolamd.rst
+
    cholmod.rst
 
    changes.rst
