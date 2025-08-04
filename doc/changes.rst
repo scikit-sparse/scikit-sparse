@@ -7,6 +7,8 @@ v0.5.0
 ------
   * Create the :mod:`sksparse.amd` module, which provides the AMD ordering
     method.
+  * Create the :mod:`sksparse.camd` module, which provides the constrained AMD
+    ordering method.
   * Create the :mod:`sksparse.colamd` module, which provides the COLAMD
     ordering method.
   * Remove support for the following versions:
