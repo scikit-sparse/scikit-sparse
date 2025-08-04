@@ -3,6 +3,11 @@ Changes
 
 .. module:: sksparse.cholmod
 
+v0.5.0
+------
+  * Create the :mod:`~sksparse.ccolamd` module, which provides the constrained
+    COLAMD ordering method.
+
 v0.4.4
 ------
   * Bug in solve with dense array, where base of result is not set correctly, fixed.
