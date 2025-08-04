@@ -41,7 +41,7 @@ following code computes the CAMD ordering of :math:`A`:
     from sksparse.camd import camd
     A = ...  # some sparse matrix
     # Set some constraints, e.g., to fix the first two rows and columns
-    C = np.ones(A.shape[0], dtype=bool)
+    C = np.ones(A.shape[0], dtype=int)
     C[:2] = 0
     p = camd(A, constraints=C)
     PAPT = A[p][:, p]
