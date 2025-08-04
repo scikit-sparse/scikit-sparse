@@ -3,6 +3,11 @@ Changes
 
 .. module:: sksparse.cholmod
 
+v0.5.0
+------
+  * Create the :mod:`~sksparse.camd` module, which provides the constrained AMD
+    ordering method.
+
 v0.4.4
 ------
   * Bug in solve with dense array, where base of result is not set correctly, fixed.
