@@ -301,17 +301,19 @@ def test_ccolamd_defaults():
     # knobs[CCOLAMD_DENSE_ROW] = 10 ;
     # knobs[CCOLAMD_DENSE_COL] = 10 ;
     # knobs[CCOLAMD_AGGRESSIVE] = TRUE ;
+    # knobs[CCOLAMD_LU] = FALSE ;
     expect_knobs = {
         "dense_row_thresh": 10,
         "dense_col_thresh": 10,
         "aggressive": True,
+        "opt_lu": "cholesky",
     }
     knobs = ccolamd_get_defaults()
     assert knobs == expect_knobs
 
-    # A = sparse.csc_array([[1, 2], [3, 4]])
-    # p = amd(A, **knobs)
-    # assert is_valid_permutation(p)
+    A = sparse.csc_array([[1, 2], [3, 4]])
+    p = ccolamd(A, **knobs)
+    assert is_valid_permutation(p)
 
 
 @pytest.fixture(scope="class")

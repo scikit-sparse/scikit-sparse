@@ -29,7 +29,7 @@ cdef extern from "ccolamd.h":
     int CCOLAMD_DENSE_ROW
     int CCOLAMD_DENSE_COL
     int CCOLAMD_AGGRESSIVE
-    # TODO int CCOLAMD_LU
+    int CCOLAMD_LU
 
     # indices of stats
     int CCOLAMD_DEFRAG_COUNT

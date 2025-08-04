@@ -174,6 +174,7 @@ def _ccolamd_base(
     dense_row_thresh=None,
     dense_col_thresh=None,
     aggressive=None,
+    opt_lu=None,
     return_info=False
 ):
     """A common base function for ccolamd and csymamd."""
@@ -236,6 +237,11 @@ def _ccolamd_base(
 
     if aggressive is not None:
         knobs[CCOLAMD_AGGRESSIVE] = 1.0 if aggressive else 0.0
+
+    if opt_lu is not None:
+        if opt_lu not in ('lu', 'cholesky'):
+            raise ValueError("opt_lu must be either 'lu' or 'cholesky'.")
+        knobs[CCOLAMD_LU] = 1.0 if opt_lu == 'lu' else 0.0
 
     # Declare typed memory views for Cython
     cdef int32_t[::1] Ai_mv_int32
@@ -387,6 +393,7 @@ def ccolamd(
     dense_row_thresh=None,
     dense_col_thresh=None,
     aggressive=None,
+    opt_lu=None,
     return_info=False
 ):
     return _ccolamd_base(
@@ -396,6 +403,7 @@ def ccolamd(
         dense_row_thresh=dense_row_thresh,
         dense_col_thresh=dense_col_thresh,
         aggressive=aggressive,
+        opt_lu=None,
         return_info=return_info
     )
 
@@ -415,6 +423,7 @@ def csymamd(
         dense_row_thresh=dense_row_thresh,
         dense_col_thresh=dense_col_thresh,
         aggressive=aggressive,
+        opt_lu=None,
         return_info=return_info
     )
 
@@ -425,7 +434,7 @@ Parameters
 ----------
 {A_param}
 contraints : (N,) array_like, optional
-    A 1D array of constraints for the ordering. Each column `i` in 
+    A 1D array of constraints for the ordering. Each column `i` in
     `A` has a constraint, ``constraints[i]``, in the range [0, N-1]. All
     columns with ``constraints[i] = 0`` are ordered first, followed by nodes
     with `C(i) = 1`, and so on. Thus, ``constraints[p]`` is monotonically
@@ -443,6 +452,7 @@ dense_row_thresh, dense_col_thresh : float, optional
 aggressive : bool, optional
     If True, use aggressive absorption. If None, uses the default value
     from CCOLAMD. The default value is True.
+{opt_lu_param}
 
 Returns
 -------
@@ -484,8 +494,16 @@ ccolamd_A_param = """A : (M, N) {array_like, sparse matrix}
     The input matrix for which to compute the column ordering.
     Must be 2D and convertible to CSC format. Need not be square."""
 
+ccolamd_opt_lu_param = """opt_lu : {'lu', 'cholesky'}, optional
+    If 'lu', the ordering is optimized for LU factorization of `A`. If 'cholesky',
+    the ordering is optimized for Cholesky factorization of :math:`A^{\\top}
+    A`. If None, uses the default value from CCOLAMD, which is 'cholesky'."""
+
 ccolamd.__doc__ = _CCOLAMD_DOC_TEMPLATE.format(
-    intro=ccolamd_intro, A_param=ccolamd_A_param, reftag=ccolamd_reftag,
+    intro=ccolamd_intro,
+	A_param=ccolamd_A_param,
+	opt_lu_param=ccolamd_opt_lu_param,
+	reftag=ccolamd_reftag,
 )
 
 
@@ -520,7 +538,10 @@ csymamd_A_param = """A : (N, N) {array_like, sparse matrix}
 """
 
 csymamd.__doc__ = _CCOLAMD_DOC_TEMPLATE.format(
-    intro=csymamd_intro, A_param=csymamd_A_param, reftag=csymamd_reftag,
+    intro=csymamd_intro,
+	A_param=csymamd_A_param,
+	opt_lu_param='',
+	reftag=csymamd_reftag,
 )
 
 
@@ -547,6 +568,6 @@ def ccolamd_get_defaults():
     return dict(
         dense_row_thresh=knobs[CCOLAMD_DENSE_ROW],
         dense_col_thresh=knobs[CCOLAMD_DENSE_COL],
-        aggressive=knobs[CCOLAMD_AGGRESSIVE]
-        # TODO lu_opt='lu' if knobs[CCOLAMD_LU] else 'cholesky'
+        aggressive=knobs[CCOLAMD_AGGRESSIVE],
+        opt_lu='lu' if knobs[CCOLAMD_LU] else 'cholesky',
     )
