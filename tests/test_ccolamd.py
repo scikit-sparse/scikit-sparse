@@ -12,7 +12,6 @@
 
 """Test cases for the sksparse.ccolamd module."""
 
-# import matplotlib.pyplot as plt  # DEBUG only
 import numpy as np
 import pytest
 
@@ -167,13 +166,15 @@ def test_ccolamd_with_dense(dense_thresh, row_or_col):
     N_elems = min(2 * thresh, max_N_elems)  # arbitrary choice for enough elements
 
     dense_idx = rng.choice(max_N_rowcols, size=N_dense, replace=False)
-    other_idx = rng.choice(max_N_elems, size=N_elems, replace=False)
+    other_idxs = np.array(
+        [rng.choice(max_N_elems, size=N_elems, replace=False) for _ in range(N_dense)]
+    )
 
-    for i in dense_idx:
+    for i, js in zip(dense_idx, other_idxs):
         if row_or_col == "row":
-            A[i, other_idx] = rng.random(size=len(other_idx))
+            A[i, js] = rng.random(size=N_elems)
         else:
-            A[other_idx, i] = rng.random(size=len(other_idx))
+            A[js, i] = rng.random(size=N_elems)
 
     A = A.tocsc()
 
@@ -189,13 +190,27 @@ def test_ccolamd_with_dense(dense_thresh, row_or_col):
     # plt.show()
 
     # Expect dense cols at the end of the permutation, but maybe not in order
-    # NOTE *empty* columns are also moved to the end of the matrix,
+    # *empty* columns are also moved to the end of the matrix,
     # so we need to check the stats.N_cols_ignored value
+    N_empty = (A.count_nonzero(axis=0) == 0).sum()
+    N_cols_ignored = N_dense + N_empty
+
     if row_or_col == "col":
         assert_array_equal(
-            np.sort(q[-stats.N_cols_ignored:-(stats.N_cols_ignored - N_dense)]),
+            np.sort(q[-N_cols_ignored:-(N_cols_ignored - N_dense)]),
             np.sort(dense_idx)
         )
+
+    # NOTE in *c*colamd, the N_cols_ignored value is the number of dense
+    # columns, while in colamd, it is the number of dense + empty columns. This
+    # appears to be a bug in the CCOLAMD implementation, as the documentation
+    # in ccolamd.c states that the N_cols_ignored value should be the number of
+    # dense + empty columns.
+    # if row_or_col == "col":
+    #     assert_array_equal(
+    #         np.sort(q[-stats.N_cols_ignored:-(stats.N_cols_ignored - N_dense)]),
+    #         np.sort(dense_idx)
+    #     )
 
 
 @pytest.mark.parametrize("dense_thresh", DENSE_THRESHOLDS)
@@ -216,10 +231,12 @@ def test_csymamd_with_dense(dense_thresh):
     N_elems = min(2 * thresh, N)  # arbitrary choice for enough elements
 
     dense_idx = rng.choice(N, size=N_dense, replace=False)
-    other_idx = rng.choice(N, size=N_elems, replace=False)
+    other_idxs = np.array(
+        [rng.choice(N, size=N_elems, replace=False) for _ in range(N_dense)]
+    )
 
-    for i in dense_idx:
-        A[i, other_idx] = rng.random(size=len(other_idx))
+    for i, js in zip(dense_idx, other_idxs):
+        A[i, js] = rng.random(size=N_elems)
 
     A = A + A.T  # make it symmetric
     A = A.tocsc()
@@ -228,7 +245,7 @@ def test_csymamd_with_dense(dense_thresh):
 
     assert is_valid_permutation(q)
 
-    # # DEBUG: plot the matrix before and after permutation
+    # DEBUG: plot the matrix before and after permutation
     # fig, axs = plt.subplots(num=1, ncols=2, clear=True)
     # axs[0].spy(A, markersize=1)
     # axs[1].spy(A[q][:, q], markersize=1)
