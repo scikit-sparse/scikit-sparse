@@ -68,3 +68,16 @@ cdef extern from "btf.h":
         int32_t *nmatch,
         int32_t Work[]
     )
+
+    int64_t btf_l_order(
+        int64_t n,
+        int64_t Ap[],
+        int64_t Ai[],
+        double maxwork,
+        double *work,
+        int64_t P[],
+        int64_t Q[],
+        int64_t R[],
+        int64_t *nmatch,
+        int64_t Work[]
+    )

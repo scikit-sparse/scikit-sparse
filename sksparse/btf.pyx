@@ -334,3 +334,161 @@ def strongcomp(A, qin=None):
         return p, q, r
     else:
         return p, r
+
+
+def btf(A):
+    """Permute the square sparse matrix into Block Triangular Form (BTF).
+
+    This function finds a permutation of a sparse matrix so that 
+    `PAQ` (``A[p][:, q]``) is block upper triangular form with a zero-free
+    diagonal, or with a maximum number of nonzeros on the diagonal if
+    a zero-free permutation does not exist [#btf_h]_.
+
+    Parameters
+    ----------
+    A : (N, N) {array-like, sparse array}
+        An array convertible to a sparse matrix in Compressed Sparse Column
+        (CSC) format. Must be square.
+
+    Returns
+    -------
+    p : (N,) ndarray of int
+        The row permutation vector such that ``A[p][:, q]`` is in block upper
+        triangular form.
+    q : (N,) ndarray of int
+        The column permutation vector. If ``A`` is structurally nonsingular,
+        ``A[p][:, q]`` has a zero-free diagonal. If ``A`` is structurally
+        singular, ``q`` will contain negative entries. The permuted matrix
+        is ``A[p][:, abs(q)]``. If ``q[k] < 0``, then ``PAQ[k, k]`` is zero.
+    r : (N+1,) ndarray of int
+        The array of indices of the start of each block in the permuted matrix.
+        Block ``b`` is in rows/columns ``r[b]`` to ``r[b+1] - 1``.
+        The number of blocks is ``r[-1]``.
+
+    Notes
+    -----
+    Adapted from the BTF documentation [#btf_h]_:
+
+        The function finds a maximum matching (or perhaps a limited matching if
+        the work is limited), via the :func:`.maxtrans` function. If a complete
+        matching is not found, :func:`.btf` completes the permutation, but
+        flags the columns of ``A[p][:, q]`` to denote which columns are not
+        matched. If the matrix is structurally rank deficient, some of the
+        entries on the diagonal of the permuted matrix will be zero.
+
+    References
+    ----------
+    .. [#btf_h] BTF header file:
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/BTF/Include/btf.h
+    .. [#btf_mex] BTF MATLAB interface:
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/BTF/MATLAB/btf.m
+    """
+    # TODO refactor this check to a separate function for all modules
+    # Convert dense to sparse CSC
+    if not issparse(A):
+        A = np.asarray(A)
+
+    if A.ndim != 2:
+        raise ValueError("Input must be 2D.")
+
+    M, N = A.shape
+
+    if M != N:
+        raise ValueError("Input must be square.")
+
+    try:
+        if not isinstance(A, csc_array):
+            warnings.warn(
+                "Input matrix is not in CSC format. Converting to CSC.",
+                SparseEfficiencyWarning,
+                stacklevel=2
+            )
+            A = csc_array(A)
+    except ValueError:
+        raise ValueError("Input must be convertible to CSC format.")
+
+    # Choose index width: int32 or int64
+    use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
+    out_dtype = np.int32 if use_int32 else np.int64
+
+    if N == 0:
+        p = np.empty(0, dtype=out_dtype)
+        q = np.empty(0, dtype=out_dtype)
+        r = np.zeros(1, dtype=out_dtype)  # no blocks
+        return p, q, r
+
+    if A.nnz == 0:
+        p = np.arange(N, dtype=out_dtype)
+        # FIXME all -1?
+        q = np.arange(N, dtype=out_dtype)
+        r = np.zeros(N + 1, dtype=out_dtype)
+        r[-1] = N  # N blocks of size 1
+        return p, q, r
+
+    # Declare typed memory views for Cython
+    cdef int32_t[::1] Ap_mv_int32
+    cdef int32_t[::1] Ai_mv_int32
+    cdef int32_t[::1] P_mv_int32
+    cdef int32_t[::1] Q_mv_int32
+    cdef int32_t[::1] R_mv_int32
+    cdef int32_t[::1] Work_mv_int32
+
+    cdef int64_t[::1] Ap_mv_int64
+    cdef int64_t[::1] Ai_mv_int64
+    cdef int64_t[::1] P_mv_int64
+    cdef int64_t[::1] Q_mv_int64
+    cdef int64_t[::1] R_mv_int64
+    cdef int64_t[::1] Work_mv_int64
+
+    # Assign memory for the input/output arrays
+    if use_int32:
+        Ap_mv_int32 = np.ascontiguousarray(A.indptr, dtype=np.int32)
+        Ai_mv_int32 = np.ascontiguousarray(A.indices, dtype=np.int32)
+        p = P_mv_int32 = np.zeros(N, dtype=np.int32)
+        q = Q_mv_int32 = np.zeros(N, dtype=np.int32)
+        r = R_mv_int32 = np.zeros(N + 1, dtype=np.int32)
+        Work_mv_int32 = np.zeros(5 * N, dtype=np.int32)
+    else:
+        Ap_mv_int64 = np.ascontiguousarray(A.indptr, dtype=np.int64)
+        Ai_mv_int64 = np.ascontiguousarray(A.indices, dtype=np.int64)
+        p = P_mv_int64 = np.zeros(N, dtype=np.int64)
+        q = Q_mv_int64 = np.zeros(N, dtype=np.int64)
+        r = R_mv_int64 = np.zeros(N + 1, dtype=np.int64)
+        Work_mv_int64 = np.zeros(5 * N, dtype=np.int64)
+
+    maxwork = 0  # TODO default value?
+    cdef double work
+    cdef int32_t nmatch_int32
+    cdef int64_t nmatch_int64
+
+    if use_int32:
+        nblocks = btf_order(
+            N,
+            &Ap_mv_int32[0],
+            &Ai_mv_int32[0],
+            maxwork,
+            &work,
+            &P_mv_int32[0],
+            &Q_mv_int32[0],
+            &R_mv_int32[0],
+            &nmatch_int32,
+            &Work_mv_int32[0]
+        )
+    else:
+        nblocks = btf_l_order(
+            N,
+            &Ap_mv_int64[0],
+            &Ai_mv_int64[0],
+            maxwork,
+            &work,
+            &P_mv_int64[0],
+            &Q_mv_int64[0],
+            &R_mv_int64[0],
+            &nmatch_int64,
+            &Work_mv_int64[0]
+        )
+
+    if nblocks < 0:
+        raise ValueError(f"BTF failed with error code: {nblocks}")
+
+    return p, q, r
