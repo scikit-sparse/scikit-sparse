@@ -48,7 +48,7 @@ def maxtrans(A):
     """Compute the maximum transversal of a sparse matrix.
 
     This function finds a permutation of the columns of a sparse matrix
-    so that it has a zero-free diagonal, if possible [#maxtrans]_.
+    so that it has a zero-free diagonal, if possible [#maxtrans_h]_.
 
     Parameters
     ----------
@@ -76,9 +76,12 @@ def maxtrans(A):
 
     References
     ----------
-    .. [#maxtrans] BTF maxtrans header file:
+    .. [#maxtrans_h] BTF maxtrans header file:
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/BTF/Include/btf.h
+    .. [#maxtrans_mex] BTF maxtrans MATLAB interface:
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/BTF/MATLAB/maxtrans.m
     """
+    # TODO refactor this check to a separate function for all modules
     # Convert dense to sparse CSC
     if not issparse(A):
         A = np.asarray(A)
@@ -130,6 +133,7 @@ def maxtrans(A):
         jmatch = Match_mv_int64 = np.zeros(M, dtype=np.int64)
         Work_mv_int64 = np.zeros(5 * N, dtype=np.int64)
 
+    # Initialize output variable
     cdef double work
     maxwork = 0  # TODO default value?
 
@@ -160,3 +164,173 @@ def maxtrans(A):
         raise ValueError(f"BTF maxtrans failed with error code: {nnz_diag}")
 
     return jmatch
+
+
+def strongcomp(A, qin=None):
+    """Compute the strongly connected components of a directed graph.
+
+    This function finds a symmetric permutation of a sparse matrix so that 
+    ``P @ A @ P.T`` is block upper triangular form.
+
+    Parameters
+    ----------
+    A : (N, N) {array-like, sparse array}
+        An array convertible to a sparse matrix in Compressed Sparse Column
+        (CSC) format. Must be square.
+    qin : (N,) ndarray, optional
+        A permutation vector. If provided, find the strongly connected
+        components of ``A[:, qin]``.
+
+    Returns
+    -------
+    p : (N,) ndarray
+        The permutation vector such that ``A[p][:, p]`` is in block upper
+        triangular form, unless ``q`` is provided (see below).
+    q : (N,) ndarray, optional
+        If ``q`` is provided on input, ``A[p][:, q]`` is in block upper
+        triangular form.
+    r : (N+1,) ndarray
+        The array of pointers to the start of each block in the permuted matrix.
+        Block ``b`` is in rows/columns ``r[b]`` to ``r[b+1] - 1``.
+        The number of blocks is ``r[-1]``.
+
+    References
+    ----------
+    .. [#strongcomp_h] BTF strongcomp header file:
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/BTF/Include/btf.h
+    .. [#strongcomp_mex] BTF strongcomp MATLAB interface:
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/BTF/MATLAB/strongcomp.m
+    """
+    # TODO refactor this check to a separate function for all modules
+    # Convert dense to sparse CSC
+    if not issparse(A):
+        A = np.asarray(A)
+
+    if A.ndim != 2:
+        raise ValueError("Input must be 2D.")
+
+    M, N = A.shape
+
+    if M != N:
+        raise ValueError("Input must be square.")
+
+    try:
+        if not isinstance(A, csc_array):
+            warnings.warn(
+                "Input matrix is not in CSC format. Converting to CSC.",
+                SparseEfficiencyWarning,
+                stacklevel=2
+            )
+            A = csc_array(A)
+    except ValueError:
+        raise ValueError("Input must be convertible to CSC format.")
+
+    # Choose index width: int32 or int64
+    use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
+    out_dtype = np.int32 if use_int32 else np.int64
+
+    if N == 0:
+        p = np.empty(0, dtype=out_dtype)
+        r = np.zeros(1, dtype=out_dtype)  # no blocks
+        if qin is not None:
+            q = np.empty(0, dtype=out_dtype)
+            return p, q, r
+        else:
+            return p, r
+
+    if A.nnz == 0:
+        p = np.arange(N, dtype=out_dtype)
+        r = np.zeros(N + 1, dtype=out_dtype)
+        r[-1] = N  # N blocks of size 1
+        if qin is not None:
+            q = np.arange(N, dtype=out_dtype)
+            return p, q, r
+        else:
+            return p, r
+
+    # Declare typed memory views for Cython
+    cdef int32_t[::1] Ap_mv_int32
+    cdef int32_t[::1] Ai_mv_int32
+    cdef int32_t[::1] P_mv_int32
+    cdef int32_t[::1] Q_mv_int32
+    cdef int32_t[::1] R_mv_int32
+    cdef int32_t[::1] Work_mv_int32
+
+    cdef int64_t[::1] Ap_mv_int64
+    cdef int64_t[::1] Ai_mv_int64
+    cdef int64_t[::1] P_mv_int64
+    cdef int64_t[::1] Q_mv_int64
+    cdef int64_t[::1] R_mv_int64
+    cdef int64_t[::1] Work_mv_int64
+
+    # Use a NULL pointer for Q if qin is not provided
+    cdef int32_t* Q_ptr_int32 = NULL
+    cdef int64_t* Q_ptr_int64 = NULL
+
+    if qin is not None:
+        try:
+            q = np.ascontiguousarray(qin, dtype=np.int32 if use_int32 else np.int64)
+        except ValueError:
+            raise ValueError("qin must be an integer array.")
+
+        if len(q) != N:
+            raise ValueError("qin must have the same length"
+                             "as the number of columns in A.")
+
+        if use_int32:
+            Q_mv_int32 = q
+            Q_ptr_int32 = &Q_mv_int32[0]
+        else:
+            Q_mv_int64 = q
+            Q_ptr_int64 = &Q_mv_int64[0]
+
+    # Assign memory for the input/output arrays
+    if use_int32:
+        Ap_mv_int32 = np.ascontiguousarray(A.indptr, dtype=np.int32)
+        Ai_mv_int32 = np.ascontiguousarray(A.indices, dtype=np.int32)
+        p = P_mv_int32 = np.zeros(N, dtype=np.int32)
+        R_mv_int32 = np.zeros(N + 1, dtype=np.int32)
+        Work_mv_int32 = np.zeros(4 * N, dtype=np.int32)
+    else:
+        Ap_mv_int64 = np.ascontiguousarray(A.indptr, dtype=np.int64)
+        Ai_mv_int64 = np.ascontiguousarray(A.indices, dtype=np.int64)
+        p = P_mv_int64 = np.zeros(N, dtype=np.int64)
+        R_mv_int64 = np.zeros(N + 1, dtype=np.int64)
+        Work_mv_int64 = np.zeros(4 * N, dtype=np.int64)
+
+    if use_int32:
+        nblocks = btf_strongcomp(
+            N,
+            &Ap_mv_int32[0],
+            &Ai_mv_int32[0],
+            Q_ptr_int32,
+            &P_mv_int32[0],
+            &R_mv_int32[0],
+            &Work_mv_int32[0]
+        )
+    else:
+        nblocks = btf_l_strongcomp(
+            N,
+            &Ap_mv_int64[0],
+            &Ai_mv_int64[0],
+            Q_ptr_int64,
+            &P_mv_int64[0],
+            &R_mv_int64[0],
+            &Work_mv_int64[0]
+        )
+
+    if nblocks < 0:
+        raise ValueError(f"BTF strongcomp failed with error code: {nblocks}")
+
+    # Take only the first nblocks of r
+    if use_int32:
+        r_slice = R_mv_int32[:nblocks + 1]
+    else:
+        r_slice = R_mv_int64[:nblocks + 1]
+
+    r = np.asarray(r_slice)
+
+    if qin is not None:
+        return p, q, r
+    else:
+        return p, r

@@ -4,36 +4,23 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 # =============================================================================
-#     File: test_btf.py
-#  Created: 2025-08-04 21:04
+#     File: test_btf_strongcomp.py
+#  Created: 2025-08-06 15:11
 # =============================================================================
 
-"""Test cases for the sksparse.btf module."""
+"""Test cases for the sksparse.btf.strongcomp function."""
 
 # from pathlib import Path
 
 import numpy as np
 import pytest
-from numpy.testing import assert_array_equal
+from numpy.testing import assert_allclose, assert_array_equal
 from scipy import sparse
 from scipy.sparse import SparseEfficiencyWarning
 
-from sksparse.btf import maxtrans
+from sksparse.btf import strongcomp
 
 from .helpers import generate_random_matrices, is_valid_permutation
-
-
-def is_valid_match(p):
-    """Check if a maximum matching is valid."""
-    if -1 not in p:
-        return is_valid_permutation(p)
-    else:
-        # Check uniqueness of non-negative entries
-        x = np.array(p)
-        x = np.sort(x[x >= 0])
-        all_x_unique = np.all(x[:-1] < x[1:])
-        # Check range of all entries [-1, len(p))
-        return all((p >= -1) & (p < len(p))) and all_x_unique
 
 
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
@@ -41,39 +28,53 @@ def test_empty_input(itype):
     empty_A = sparse.csc_array((0, 0))
     empty_A.indptr = empty_A.indptr.astype(itype)
     empty_A.indices = empty_A.indices.astype(itype)
-    assert_array_equal(maxtrans(empty_A), np.array([], dtype=itype), strict=True)
+    p, r = strongcomp(empty_A)
+    assert_array_equal(p, np.array([], dtype=itype), strict=True)
+    assert_array_equal(r, np.zeros(1, dtype=itype), strict=True)
 
 
 def test_1D_input():
     with pytest.raises(ValueError, match="must be 2D"):
-        maxtrans(np.arange(10))
+        strongcomp(np.arange(10))
+
+
+def test_nonsquare_input():
+    with pytest.raises(ValueError, match="Input must be square"):
+        strongcomp(sparse.csc_array((3, 4)))
 
 
 def test_ND_input():
-    rng = np.random.default_rng(565656)
     with pytest.raises(ValueError, match="must be 2D"):
-        maxtrans(rng.random((2, 3, 4)))
+        strongcomp(np.empty((2, 3, 4)))
 
 
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
 def test_zero_input(itype):
-    M, N = 10, 8  # arbitrary
-    zero_A = sparse.csc_array((M, N))
+    N = 10  # arbitrary
+    zero_A = sparse.csc_array((N, N))
     zero_A.indptr = zero_A.indptr.astype(itype)
     zero_A.indices = zero_A.indices.astype(itype)
-    assert_array_equal(maxtrans(zero_A), np.full(M, -1, dtype=itype), strict=True)
+    p, r = strongcomp(zero_A)
+    expect_r = np.zeros(N + 1, dtype=itype)
+    expect_r[-1] = N
+    assert_array_equal(p, np.arange(N, dtype=itype), strict=True)
+    assert_array_equal(r, expect_r, strict=True)
 
 
 def test_singleton_matrix():
     singleton_A = sparse.csc_array([[1]])
-    assert_array_equal(
-        maxtrans(singleton_A), np.array([0], dtype=np.int32), strict=True
-    )
+    p, r = strongcomp(singleton_A)
+    assert_array_equal(p, np.array([0], dtype=np.int32), strict=True)
+    assert_array_equal(r, np.array([0, 1], dtype=np.int32), strict=True)
 
 
 @pytest.mark.parametrize(
     "A",
-    list(generate_random_matrices(N_trials=100, N_max=200, d_scale=0.05)),
+    list(
+        generate_random_matrices(
+            N_trials=100, N_max=200, d_scale=0.05, square_only=True
+        )
+    ),
 )
 class TestRandomSquareMatrices:
     @pytest.mark.parametrize("matrix_type", ["dense", "csc", "coo"])
@@ -90,20 +91,32 @@ class TestRandomSquareMatrices:
 
         if matrix_type != "csc":
             with pytest.warns(SparseEfficiencyWarning, match="not in CSC format"):
-                p = maxtrans(A)
+                p, r = strongcomp(A)
         else:
-            p = maxtrans(A)
+            p, r = strongcomp(A)
 
-        assert is_valid_match(p)
+        assert is_valid_permutation(p)
 
     @pytest.mark.parametrize("itype", [np.int32, np.int64])
     def test_itype(self, A, itype):
         A.indptr = A.indptr.astype(itype)
         A.indices = A.indices.astype(itype)
-        p = maxtrans(A)
+        p, r = strongcomp(A)
         assert p.dtype == itype
         assert p.shape == (A.shape[0],)
-        assert is_valid_match(p)
+        assert is_valid_permutation(p)
+
+
+def test_column_permutation():
+    rng = np.random.default_rng(565656)
+    N = 100
+    A = sparse.random_array((N, N), density=0.2, format="csc", rng=rng)
+    qin = rng.permutation(N)
+    AQ = A[:, qin].tocsc()
+    p_, r_ = strongcomp(AQ)
+    p, q, r = strongcomp(A, qin)
+    assert_array_equal(q, qin[p_])
+    assert_allclose(A[p][:, q].toarray(), AQ[p_][:, p_].toarray(), atol=1e-15)
 
 
 # =============================================================================
