@@ -418,11 +418,11 @@ def btf(A):
         return p, q, r
 
     if A.nnz == 0:
+        # p = [0, 1, ..., N - 1]
         p = np.arange(N, dtype=out_dtype)
-        # FIXME all -1?
-        q = np.arange(N, dtype=out_dtype)
-        r = np.zeros(N + 1, dtype=out_dtype)
-        r[-1] = N  # N blocks of size 1
+        # q = [-2, -3, ..., -(N + 1)]
+        q = -np.arange(N, dtype=out_dtype) - 2  # flag all columns
+        r = np.arange(N + 1, dtype=out_dtype)      # N blocks of size 1
         return p, q, r
 
     # Declare typed memory views for Cython
@@ -492,3 +492,46 @@ def btf(A):
         raise ValueError(f"BTF failed with error code: {nblocks}")
 
     return p, q, r
+
+
+def btf_q_permutation(q):
+    """Convert a raw BTF column permutation vector to a valid permutation.
+
+    Parameters
+    ----------
+    q : (N,) ndarray of int
+        The raw BTF column permutation vector. Contains negative entries for
+        unmatched columns.
+
+    Returns
+    -------
+    q_perm : (N,) ndarray of int
+        The valid BTF column permutation vector. Contains only non-negative
+        entries, where unmatched columns are replaced with their shifted
+        absolute values.
+
+    Notes
+    -----
+    In C, the values of ``q`` should be converted using
+    ``j = BTF_UNFLIP(Q[k])``, which is a macro for:
+
+    .. code-block:: C
+        j = (Q[k] < 0) ? -j - 2 : j
+
+    In MATLAB, you can then take ``j + 1`` to get the 1-based indices (with
+    negatives for unmatched values), and then ``abs(j)`` gives a valid
+    permutation.
+    
+    We can achieve the same in Python by using:
+
+    .. code-block:: python
+        j = np.abs(q + 1) - 1
+
+    which is what this function returns.
+    """
+    q = np.asarray(q)
+
+    if q.ndim != 1:
+        raise ValueError("Input must be a 1D array.")
+
+    return np.abs(q + 1) - 1

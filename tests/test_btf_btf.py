@@ -18,11 +18,10 @@ from numpy.testing import assert_array_equal
 from scipy import sparse
 from scipy.sparse import SparseEfficiencyWarning
 
-from sksparse.btf import btf
+from sksparse.btf import btf, btf_q_permutation
 
 from .helpers import generate_random_matrices, is_valid_permutation
 
-# TODO check q outputs
 
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
 def test_empty_input(itype):
@@ -31,6 +30,7 @@ def test_empty_input(itype):
     empty_A.indices = empty_A.indices.astype(itype)
     p, q, r = btf(empty_A)
     assert_array_equal(p, np.array([], dtype=itype), strict=True)
+    assert_array_equal(q, np.array([], dtype=itype), strict=True)
     assert_array_equal(r, np.zeros(1, dtype=itype), strict=True)
 
 
@@ -56,17 +56,27 @@ def test_zero_input(itype):
     zero_A.indptr = zero_A.indptr.astype(itype)
     zero_A.indices = zero_A.indices.astype(itype)
     p, q, r = btf(zero_A)
-    expect_r = np.zeros(N + 1, dtype=itype)
-    expect_r[-1] = N
     assert_array_equal(p, np.arange(N, dtype=itype), strict=True)
-    assert_array_equal(r, expect_r, strict=True)
+    assert_array_equal(q, -np.arange(N, dtype=itype) - 2, strict=True)
+    assert_array_equal(r, np.arange(N + 1, dtype=itype), strict=True)
 
 
 def test_singleton_matrix():
     singleton_A = sparse.csc_array([[1]])
     p, q, r = btf(singleton_A)
     assert_array_equal(p, np.array([0], dtype=np.int32), strict=True)
+    assert_array_equal(q, np.array([0], dtype=np.int32), strict=True)
     assert_array_equal(r, np.array([0, 1], dtype=np.int32), strict=True)
+
+
+def test_q_permutation():
+    """Test that the q permutation is correct for a simple case."""
+    N = 10
+    A = sparse.csc_array((N, N))  # empty array
+    _, q, _ = btf(A)
+    expect_q = -np.arange(N, dtype=np.int32) - 2
+    assert_array_equal(q, expect_q, strict=True)
+    assert_array_equal(btf_q_permutation(q), np.abs(q + 1) - 1, strict=True)
 
 
 @pytest.mark.parametrize(
@@ -97,8 +107,7 @@ class TestRandomSquareMatrices:
             p, q, r = btf(A)
 
         assert is_valid_permutation(p)
-        # TODO check q
-        # assert is_valid_permutation(q)
+        assert is_valid_permutation(btf_q_permutation(q))
 
     @pytest.mark.parametrize("itype", [np.int32, np.int64])
     def test_itype(self, A, itype):
@@ -108,8 +117,7 @@ class TestRandomSquareMatrices:
         assert p.dtype == itype
         assert p.shape == (A.shape[0],)
         assert is_valid_permutation(p)
-        # TODO check q
-        # assert is_valid_permutation(q)
+        assert is_valid_permutation(btf_q_permutation(q))
 
 
 # =============================================================================
