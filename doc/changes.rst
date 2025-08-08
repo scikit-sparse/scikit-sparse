@@ -1,7 +1,10 @@
 Changes
 =======
 
-.. module:: sksparse.cholmod
+v0.5.0
+------
+  * Create the :mod:`sksparse.btf` module, which provides the BTF ordering
+    method.
 
 v0.4.4
 ------

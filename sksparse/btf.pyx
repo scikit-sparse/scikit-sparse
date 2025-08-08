@@ -61,7 +61,7 @@ def maxtrans(A):
     jmatch : (M,) ndarray
         Array containing the maximum transversal.
 
-        Adapted from the BTF maxtrans documentation [#maxtrans]_:
+        Adapted from the BTF maxtrans documentation [#maxtrans_h]_:
 
             The output is an array ``jmatch`` of size ``N``.  If row ``i`` is
             matched with column ``j``, then ``A[i, j]`` is nonzero, and then
@@ -78,8 +78,6 @@ def maxtrans(A):
     ----------
     .. [#maxtrans_h] BTF maxtrans header file:
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/BTF/Include/btf.h
-    .. [#maxtrans_mex] BTF maxtrans MATLAB interface:
-        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/BTF/MATLAB/maxtrans.m
     """
     # TODO refactor this check to a separate function for all modules
     # Convert dense to sparse CSC
@@ -170,36 +168,34 @@ def strongcomp(A, qin=None):
     """Compute the strongly connected components of a directed graph.
 
     This function finds a symmetric permutation of a sparse matrix so that 
-    ``P @ A @ P.T`` is block upper triangular form.
+    ``A[p][:, p]`` is block upper triangular form [#strongcomp_h]_.
 
     Parameters
     ----------
     A : (N, N) {array-like, sparse array}
         An array convertible to a sparse matrix in Compressed Sparse Column
         (CSC) format. Must be square.
-    qin : (N,) ndarray, optional
+    qin : (N,) ndarray of int, optional
         A permutation vector. If provided, find the strongly connected
         components of ``A[:, qin]``.
 
     Returns
     -------
-    p : (N,) ndarray
+    p : (N,) ndarray of int
         The permutation vector such that ``A[p][:, p]`` is in block upper
         triangular form, unless ``q`` is provided (see below).
-    q : (N,) ndarray, optional
+    q : (N,) ndarray of int, optional
         If ``q`` is provided on input, ``A[p][:, q]`` is in block upper
         triangular form.
-    r : (N+1,) ndarray
-        The array of pointers to the start of each block in the permuted matrix.
+    r : (Nb+1,) ndarray of int
+        The array of indices of the start of each block in the permuted matrix.
         Block ``b`` is in rows/columns ``r[b]`` to ``r[b+1] - 1``.
-        The number of blocks is ``r[-1]``.
+        The number of blocks is ``len(r) - 1``.
 
     References
     ----------
     .. [#strongcomp_h] BTF strongcomp header file:
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/BTF/Include/btf.h
-    .. [#strongcomp_mex] BTF strongcomp MATLAB interface:
-        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/BTF/MATLAB/strongcomp.m
     """
     # TODO refactor this check to a separate function for all modules
     # Convert dense to sparse CSC
@@ -360,10 +356,10 @@ def btf(A):
         ``A[p][:, q]`` has a zero-free diagonal. If ``A`` is structurally
         singular, ``q`` will contain negative entries. The permuted matrix
         is ``A[p][:, abs(q)]``. If ``q[k] < 0``, then ``PAQ[k, k]`` is zero.
-    r : (N+1,) ndarray of int
+    r : (Nb+1,) ndarray of int
         The array of indices of the start of each block in the permuted matrix.
         Block ``b`` is in rows/columns ``r[b]`` to ``r[b+1] - 1``.
-        The number of blocks is ``r[-1]``.
+        The number of blocks is ``len(r) - 1``.
 
     Notes
     -----
@@ -380,8 +376,6 @@ def btf(A):
     ----------
     .. [#btf_h] BTF header file:
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/BTF/Include/btf.h
-    .. [#btf_mex] BTF MATLAB interface:
-        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/BTF/MATLAB/btf.m
     """
     # TODO refactor this check to a separate function for all modules
     # Convert dense to sparse CSC
@@ -512,26 +506,20 @@ def btf_q_permutation(q):
 
     Notes
     -----
-    In C, the values of ``q`` should be converted using
-    ``j = BTF_UNFLIP(Q[k])``, which is a macro for:
+    In C, the values of ``q`` are converted using ``j = BTF_UNFLIP(Q[k])``,
+    which is a macro for:
 
-    .. code-block:: C
-        j = (Q[k] < 0) ? -j - 2 : j
+    .. code:: C
 
-    In MATLAB, you can then take ``j + 1`` to get the 1-based indices (with
-    negatives for unmatched values), and then ``abs(j)`` gives a valid
-    permutation.
-    
-    We can achieve the same in Python by using:
+        j = (Q[k] < 0) ? -Q[k] - 2 : Q[k]
 
-    .. code-block:: python
-        j = np.abs(q + 1) - 1
-
-    which is what this function returns.
+    This function is a Python equivalent of that macro.
     """
     q = np.asarray(q)
 
     if q.ndim != 1:
         raise ValueError("Input must be a 1D array.")
 
-    return np.abs(q + 1) - 1
+    idx = q < 0
+    q[idx] = -q[idx] - 2  # flip negative values
+    return q
