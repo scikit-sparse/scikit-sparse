@@ -3,15 +3,15 @@
    See pyproject.toml for full author list and LICENSE.txt for license details.
    SPDX-License-Identifier: BSD-2-Clause
 
-Cholesky Decomposition (:mod:`sksparse.cholmod`)
+Cholesky Decomposition (:mod:`sksparse._cholmod_internal`)
 ================================================
 
-.. module:: sksparse.cholmod
+.. module:: sksparse._cholmod_internal
    :synopsis: Cholesky decomposition using CHOLMOD
 
 .. versionadded:: 0.1
 
-The :mod:`sksparse.cholmod` module provides efficient implementations of all
+The :mod:`sksparse._cholmod_internal` module provides efficient implementations of all
 the basic linear algebra operations for sparse, symmetric, positive-definite
 matrices (as, for instance, commonly arise in least squares problems).
 
@@ -49,7 +49,7 @@ If :math:`A` is a sparse, symmetric, positive-definite matrix, and
 :math:`b` is a matrix or vector (either sparse or dense), then the
 following code solves the equation :math:`Ax = b`::
 
-  from sksparse.cholmod import cholesky
+  from sksparse._cholmod_internal import cholesky
   factor = cholesky(A)
   x = factor(b)
 
@@ -67,7 +67,7 @@ b||^2`, and :math:`M` is a sparse matrix, the `solution
 is :math:`x = (M^{\top}M)^{-1} M^{\top}b`, which can be efficiently calculated
 as::
 
-  from sksparse.cholmod import cholesky_AAt
+  from sksparse._cholmod_internal import cholesky_AAt
   # Notice that CHOLMOD computes AA.T and we want M.T M, so we must set A = M.T!
   factor = cholesky_AAt(M.T)
   x = factor(M.T * b)
