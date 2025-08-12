@@ -12,13 +12,13 @@
 
 import numpy as np
 import pytest
-from numpy.testing import assert_array_equal
+from numpy.testing import assert_allclose, assert_array_equal
 from scipy import sparse
+from scipy.sparse import SparseEfficiencyWarning
 
-# from scipy.sparse import SparseEfficiencyWarning
 from sksparse.cholmod import cholesky
 
-# from .helpers import generate_random_matrices, is_valid_permutation
+from .helpers import generate_random_matrices, is_valid_permutation
 
 
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
@@ -26,8 +26,8 @@ def test_empty_input(itype):
     empty_A = sparse.csc_array((0, 0))
     empty_A.indptr = empty_A.indptr.astype(itype)
     empty_A.indices = empty_A.indices.astype(itype)
-    L = cholesky(empty_A)
-    assert_array_equal(L.toarray(), empty_A.toarray(), strict=True)
+    R = cholesky(empty_A)
+    assert_array_equal(R.toarray(), empty_A.toarray(), strict=True)
 
 
 def test_1D_input():
@@ -58,51 +58,73 @@ def test_zero_input(itype):
 @pytest.mark.parametrize(
     # TODO integer dtypes currently lead to a ValueError in CHOLMOD
     # "dtype", [np.int32, np.int64, np.float32, np.float64, np.complex64, np.complex128]
-    "dtype", [np.float32, np.float64, np.complex64, np.complex128]
+    "dtype",
+    [np.float32, np.float64, np.complex64, np.complex128],
 )
 def test_singleton_matrix(dtype):
     singleton_A = sparse.csc_array([[1]], dtype=dtype)
-    L = cholesky(singleton_A)
-    expect_L = singleton_A.copy()
-    assert_array_equal(L.toarray(), expect_L.toarray(), strict=True)
+    R = cholesky(singleton_A)
+    expect_R = singleton_A.copy()
+    assert_array_equal(R.toarray(), expect_R.toarray(), strict=True)
 
 
-# @pytest.mark.parametrize(
-#     "A",
-#     list(
-#         generate_random_matrices(
-#             N_trials=100, N_max=200, d_scale=0.05, square_only=True
-#         )
-#     ),
-# )
-# class TestRandomSquareMatrices:
-#     @pytest.mark.parametrize("matrix_type", ["dense", "csc", "coo"])
-#     def test_input_type(self, A, matrix_type):
-#         match matrix_type:
-#             case "dense":
-#                 A = A.toarray()
-#             case "csc":
-#                 A = A.tocsc()
-#             case "coo":
-#                 A = A.tocoo()
-#             case _:
-#                 raise ValueError(f"Unknown matrix type: {matrix_type}")
+test_As = []
+for dtype in [np.float32, np.float64, np.complex64, np.complex128]:
+    test_As.extend(
+        generate_random_matrices(
+            N_trials=100, N_max=200, d_scale=0.05, pos_def_only=True, dtype=dtype
+        )
+    )
 
-#         if matrix_type != "csc":
-#             with pytest.warns(SparseEfficiencyWarning, match="not in CSC format"):
-#                 L = cholesky(A)
-#         else:
-#             L = cholesky(A)
 
-#         assert is_valid_permutation(p)
-#         assert is_valid_permutation(btf_q_permutation(q))
+@pytest.mark.parametrize("A", test_As)
+class TestRandomSquareMatrices:
+    @pytest.mark.parametrize("matrix_type", ["dense", "csc", "coo"])
+    def test_input_type(self, A, matrix_type):
+        match matrix_type:
+            case "dense":
+                A = A.toarray()
+            case "csc":
+                A = A.tocsc()
+            case "coo":
+                A = A.tocoo()
+            case _:
+                raise ValueError(f"Unknown matrix type: {matrix_type}")
 
-#     @pytest.mark.parametrize("itype", [np.int32, np.int64])
-#     def test_itype(self, A, itype):
-#         A.indptr = A.indptr.astype(itype)
-#         A.indices = A.indices.astype(itype)
-#         L = cholesky(A)
-#         assert p.dtype == itype
-#         assert p.shape == (A.shape[0],)
-#         assert is_valid_permutation(p)
-#         assert is_valid_permutation(btf_q_permutation(q))
+        if matrix_type != "csc":
+            with pytest.warns(SparseEfficiencyWarning, match="not in CSC format"):
+                R = cholesky(A)
+        else:
+            R = cholesky(A)
+
+        assert isinstance(R, sparse.csc_array)
+        assert R.shape == A.shape
+        assert R.dtype == A.dtype
+
+    @pytest.mark.parametrize("itype", [np.int32, np.int64])
+    def test_itype(self, A, itype):
+        A.indptr = A.indptr.astype(itype)
+        A.indices = A.indices.astype(itype)
+        R = cholesky(A)
+        assert R.indptr.dtype == itype
+        assert R.indices.dtype == itype
+
+    @pytest.mark.parametrize("lower", [True, False])
+    def test_lower(self, A, lower):
+        R = cholesky(A, lower=lower)
+        if lower:
+            assert_allclose(R.toarray(), sparse.tril(R).toarray(), atol=1e-15)
+        else:
+            assert_allclose(R.toarray(), sparse.triu(R).toarray(), atol=1e-15)
+
+    @pytest.mark.parametrize("order", ["natural", "best", "metis", "nesdis", "amd"])
+    def test_ordering(self, A, order):
+        if order == "natural":
+            R = cholesky(A, order=order)
+        else:
+            R, p = cholesky(A, order=order)
+            assert is_valid_permutation(p)
+
+        assert isinstance(R, sparse.csc_array)
+        assert R.shape == A.shape
+        assert R.dtype == A.dtype
