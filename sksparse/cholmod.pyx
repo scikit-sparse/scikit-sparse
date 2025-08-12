@@ -82,7 +82,7 @@ cdef object _cholmod_sparse_from_csc(
     A.packed = True
     A.sorted = True
     A.itype = CHOLMOD_INT if use_int32 else CHOLMOD_LONG
-    A.stype = 1  # assume upper triangular for now
+    A.stype = 1  # TODO assume upper triangular for now
     A.dtype = A_py_dtype
     A.z = NULL
 
@@ -101,13 +101,13 @@ cdef object _cholmod_sparse_from_csc(
     if use_int32:
         Ap_array = Ap_mv_int32 = np.ascontiguousarray(A_py.indptr, dtype=np.int32)
         Ai_array = Ai_mv_int32 = np.ascontiguousarray(A_py.indices, dtype=np.int32)
-        A.p = <void*>&Ap_mv_int32[0]
-        A.i = <void*>&Ai_mv_int32[0]
+        A.p = &Ap_mv_int32[0]
+        A.i = &Ai_mv_int32[0]
     else:
         Ap_array = Ap_mv_int64 = np.ascontiguousarray(A_py.indptr, dtype=np.int64)
         Ai_array = Ai_mv_int64 = np.ascontiguousarray(A_py.indices, dtype=np.int64)
-        A.p = <void*>&Ap_mv_int64[0]
-        A.i = <void*>&Ai_mv_int64[0]
+        A.p = &Ap_mv_int64[0]
+        A.i = &Ai_mv_int64[0]
 
     # Get the numerical values of A
     if A_py.dtype == bool:
@@ -120,18 +120,20 @@ cdef object _cholmod_sparse_from_csc(
             else CHOLMOD_REAL
         )
 
+        # TODO what about integer matrices? upcast to float/double? MATLAB
+        # doesn't have integer sparse matrices, all are doubles.
         if A_py.dtype == np.float32:
             Ax_array = Ax_mv_float32 = np.ascontiguousarray(A_py.data, dtype=np.float32)
-            A.x = <void*>&Ax_mv_float32[0]
+            A.x = &Ax_mv_float32[0]
         elif A_py.dtype == np.float64:
             Ax_array = Ax_mv_float64 = np.ascontiguousarray(A_py.data, dtype=np.float64)
-            A.x = <void*>&Ax_mv_float64[0]
+            A.x = &Ax_mv_float64[0]
         elif A_py.dtype == np.complex64:
             Ax_array = Ax_mv_complex64 = np.ascontiguousarray(A_py.data, dtype=np.complex64)
-            A.x = <void*>&Ax_mv_complex64[0]
+            A.x = &Ax_mv_complex64[0]
         elif A_py.dtype == np.complex128:
             Ax_array = Ax_mv_complex128 = np.ascontiguousarray(A_py.data, dtype=np.complex128)
-            A.x = <void*>&Ax_mv_complex128[0]
+            A.x = &Ax_mv_complex128[0]
         else:
             raise ValueError(f"Unsupported data type for CHOLMOD: {A_py.dtype}")
 
