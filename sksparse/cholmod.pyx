@@ -34,10 +34,122 @@ import numpy as np
 cimport numpy as np
 
 from scipy.sparse import csc_array
+import warnings
 
 from .utils import validate_csc_input
 
 
+# -----------------------------------------------------------------------------
+#         Define error handling
+# -----------------------------------------------------------------------------
+class CholmodError(Exception):
+    pass
+
+
+class CholmodNotPositiveDefiniteError(CholmodError):
+    pass
+
+
+class CholmodNotInstalledError(CholmodError):
+    pass
+
+
+class CholmodOutOfMemoryError(CholmodError):
+    pass
+
+
+class CholmodOverflowError(CholmodError):
+    pass
+
+
+class CholmodInvalidInputError(CholmodError):
+    pass
+
+
+class CholmodGpuProblemError(CholmodError):
+    pass
+
+
+class CholmodWarning(Warning):
+    pass
+
+
+class CholmodSmallDiagonalWarning(CholmodWarning):
+    pass
+
+
+cdef _error_handler(int status) except * with gil:
+    """Handle CHOLMOD errors by raising Python exceptions or warnings.
+
+    This function should be set as the error handler in the CHOLMOD common
+    struct before passing to any CHOLMOD function.
+
+    Parameters
+    ----------
+    status : int
+        The CHOLMOD status code, from the cholmod_common.status field.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    CholmodWarning
+        Raises a warning for non-critical issues.
+    CholmodError or subclass
+        Raises an appropriate Python exception based on the CHOLMOD status code.
+    """
+    if status == CHOLMOD_OK:
+        return
+
+    status_msg = f"(code {status:d})"
+
+    # Known Errors
+    cdef dict error_map = {
+        CHOLMOD_NOT_INSTALLED: (
+            CholmodNotInstalledError,
+            "CHOLMOD library is not installed or not found."
+        ),
+        CHOLMOD_OUT_OF_MEMORY: (
+            CholmodOutOfMemoryError,
+            "CHOLMOD ran out of memory."
+        ),
+        CHOLMOD_TOO_LARGE: (
+            CholmodOverflowError,
+            "CHOLMOD encountered an integer overflow."
+        ),
+        CHOLMOD_INVALID: (
+            CholmodInvalidInputError,
+            "CHOLMOD received invalid input."
+        ),
+        CHOLMOD_GPU_PROBLEM: (
+            CholmodGpuProblemError,
+            "CHOLMOD encountered a problem with CUDA."
+        ),
+        CHOLMOD_NOT_POSDEF: (
+            CholmodNotPositiveDefiniteError,
+            "Input matrix is not positive definite."
+        ),
+        CHOLMOD_DSMALL: (
+            CholmodSmallDiagonalWarning,
+            "A diagonal entry is very small, which may lead to numerical instability."
+        ),
+    }
+
+    # Fallback to generic error for unknown codes
+    exc_class, msg = error_map.get(status, CholmodError)
+    full_msg = msg + " " + status_msg
+
+    if issubclass(exc_class, Warning):
+        warnings.warn(full_msg, exc_class)
+    else:
+        raise exc_class(full_msg)
+
+
+# -----------------------------------------------------------------------------
+#         Data Conversions
+# -----------------------------------------------------------------------------
 cdef object _cholmod_sparse_from_csc(
     object A_py,
     bint use_int32,
@@ -312,6 +424,18 @@ def cholesky(A, order=None, lower=False, remove_zeros=True):
     p : ndarray, optional
         The permutation vector used in the factorization. This is only returned
         if the ordering is not ``None``.
+
+    Raises
+    ------
+    ValueError
+        If the input matrix is not square, or if an unknown ordering method is
+        specified.
+    CholmodError
+        If the factorization fails for any reason, such as the input matrix not
+        being positive definite.
+    CholmodWarning
+        If the input matrix is not positive definite, but the factorization
+        succeeds anyway (*e.g.*, due to a small diagonal entry).
     """
     A, use_int32, out_itype = validate_csc_input(A, require_square=True)
 
@@ -336,7 +460,7 @@ def cholesky(A, order=None, lower=False, remove_zeros=True):
     # R = chol2(sparse(N, N)) -> error not pos def
     # [R, p, q] = chol2(sparse(N, N)) -> R: (0, 10) nnz = 0, p: 1, q: [1:N]
     if A.nnz == 0:
-        raise ValueError("Input matrix not positive definite.")
+        raise CholmodNotPositiveDefiniteError("Input matrix is not positive definite.")
 
     # -------------------------------------------------------------------------
     #         Set up Data Structures
@@ -392,9 +516,8 @@ def cholesky(A, order=None, lower=False, remove_zeros=True):
         Lc = cholmod_l_analyze(Ac, &cm)
         cholmod_l_factorize(Ac, Lc, &cm)
 
-    if cm.status != CHOLMOD_OK:
-        # TODO raise appropriate exceptions
-        raise ValueError(f"Failed with code: {cm.status}")
+    # Check for errors
+    _error_handler(cm.status)
 
     # -------------------------------------------------------------------------
     #         Convert to scipy csc_array
