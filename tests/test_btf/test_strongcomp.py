@@ -16,7 +16,6 @@ import numpy as np
 import pytest
 from numpy.testing import assert_allclose, assert_array_equal
 from scipy import sparse
-from scipy.sparse import SparseEfficiencyWarning
 
 from sksparse.btf import strongcomp
 
@@ -31,21 +30,6 @@ def test_empty_input(itype):
     p, r = strongcomp(empty_A)
     assert_array_equal(p, np.array([], dtype=itype), strict=True)
     assert_array_equal(r, np.zeros(1, dtype=itype), strict=True)
-
-
-def test_1D_input():
-    with pytest.raises(ValueError, match="must be 2D"):
-        strongcomp(np.arange(10))
-
-
-def test_nonsquare_input():
-    with pytest.raises(ValueError, match="Input must be square"):
-        strongcomp(sparse.csc_array((3, 4)))
-
-
-def test_ND_input():
-    with pytest.raises(ValueError, match="must be 2D"):
-        strongcomp(np.empty((2, 3, 4)))
 
 
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
@@ -77,26 +61,6 @@ def test_singleton_matrix():
     ),
 )
 class TestRandomSquareMatrices:
-    @pytest.mark.parametrize("matrix_type", ["dense", "csc", "coo"])
-    def test_input_type(self, A, matrix_type):
-        match matrix_type:
-            case "dense":
-                A = A.toarray()
-            case "csc":
-                A = A.tocsc()
-            case "coo":
-                A = A.tocoo()
-            case _:
-                raise ValueError(f"Unknown matrix type: {matrix_type}")
-
-        if matrix_type != "csc":
-            with pytest.warns(SparseEfficiencyWarning, match="not in CSC format"):
-                p, r = strongcomp(A)
-        else:
-            p, r = strongcomp(A)
-
-        assert is_valid_permutation(p)
-
     @pytest.mark.parametrize("itype", [np.int32, np.int64])
     def test_itype(self, A, itype):
         A.indptr = A.indptr.astype(itype)

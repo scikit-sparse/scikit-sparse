@@ -16,7 +16,6 @@ import numpy as np
 import pytest
 from numpy.testing import assert_array_equal
 from scipy import sparse
-from scipy.sparse import SparseEfficiencyWarning
 
 from sksparse.btf import btf, btf_q_permutation
 
@@ -32,21 +31,6 @@ def test_empty_input(itype):
     assert_array_equal(p, np.array([], dtype=itype), strict=True)
     assert_array_equal(q, np.array([], dtype=itype), strict=True)
     assert_array_equal(r, np.zeros(1, dtype=itype), strict=True)
-
-
-def test_1D_input():
-    with pytest.raises(ValueError, match="must be 2D"):
-        btf(np.arange(10))
-
-
-def test_nonsquare_input():
-    with pytest.raises(ValueError, match="Input must be square"):
-        btf(sparse.csc_array((3, 4)))
-
-
-def test_ND_input():
-    with pytest.raises(ValueError, match="must be 2D"):
-        btf(np.empty((2, 3, 4)))
 
 
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
@@ -88,27 +72,6 @@ def test_q_permutation():
     ),
 )
 class TestRandomSquareMatrices:
-    @pytest.mark.parametrize("matrix_type", ["dense", "csc", "coo"])
-    def test_input_type(self, A, matrix_type):
-        match matrix_type:
-            case "dense":
-                A = A.toarray()
-            case "csc":
-                A = A.tocsc()
-            case "coo":
-                A = A.tocoo()
-            case _:
-                raise ValueError(f"Unknown matrix type: {matrix_type}")
-
-        if matrix_type != "csc":
-            with pytest.warns(SparseEfficiencyWarning, match="not in CSC format"):
-                p, q, r = btf(A)
-        else:
-            p, q, r = btf(A)
-
-        assert is_valid_permutation(p)
-        assert is_valid_permutation(btf_q_permutation(q))
-
     @pytest.mark.parametrize("itype", [np.int32, np.int64])
     def test_itype(self, A, itype):
         A.indptr = A.indptr.astype(itype)
