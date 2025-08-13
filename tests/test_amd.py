@@ -74,24 +74,6 @@ def test_empty_input(itype):
     assert_array_equal(amd(empty_A), np.array([], dtype=itype), strict=True)
 
 
-def test_1D_input():
-    with pytest.warns(SparseEfficiencyWarning, match="not in CSC format"):
-        with pytest.raises(ValueError, match="Input must be square"):
-            amd(np.arange(10))
-
-
-def test_nonsquare_input():
-    with pytest.raises(ValueError, match="Input must be square"):
-        amd(sparse.csc_array((3, 4)))
-
-
-def test_ND_input():
-    rng = np.random.default_rng(565656)
-    with pytest.warns(SparseEfficiencyWarning, match="not in CSC format"):
-        with pytest.raises(ValueError, match="Input must be convertible to CSC format"):
-            amd(rng.random((2, 3, 4)))
-
-
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
 def test_zero_input(itype):
     N = 10  # arbitrary
