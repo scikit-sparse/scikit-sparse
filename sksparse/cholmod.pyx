@@ -413,15 +413,17 @@ def cholesky(A, order=None, lower=False, remove_zeros=True):
         :math:`A = L L^{\\top}`. Default is False, returning the upper
         triangular factor `R`.
     remove_zeros : bool, optional
-        If False, do not remove explicit zeros from the factor `L` or `R`. This
-        flag allows use of the ``chol_update`` function afterwards. Default is
-        True.
+        If False, do not remove explicit zeros from the factor ``L`` or ``R``.
+        This flag allows use of the ``chol_update`` function afterwards.
+        Default is True, so that the output is in canonical form.
 
     Returns
     -------
     R : csc_array
-        The triangular factor of the Cholesky decomposition.
-    p : ndarray, optional
+        The triangular factor of the Cholesky decomposition. The data type will
+        match that of ``A``, except in the case of integer matrices, where it
+        will be upcast to float.
+    p : ndarray of int, optional
         The permutation vector used in the factorization. This is only returned
         if the ordering is not ``None``.
 
@@ -436,6 +438,17 @@ def cholesky(A, order=None, lower=False, remove_zeros=True):
     CholmodWarning
         If the input matrix is not positive definite, but the factorization
         succeeds anyway (*e.g.*, due to a small diagonal entry).
+
+    Notes
+    -----
+    This function is an interface to the CHOLMOD library, which is part of
+    the SuiteSparse collection by Timothy A. Davis. For more details, see the
+    documentation in the header file [#cholmod_h]_.
+
+    References
+    ----------
+    .. [#cholmod_h] ``cholmod.h`` - SuiteSparse CHOLMOD header file.
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/Include/cholmod.h
     """
     A, use_int32, out_itype = validate_csc_input(A, require_square=True)
 
