@@ -19,8 +19,6 @@ from sksparse.cholmod import CholmodNotPositiveDefiniteError, cholesky
 
 from .helpers import generate_random_matrices, is_valid_permutation
 
-# TODO integer dtypes currently lead to a ValueError
-# DTYPES + [np.int32, np.int64, np.float32, np.float64, np.complex64, np.complex128]
 DTYPES = [np.float32, np.float64, np.complex64, np.complex128]
 
 
@@ -72,19 +70,15 @@ def test_not_positive_definite(dtype):
         cholesky(A)
 
 
-test_As = []
-
-# for dtype in DTYPES:
-for dtype in [np.float32, np.float64]:
-    test_As.extend(
-        generate_random_matrices(
-            N_trials=10, N_max=200, d_scale=0.05, pos_def_only=True, dtype=dtype
-        )
+test_As = [
+    A
+    for dtype in DTYPES
+    for A in generate_random_matrices(
+        N_trials=10, N_max=200, d_scale=0.05, pos_def_only=True, dtype=dtype
     )
+]
 
 
-# FIXME
-# This test fails for some matrices with complex64, and complex128 dtypes.
 @pytest.mark.parametrize("A", test_As)
 @pytest.mark.parametrize(
     "order",
@@ -103,17 +97,15 @@ for dtype in [np.float32, np.float64]:
 def test_ordering(A, order):
     atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
     if order is None:
-        R = cholesky(A, order=order, lower=True).T
-        assert_allclose((R.T.conj() @ R).toarray(), A.toarray(), atol=atol)
+        L = cholesky(A, order=order, lower=True)
+        assert_allclose((L @ L.T.conj()).toarray(), A.toarray(), atol=atol)
     else:
-        R, p = cholesky(A, order=order, lower=True)
-        R = R.T
+        L, p = cholesky(A, order=order, lower=True)
         assert is_valid_permutation(p)
         PAPT = A[p][:, p]
-        assert_allclose((R.T.conj() @ R).toarray(), PAPT.toarray(), atol=atol)
+        assert_allclose((L @ L.T.conj()).toarray(), PAPT.toarray(), atol=atol)
 
 
-# FIXME fails see cholmod.pyx for details
 @pytest.mark.parametrize("A", test_As)
 def test_lower(A):
     atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
