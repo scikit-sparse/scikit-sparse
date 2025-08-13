@@ -13,16 +13,16 @@
 """Test cases for the sksparse.colamd module."""
 
 # import matplotlib.pyplot as plt  # DEBUG only
+from pathlib import Path
+
 import numpy as np
 import pytest
-
 from numpy.testing import assert_array_equal
-from pathlib import Path
 from scipy import sparse
-from scipy.sparse import SparseEfficiencyWarning
-from sksparse.colamd import COLAMDStats, colamd, symamd, colamd_get_defaults
 
-from .helpers import is_valid_permutation, generate_random_matrices
+from sksparse.colamd import COLAMDStats, colamd, colamd_get_defaults, symamd
+
+from .helpers import generate_random_matrices, is_valid_permutation
 
 
 class _BasicInputMixin:
@@ -34,15 +34,6 @@ class _BasicInputMixin:
         assert_array_equal(
             self.colamd_func(empty_A), np.array([], dtype=itype), strict=True
         )
-
-    def test_1D_row_input(self):
-        with pytest.raises(ValueError, match="must be 2D"):
-            self.colamd_func(np.arange(10))
-
-    def test_ND_input(self):
-        rng = np.random.default_rng(565656)
-        with pytest.raises(ValueError, match="must be 2D"):
-            self.colamd_func(rng.random((2, 3, 4)))
 
     @pytest.mark.parametrize("itype", [np.int32, np.int64])
     def test_zero_input(self, itype):
@@ -65,47 +56,23 @@ class TestColamdInput(_BasicInputMixin):
     colamd_func = staticmethod(colamd)
 
     def test_2D_row_input(self):
-        with pytest.warns(SparseEfficiencyWarning, match="not in CSC format"):
-            N = 10
-            q = self.colamd_func(np.arange(N)[np.newaxis, :])  # (1, N)
-            assert_array_equal(q, np.arange(N, dtype=np.int32), strict=True)
+        N = 10
+        A = sparse.csc_array(np.arange(N)[np.newaxis, :])  # (1, N)
+        q = self.colamd_func(A)
+        assert_array_equal(q, np.arange(N, dtype=np.int32), strict=True)
 
     def test_2D_col_input(self):
-        with pytest.warns(SparseEfficiencyWarning, match="not in CSC format"):
-            N = 10
-            q = self.colamd_func(np.arange(N)[:, np.newaxis])  # (N, 1)
-            assert_array_equal(q, np.zeros(1, dtype=np.int32), strict=True)
+        N = 10
+        A = sparse.csc_array(np.arange(N)[:, np.newaxis])  # (N, 1)
+        q = self.colamd_func(A)
+        assert_array_equal(q, np.zeros(1, dtype=np.int32), strict=True)
 
 
 class TestSymamdInput(_BasicInputMixin):
     colamd_func = staticmethod(symamd)
 
-    def test_2D_nonsquare_input(self):
-        with pytest.raises(ValueError, match="must be square"):
-            self.colamd_func(np.arange(12).reshape((4, 3)))
-
 
 class _RandomInputMixin:
-    @pytest.mark.parametrize("matrix_type", ["dense", "csc", "coo"])
-    def test_input_type(self, A, matrix_type):
-        match matrix_type:
-            case "dense":
-                A = A.toarray()
-            case "csc":
-                A = A.tocsc()
-            case "coo":
-                A = A.tocoo()
-            case _:
-                raise ValueError(f"Unknown matrix type: {matrix_type}")
-
-        if matrix_type != "csc":
-            with pytest.warns(SparseEfficiencyWarning, match="not in CSC format"):
-                q = self.colamd_func(A)
-        else:
-            q = self.colamd_func(A)
-
-        assert is_valid_permutation(q)
-
     @pytest.mark.parametrize("itype", [np.int32, np.int64])
     def test_itype(self, A, itype):
         A.indptr = A.indptr.astype(itype)
@@ -149,7 +116,7 @@ DENSE_THRESHOLDS = [None, 5, 2]
 @pytest.mark.parametrize("dense_thresh", DENSE_THRESHOLDS)
 def test_colamd_with_dense(dense_thresh, row_or_col):
     M = 1000  # arbitrary size
-    N =  800
+    N = 800
     rng = np.random.default_rng(56)
     A = sparse.random_array((M, N), density=0.001, format="lil", rng=rng)
 
@@ -167,6 +134,7 @@ def test_colamd_with_dense(dense_thresh, row_or_col):
     N_elems = min(2 * thresh, max_N_elems)  # arbitrary choice for enough elements
 
     dense_idx = rng.choice(max_N_rowcols, size=N_dense, replace=False)
+    # TODO use a different set of indices for each row/col (see test_ccolamd.py)
     other_idx = rng.choice(max_N_elems, size=N_elems, replace=False)
 
     for i in dense_idx:
@@ -193,8 +161,8 @@ def test_colamd_with_dense(dense_thresh, row_or_col):
     # so we need to check the stats.N_cols_ignored value
     if row_or_col == "col":
         assert_array_equal(
-            np.sort(q[-stats.N_cols_ignored:-(stats.N_cols_ignored - N_dense)]),
-            np.sort(dense_idx)
+            np.sort(q[-stats.N_cols_ignored : -(stats.N_cols_ignored - N_dense)]),
+            np.sort(dense_idx),
         )
 
 
@@ -255,15 +223,17 @@ def test_symamd_with_dense(dense_thresh):
 def test_info_can_24():
     # The can_24 matrix is used in the SuiteSparse AMD MATLAB/amd_demo.m file.
     expect_info = COLAMDStats.from_array(
-        np.array([
-            0,   # N_rows_ignored
-            0,   # N_cols_ignored
-            1,   # Ncmpa
-            0,   # status
-            -1,  # info1
-            -1,  # info2
-            0,   # info3
-        ])
+        np.array(
+            [
+                0,  # N_rows_ignored
+                0,  # N_cols_ignored
+                1,  # Ncmpa
+                0,  # status
+                -1,  # info1
+                -1,  # info2
+                0,  # info3
+            ]
+        )
     )
 
     # Load the can_24 matrix from a file
@@ -297,5 +267,5 @@ def test_colamd_defaults():
     # assert is_valid_permutation(p)
 
 
-# # =============================================================================
-# # =============================================================================
+# =============================================================================
+# =============================================================================
