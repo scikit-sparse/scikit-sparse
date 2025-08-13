@@ -59,7 +59,7 @@ def validate_csc_input(A, require_square=False):
     try:
         if not isinstance(A, csc_array):
             warnings.warn(
-                "Input matrix is not in CSC format. Converting to CSC.",
+                f"Input matrix ({type(A)}) not in CSC array format. Converting to CSC.",
                 SparseEfficiencyWarning,
                 stacklevel=3,
             )
