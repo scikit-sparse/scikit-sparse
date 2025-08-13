@@ -36,8 +36,9 @@ cdef extern from "cholmod.h":
     int CHOLMOD_DOUBLE
 
     # Ordering methods
+    int CHOLMOD_MAXMETHODS
     int CHOLMOD_NATURAL
-    int CHOLMOD_GIVEN
+    # int CHOLMOD_GIVEN
     int CHOLMOD_AMD
     int CHOLMOD_METIS
     int CHOLMOD_NESDIS

@@ -248,6 +248,18 @@ cdef np.ndarray _array_from_cholmod_permutation(
     return p.copy()
 
 
+cdef dict _ordering_methods = {
+    "default": None,
+    "best": None,
+    "natural": CHOLMOD_NATURAL,
+    "amd": CHOLMOD_AMD,
+    "metis": CHOLMOD_METIS,
+    "nesdis": CHOLMOD_NESDIS,
+    "colamd": CHOLMOD_COLAMD,
+    "postordered": CHOLMOD_POSTORDERED,
+}
+
+
 def cholesky(A, order=None, lower=False, remove_zeros=True):
     """Compute the Cholesky factorization of a sparse matrix.
 
@@ -265,15 +277,25 @@ def cholesky(A, order=None, lower=False, remove_zeros=True):
     A : (N, N) {array_like, sparse array}
         An array convertible to a sparse matrix in Compressed Sparse Column
         (CSC) format. Must be symmetric positive definite.
-    order : {None, "best", "natural", "metis", "nesdis", "amd"}, optional
+    order : {None, "default", "best", "natural", "metis", "nesdis", "amd", "colamd", "postordered"}, optional
         The permutation algorithm to use for the factorization. By default, the
         natural ordering of the input matrix is used. The other options are:
-        * `"best"`: Automatically select the best ordering based on the input.
-        * `"metis"`: Use the METIS library for graph partitioning.
-        * `"nesdis"`: Use the NESDIS library for nested dissection.
-        * `"amd"`: Use the Approximate Minimum Degree (AMD) algorithm for the
+        * ``"default"``: Use the default method, which first tries AMD, then METIS.
+        * ``"best"``: Automatically select the best ordering based on the input.
+        * ``"metis"``: Use the METIS library for graph partitioning.
+        * ``"nesdis"``: Use the NESDIS library for nested dissection.
+        * ``"amd"``: Use the Approximate Minimum Degree (AMD) algorithm.
+        * ``"colamd"``: Use the Approximate Minimum Degree (AMD) algorithm for the
           symmetric case, or the COLAMD algorithm for the unsymmetric case
           (:math:`A A^{\\top}` or :math:`A^{\\top} A`).
+        * ``"postordered"``: Use natural ordering followed by postordering.
+        By default, methods other than ``"natural"`` will also be postordered.
+
+        .. warning::
+
+            The ordering method `"best"` may be quite slow for large matrices,
+            but if the factorization is reused many times, it can be worth it.
+
     lower : bool, optional
         If True, return the lower triangular factor `L` such that
         :math:`A = L L^{\\top}`. Default is False, returning the upper
@@ -296,7 +318,7 @@ def cholesky(A, order=None, lower=False, remove_zeros=True):
     N = A.shape[0]
 
     # Check the input ordering method
-    if order not in {None, "best", "natural", "metis", "nesdis", "amd"}:
+    if order is not None and order not in _ordering_methods:
         raise ValueError(f"Unknown ordering method: {order}")
 
     # Empty matrix
@@ -339,11 +361,17 @@ def cholesky(A, order=None, lower=False, remove_zeros=True):
 
     cm.quick_return_if_not_posdef = True
 
-    # TODO support other ordering methods
-    if order is None or order == "natural":
+    if order == "default":
+        cm.nmethods = 0
+    elif order == "best":
+        cm.nmethods = CHOLMOD_MAXMETHODS
+    else:
+        # CHOLMOD_POSTORDERED is not an input, but an output flag. We treat it
+        # as "natural" + postordering, per cholmod.h description.
+        ordering = "natural" if order is None or order == "postordered" else order
         cm.nmethods = 1
-        cm.method[0].ordering = CHOLMOD_NATURAL
-        cm.postorder = False
+        cm.method[0].ordering = _ordering_methods[ordering]
+        cm.postorder = (order == "postordered" or ordering != "natural")
 
     # Get the input matrix into CHOLMOD format
     cdef cholmod_sparse Amatrix
