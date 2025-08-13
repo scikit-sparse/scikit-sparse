@@ -39,6 +39,12 @@ import warnings
 from .utils import validate_csc_input
 
 
+# Define constants for the mode of cholmod_transpose (see cholmod.h)
+cdef int CHOLMOD_TRANS_PATTERN = 0    # transpose only the pattern
+cdef int CHOLMOD_TRANS_NOCONJ = 1  # numeric (no conjugate)
+cdef int CHOLMOD_TRANS_CONJ = 2  # numeric (conjugate transpose)
+
+
 # -----------------------------------------------------------------------------
 #         Define error handling
 # -----------------------------------------------------------------------------
@@ -552,6 +558,7 @@ def cholesky(A, order=None, lower=False, remove_zeros=True):
         else:
             cholmod_l_drop(0, Lsparse, &cm)
 
+<<<<<<< HEAD
     if lower:
         Rc = Lsparse
     else:
@@ -562,10 +569,6 @@ def cholesky(A, order=None, lower=False, remove_zeros=True):
         else:
             Rc = cholmod_l_transpose(Lsparse, CHOLMOD_TRANS_CONJUGATE, &cm)
             cholmod_l_free_sparse(&Lsparse, &cm)
-
-    # NOTE HACK
-    if Rc.xtype == CHOLMOD_PATTERN and A.dtype != np.bool_:
-        Rc.xtype = CHOLMOD_REAL if A.dtype in (np.float32, np.float64) else CHOLMOD_COMPLEX
 
     # -------------------------------------------------------------------------
     #         Create outputs

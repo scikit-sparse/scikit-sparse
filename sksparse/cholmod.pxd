@@ -14,11 +14,6 @@ from libc.stdint cimport int32_t, int64_t
 from libc.string cimport memset
 from numpy cimport float32_t, float64_t, complex64_t, complex128_t
 
-# Define constants for the mode of cholmod_transpose (see cholmod.h)
-cdef int CHOLMOD_TRANS_PATTERN = 0
-cdef int CHOLMOD_TRANS_TRANSPOSE = 1
-cdef int CHOLMOD_TRANS_CONJUGATE = 2
-
 
 cdef extern from "cholmod.h":
     # xtypes
