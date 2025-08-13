@@ -30,4 +30,11 @@ except PackageNotFoundError:
     # package is not installed, so we set a default version
     __version__ = "0.0.0.dev0"
 
-__all__ = ["cholmod"]
+from . import amd
+from . import btf
+from . import camd
+from . import ccolamd
+from . import cholmod
+from . import colamd
+
+__all__ = ["amd", "btf", "camd", "ccolamd", "cholmod", "colamd"]

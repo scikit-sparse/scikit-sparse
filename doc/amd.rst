@@ -86,7 +86,7 @@ Cholesky factorization of the original matrix, without computing it directly:
 .. code:: python
 
     from sksparse.amd import amd
-    from sksparse.cholmod import amd
+    from sksparse.cholmod import cholesky
     A = ...  # some sparse matrix
     N = A.shape[0]
     p, info = amd(A, return_info=True)
