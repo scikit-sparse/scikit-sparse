@@ -158,6 +158,7 @@ cdef _error_handler(int status) except * with gil:
 # -----------------------------------------------------------------------------
 cdef object _cholmod_sparse_from_csc(
     object A_py,
+    int stype,
     bint use_int32,
     cholmod_sparse *A_static,
     cholmod_common *cm
@@ -168,6 +169,11 @@ cdef object _cholmod_sparse_from_csc(
     ----------
     A_py : (N, N) csc_array
         The input sparse matrix in Compressed Sparse Column (CSC) format.
+    stype : int
+        The assumed symmetry type of ``A_py``:
+        * -1: lower triangular, 
+        *  0: unsymmetric (not used here),
+        *  1: upper triangular.
     use_int32 : bool
         Whether to use 32-bit or 64-bit integers for indices and indptr.
     A_static : cholmod_sparse*
@@ -178,17 +184,26 @@ cdef object _cholmod_sparse_from_csc(
 
     Returns
     -------
-    result : (M, N) ndarray
-        Matrix of M vectors in N dimensions
+    res : tuple
+        A tuple containing a reference to ``A_py`` and the three arrays that
+        make it up: ``A.indptr``, ``A.indices``, and ``A.data``. There is no
+        use for the output of this function, except to keep the underlying data
+        from being garbage collected until the cholmod_sparse object is freed.
     """
     if not isinstance(A_py, csc_array):
         raise ValueError("Input must be a csc_array.")
 
-    A_py_dtype = (
-        CHOLMOD_SINGLE
-        if A_py.dtype == np.float32 or A_py.dtype == np.complex64
-        else CHOLMOD_DOUBLE
+    cdef supported_dtypes = (
+        np.float32, 
+        np.float64, 
+        np.complex64, 
+        np.complex128
     )
+
+    dtype = A_py.dtype
+
+    if dtype not in supported_dtypes:
+        raise ValueError(f"Unsupported data type for CHOLMOD: {dtype}")
 
     # Initialize the CHOLMOD sparse matrix
     cdef cholmod_sparse* A = A_static
@@ -200,8 +215,12 @@ cdef object _cholmod_sparse_from_csc(
     A.packed = True
     A.sorted = True
     A.itype = CHOLMOD_INT if use_int32 else CHOLMOD_LONG
-    A.stype = 1  # TODO assume upper triangular for now
-    A.dtype = A_py_dtype
+    A.stype = -1 if stype < 0 else (0 if stype == 0 else 1)
+    A.dtype = (
+        CHOLMOD_SINGLE
+        if dtype == np.float32 or dtype == np.complex64
+        else CHOLMOD_DOUBLE
+    )
     A.z = NULL
 
     # Declare memoryviews for the index and data arrays
@@ -214,48 +233,51 @@ cdef object _cholmod_sparse_from_csc(
     cdef complex128_t[::1] Ax_mv_complex128
 
     # Declare array references to keep memory alive
-    cdef np.ndarray Ap_array, Ai_array, Ax_array
+    cdef np.ndarray Ap, Ai, Ax
+
+    # Create the index arrays
+    itype = np.int32 if use_int32 else np.int64
+    Ap = np.ascontiguousarray(A_py.indptr, dtype=itype)
+    Ai = np.ascontiguousarray(A_py.indices, dtype=itype)
 
     if use_int32:
-        Ap_array = Ap_mv_int32 = np.ascontiguousarray(A_py.indptr, dtype=np.int32)
-        Ai_array = Ai_mv_int32 = np.ascontiguousarray(A_py.indices, dtype=np.int32)
+        Ap_mv_int32 = Ap
+        Ai_mv_int32 = Ai
         A.p = &Ap_mv_int32[0]
         A.i = &Ai_mv_int32[0]
     else:
-        Ap_array = Ap_mv_int64 = np.ascontiguousarray(A_py.indptr, dtype=np.int64)
-        Ai_array = Ai_mv_int64 = np.ascontiguousarray(A_py.indices, dtype=np.int64)
+        Ap_mv_int64 = Ap
+        Ai_mv_int64 = Ai
         A.p = &Ap_mv_int64[0]
         A.i = &Ai_mv_int64[0]
 
     # Get the numerical values of A
-    if A_py.dtype == bool:
+    if dtype == bool:
         A.xtype = CHOLMOD_PATTERN
         A.x = NULL
     else:
         A.xtype = (
             CHOLMOD_COMPLEX
-            if np.issubdtype(A_py.dtype, np.complexfloating)
+            if np.issubdtype(dtype, np.complexfloating)
             else CHOLMOD_REAL
         )
 
-        # TODO what about integer matrices? upcast to float/double? MATLAB
-        # doesn't have integer sparse matrices, all are doubles.
-        if A_py.dtype == np.float32:
-            Ax_array = Ax_mv_float32 = np.ascontiguousarray(A_py.data, dtype=np.float32)
-            A.x = &Ax_mv_float32[0]
-        elif A_py.dtype == np.float64:
-            Ax_array = Ax_mv_float64 = np.ascontiguousarray(A_py.data, dtype=np.float64)
-            A.x = &Ax_mv_float64[0]
-        elif A_py.dtype == np.complex64:
-            Ax_array = Ax_mv_complex64 = np.ascontiguousarray(A_py.data, dtype=np.complex64)
-            A.x = &Ax_mv_complex64[0]
-        elif A_py.dtype == np.complex128:
-            Ax_array = Ax_mv_complex128 = np.ascontiguousarray(A_py.data, dtype=np.complex128)
-            A.x = &Ax_mv_complex128[0]
-        else:
-            raise ValueError(f"Unsupported data type for CHOLMOD: {A_py.dtype}")
+        Ax = np.ascontiguousarray(A_py.data, dtype=dtype)
 
-    return (A_py, Ap_array, Ai_array, Ax_array)
+        if dtype == np.float32:
+            Ax_mv_float32 = Ax
+            A.x = &Ax_mv_float32[0]
+        elif dtype == np.float64:
+            Ax_mv_float64 = Ax
+            A.x = &Ax_mv_float64[0]
+        elif dtype == np.complex64:
+            Ax_mv_complex64 = Ax
+            A.x = &Ax_mv_complex64[0]
+        elif dtype == np.complex128:
+            Ax_mv_complex128 = Ax
+            A.x = &Ax_mv_complex128[0]
+
+    return (A_py, Ap, Ai, Ax)
 
 
 cdef class _CholmodSparseDestructor:
@@ -520,8 +542,9 @@ def cholesky(A, order=None, lower=False, remove_zeros=True):
     cdef cholmod_sparse Amatrix
     cdef cholmod_sparse *Ac = &Amatrix
 
+    stype = -1 if lower else 1  # use lower or upper triangular part
     # Keep a reference to the input matrix to keep it alive
-    cdef object ref = _cholmod_sparse_from_csc(A, use_int32, &Amatrix, &cm)
+    cdef object ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix, &cm)
 
     # -------------------------------------------------------------------------
     #         Analyze and Factorize
