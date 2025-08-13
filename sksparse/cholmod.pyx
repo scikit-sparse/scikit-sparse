@@ -33,9 +33,9 @@ References
 import numpy as np
 cimport numpy as np
 
-import warnings
+from scipy.sparse import csc_array
 
-from scipy.sparse import csc_array, issparse, SparseEfficiencyWarning
+from .utils import validate_csc_input
 
 
 cdef object _cholmod_sparse_from_csc(
@@ -248,7 +248,7 @@ cdef np.ndarray _array_from_cholmod_permutation(
     return p.copy()
 
 
-def cholesky(A, order="natural", lower=False, remove_zeros=True):
+def cholesky(A, order=None, lower=False, remove_zeros=True):
     """Compute the Cholesky factorization of a sparse matrix.
 
     This function computes the Cholesky factorization of a symmetric positive
@@ -265,7 +265,7 @@ def cholesky(A, order="natural", lower=False, remove_zeros=True):
     A : (N, N) {array_like, sparse array}
         An array convertible to a sparse matrix in Compressed Sparse Column
         (CSC) format. Must be symmetric positive definite.
-    order : {"best", "natural", "metis", "nesdis", "amd"}, optional
+    order : {None, "best", "natural", "metis", "nesdis", "amd"}, optional
         The permutation algorithm to use for the factorization. By default, the
         natural ordering of the input matrix is used. The other options are:
         * `"best"`: Automatically select the best ordering based on the input.
@@ -285,51 +285,30 @@ def cholesky(A, order="natural", lower=False, remove_zeros=True):
 
     Returns
     -------
-    L : csc_array
-        The lower triangular factor of the Cholesky decomposition.
+    R : csc_array
+        The triangular factor of the Cholesky decomposition.
     p : ndarray, optional
         The permutation vector used in the factorization. This is only returned
-        if the ordering is not "natural".
+        if the ordering is not ``None``.
     """
-    # TODO refactor this check to a separate function for all modules
-    if not issparse(A):
-        A = np.asarray(A)
+    A, use_int32, out_itype = validate_csc_input(A, require_square=True)
 
-    if A.ndim != 2:
-        raise ValueError("Input must be 2D.")
-
-    M, N = A.shape
-
-    if M != N:
-        raise ValueError("Input must be square.")
-
-    try:
-        if not isinstance(A, csc_array):
-            warnings.warn(
-                "Input matrix is not in CSC format. Converting to CSC.",
-                SparseEfficiencyWarning,
-                stacklevel=2
-            )
-            A = csc_array(A)
-    except ValueError:
-        raise ValueError("Input must be convertible to CSC format.")
+    N = A.shape[0]
 
     # Check the input ordering method
-    if order not in {"best", "natural", "metis", "nesdis", "amd"}:
+    if order not in {None, "best", "natural", "metis", "nesdis", "amd"}:
         raise ValueError(f"Unknown ordering method: {order}")
-
-    # Choose index width: int32 or int64
-    use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
-    out_dtype = np.int32 if use_int32 else np.int64
 
     # Empty matrix
     # R = chol2(sparse(0, 0)) -> R: (0, 0) nnz = 0
     # [R, p, q] = chol2(sparse(0, 0)) -> R: (0, 0) nnz = 0, p: 0, q: []
     if N == 0:
-        if order == "natural":
-            return csc_array((0, 0))
+        R = csc_array((0, 0), dtype=A.dtype)
+        if order is None:
+            return R
         else:
-            return csc_array((0, 0)), np.array([], dtype=out_dtype)
+            p = np.array([], dtype=out_itype)
+            return R, p
 
     # Matrix of all zeros
     # R = chol2(sparse(N, N)) -> error not pos def
@@ -360,7 +339,8 @@ def cholesky(A, order="natural", lower=False, remove_zeros=True):
 
     cm.quick_return_if_not_posdef = True
 
-    if order == "natural":
+    # TODO support other ordering methods
+    if order is None or order == "natural":
         cm.nmethods = 1
         cm.method[0].ordering = CHOLMOD_NATURAL
         cm.postorder = False
@@ -426,20 +406,21 @@ def cholesky(A, order="natural", lower=False, remove_zeros=True):
     # -------------------------------------------------------------------------
     #         Create outputs
     # -------------------------------------------------------------------------
-    L = _csc_from_cholmod_sparse(Rc, &cm)
+    R = _csc_from_cholmod_sparse(Rc, &cm)
     p = _array_from_cholmod_permutation(Lc, N, use_int32)
 
-    # # Free everything else
-    # if use_int32:
-    #     cholmod_free_factor(&Lc, &cm)
-    #     cholmod_free_sparse(&Ac, &cm)
-    #     cholmod_finish(&cm)
-    # else:
-    #     cholmod_l_free_factor(&Lc, &cm)
-    #     cholmod_l_free_sparse(&Ac, &cm)
-    #     cholmod_l_finish(&cm)
-
-    if order == "natural":
-        return L
+    # Free everything else
+    # NOTE there is no need to free Ac here, since it is just a pointer to the
+    # original input matrix A. The MATLAB interface creates a *new*
+    # cholmod_sparse object, so it needs to be freed.
+    if use_int32:
+        cholmod_free_factor(&Lc, &cm)
+        cholmod_finish(&cm)
     else:
-        return L, p
+        cholmod_l_free_factor(&Lc, &cm)
+        cholmod_l_finish(&cm)
+
+    if order is None:
+        return R
+    else:
+        return R, p

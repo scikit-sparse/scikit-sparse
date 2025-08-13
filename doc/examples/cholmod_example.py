@@ -26,7 +26,7 @@ A = mmread(filepath, spmatrix=False)  # read the matrix
 A = (A.T @ A).tocsc()  # make it symmetric positive definite
 
 # compute the Cholesky factorization
-R = cholesky(A, order="natural")
+R = cholesky(A)
 Rp, p = cholesky(A, order="amd")
 
 PAPT = A[p][:, p]  # apply the ordering to the matrix
