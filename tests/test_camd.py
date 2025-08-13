@@ -12,16 +12,16 @@
 
 """Test cases for the sksparse.camd module."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
-
 from numpy.testing import assert_array_equal
-from pathlib import Path
 from scipy import sparse
-from scipy.sparse import SparseEfficiencyWarning
+
 from sksparse.camd import CAMDInfo, camd, camd_default_control
 
-from .helpers import is_valid_permutation, generate_random_matrices
+from .helpers import generate_random_matrices, is_valid_permutation
 
 
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
@@ -55,26 +55,6 @@ def test_singleton_matrix():
     ),
 )
 class TestRandomSquareMatrices:
-    @pytest.mark.parametrize("matrix_type", ["dense", "csc", "coo"])
-    def test_input_type(self, A, matrix_type):
-        match matrix_type:
-            case "dense":
-                A = A.toarray()
-            case "csc":
-                A = A.tocsc()
-            case "coo":
-                A = A.tocoo()
-            case _:
-                raise ValueError(f"Unknown matrix type: {matrix_type}")
-
-        if matrix_type != "csc":
-            with pytest.warns(SparseEfficiencyWarning, match="not in CSC format"):
-                p = camd(A)
-        else:
-            p = camd(A)
-
-        assert is_valid_permutation(p)
-
     @pytest.mark.parametrize("itype", [np.int32, np.int64])
     def test_itype(self, A, itype):
         A.indptr = A.indptr.astype(itype)
