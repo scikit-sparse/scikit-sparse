@@ -23,7 +23,7 @@ Contents:
 
    Search <search>
 
-Indices and tables
+Indices and Tables
 ==================
 
 * :ref:`genindex`

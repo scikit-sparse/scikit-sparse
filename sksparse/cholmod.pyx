@@ -111,6 +111,7 @@ cdef _error_handler(int status) except * with gil:
 
     status_msg = f"(code {status:d})"
 
+    # TODO include informative error messages.
     # Known Errors
     cdef dict error_map = {
         CHOLMOD_NOT_INSTALLED: (
@@ -171,7 +172,7 @@ cdef object _cholmod_sparse_from_csc(
         The input sparse matrix in Compressed Sparse Column (CSC) format.
     stype : int
         The assumed symmetry type of ``A_py``:
-        * -1: lower triangular, 
+        * -1: lower triangular,
         *  0: unsymmetric (not used here),
         *  1: upper triangular.
     use_int32 : bool
@@ -194,9 +195,9 @@ cdef object _cholmod_sparse_from_csc(
         raise ValueError("Input must be a csc_array.")
 
     cdef supported_dtypes = (
-        np.float32, 
-        np.float64, 
-        np.complex64, 
+        np.float32,
+        np.float64,
+        np.complex64,
         np.complex128
     )
 
@@ -400,40 +401,51 @@ cdef dict _ordering_methods = {
 }
 
 
-def cholesky(A, order=None, lower=False, remove_zeros=True):
+def cholesky(A, *, lower=False, order=None, remove_zeros=True):
     """Compute the Cholesky factorization of a sparse matrix.
 
     This function computes the Cholesky factorization of a symmetric positive
     definite matrix `A`:
 
-    .. math:
-        P A P^{\top} = R^{\top} R,
+    .. math::
+
+        P A P^{\\top} = R^{\\top} R,
 
     where `R` is an upper triangular matrix. Only the upper triangular part of
-    `A` is used.
+    `A` is used. If ``lower`` is True, the lower triangular factor `L` is
+    returned instead, such that:
+
+    .. math::
+
+        P A P^{\\top} = L L^{\\top}.
+
+    In this case, only the lower triangular part of `A` is used.
 
     Parameters
     ----------
     A : (N, N) {array_like, sparse array}
         An array convertible to a sparse matrix in Compressed Sparse Column
         (CSC) format. Must be symmetric positive definite.
-    order : {None, "default", "best", "natural", "metis", "nesdis", "amd", "colamd", "postordered"}, optional
+    order : None or str in {"default", "best", "natural", "metis", "nesdis", \
+            "amd", "colamd", "postordered"}, optional
         The permutation algorithm to use for the factorization. By default, the
         natural ordering of the input matrix is used. The other options are:
-        * ``"default"``: Use the default method, which first tries AMD, then METIS.
-        * ``"best"``: Automatically select the best ordering based on the input.
-        * ``"metis"``: Use the METIS library for graph partitioning.
-        * ``"nesdis"``: Use the NESDIS library for nested dissection.
-        * ``"amd"``: Use the Approximate Minimum Degree (AMD) algorithm.
-        * ``"colamd"``: Use the Approximate Minimum Degree (AMD) algorithm for the
+
+        * ``default``: Use the default method, which first tries AMD, then METIS.
+        * ``best``: Automatically select the best ordering based on the input.
+        * ``metis``: Use the METIS library for graph partitioning.
+        * ``nesdis``: Use the NESDIS library for nested dissection.
+        * ``amd``: Use the Approximate Minimum Degree (AMD) algorithm.
+        * ``colamd``: Use the Approximate Minimum Degree (AMD) algorithm for the
           symmetric case, or the COLAMD algorithm for the unsymmetric case
           (:math:`A A^{\\top}` or :math:`A^{\\top} A`).
-        * ``"postordered"``: Use natural ordering followed by postordering.
-        By default, methods other than ``"natural"`` will also be postordered.
+        * ``postordered``: Use natural ordering followed by postordering.
+
+        By default, methods other than ``natural`` will also be postordered.
 
         .. warning::
 
-            The ordering method `"best"` may be quite slow for large matrices,
+            The ordering method ``best`` may be quite slow for large matrices,
             but if the factorization is reused many times, it can be worth it.
 
     lower : bool, optional
@@ -452,8 +464,8 @@ def cholesky(A, order=None, lower=False, remove_zeros=True):
         match that of ``A``, except in the case of integer matrices, where it
         will be upcast to float.
     p : ndarray of int, optional
-        The permutation vector used in the factorization. This is only returned
-        if the ordering is not ``None``.
+        The permutation vector used in the factorization. Only returned if the
+        ordering is not ``None``.
 
     Raises
     ------
