@@ -81,6 +81,11 @@ Cholesy factor and optionally a fill-reducing permutation of a sparse matrix.
 
 .. autofunction:: cholesky
 
+For matrices that are symmetric but not positive-definite, the LDL factorization
+can be computed using the :func:`ldl` function.
+
+.. autofunction:: ldl
+
 
 Error handling
 --------------

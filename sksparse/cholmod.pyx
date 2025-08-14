@@ -401,6 +401,9 @@ cdef dict _ordering_methods = {
 }
 
 
+# -----------------------------------------------------------------------------
+#         Cholesky and LDL Factorizations
+# -----------------------------------------------------------------------------
 def _cholesky_base(
     A, *, ldl=False, beta=None, lower=False, order=None, remove_zeros=True
 ):
@@ -414,20 +417,16 @@ def _cholesky_base(
         raise ValueError(f"Unknown ordering method: {order}")
 
     # Empty matrix
-    # R = chol2(sparse(0, 0)) -> R: (0, 0) nnz = 0
-    # [R, p, q] = chol2(sparse(0, 0)) -> R: (0, 0) nnz = 0, p: 0, q: []
     if N == 0:
         R = csc_array((0, 0), dtype=A.dtype)
-        D = diags_array((0,), shape=(0, 0), dtype=A.dtype)
         p = np.array([], dtype=out_itype)
         if ldl:
+            D = diags_array((0,), shape=(0, 0), dtype=A.dtype)
             return (R, D) if order is None else (R, D, p)
         else:
             return R if order is None else (R, p)
 
     # Matrix of all zeros
-    # R = chol2(sparse(N, N)) -> error not pos def
-    # [R, p, q] = chol2(sparse(N, N)) -> R: (0, 10) nnz = 0, p: 1, q: [1:N]
     if A.nnz == 0:
         raise CholmodNotPositiveDefiniteError("Input matrix not positive definite.")
 
@@ -575,202 +574,163 @@ def _cholesky_base(
 
 
 def cholesky(A, *, lower=False, order=None, remove_zeros=True):
-    """Compute the Cholesky factorization of a sparse matrix.
-
-    This function computes the Cholesky factorization of a symmetric positive
-    definite matrix `A`:
-
-    .. math::
-
-        P A P^{\\top} = R^{\\top} R,
-
-    where `R` is an upper triangular matrix. Only the upper triangular part of
-    `A` is used. If ``lower`` is True, the lower triangular factor `L` is
-    returned instead, such that:
-
-    .. math::
-
-        P A P^{\\top} = L L^{\\top}.
-
-    In this case, only the lower triangular part of `A` is used.
-
-    Parameters
-    ----------
-    A : (N, N) {array_like, sparse array}
-        An array convertible to a sparse matrix in Compressed Sparse Column
-        (CSC) format. Must be symmetric positive definite.
-    order : None or str in {"default", "best", "natural", "metis", "nesdis", \
-            "amd", "colamd", "postordered"}, optional
-        The permutation algorithm to use for the factorization. By default, the
-        natural ordering of the input matrix is used. The other options are:
-
-        * ``default``: Use the default method, which first tries AMD, then METIS.
-        * ``best``: Automatically select the best ordering based on the input.
-        * ``metis``: Use the METIS library for graph partitioning.
-        * ``nesdis``: Use the NESDIS library for nested dissection.
-        * ``amd``: Use the Approximate Minimum Degree (AMD) algorithm.
-        * ``colamd``: Use the Approximate Minimum Degree (AMD) algorithm for the
-          symmetric case, or the COLAMD algorithm for the unsymmetric case
-          (:math:`A A^{\\top}` or :math:`A^{\\top} A`).
-        * ``postordered``: Use natural ordering followed by postordering.
-
-        By default, methods other than ``natural`` will also be postordered.
-
-        .. warning::
-
-            The ordering method ``best`` may be quite slow for large matrices,
-            but if the factorization is reused many times, it can be worth it.
-
-    lower : bool, optional
-        If True, return the lower triangular factor `L` such that
-        :math:`A = L L^{\\top}`. Default is False, returning the upper
-        triangular factor `R`.
-    remove_zeros : bool, optional
-        If False, do not remove explicit zeros from the factor ``L`` or ``R``.
-        This flag allows use of the ``chol_update`` function afterwards.
-        Default is True, so that the output is in canonical form.
-
-    Returns
-    -------
-    R : csc_array
-        The triangular factor of the Cholesky decomposition. The data type will
-        match that of ``A``.
-    p : ndarray of int, optional
-        The permutation vector used in the factorization. Only returned if the
-        ordering is not ``None``.
-
-    Raises
-    ------
-    ValueError
-        If the input matrix is not square, or if an unknown ordering method is
-        specified.
-    CholmodError
-        If the factorization fails for any reason, such as the input matrix not
-        being positive definite.
-    CholmodWarning
-        If the input matrix is not positive definite, but the factorization
-        succeeds anyway (*e.g.*, due to a small diagonal entry).
-
-    Notes
-    -----
-    This function is an interface to the CHOLMOD library, which is part of
-    the SuiteSparse collection by Timothy A. Davis. For more details, see the
-    documentation in the header file [#cholmod_h]_.
-
-    References
-    ----------
-    .. [#cholmod_h] ``cholmod.h`` - SuiteSparse CHOLMOD header file.
-        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/Include/cholmod.h
-    """
     return _cholesky_base(
         A, ldl=False, lower=lower, order=order, remove_zeros=remove_zeros
     )
 
 
-# TODO refactor docstrings
 def ldl(A, beta=None, *, lower=True, order=None, remove_zeros=True):
-    """Compute the LDL factorization of a sparse matrix.
-
-    This function computes the LDL factorization of a symmetric matrix `A`:
-
-    .. math::
-
-        L D L^{\\top} = P A P^{\\top},
-
-    where `L` is a lower triangular matrix with unit diagonal, and `D` is
-    a diagonal matrix. Only the lower triangular part of `A` is used. If
-    ``lower`` is False, the upper triangular factor `R` is returned instead,
-    such that:
-
-    .. math::
-
-        R^{\\top} D R = P A P^{\\top}.
-
-    In this case, only the upper triangular part of `A` is used.
-
-    If ``beta`` is a scalar value, compute the factorization of:
-
-    .. math::
-
-        L D L^{\\top} = P A A^{\\top} P^{\\top} + \\beta I,
-
-    where `I` is the identity matrix.
-
-    Parameters
-    ----------
-    A : (N, N) {array_like, sparse array}
-        An array convertible to a sparse matrix in Compressed Sparse Column
-        (CSC) format. Must be symmetric, by may be indefinite.
-    beta : float, optional
-        The scalar value to add to the diagonal of the symmetrized matrix
-        :math:`A A^{\\top}` before factorization. Default is None, which
-        computes the factorization of :math:`A` itself.
-    order : None or str in {"default", "best", "natural", "metis", "nesdis", \
-            "amd", "colamd", "postordered"}, optional
-        The permutation algorithm to use for the factorization. By default, the
-        natural ordering of the input matrix is used. The other options are:
-
-        * ``default``: Use the default method, which first tries AMD, then METIS.
-        * ``best``: Automatically select the best ordering based on the input.
-        * ``metis``: Use the METIS library for graph partitioning.
-        * ``nesdis``: Use the NESDIS library for nested dissection.
-        * ``amd``: Use the Approximate Minimum Degree (AMD) algorithm.
-        * ``colamd``: Use the Approximate Minimum Degree (AMD) algorithm for the
-          symmetric case, or the COLAMD algorithm for the unsymmetric case
-          (:math:`A A^{\\top}` or :math:`A^{\\top} A`).
-        * ``postordered``: Use natural ordering followed by postordering.
-
-        By default, methods other than ``natural`` will also be postordered.
-
-        .. warning::
-
-            The ordering method ``best`` may be quite slow for large matrices,
-            but if the factorization is reused many times, it can be worth it.
-
-    lower : bool, optional
-        If True, return the lower triangular factor `L` such that
-        :math:`A = L D L^{\\top}`. Default is False, returning the upper
-        triangular factor `R`, such that :math:`A = R^{\\top} D R`.
-    remove_zeros : bool, optional
-        If False, do not remove explicit zeros from the factor ``L`` or ``R``.
-        This flag allows use of the ``chol_update`` function afterwards.
-        Default is True, so that the output is in canonical form.
-
-    Returns
-    -------
-    R : csc_array
-        The triangular factor of the Cholesky decomposition. The data type will
-        match that of ``A``.
-    D : dia_array
-        The diagonal matrix `D` of the factorization, in sparse DIA format.
-        The data type will match that of ``A``.
-    p : ndarray of int, optional
-        The permutation vector used in the factorization. Only returned if the
-        ordering is not ``None``.
-
-    Raises
-    ------
-    ValueError
-        If the input matrix is not square, or if an unknown ordering method is
-        specified.
-    CholmodError
-        If the factorization fails for any reason, such as the input matrix not
-        being positive definite.
-    CholmodWarning
-        If the input matrix is not positive definite, but the factorization
-        succeeds anyway (*e.g.*, due to a small diagonal entry).
-
-    Notes
-    -----
-    This function is an interface to the CHOLMOD library, which is part of
-    the SuiteSparse collection by Timothy A. Davis. For more details, see the
-    documentation in the header file [#ldl_h]_.
-
-    References
-    ----------
-    .. [#ldl_h] ``ldl.h`` - SuiteSparse CHOLMOD header file.
-        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/Include/cholmod.h
-    """
     return _cholesky_base(
         A, ldl=True, beta=beta, lower=lower, order=order, remove_zeros=remove_zeros
     )
+
+
+# -----------------------------------------------------------------------------
+#         Docstring Template
+# -----------------------------------------------------------------------------
+_CHOLMOD_DOC_TEMPLATE = """
+{intro}
+Parameters
+----------
+A : (N, N) {{array_like, sparse array}}
+    An array convertible to a sparse matrix in Compressed Sparse Column
+    (CSC) format. Must be symmetric, by may be indefinite.
+{beta_param}
+order : None or str in {{"default", "best", "natural", "metis", "nesdis", \
+        "amd", "colamd", "postordered"}}, optional
+    The permutation algorithm to use for the factorization. By default, the
+    natural ordering of the input matrix is used. The other options are:
+
+    * ``default``: Use the default method, which first tries AMD, then METIS.
+    * ``best``: Automatically select the best ordering based on the input.
+    * ``metis``: Use the METIS library for graph partitioning.
+    * ``nesdis``: Use the NESDIS library for nested dissection.
+    * ``amd``: Use the Approximate Minimum Degree (AMD) algorithm.
+    * ``colamd``: Use the Approximate Minimum Degree (AMD) algorithm for the
+        symmetric case, or the COLAMD algorithm for the unsymmetric case
+        (:math:`A A^{{\\top}}` or :math:`A^{{\\top}} A`).
+    * ``postordered``: Use natural ordering followed by postordering.
+
+    By default, methods other than ``natural`` will also be postordered.
+
+    .. warning::
+
+        The ordering method ``best`` may be quite slow for large matrices,
+        but if the factorization is reused many times, it can be worth it.
+
+lower : bool, optional
+    If True, return the lower triangular factor `L`.
+remove_zeros : bool, optional
+    If False, do not remove explicit zeros from the factor ``L`` or ``R``.
+    This flag allows use of the ``chol_update`` function afterwards.
+    Default is True, so that the output is in canonical form.
+
+Returns
+-------
+R : csc_array
+    The triangular factor of the Cholesky decomposition. The data type will
+    match that of ``A``.
+{ldl_D_output}
+p : ndarray of int, optional
+    The permutation vector used in the factorization. Only returned if the
+    ordering is not ``None``.
+
+Raises
+------
+CholmodNotPositiveDefiniteError
+    If the input matrix is not positive definite.
+
+Notes
+-----
+This function is an interface to the CHOLMOD library, which is part of
+the SuiteSparse collection by Timothy A. Davis. For more details, see the
+documentation in the header file [{doc_tag}]_.
+
+References
+----------
+.. [{doc_tag}] ``cholmod.h`` - SuiteSparse CHOLMOD header file.
+    https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/Include/cholmod.h
+"""
+
+
+# -----------------------------------------------------------------------------
+#         Cholesky Docstring
+# -----------------------------------------------------------------------------
+_cholesky_intro = """Compute the Cholesky factorization of a sparse matrix.
+
+This function computes the Cholesky factorization of a symmetric positive
+definite matrix `A`:
+
+.. math::
+
+    R^{\\top} R = P A P^{\\top},
+
+where `R` is an upper triangular matrix. Only the upper triangular part of
+`A` is used. If ``lower`` is True, the lower triangular factor `L` is
+returned instead, such that:
+
+.. math::
+
+    L L^{\\top} = P A P^{\\top}.
+
+In this case, only the lower triangular part of `A` is used.
+"""
+
+
+cholesky.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
+    intro=_cholesky_intro,
+    beta_param="",
+    ldl_D_output="",
+    doc_tag="#cholesky_h"
+)
+
+
+# -----------------------------------------------------------------------------
+#         LDL Docstring
+# -----------------------------------------------------------------------------
+_ldl_intro = """
+Compute the LDL factorization of a sparse matrix.
+
+This function computes the LDL factorization of a symmetric matrix `A`:
+
+.. math::
+
+    L D L^{\\top} = P A P^{\\top},
+
+where `L` is a lower triangular matrix with unit diagonal, and `D` is
+a diagonal matrix. Only the lower triangular part of `A` is used. If
+``lower`` is False, the upper triangular factor `R` is returned instead,
+such that:
+
+.. math::
+
+    R^{\\top} D R = P A P^{\\top}.
+
+In this case, only the upper triangular part of `A` is used.
+
+If ``beta`` is a scalar value, compute the factorization of:
+
+.. math::
+
+    L D L^{\\top} = P A A^{\\top} P^{\\top} + \\beta I,
+
+where `I` is the identity matrix.
+"""
+
+_beta_param = """beta : float, optional
+    The scalar value to add to the diagonal of the symmetrized matrix
+    :math:`A A^{\\top}` before factorization. Default is None, which
+    computes the factorization of :math:`A` itself."""
+
+
+_ldl_D_output = """D : dia_array
+    The diagonal matrix `D` of the factorization, in sparse DIA format.
+    The data type will match that of ``A``."""
+
+
+ldl.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
+    intro=_ldl_intro,
+    beta_param=_beta_param,
+    ldl_D_output=_ldl_D_output,
+    doc_tag="#ldl_h"
+)
