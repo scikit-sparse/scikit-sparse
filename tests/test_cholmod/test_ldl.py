@@ -4,20 +4,20 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 # =============================================================================
-#     File: test_cholmod.py
-#  Created: 2025-08-12 14:52
+#     File: test_ldl.py
+#  Created: 2025-08-14 14:12
 # =============================================================================
 
-"""Unit tests for the cholmod module."""
+"""Unit tests for the cholmod.ldl function."""
 
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose, assert_array_equal
 from scipy import sparse
 
-from sksparse.cholmod import CholmodNotPositiveDefiniteError, cholesky
+from sksparse.cholmod import CholmodNotPositiveDefiniteError, ldl
 
-from .helpers import generate_random_matrices, is_valid_permutation
+from ..helpers import generate_random_matrices, is_valid_permutation
 
 DTYPES = [np.float32, np.float64, np.complex64, np.complex128]
 
@@ -27,8 +27,9 @@ def test_empty_input(itype):
     empty_A = sparse.csc_array((0, 0))
     empty_A.indptr = empty_A.indptr.astype(itype)
     empty_A.indices = empty_A.indices.astype(itype)
-    R = cholesky(empty_A)
-    assert_array_equal(R.toarray(), empty_A.toarray(), strict=True)
+    L, D = ldl(empty_A)
+    assert_array_equal(L.toarray(), empty_A.toarray(), strict=True)
+    assert_array_equal(D.toarray(), empty_A.toarray(), strict=True)
 
 
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
@@ -38,15 +39,16 @@ def test_zero_input(itype):
     zero_A.indptr = zero_A.indptr.astype(itype)
     zero_A.indices = zero_A.indices.astype(itype)
     with pytest.raises(CholmodNotPositiveDefiniteError, match="not positive definite"):
-        cholesky(zero_A)
+        ldl(zero_A)
 
 
 @pytest.mark.parametrize("dtype", DTYPES)
 def test_singleton_matrix(dtype):
     singleton_A = sparse.csc_array([[1]], dtype=dtype)
-    L = cholesky(singleton_A, lower=True)
-    expect_L = singleton_A.copy()
+    L, D = ldl(singleton_A)
+    expect_L = expect_D = singleton_A.copy()
     assert_array_equal(L.toarray(), expect_L.toarray(), strict=True)
+    assert_array_equal(D.toarray(), expect_D.toarray(), strict=True)
 
 
 @pytest.mark.parametrize(
@@ -57,17 +59,17 @@ def test_singleton_matrix(dtype):
 def test_itype(A, itype):
     A.indptr = A.indptr.astype(itype)
     A.indices = A.indices.astype(itype)
-    R = cholesky(A)
-    assert R.indptr.dtype == itype
-    assert R.indices.dtype == itype
+    L, _ = ldl(A)
+    assert L.indptr.dtype == itype
+    assert L.indices.dtype == itype
 
 
 @pytest.mark.parametrize("dtype", DTYPES)
 def test_not_positive_definite(dtype):
     # Create a simple non-positive definite matrix
-    A = sparse.csc_array([[1, 2], [2, 1]], dtype=dtype)
+    A = sparse.csc_array([[0, 2], [2, 1]], dtype=dtype)
     with pytest.raises(CholmodNotPositiveDefiniteError):
-        cholesky(A)
+        ldl(A)
 
 
 test_As = [
@@ -97,18 +99,29 @@ test_As = [
 def test_ordering(A, order):
     atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
     if order is None:
-        L = cholesky(A, order=order, lower=True)
-        assert_allclose((L @ L.T.conj()).toarray(), A.toarray(), atol=atol)
+        L, D = ldl(A, order=order)
+        assert_allclose((L @ D @ L.T.conj()).toarray(), A.toarray(), atol=atol)
     else:
-        L, p = cholesky(A, order=order, lower=True)
+        L, D, p = ldl(A, order=order)
         assert is_valid_permutation(p)
         PAPT = A[p][:, p]
-        assert_allclose((L @ L.T.conj()).toarray(), PAPT.toarray(), atol=atol)
+        assert_allclose((L @ D @ L.T.conj()).toarray(), PAPT.toarray(), atol=atol)
 
 
 @pytest.mark.parametrize("A", test_As)
 def test_lower(A):
     atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
-    R = cholesky(A)
-    L = cholesky(A, lower=True)
+    R, Dr = ldl(A, lower=False)
+    L, Dl = ldl(A)
     assert_allclose(R.T.conj().toarray(), L.toarray(), atol=atol)
+    assert_allclose(Dr.toarray(), Dl.toarray(), atol=atol)
+
+
+@pytest.mark.parametrize("A", test_As)
+def test_beta(A):
+    atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-4
+    N = A.shape[0]
+    beta = 17.0  # arbitrary positive value
+    L, D = ldl(A, beta)
+    expect_LDL = (A @ A.T.conj() + beta * sparse.eye(N)).toarray()
+    assert_allclose((L @ D @ L.T.conj()).toarray(), expect_LDL, atol=atol)

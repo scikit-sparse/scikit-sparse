@@ -101,6 +101,23 @@ cdef extern from "cholmod.h":
     int cholmod_factorize(cholmod_sparse *A, cholmod_factor *L, cholmod_common *Common)
     int cholmod_l_factorize(cholmod_sparse *A, cholmod_factor *L, cholmod_common *Common)
 
+    int cholmod_factorize_p(
+        cholmod_sparse *A,
+        double beta [2],
+        int32_t *fset,
+        size_t fsize,
+        cholmod_factor *L,
+        cholmod_common *Common
+    )
+    int cholmod_l_factorize_p(
+        cholmod_sparse *A,
+        double beta[2],
+        int64_t *fset,
+        size_t fsize,
+        cholmod_factor *L,
+        cholmod_common *Common
+    )
+    
     cholmod_sparse* cholmod_factor_to_sparse(cholmod_factor *L, cholmod_common *Common)
     cholmod_sparse* cholmod_l_factor_to_sparse(cholmod_factor *L, cholmod_common *Common)
 

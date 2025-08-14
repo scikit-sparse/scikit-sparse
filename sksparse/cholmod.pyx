@@ -33,7 +33,7 @@ References
 import numpy as np
 cimport numpy as np
 
-from scipy.sparse import csc_array
+from scipy.sparse import csc_array, diags_array
 import warnings
 
 from .utils import validate_csc_input
@@ -401,6 +401,179 @@ cdef dict _ordering_methods = {
 }
 
 
+def _cholesky_base(
+    A, *, ldl=False, beta=None, lower=False, order=None, remove_zeros=True
+):
+    """Base function for Cholesky factorization."""
+    A, use_int32, out_itype = validate_csc_input(A, require_square=True)
+
+    N = A.shape[0]
+
+    # Check the input ordering method
+    if order is not None and order not in _ordering_methods:
+        raise ValueError(f"Unknown ordering method: {order}")
+
+    # Empty matrix
+    # R = chol2(sparse(0, 0)) -> R: (0, 0) nnz = 0
+    # [R, p, q] = chol2(sparse(0, 0)) -> R: (0, 0) nnz = 0, p: 0, q: []
+    if N == 0:
+        R = csc_array((0, 0), dtype=A.dtype)
+        D = diags_array((0,), shape=(0, 0), dtype=A.dtype)
+        p = np.array([], dtype=out_itype)
+        if ldl:
+            return (R, D) if order is None else (R, D, p)
+        else:
+            return R if order is None else (R, p)
+
+    # Matrix of all zeros
+    # R = chol2(sparse(N, N)) -> error not pos def
+    # [R, p, q] = chol2(sparse(N, N)) -> R: (0, 10) nnz = 0, p: 1, q: [1:N]
+    if A.nnz == 0:
+        raise CholmodNotPositiveDefiniteError("Input matrix not positive definite.")
+
+    # -------------------------------------------------------------------------
+    #         Set up Data Structures
+    # -------------------------------------------------------------------------
+    # Create the CHOLMOD common object
+    cdef cholmod_common cm
+
+    if use_int32:
+        cholmod_start(&cm)
+    else:
+        cholmod_l_start(&cm)
+
+    # Convert to packed LL.T when done
+    cm.final_asis = False
+    cm.final_super = False
+    cm.final_ll = not ldl  # LL.T for Cholesky, LDL.T for LDL
+    cm.final_pack = True
+    cm.final_monotonic = True
+
+    # TODO test if this is needed when we implement chol_update (see ldlchol.c)
+    # If we do *not* drop numerically zero entries from the symbolic pattern,
+    # we *do* need to drop entries that result from supernodal amalgamation.
+    # Otherwise, all zeros are dropped in cholmod_drop, so save the extra step.
+    cm.final_resymbol = not remove_zeros
+
+    cm.quick_return_if_not_posdef = True
+
+    if order == "default":
+        cm.nmethods = 0
+    elif order == "best":
+        cm.nmethods = CHOLMOD_MAXMETHODS
+    else:
+        # CHOLMOD_POSTORDERED is not an input, but an output flag. We treat it
+        # as "natural" + postordering, per cholmod.h description.
+        ordering = "natural" if order is None or order == "postordered" else order
+        cm.nmethods = 1
+        cm.method[0].ordering = _ordering_methods[ordering]
+        cm.postorder = (order == "postordered" or ordering != "natural")
+
+    # Get the input matrix into CHOLMOD format
+    cdef cholmod_sparse Amatrix
+    cdef cholmod_sparse *Ac = &Amatrix
+
+    stype = -1 if lower else 1  # use lower or upper triangular part
+    # Keep a reference to the input matrix to keep it alive
+    cdef object ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix, &cm)
+
+    # Set stype and beta for LDL
+    cdef double betac[2]
+
+    if ldl:
+        if beta is None:
+            Amatrix.stype = -1  # lower triangular
+            betac[0] = 0.0
+            betac[1] = 0.0
+        else:
+            if not np.isscalar(beta):
+                raise ValueError("beta must be a scalar value.")
+            Amatrix.stype = 0  # symmetric, not triangular
+            betac[0] = beta
+            betac[1] = 0.0
+
+    # -------------------------------------------------------------------------
+    #         Analyze and Factorize
+    # -------------------------------------------------------------------------
+    cdef cholmod_factor* Lc
+
+    if use_int32:
+        Lc = cholmod_analyze(Ac, &cm)
+
+        if ldl:
+            cholmod_factorize_p(Ac, betac, NULL, 0, Lc, &cm)
+        else:
+            cholmod_factorize(Ac, Lc, &cm)
+    else:
+        Lc = cholmod_l_analyze(Ac, &cm)
+
+        if ldl:
+            cholmod_l_factorize_p(Ac, betac, NULL, 0, Lc, &cm)
+        else:
+            cholmod_l_factorize(Ac, Lc, &cm)
+
+    # Check for errors
+    _error_handler(cm.status)
+
+    # -------------------------------------------------------------------------
+    #         Convert to scipy csc_array
+    # -------------------------------------------------------------------------
+    # NOTE there is no need to keep "minor" here, since we just raise an error
+    # if the matrix is not positive definite.
+    cdef cholmod_sparse* Lsparse
+    cdef cholmod_sparse* Rc
+
+    if use_int32:
+        Lsparse = cholmod_factor_to_sparse(Lc, &cm)
+    else:
+        Lsparse = cholmod_l_factor_to_sparse(Lc, &cm)
+
+    if remove_zeros:
+        # drop explicit zeros from Lsparse
+        if use_int32:
+            cholmod_drop(0, Lsparse, &cm)
+        else:
+            cholmod_l_drop(0, Lsparse, &cm)
+
+    if lower:
+        Rc = Lsparse
+    else:
+        # Convert to upper triangular (conjugate transpose)
+        if use_int32:
+            Rc = cholmod_transpose(Lsparse, CHOLMOD_TRANS_CONJ, &cm)
+            cholmod_free_sparse(&Lsparse, &cm)
+        else:
+            Rc = cholmod_l_transpose(Lsparse, CHOLMOD_TRANS_CONJ, &cm)
+            cholmod_l_free_sparse(&Lsparse, &cm)
+
+    # -------------------------------------------------------------------------
+    #         Create outputs
+    # -------------------------------------------------------------------------
+    R = _csc_from_cholmod_sparse(Rc, &cm)
+    p = _array_from_cholmod_permutation(Lc, N, use_int32)
+
+    # For LDL, we need to extract the diagonal matrix D
+    if ldl:
+        D = diags_array(R.diagonal())
+        R.setdiag(1.0)  # set unit diagonal
+
+    # Free everything else
+    # NOTE there is no need to free Ac here, since it is just a pointer to the
+    # original input matrix A. The MATLAB interface creates a *new*
+    # cholmod_sparse object, so it needs to be freed.
+    if use_int32:
+        cholmod_free_factor(&Lc, &cm)
+        cholmod_finish(&cm)
+    else:
+        cholmod_l_free_factor(&Lc, &cm)
+        cholmod_l_finish(&cm)
+
+    if ldl:
+        return (R, D) if order is None else (R, D, p)
+    else:
+        return R if order is None else (R, p)
+
+
 def cholesky(A, *, lower=False, order=None, remove_zeros=True):
     """Compute the Cholesky factorization of a sparse matrix.
 
@@ -461,8 +634,7 @@ def cholesky(A, *, lower=False, order=None, remove_zeros=True):
     -------
     R : csc_array
         The triangular factor of the Cholesky decomposition. The data type will
-        match that of ``A``, except in the case of integer matrices, where it
-        will be upcast to float.
+        match that of ``A``.
     p : ndarray of int, optional
         The permutation vector used in the factorization. Only returned if the
         ordering is not ``None``.
@@ -490,139 +662,115 @@ def cholesky(A, *, lower=False, order=None, remove_zeros=True):
     .. [#cholmod_h] ``cholmod.h`` - SuiteSparse CHOLMOD header file.
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/Include/cholmod.h
     """
-    A, use_int32, out_itype = validate_csc_input(A, require_square=True)
+    return _cholesky_base(
+        A, ldl=False, lower=lower, order=order, remove_zeros=remove_zeros
+    )
 
-    N = A.shape[0]
 
-    # Check the input ordering method
-    if order is not None and order not in _ordering_methods:
-        raise ValueError(f"Unknown ordering method: {order}")
+# TODO refactor docstrings
+def ldl(A, beta=None, *, lower=True, order=None, remove_zeros=True):
+    """Compute the LDL factorization of a sparse matrix.
 
-    # Empty matrix
-    # R = chol2(sparse(0, 0)) -> R: (0, 0) nnz = 0
-    # [R, p, q] = chol2(sparse(0, 0)) -> R: (0, 0) nnz = 0, p: 0, q: []
-    if N == 0:
-        R = csc_array((0, 0), dtype=A.dtype)
-        if order is None:
-            return R
-        else:
-            p = np.array([], dtype=out_itype)
-            return R, p
+    This function computes the LDL factorization of a symmetric matrix `A`:
 
-    # Matrix of all zeros
-    # R = chol2(sparse(N, N)) -> error not pos def
-    # [R, p, q] = chol2(sparse(N, N)) -> R: (0, 10) nnz = 0, p: 1, q: [1:N]
-    if A.nnz == 0:
-        raise CholmodNotPositiveDefiniteError("Input matrix is not positive definite.")
+    .. math::
 
-    # -------------------------------------------------------------------------
-    #         Set up Data Structures
-    # -------------------------------------------------------------------------
-    # Create the CHOLMOD common object
-    cdef cholmod_common cm
+        L D L^{\\top} = P A P^{\\top},
 
-    if use_int32:
-        cholmod_start(&cm)
-    else:
-        cholmod_l_start(&cm)
+    where `L` is a lower triangular matrix with unit diagonal, and `D` is
+    a diagonal matrix. Only the lower triangular part of `A` is used. If
+    ``lower`` is False, the upper triangular factor `R` is returned instead,
+    such that:
 
-    # Convert to packed LL.T when done
-    cm.final_asis = False
-    cm.final_super = False
-    cm.final_ll = True
-    cm.final_pack = True
-    cm.final_monotonic = True
+    .. math::
 
-    # Do not prune entries at the end
-    cm.final_resymbol = False
+        R^{\\top} D R = P A P^{\\top}.
 
-    cm.quick_return_if_not_posdef = True
+    In this case, only the upper triangular part of `A` is used.
 
-    if order == "default":
-        cm.nmethods = 0
-    elif order == "best":
-        cm.nmethods = CHOLMOD_MAXMETHODS
-    else:
-        # CHOLMOD_POSTORDERED is not an input, but an output flag. We treat it
-        # as "natural" + postordering, per cholmod.h description.
-        ordering = "natural" if order is None or order == "postordered" else order
-        cm.nmethods = 1
-        cm.method[0].ordering = _ordering_methods[ordering]
-        cm.postorder = (order == "postordered" or ordering != "natural")
+    If ``beta`` is a scalar value, compute the factorization of:
 
-    # Get the input matrix into CHOLMOD format
-    cdef cholmod_sparse Amatrix
-    cdef cholmod_sparse *Ac = &Amatrix
+    .. math::
 
-    stype = -1 if lower else 1  # use lower or upper triangular part
-    # Keep a reference to the input matrix to keep it alive
-    cdef object ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix, &cm)
+        L D L^{\\top} = P A A^{\\top} P^{\\top} + \\beta I,
 
-    # -------------------------------------------------------------------------
-    #         Analyze and Factorize
-    # -------------------------------------------------------------------------
-    cdef cholmod_factor* Lc
+    where `I` is the identity matrix.
 
-    if use_int32:
-        Lc = cholmod_analyze(Ac, &cm)
-        cholmod_factorize(Ac, Lc, &cm)
-    else:
-        Lc = cholmod_l_analyze(Ac, &cm)
-        cholmod_l_factorize(Ac, Lc, &cm)
+    Parameters
+    ----------
+    A : (N, N) {array_like, sparse array}
+        An array convertible to a sparse matrix in Compressed Sparse Column
+        (CSC) format. Must be symmetric, by may be indefinite.
+    beta : float, optional
+        The scalar value to add to the diagonal of the symmetrized matrix
+        :math:`A A^{\\top}` before factorization. Default is None, which
+        computes the factorization of :math:`A` itself.
+    order : None or str in {"default", "best", "natural", "metis", "nesdis", \
+            "amd", "colamd", "postordered"}, optional
+        The permutation algorithm to use for the factorization. By default, the
+        natural ordering of the input matrix is used. The other options are:
 
-    # Check for errors
-    _error_handler(cm.status)
+        * ``default``: Use the default method, which first tries AMD, then METIS.
+        * ``best``: Automatically select the best ordering based on the input.
+        * ``metis``: Use the METIS library for graph partitioning.
+        * ``nesdis``: Use the NESDIS library for nested dissection.
+        * ``amd``: Use the Approximate Minimum Degree (AMD) algorithm.
+        * ``colamd``: Use the Approximate Minimum Degree (AMD) algorithm for the
+          symmetric case, or the COLAMD algorithm for the unsymmetric case
+          (:math:`A A^{\\top}` or :math:`A^{\\top} A`).
+        * ``postordered``: Use natural ordering followed by postordering.
 
-    # -------------------------------------------------------------------------
-    #         Convert to scipy csc_array
-    # -------------------------------------------------------------------------
-    # NOTE there is no need to keep "minor" here, since we just raise an error
-    # if the matrix is not positive definite.
-    cdef cholmod_sparse* Lsparse
-    cdef cholmod_sparse* Rc
+        By default, methods other than ``natural`` will also be postordered.
 
-    if use_int32:
-        Lsparse = cholmod_factor_to_sparse(Lc, &cm)
-    else:
-        Lsparse = cholmod_l_factor_to_sparse(Lc, &cm)
+        .. warning::
 
-    if remove_zeros:
-        # drop explicit zeros from Lsparse
-        if use_int32:
-            cholmod_drop(0, Lsparse, &cm)
-        else:
-            cholmod_l_drop(0, Lsparse, &cm)
+            The ordering method ``best`` may be quite slow for large matrices,
+            but if the factorization is reused many times, it can be worth it.
 
-<<<<<<< HEAD
-    if lower:
-        Rc = Lsparse
-    else:
-        # Convert to upper triangular (conjugate transpose)
-        if use_int32:
-            Rc = cholmod_transpose(Lsparse, CHOLMOD_TRANS_CONJUGATE, &cm)
-            cholmod_free_sparse(&Lsparse, &cm)
-        else:
-            Rc = cholmod_l_transpose(Lsparse, CHOLMOD_TRANS_CONJUGATE, &cm)
-            cholmod_l_free_sparse(&Lsparse, &cm)
+    lower : bool, optional
+        If True, return the lower triangular factor `L` such that
+        :math:`A = L D L^{\\top}`. Default is False, returning the upper
+        triangular factor `R`, such that :math:`A = R^{\\top} D R`.
+    remove_zeros : bool, optional
+        If False, do not remove explicit zeros from the factor ``L`` or ``R``.
+        This flag allows use of the ``chol_update`` function afterwards.
+        Default is True, so that the output is in canonical form.
 
-    # -------------------------------------------------------------------------
-    #         Create outputs
-    # -------------------------------------------------------------------------
-    R = _csc_from_cholmod_sparse(Rc, &cm)
-    p = _array_from_cholmod_permutation(Lc, N, use_int32)
+    Returns
+    -------
+    R : csc_array
+        The triangular factor of the Cholesky decomposition. The data type will
+        match that of ``A``.
+    D : dia_array
+        The diagonal matrix `D` of the factorization, in sparse DIA format.
+        The data type will match that of ``A``.
+    p : ndarray of int, optional
+        The permutation vector used in the factorization. Only returned if the
+        ordering is not ``None``.
 
-    # Free everything else
-    # NOTE there is no need to free Ac here, since it is just a pointer to the
-    # original input matrix A. The MATLAB interface creates a *new*
-    # cholmod_sparse object, so it needs to be freed.
-    if use_int32:
-        cholmod_free_factor(&Lc, &cm)
-        cholmod_finish(&cm)
-    else:
-        cholmod_l_free_factor(&Lc, &cm)
-        cholmod_l_finish(&cm)
+    Raises
+    ------
+    ValueError
+        If the input matrix is not square, or if an unknown ordering method is
+        specified.
+    CholmodError
+        If the factorization fails for any reason, such as the input matrix not
+        being positive definite.
+    CholmodWarning
+        If the input matrix is not positive definite, but the factorization
+        succeeds anyway (*e.g.*, due to a small diagonal entry).
 
-    if order is None:
-        return R
-    else:
-        return R, p
+    Notes
+    -----
+    This function is an interface to the CHOLMOD library, which is part of
+    the SuiteSparse collection by Timothy A. Davis. For more details, see the
+    documentation in the header file [#ldl_h]_.
+
+    References
+    ----------
+    .. [#ldl_h] ``ldl.h`` - SuiteSparse CHOLMOD header file.
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/Include/cholmod.h
+    """
+    return _cholesky_base(
+        A, ldl=True, beta=beta, lower=lower, order=order, remove_zeros=remove_zeros
+    )
