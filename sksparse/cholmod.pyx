@@ -184,6 +184,8 @@ cdef object _cholmod_sparse_from_csc(
 ):
     """Create a CHOLMOD sparse matrix from a scipy.sparse.csc_array.
 
+    See the CHOLMOD MATLAB interface for details [#sputil_get_sparse]_.
+
     Parameters
     ----------
     A_py : (N, N) csc_array
@@ -206,6 +208,11 @@ cdef object _cholmod_sparse_from_csc(
         make it up: ``A.indptr``, ``A.indices``, and ``A.data``. There is no
         use for the output of this function, except to keep the underlying data
         from being garbage collected until the cholmod_sparse object is freed.
+
+    References
+    ----------
+    .. [#sputil_get_sparse] ``sputil2.c`` - CHOLMOD MATLAB utilities
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/sputil2.c
     """
     if not isinstance(A_py, csc_array):
         raise ValueError("Input must be a csc_array.")
