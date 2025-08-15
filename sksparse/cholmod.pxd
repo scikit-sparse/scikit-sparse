@@ -50,6 +50,17 @@ cdef extern from "cholmod.h":
     int CHOLMOD_NOT_POSDEF
     int CHOLMOD_DSMALL
 
+    # Solve codes
+    int CHOLMOD_A
+    int CHOLMOD_LDLt
+    int CHOLMOD_LD
+    int CHOLMOD_DLt
+    int CHOLMOD_L
+    int CHOLMOD_Lt
+    int CHOLMOD_D
+    int CHOLMOD_P
+    int CHOLMOD_Pt
+
     ctypedef struct cholmod_method_struct:
         int ordering
 
@@ -70,6 +81,15 @@ cdef extern from "cholmod.h":
         size_t n
         size_t minor
         void *Perm
+        size_t nzmax
+        void *p
+        void *i
+        void *x
+        void *z
+        void *nz
+        void *next
+        void *prev
+        int ordering
         int itype
         int xtype
         int dtype
@@ -88,6 +108,16 @@ cdef extern from "cholmod.h":
         int dtype
         int sorted
         int packed
+
+    ctypedef struct cholmod_dense:
+        size_t nrow
+        size_t ncol
+        size_t nzmax
+        size_t d
+        void *x
+        void *z
+        int xtype
+        int dtype
 
     int cholmod_start(cholmod_common *Common)
     int cholmod_l_start(cholmod_common *Common)
@@ -117,12 +147,47 @@ cdef extern from "cholmod.h":
         cholmod_factor *L,
         cholmod_common *Common
     )
-    
+
+    cholmod_sparse *cholmod_spsolve(
+        int sys,
+        cholmod_factor *L,
+        cholmod_sparse *B,
+        cholmod_common *Common
+    )
+    cholmod_sparse *cholmod_l_spsolve(
+        int sys,
+        cholmod_factor *L,
+        cholmod_sparse *B,
+        cholmod_common *Common
+    )
+
+    cholmod_dense *cholmod_solve(
+        int sys,
+        cholmod_factor *L,
+        cholmod_dense *B,
+        cholmod_common *Common
+    )
+    cholmod_dense *cholmod_l_solve(
+        int sys,
+        cholmod_factor *L,
+        cholmod_dense *B,
+        cholmod_common *Common
+    )
+
+    double cholmod_rcond(cholmod_factor *L, cholmod_common *Common)
+    double cholmod_l_rcond(cholmod_factor *L, cholmod_common *Common)
+
     cholmod_sparse* cholmod_factor_to_sparse(cholmod_factor *L, cholmod_common *Common)
     cholmod_sparse* cholmod_l_factor_to_sparse(cholmod_factor *L, cholmod_common *Common)
 
+    cholmod_factor* cholmod_allocate_factor(size_t n, cholmod_common *Common)
+    cholmod_factor* cholmod_l_allocate_factor(size_t n, cholmod_common *Common)
+
     int cholmod_free_sparse(cholmod_sparse **A, cholmod_common *Common)
     int cholmod_l_free_sparse(cholmod_sparse **A, cholmod_common *Common)
+
+    int cholmod_free_dense(cholmod_dense **A, cholmod_common *Common)
+    int cholmod_l_free_dense(cholmod_dense **A, cholmod_common *Common)
 
     int cholmod_free_factor(cholmod_factor **L, cholmod_common *Common)
     int cholmod_l_free_factor(cholmod_factor **L, cholmod_common *Common)
@@ -132,3 +197,6 @@ cdef extern from "cholmod.h":
 
     cholmod_sparse* cholmod_transpose(cholmod_sparse *A, int mode, cholmod_common *Common)
     cholmod_sparse* cholmod_l_transpose(cholmod_sparse *A, int mode, cholmod_common *Common)
+
+    void *cholmod_malloc(size_t n, size_t size, cholmod_common *Common)
+    void *cholmod_l_malloc(size_t n, size_t size, cholmod_common *Common)

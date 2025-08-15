@@ -33,7 +33,7 @@ References
 import numpy as np
 cimport numpy as np
 
-from scipy.sparse import csc_array, diags_array
+from scipy.sparse import csc_array, diags_array, issparse
 import warnings
 
 from .utils import validate_csc_input
@@ -365,6 +365,344 @@ cdef object _csc_from_cholmod_sparse(cholmod_sparse* A, cholmod_common* common):
         assert np.PyArray_ISWRITEABLE(array)
 
     return csc_array((data, indices, indptr), shape=(A.nrow, A.ncol))
+
+
+cdef object _cholmod_factor_from_csc(
+    object LD_py,
+    bint use_int32,
+    cholmod_factor *L_static,
+    cholmod_common *cm
+):
+    """Create a CHOLMOD factor from a scipy.sparse.csc_array.
+
+    See the ``ldlsolve.m`` function in [#ldlsolve_ref]_.
+
+    Parameters
+    ----------
+    LD_py : csc_array
+        The input sparse matrix in Compressed Sparse Column (CSC) format. This
+        should be a combination of the ``L`` and ``D`` factors computed from
+        :func:`ldl`.
+    use_int32 : bool
+        Whether to use 32-bit or 64-bit integers for indices and indptr.
+    L_static : cholmod_factor*
+        Pointer to a preallocated CHOLMOD factor structure. Contents need not
+        be initialized. Contains the CHOLMOD factor on output.
+    cm : cholmod_common*
+        Pointer to a CHOLMOD common structure for configuration and status.
+
+    Returns
+    -------
+    res : tuple
+        A reference to the underlying arrays whose data the CHOLMOD factor
+        references. There is no use for this object other than to prevent it
+        from being garbarge collected.
+
+    References
+    ----------
+    .. [#ldlsolve_ref] ``ldlsolve.c`` - CHOLMOD MATLAB utilities
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/ldlsolve.c
+    """
+    if not isinstance(LD_py, csc_array):
+        raise ValueError("Input must be a csc_array.")
+
+    cdef np.dtype dtype = LD_py.dtype
+
+    if dtype not in _supported_dtypes:
+        raise ValueError(f"Unsupported data type for CHOLMOD: {dtype}")
+
+    # Initialize the CHOLMOD factor
+    cdef cholmod_factor* L = L_static
+    assert L is not NULL
+
+    cdef size_t N = LD_py.shape[0]
+
+    L.ordering = CHOLMOD_NATURAL  # LD is already ordered
+
+    # Get views on the data
+    cdef int32_t[::1] LDp_mv_int32, LDi_mv_int32
+    cdef int64_t[::1] LDp_mv_int64, LDi_mv_int64
+
+    cdef float32_t[::1] LDx_mv_float32
+    cdef float64_t[::1] LDx_mv_float64
+    cdef complex64_t[::1] LDx_mv_complex64
+    cdef complex128_t[::1] LDx_mv_complex128
+
+    # Declare array references to keep memory alive
+    cdef np.ndarray LDp, LDi, LDx
+
+    itype = np.int32 if use_int32 else np.int64
+    LDp = np.ascontiguousarray(LD_py.indptr, dtype=itype)
+    LDi = np.ascontiguousarray(LD_py.indices, dtype=itype)
+
+    if use_int32:
+        LDp_mv_int32 = LDp
+        LDi_mv_int32 = LDi
+        L.p = &LDp_mv_int32[0]
+        L.i = &LDi_mv_int32[0]
+    else:
+        LDp_mv_int64 = LDp
+        LDi_mv_int64 = LDi
+        L.p = &LDp_mv_int64[0]
+        L.i = &LDi_mv_int64[0]
+
+    # Get the data values
+    L.itype = CHOLMOD_INT if use_int32 else CHOLMOD_LONG
+    L.dtype = _single_or_double(dtype)
+    L.xtype = _real_or_complex(dtype)
+
+    LDx = np.ascontiguousarray(LD_py.data, dtype=dtype)
+
+    if dtype == np.float32:
+        LDx_mv_float32 = LDx
+        L.x = &LDx_mv_float32[0]
+    elif dtype == np.float64:
+        LDx_mv_float64 = LDx
+        L.x = &LDx_mv_float64[0]
+    elif dtype == np.complex64:
+        LDx_mv_complex64 = LDx
+        L.x = &LDx_mv_complex64[0]
+    elif dtype == np.complex128:
+        LDx_mv_complex128 = LDx
+        L.x = &LDx_mv_complex128[0]
+
+    L.z = NULL
+
+    # Allocate and initialize the rest of L
+    if use_int32:
+        L.nz = cholmod_malloc(N, sizeof(int32_t), cm)
+        L.prev = cholmod_malloc(N + 2, sizeof(int32_t), cm)
+        L.next = cholmod_malloc(N + 2, sizeof(int32_t), cm)
+        _initialize_factor(L, N)
+    else:
+        L.nz = cholmod_l_malloc(N, sizeof(int64_t), cm)
+        L.prev = cholmod_l_malloc(N + 2, sizeof(int64_t), cm)
+        L.next = cholmod_l_malloc(N + 2, sizeof(int64_t), cm)
+        _initialize_l_factor(L, N)
+
+    return (LD_py, LDp, LDi, LDx)
+
+
+cdef void _initialize_factor(cholmod_factor* L, size_t N):
+    """Initialize the additional fields of a CHOLMOD factor (32-bit)."""
+    cdef int32_t *Lp = <int32_t*>L.p
+    cdef int32_t *Lnz = <int32_t*>L.nz
+    cdef int32_t *Lnext = <int32_t*>L.next
+    cdef int32_t *Lprev = <int32_t*>L.prev
+
+    cdef size_t j
+
+    for j in range(N):
+        Lnz[j] = Lp[j + 1] - Lp[j]
+
+    cdef int head = N + 1
+    cdef int tail = N
+
+    Lnext[head] = 0
+    Lprev[head] = -1
+    Lnext[tail] = -1
+    Lprev[tail] = N - 1
+
+    for j in range(N):
+        Lnext[j] = j + 1
+        Lprev[j] = j - 1
+
+    Lprev[0] = head
+
+    L.nzmax = Lp[N]
+
+
+cdef void _initialize_l_factor(cholmod_factor* L, size_t N):
+    """Initialize the additional fields of a CHOLMOD factor (64-bit)."""
+    cdef int64_t *Lp = <int64_t*>L.p
+    cdef int64_t *Lnz = <int64_t*>L.nz
+    cdef int64_t *Lnext = <int64_t*>L.next
+    cdef int64_t *Lprev = <int64_t*>L.prev
+
+    cdef size_t j
+
+    for j in range(N):
+        Lnz[j] = Lp[j + 1] - Lp[j]
+
+    cdef int head = N + 1
+    cdef int tail = N
+
+    Lnext[head] = 0
+    Lprev[head] = -1
+    Lnext[tail] = -1
+    Lprev[tail] = N - 1
+
+    for j in range(N):
+        Lnext[j] = j + 1
+        Lprev[j] = j - 1
+
+    Lprev[0] = head
+
+
+# -----------------------------------------------------------------------------
+#         CSC <==> CHOLMOD Dense
+# -----------------------------------------------------------------------------
+cdef object _cholmod_dense_from_ndarray(
+    object X_py,
+    cholmod_dense *X_static,
+):
+    """Create a CHOLMOD dense matrix from a numpy.ndarray.
+
+    See the CHOLMOD MATLAB interface for details [#sputil_get_dense]_.
+
+    Parameters
+    ----------
+    X_py : (M, N) ndarray
+        The input sparse matrix. Boolean data types are converted to float64.
+    X_static : cholmod_sparse*
+        Pointer to a preallocated CHOLMOD sparse matrix structure. Contents
+        need not be initialized. Contains the CHOLMOD sparse matrix on output.
+
+    Returns
+    -------
+    res : ndarray
+        A reference to the array ``X_py``. If it has been type-converted, the
+        reference will not be the original array. There is no use for the
+        output of this function, except to keep the underlying data from being
+        garbage collected until the cholmod_sparse object is freed.
+
+    References
+    ----------
+    .. [#sputil_get_dense] ``sputil2.c`` - CHOLMOD MATLAB utilities
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/sputil2.c
+    """
+    # NOTE cholmod_dense objects are stored in column-major order.
+    X_py = np.asfortranarray(X_py)
+
+    if X_py.ndim != 2:
+        raise ValueError("Input must be a 2D array.")
+
+    dtype = X_py.dtype
+
+    if dtype not in _supported_dtypes:
+        raise ValueError(f"Unsupported data type for CHOLMOD: {dtype}")
+
+    # Convert boolean to float64, as CHOLMOD does not support boolean dense
+    if dtype == np.bool_:
+        X_py = X_py.astype(np.float64)
+        dtype = X_py.dtype
+
+    # Initialize the CHOLMOD dense matrix
+    cdef cholmod_dense* X = X_static
+    memset(X, 0, sizeof(cholmod_dense))
+
+    X.nrow = X_py.shape[0]
+    X.ncol = X_py.shape[1]
+    X.d = X.nrow
+    X.nzmax = X.nrow * X.ncol
+    X.dtype = _single_or_double(dtype)
+    X.z = NULL
+
+    # Declare memoryviews for the index and data arrays
+    cdef float32_t[::1] X_mv_float32
+    cdef float64_t[::1] X_mv_float64
+    cdef complex64_t[::1] X_mv_complex64
+    cdef complex128_t[::1] X_mv_complex128
+
+    # Get the numerical values of X
+    X.xtype = _real_or_complex(dtype)
+
+    # Flatten the array to a 1D array for CHOLMOD
+    X_py = X_py.ravel(order="F")
+
+    if dtype == np.float32:
+        X_mv_float32 = X_py
+        X.x = &X_mv_float32[0]
+    elif dtype == np.float64:
+        X_mv_float64 = X_py
+        X.x = &X_mv_float64[0]
+    elif dtype == np.complex64:
+        X_mv_complex64 = X_py
+        X.x = &X_mv_complex64[0]
+    elif dtype == np.complex128:
+        X_mv_complex128 = X_py
+        X.x = &X_mv_complex128[0]
+
+    return X_py
+
+
+cdef class _CholmodDenseDestructor:
+    """A destructor for CHOLMOD dense matrices.
+
+    This class is used as a base for NumPy arrays that are views on CHOLMOD
+    dense matrices. It ensures that the CHOLMOD dense matrix is properly
+    freed when the NumPy array is no longer in use.
+
+    Attributes
+    ----------
+    _dense : cholmod_dense*
+        The CHOLMOD dense matrix to be freed.
+    _use_int32 : bint
+        Whether to use 32-bit or 64-bit integers.
+    _common : cholmod_common*
+        The CHOLMOD common structure used for memory management.
+    """
+
+    cdef cholmod_dense* _dense
+    cdef cholmod_common* _common
+    cdef bint _use_int32
+
+    cdef void init(self, cholmod_dense* A, bint use_int32, cholmod_common* common):
+        assert A is not NULL
+        assert common is not NULL
+        self._dense = A
+        self._common = common
+        self._use_int32 = use_int32
+
+    def __dealloc__(self):
+        if self._use_int32:
+            cholmod_free_dense(&self._dense, self._common)
+        else:
+            cholmod_l_free_dense(&self._dense, self._common)
+
+
+
+cdef object _ndarray_from_cholmod_dense(
+    cholmod_dense* X, bint use_int32, cholmod_common* common
+):
+    """Build a numpy.ndarray that is a view onto a cholmod_dense object.
+
+    Parameters
+    ----------
+    X : cholmod_dense*
+        The CHOLMOD dense matrix to convert to a NumPy array.
+    use_int32 : bint
+        Whether to use 32-bit or 64-bit integers.
+    common : cholmod_common*
+        The CHOLMOD common structure used for memory management.
+
+    Returns
+    -------
+    res : ndarray
+        A NumPy array that is a view onto the CHOLMOD dense matrix. The array
+        has a base with a destructor that frees the CHOLMOD dense matrix when
+        the array is no longer in use.
+    """
+    cdef _CholmodDenseDestructor base = _CholmodDenseDestructor()
+    base.init(X, use_int32, common)
+
+    cdef int np_dtypenum = _np_dtypenum_from_cholmod.get(
+        (X.xtype, X.dtype), np.NPY_OBJECT
+    )
+
+    # convert to NumPy array
+    cdef np.ndarray arr = np.PyArray_SimpleNewFromData(
+        1, [X.nrow * X.ncol], np_dtypenum, X.x
+    )
+
+    # set destructor and check if writeable
+    np.set_array_base(arr, base)
+    assert np.PyArray_ISWRITEABLE(arr)
+
+    # Cholmod dense matrices are stored in column-major order, so reshape
+    arr = arr.reshape((X.nrow, X.ncol), order="F")
+
+    return arr
 
 
 cdef np.ndarray _array_from_cholmod_permutation(
@@ -743,3 +1081,198 @@ ldl.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     ldl_D_output=_ldl_D_output,
     doc_tag="#ldl_h"
 )
+
+
+# -----------------------------------------------------------------------------
+#         Solve Functions
+# -----------------------------------------------------------------------------
+def ldlsolve(L, D, b):
+    """Solve a linear system using the LDL factorization.
+
+    This function solves the linear system:
+
+    .. math::
+
+        L D L^{\\top} x = b,
+
+    where `L` is a lower triangular matrix with unit diagonal, and `D` is
+    a diagonal matrix. The input `b` is either dense or sparse, vector or
+    matrix.
+
+    Parameters
+    ----------
+    L : (N, N) csc_array
+        The lower triangular factor ``L`` from the LDL factorization, as
+        computed by :func:`.ldl`.
+    D : (N, N) dia_array
+        The diagonal matrix ``D`` from the LDL factorization, as computed by
+        :func:`.ldl`.
+    b : (N, K) sparray or ndarray
+        The right-hand side vector or matrix.
+
+    Returns
+    -------
+    x : (N, K) coo_array, csc_array or ndarray
+        The solution vector or matrix. The type of the output matches that
+        of the right-hand side ``b``.
+
+    See Also
+    --------
+    .cholesky : Compute the Cholesky factorization of a matrix.
+    .ldl : Compute the LDL factorization of a matrix.
+
+    Notes
+    -----
+    This function uses the CHOLMOD library to solve the linear system. It is
+    intended to replicate the MATLAB interface ``ldlsolve.m`` [#ldlsolve_c]_.
+
+    References
+    ----------
+    .. [#ldlsolve_c] ``ldlsolve.c`` - CHOLMOD MATLAB interface
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/ldlsolve.c
+    """
+    L, use_int32, _ = validate_csc_input(L, require_square=True)
+
+    if not issparse(D):
+        raise ValueError(f"Diagonal matrix D is type {type(D)}. "
+                         "Expected a scipy.sparse.dia_array or similar.")
+
+    if L.dtype != D.dtype:
+        raise ValueError(
+            f"Data types of L and D must match. Got {L.dtype} and {D.dtype}."
+        )
+
+    if L.dtype != b.dtype:
+        raise ValueError(
+            f"Data types of L and b must match. Got {L.dtype} and {b.dtype}."
+        )
+
+    if D.shape != L.shape:
+        raise ValueError("Diagonal matrix D must match the size of L.")
+
+    if b.ndim not in {1, 2}:
+        raise ValueError("Right-hand side b must be a vector or matrix.")
+
+    N = L.shape[0]
+    K = b.shape[1] if b.ndim == 2 else 0
+    
+    if b.shape[0] != N:
+        raise ValueError("Right-hand side b must have the same number of rows as L.")
+
+    # Empty matrix
+    if N == 0:
+        if issparse(b):
+            return type(b)(b.shape, dtype=b.dtype)
+        else:
+            return np.empty_like(b)
+
+    if L.nnz == 0 or D.nnz == 0:
+        raise CholmodError("Input matrix L or diagonal matrix D is empty.")
+
+    # Initialize the CHOLMOD common object
+    cdef cholmod_common cm
+    
+    if use_int32:
+        cholmod_start(&cm)
+    else:
+        cholmod_l_start(&cm)
+
+    # -------------------------------------------------------------------------
+    #         Get the b vector or matrix into CHOLMOD format
+    # -------------------------------------------------------------------------
+    cdef cholmod_sparse Bspmatrix
+    cdef cholmod_sparse* Bs = &Bspmatrix
+    cdef cholmod_dense Bmatrix
+    cdef cholmod_dense* Bd = &Bmatrix
+
+    cdef object ref  # keep a reference to b so it is not garbage collected
+
+    # CHOLMOD expects at least a column vector for the RHS
+    if b.ndim == 1:
+        if issparse(b):
+            b = b.reshape((-1, 1)).tocsc()  # (N, 1)
+        else:
+            b = b[:, np.newaxis]  # (N, 1)
+
+    if issparse(b):
+        b, b_use_int32, _ = validate_csc_input(b)
+        ref = _cholmod_sparse_from_csc(b, 0, b_use_int32, &Bspmatrix)
+    else:
+        ref = _cholmod_dense_from_ndarray(b, &Bmatrix)
+
+    # -------------------------------------------------------------------------
+    #         Create the CHOLMOD Factor from L and D
+    # -------------------------------------------------------------------------
+    cdef cholmod_factor* Lc
+
+    if use_int32:
+        Lc = cholmod_allocate_factor(N, &cm)
+    else:
+        Lc = cholmod_l_allocate_factor(N, &cm)
+
+    # Combine the input L and D into a CHOLMOD factor
+    LD = L.copy()
+    LD.setdiag(D.diagonal())
+
+    cdef object Lref = _cholmod_factor_from_csc(LD, use_int32, Lc, &cm)
+
+    # -------------------------------------------------------------------------
+    #         Solve the System
+    # -------------------------------------------------------------------------
+    cdef cholmod_sparse* Xs
+    cdef cholmod_dense* Xd 
+
+    if issparse(b):
+        # Solve the sparse system
+        if use_int32:
+            Xs = cholmod_spsolve(CHOLMOD_LDLt, Lc, Bs, &cm)
+        else:
+            Xs = cholmod_l_spsolve(CHOLMOD_LDLt, Lc, Bs, &cm)
+
+        X = _csc_from_cholmod_sparse(Xs, &cm)
+    else:
+        # Solve the dense system
+        if use_int32:
+            Xd = cholmod_solve(CHOLMOD_LDLt, Lc, Bd, &cm)
+        else:
+            Xd = cholmod_l_solve(CHOLMOD_LDLt, Lc, Bd, &cm)
+
+        X = _ndarray_from_cholmod_dense(Xd, use_int32, &cm)
+
+    # convert to 1D array if single column
+    if X.shape[1] == 1:
+        X = X[:, 0]
+
+    # Check the condition number of the solution
+    cdef double rcond
+
+    if use_int32:
+        rcond = cholmod_rcond(Lc, &cm)
+    else:
+        rcond = cholmod_l_rcond(Lc, &cm)
+
+    if rcond == 0:
+        raise CholmodNotPositiveDefiniteError(
+            "Matrix is indefinite or singular to working precision."
+        )
+    elif rcond < np.finfo(np.float64).eps:
+        raise CholmodNotPositiveDefiniteError(
+            "Matrix is nearly singular."
+            f"  Results may be inaccurate (rcond={rcond:.2e})."
+        )
+
+    # Free memory
+    Lc.p = NULL
+    Lc.i = NULL
+    Lc.x = NULL
+
+    # NOTE there is no need to free Bspmatrix or Bmatrix here, since they
+    # are just pointers to the original input b.
+    if use_int32:
+        cholmod_free_factor(&Lc, &cm)
+        cholmod_finish(&cm)
+    else:
+        cholmod_l_free_factor(&Lc, &cm)
+        cholmod_l_finish(&cm)
+
+    return X
