@@ -46,7 +46,7 @@ cdef int CHOLMOD_TRANS_CONJ = 2  # numeric (conjugate transpose)
 
 
 # -----------------------------------------------------------------------------
-#         Define error handling
+#         Error Handling
 # -----------------------------------------------------------------------------
 class CholmodError(Exception):
     pass
@@ -155,8 +155,27 @@ cdef _error_handler(int status) except * with gil:
 
 
 # -----------------------------------------------------------------------------
-#         Data Conversions
+#         CSC <==> CHOLMOD Sparse
 # -----------------------------------------------------------------------------
+cdef _supported_dtypes = (
+    np.bool_,
+    np.float32,
+    np.float64,
+    np.complex64,
+    np.complex128
+)
+
+
+cdef int _single_or_double(np.dtype dtype):
+    """Return the CHOLMOD dtype number for a given NumPy dtype."""
+    return CHOLMOD_SINGLE if dtype in [np.float32, np.complex64] else CHOLMOD_DOUBLE
+
+
+cdef int _real_or_complex(np.dtype dtype):
+    """Return the CHOLMOD xtype number for a given NumPy dtype."""
+    return CHOLMOD_COMPLEX if np.issubdtype(dtype, np.complexfloating) else CHOLMOD_REAL
+
+
 cdef object _cholmod_sparse_from_csc(
     object A_py,
     int stype,
@@ -194,16 +213,9 @@ cdef object _cholmod_sparse_from_csc(
     if not isinstance(A_py, csc_array):
         raise ValueError("Input must be a csc_array.")
 
-    cdef supported_dtypes = (
-        np.float32,
-        np.float64,
-        np.complex64,
-        np.complex128
-    )
-
     dtype = A_py.dtype
 
-    if dtype not in supported_dtypes:
+    if dtype not in _supported_dtypes:
         raise ValueError(f"Unsupported data type for CHOLMOD: {dtype}")
 
     # Initialize the CHOLMOD sparse matrix
@@ -217,11 +229,7 @@ cdef object _cholmod_sparse_from_csc(
     A.sorted = True
     A.itype = CHOLMOD_INT if use_int32 else CHOLMOD_LONG
     A.stype = -1 if stype < 0 else (0 if stype == 0 else 1)
-    A.dtype = (
-        CHOLMOD_SINGLE
-        if dtype == np.float32 or dtype == np.complex64
-        else CHOLMOD_DOUBLE
-    )
+    A.dtype = _single_or_double(dtype)
     A.z = NULL
 
     # Declare memoryviews for the index and data arrays
@@ -253,16 +261,11 @@ cdef object _cholmod_sparse_from_csc(
         A.i = &Ai_mv_int64[0]
 
     # Get the numerical values of A
-    if dtype == bool:
+    if dtype == np.bool_:
         A.xtype = CHOLMOD_PATTERN
         A.x = NULL
     else:
-        A.xtype = (
-            CHOLMOD_COMPLEX
-            if np.issubdtype(dtype, np.complexfloating)
-            else CHOLMOD_REAL
-        )
-
+        A.xtype = _real_or_complex(dtype)
         Ax = np.ascontiguousarray(A_py.data, dtype=dtype)
 
         if dtype == np.float32:
