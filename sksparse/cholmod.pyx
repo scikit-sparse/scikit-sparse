@@ -181,7 +181,6 @@ cdef object _cholmod_sparse_from_csc(
     int stype,
     bint use_int32,
     cholmod_sparse *A_static,
-    cholmod_common *cm
 ):
     """Create a CHOLMOD sparse matrix from a scipy.sparse.csc_array.
 
@@ -199,8 +198,6 @@ cdef object _cholmod_sparse_from_csc(
     A_static : cholmod_sparse*
         Pointer to a preallocated CHOLMOD sparse matrix structure. Contents
         need not be initialized. Contains the CHOLMOD sparse matrix on output.
-    cm : cholmod_common*
-        Pointer to a CHOLMOD common structure for configuration and status.
 
     Returns
     -------
@@ -477,7 +474,7 @@ def _cholesky_base(
 
     stype = -1 if lower else 1  # use lower or upper triangular part
     # Keep a reference to the input matrix to keep it alive
-    cdef object ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix, &cm)
+    cdef object ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
 
     # Set stype and beta for LDL
     cdef double betac[2]
