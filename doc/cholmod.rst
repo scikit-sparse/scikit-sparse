@@ -72,6 +72,17 @@ or, with a fill-reducing permutation:
 See the :ref:`example <cholesky-example>` below for a demonstration of the
 effect of the fill-reducing permutation.
 
+Once the factorization has been computed, it can be used to solve a linear
+system:
+
+.. code:: python
+
+  from sksparse.cholmod import ldl, ldlsolve
+  A = ...                # a symmetric, positive-definite sparse matrix
+  b = ...                # right-hand side
+  L, D = ldl(A)          # compute LDL^T factorization
+  x = ldlsolve(L, D, b)  # solve Ax = b
+
 
 Top-level functions
 -------------------
@@ -85,6 +96,11 @@ For matrices that are symmetric but not positive-definite, the LDL factorization
 can be computed using the :func:`ldl` function.
 
 .. autofunction:: ldl
+
+Once the factorization has been computed, the resulting matrices can be used to
+solve linear systems using :func:`ldlsolve`:
+
+.. autofunction:: ldlsolve
 
 
 Error handling

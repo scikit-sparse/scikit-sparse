@@ -1118,8 +1118,7 @@ def ldlsolve(L, D, b):
 
     See Also
     --------
-    .cholesky : Compute the Cholesky factorization of a matrix.
-    .ldl : Compute the LDL factorization of a matrix.
+    :func:`.cholesky`, :func:`.ldl`
 
     Notes
     -----
