@@ -320,7 +320,7 @@ cdef class _CholmodSparseDestructor:
 
 
 # dict[xtype, dtype] -> numpy typenum
-cdef dict _np_dtype_from_cholmod = {
+cdef dict _np_dtypenum_from_cholmod = {
     (CHOLMOD_REAL, CHOLMOD_SINGLE): np.NPY_FLOAT32,
     (CHOLMOD_REAL, CHOLMOD_DOUBLE): np.NPY_FLOAT64,
     (CHOLMOD_COMPLEX, CHOLMOD_SINGLE): np.NPY_COMPLEX64,
@@ -344,7 +344,9 @@ cdef object _csc_from_cholmod_sparse(cholmod_sparse* A, cholmod_common* common):
     base.init(A, common)
 
     cdef int np_itypenum = np.NPY_INT32 if A.itype == CHOLMOD_INT else np.NPY_INT64
-    cdef int np_dtypenum = _np_dtype_from_cholmod.get((A.xtype, A.dtype), np.NPY_OBJECT)
+    cdef int np_dtypenum = _np_dtypenum_from_cholmod.get(
+        (A.xtype, A.dtype), np.NPY_OBJECT
+    )
 
     # convert to NumPy arrays
     cdef np.ndarray indptr = np.PyArray_SimpleNewFromData(
