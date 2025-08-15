@@ -1239,8 +1239,8 @@ def ldlsolve(L, D, b):
 
         X = _ndarray_from_cholmod_dense(Xd, use_int32, &cm)
 
-    # convert to 1D array if single column
-    if X.shape[1] == 1:
+    # convert to 1D array if input b is 1D
+    if K == 0:
         X = X[:, 0]
 
     # Check the condition number of the solution
