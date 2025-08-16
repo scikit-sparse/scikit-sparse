@@ -736,10 +736,14 @@ cdef np.ndarray _array_from_cholmod_permutation(
     return p.copy()
 
 
+# -----------------------------------------------------------------------------
+#         Utilities
+# -----------------------------------------------------------------------------
 cdef dict _ordering_methods = {
     "default": None,
     "best": None,
     "natural": CHOLMOD_NATURAL,
+    "given": CHOLMOD_GIVEN,
     "amd": CHOLMOD_AMD,
     "metis": CHOLMOD_METIS,
     "nesdis": CHOLMOD_NESDIS,
@@ -760,7 +764,10 @@ cdef void _set_ordering_method(object order, cholmod_common* cm):
         ordering = "natural" if (order is None or order == "postordered") else order
         cm.nmethods = 1
         cm.method[0].ordering = _ordering_methods.get(ordering, CHOLMOD_NATURAL)
-        cm.postorder = (order == "postordered" or ordering != "natural")
+        cm.postorder = (
+            order == "postordered"
+            or ordering not in ["natural", "given"]
+        )
 
 
 cdef bint _check_perm(np.ndarray p, bint use_int32, cholmod_common *cm):
@@ -1109,6 +1116,232 @@ ldl.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
 # -----------------------------------------------------------------------------
 #         Solve Functions
 # -----------------------------------------------------------------------------
+def cholmod(A, b, *, order=None, p=None):
+    """Solve a linear system using the Cholesky factorization.
+
+    This function solves the linear system:
+
+    .. math::
+
+        R^{\\top} R x = b,
+
+    where `R` is the upper triangular factor from the Cholesky factorization
+    of `A`. The input `b` is either dense or sparse, vector or matrix.
+
+    If ``order`` or ``p`` is provided, it is used as a permutation vector to
+    solve the system:
+
+    .. math::
+
+        \begin{align*}
+        A x = b,
+        R^{\\top} R = P A P^{\\top}.
+        \end{align*}
+
+    where `P` is the permutation matrix corresponding to the permutation
+    vector. ``order`` should be one of the methods supported by
+    :func:`.cholesky`. If ``p`` is provided, it should be the permutation
+    vector returned by the :func:`.cholesky` function with ``order != None``.
+    Only one of ``order`` or ``p`` should be provided.
+
+    Parameters
+    ----------
+    A : (N, N) csc_array
+        The input matrix in Compressed Sparse Column (CSC) format.
+    b : (N, K) sparray or ndarray
+        The right-hand side vector or matrix.
+    order : None or str in {"default", "best", "natural", "metis", "nesdis",
+                           "amd", "colamd", "postordered"}, optional
+        The permutation algorithm to use for the factorization. By default,
+        the natural ordering of the input matrix is used.
+
+    Returns
+    -------
+    x : (N, K) coo_array, csc_array or ndarray
+        The solution vector or matrix. The shape and type of the output matches
+        that of the right-hand side ``b``.
+
+    See Also
+    --------
+    :func:`.cholesky`, :func:`.ldl`, :func:`.ldlsolve`
+
+    Notes
+    -----
+    This function uses the CHOLMOD library to solve the linear system. It is
+    intended to replicate the MATLAB interface ``cholmod2.m`` [#cholmod_c]_.
+
+    References
+    ----------
+    .. [#cholmod_c] ``cholmod2.c`` - CHOLMOD MATLAB interface
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/cholmod2.c
+    """
+    A, use_int32, _ = validate_csc_input(A, require_square=True)
+
+    if b.ndim not in {1, 2}:
+        raise ValueError("Right-hand side b must be a vector or matrix.")
+
+    N = A.shape[0]
+    K = b.shape[1] if b.ndim == 2 else 0
+    
+    if b.shape[0] != N:
+        raise ValueError("Right-hand side b must have the same number of rows as A.")
+
+    if order is not None:
+        if p is not None:
+            raise ValueError("Only one of 'order' or 'p' should be provided.")
+
+        if order not in _ordering_methods:
+            raise ValueError(f"Unknown ordering method: {order}")
+
+    # Initialize the CHOLMOD common object
+    cdef cholmod_common cm
+    
+    if use_int32:
+        cholmod_start(&cm)
+    else:
+        cholmod_l_start(&cm)
+
+    cm.final_ll = True
+    cm.quick_return_if_not_posdef = True
+
+    if p is not None:
+        if not isinstance(p, np.ndarray) or p.shape != (N,):
+            raise ValueError("Permutation vector p must be a 1D array of length N.")
+
+        if not _check_perm(p, use_int32, &cm):
+            raise ValueError("Permutation vector p is not valid.")
+
+        p = np.ascontiguousarray(p)
+        order = "given"
+
+    _set_ordering_method(order, &cm)
+
+    # -------------------------------------------------------------------------
+    #         Special Cases
+    # -------------------------------------------------------------------------
+    # Empty matrix
+    if N == 0:
+        if issparse(b):
+            return type(b)(b.shape, dtype=b.dtype)
+        else:
+            return np.empty_like(b)
+
+    if A.nnz == 0:
+        raise CholmodError("Input matrix A is empty.")
+
+    # -------------------------------------------------------------------------
+    #         Get the A matrix
+    # -------------------------------------------------------------------------
+    cdef cholmod_sparse Amatrix
+    cdef cholmod_sparse* Ac = &Amatrix
+    cdef int stype = 1  # use triu(A) only
+
+    cdef object A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
+
+    # -------------------------------------------------------------------------
+    #         Get the b vector or matrix into CHOLMOD format
+    # -------------------------------------------------------------------------
+    cdef cholmod_sparse Bspmatrix
+    cdef cholmod_sparse* Bs = &Bspmatrix
+    cdef cholmod_dense Bmatrix
+    cdef cholmod_dense* Bd = &Bmatrix
+
+    # CHOLMOD expects at least a column vector for the RHS
+    if b.ndim == 1:
+        if issparse(b):
+            b = b.reshape((-1, 1)).tocsc()  # (N, 1)
+        else:
+            b = b[:, np.newaxis]  # (N, 1)
+
+    cdef object b_ref  # keep a reference to b so it is not garbage collected
+
+    if issparse(b):
+        b, b_use_int32, _ = validate_csc_input(b)
+        b_ref = _cholmod_sparse_from_csc(b, 0, b_use_int32, &Bspmatrix)
+    else:
+        b_ref = _cholmod_dense_from_ndarray(b, &Bmatrix)
+
+    # -------------------------------------------------------------------------
+    #         Analyze and Factorize the Matrix
+    # -------------------------------------------------------------------------
+    cdef int32_t[::1] Perm_mv_int32
+    cdef int32_t* Perm_int32_ptr = NULL
+
+    cdef int64_t[::1] Perm_mv_int64
+    cdef int64_t* Perm_int64_ptr = NULL
+
+    cdef cholmod_factor* Lc
+    if use_int32:
+        if p is not None:
+            Perm_mv_int32 = p
+            Perm_int32_ptr = &Perm_mv_int32[0]
+        Lc = cholmod_analyze_p(Ac, Perm_int32_ptr, NULL, 0, &cm)
+        cholmod_factorize(Ac, Lc, &cm)
+    else:
+        if p is not None:
+            Perm_mv_int64 = p
+            Perm_int64_ptr = &Perm_mv_int64[0]
+        Lc = cholmod_l_analyze_p(Ac, Perm_int64_ptr, NULL, 0, &cm)
+        cholmod_l_factorize(Ac, Lc, &cm)
+
+    # Check the condition number
+    cdef double rcond
+
+    if use_int32:
+        rcond = cholmod_rcond(Lc, &cm)
+    else:
+        rcond = cholmod_l_rcond(Lc, &cm)
+
+    if rcond == 0:
+        raise CholmodNotPositiveDefiniteError(
+            "Matrix is indefinite or singular to working precision."
+        )
+    elif rcond < np.finfo(np.float64).eps:
+        raise CholmodNotPositiveDefiniteError(
+            "Matrix is nearly singular."
+            f"  Results may be inaccurate (rcond={rcond:.2e})."
+        )
+
+    # -------------------------------------------------------------------------
+    #         Solve the System
+    # -------------------------------------------------------------------------
+    cdef cholmod_sparse* Xs
+    cdef cholmod_dense* Xd 
+
+    if issparse(b):
+        # Solve the sparse system
+        if use_int32:
+            Xs = cholmod_spsolve(CHOLMOD_A, Lc, Bs, &cm)
+        else:
+            Xs = cholmod_l_spsolve(CHOLMOD_A, Lc, Bs, &cm)
+
+        X = _csc_from_cholmod_sparse(Xs, &cm)
+    else:
+        # Solve the dense system
+        if use_int32:
+            Xd = cholmod_solve(CHOLMOD_A, Lc, Bd, &cm)
+        else:
+            Xd = cholmod_l_solve(CHOLMOD_A, Lc, Bd, &cm)
+
+        X = _ndarray_from_cholmod_dense(Xd, use_int32, &cm)
+
+    # Convert to 1D array if input b is 1D
+    if K == 0:
+        X = X[:, 0]
+
+    # TODO stats data structure
+
+    # Free data
+    if use_int32:
+        cholmod_free_factor(&Lc, &cm)
+        cholmod_finish(&cm)
+    else:
+        cholmod_l_free_factor(&Lc, &cm)
+        cholmod_l_finish(&cm)
+
+    return X
+
+
 def ldlsolve(L, D, b, p=None):
     """Solve a linear system using the LDL factorization.
 

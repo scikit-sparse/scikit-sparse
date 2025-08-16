@@ -33,7 +33,7 @@ cdef extern from "cholmod.h":
     # Ordering methods
     int CHOLMOD_MAXMETHODS
     int CHOLMOD_NATURAL
-    # int CHOLMOD_GIVEN
+    int CHOLMOD_GIVEN
     int CHOLMOD_AMD
     int CHOLMOD_METIS
     int CHOLMOD_NESDIS
@@ -127,6 +127,21 @@ cdef extern from "cholmod.h":
 
     cholmod_factor* cholmod_analyze(cholmod_sparse *A, cholmod_common *Common)
     cholmod_factor* cholmod_l_analyze(cholmod_sparse *A, cholmod_common *Common)
+
+    cholmod_factor* cholmod_analyze_p(
+        cholmod_sparse *A,
+        int32_t *UserPerm,
+        int32_t *fset,
+        size_t fsize,
+        cholmod_common *Common
+    )
+    cholmod_factor* cholmod_l_analyze_p(
+        cholmod_sparse *A,
+        int64_t *UserPerm,
+        int64_t *fset,
+        size_t fsize,
+        cholmod_common *Common
+    )
 
     int cholmod_factorize(cholmod_sparse *A, cholmod_factor *L, cholmod_common *Common)
     int cholmod_l_factorize(cholmod_sparse *A, cholmod_factor *L, cholmod_common *Common)
