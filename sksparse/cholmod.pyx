@@ -1086,7 +1086,7 @@ ldl.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
 # -----------------------------------------------------------------------------
 #         Solve Functions
 # -----------------------------------------------------------------------------
-def ldlsolve(L, D, b):
+def ldlsolve(L, D, b, p=None):
     """Solve a linear system using the LDL factorization.
 
     This function solves the linear system:
@@ -1099,6 +1099,20 @@ def ldlsolve(L, D, b):
     a diagonal matrix. The input `b` is either dense or sparse, vector or
     matrix.
 
+    If ``p`` is provided, it is used as a permutation vector to solve the
+    system:
+
+    .. math::
+
+        \begin{align*}
+        A x = b,
+        L D L^{\\top} = P A P^{\\top}.
+        \end{align*}
+
+    where `P` is the permutation matrix corresponding to the permutation
+    vector. ``p`` should be the permutation vector returned by the :func:`ldl`
+    function with ``order != None``.
+
     Parameters
     ----------
     L : (N, N) csc_array
@@ -1109,6 +1123,10 @@ def ldlsolve(L, D, b):
         :func:`.ldl`.
     b : (N, K) sparray or ndarray
         The right-hand side vector or matrix.
+    p : (N,) ndarray of int, optional
+        The permutation vector used in the factorization. If provided, it
+        should be the same as the one returned by :func:`.ldl` with
+        ``order != None``.
 
     Returns
     -------
@@ -1193,6 +1211,13 @@ def ldlsolve(L, D, b):
         else:
             b = b[:, np.newaxis]  # (N, 1)
 
+    if p is not None:
+        if not isinstance(p, np.ndarray) or p.ndim != 1 or p.shape[0] != N:
+            raise ValueError("Permutation vector p must be a 1D array of length N.")
+
+        # Apply the permutation to b
+        b = b[p]
+
     if issparse(b):
         b, b_use_int32, _ = validate_csc_input(b)
         ref = _cholmod_sparse_from_csc(b, 0, b_use_int32, &Bspmatrix)
@@ -1238,7 +1263,12 @@ def ldlsolve(L, D, b):
 
         X = _ndarray_from_cholmod_dense(Xd, use_int32, &cm)
 
-    # convert to 1D array if input b is 1D
+    if p is not None:
+        # Apply the inverse permutation to the solution before (possibly)
+        # converting to a 1D COO array (not subscriptable)
+        X = X[np.argsort(p)]
+
+    # Convert to 1D array if input b is 1D
     if K == 0:
         X = X[:, 0]
 

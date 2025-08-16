@@ -22,8 +22,6 @@ from ..helpers import generate_random_matrices
 DTYPES = [np.float32, np.float64, np.complex64, np.complex128]
 
 # TODO: Add tests for the `ldlsolve` function, including:
-# * Correctness of the solution for various input matrices
-# * Matrix and vector right-hand sides
 # * Permuted systems (need to manually permute b, x for now)
 # * *nearly* singular matrices (check for rcond errors)
 
@@ -163,7 +161,9 @@ def test_itype_2D(A, itype):
     assert x.indices.dtype == itype
 
 
-# Test many random matrices of various dtypes
+# -----------------------------------------------------------------------------
+#         Test many random matrices of various dtypes
+# -----------------------------------------------------------------------------
 test_As = [
     A
     # for dtype in DTYPES  # FIXME? single precision dtypes are not close
@@ -205,6 +205,40 @@ def test_solve_sparse(A, K):
     expect_x = sparse.coo_array(data, dtype=A.dtype)
     b = A @ expect_x
     x = ldlsolve(L, D, b)
+    assert_allclose(x.toarray(), expect_x.toarray(), atol=atol)
+
+
+@pytest.mark.parametrize("A", test_As)
+@pytest.mark.parametrize("K", [0, 1, 3])  # arbitrary number of rhs
+def test_solve_dense_permuted(A, K):
+    atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
+    L, D, p = ldl(A, order="default")
+    N = A.shape[0]
+    s = np.arange(1, N + 1, dtype=A.dtype)
+    if K == 0:
+        data = s  # (N,)
+    else:
+        data = np.array([i * s for i in range(1, K + 1)], dtype=A.dtype).T  # (N, K)
+    expect_x = np.asarray(data, dtype=A.dtype)
+    b = A @ expect_x
+    x = ldlsolve(L, D, b, p)
+    assert_allclose(x, expect_x, atol=atol)
+
+
+@pytest.mark.parametrize("A", test_As)
+@pytest.mark.parametrize("K", [0, 1, 3])  # arbitrary number of rhs
+def test_solve_sparse_permuted(A, K):
+    atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
+    L, D, p = ldl(A, order="default")
+    N = A.shape[0]
+    s = np.arange(1, N + 1, dtype=A.dtype)
+    if K == 0:
+        data = s  # (N,)
+    else:
+        data = np.array([i * s for i in range(1, K + 1)], dtype=A.dtype).T  # (N, K)
+    expect_x = sparse.coo_array(data, dtype=A.dtype)
+    b = A @ expect_x
+    x = ldlsolve(L, D, b, p)
     assert_allclose(x.toarray(), expect_x.toarray(), atol=atol)
 
 
