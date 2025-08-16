@@ -13,6 +13,7 @@
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose, assert_array_equal
+from scipy import linalg as la
 from scipy import sparse
 
 from sksparse.cholmod import CholmodError, ldl, ldlsolve
@@ -120,15 +121,20 @@ def test_singleton_sparse(dtype):
 
 
 # Declare a single random matrix fixture for some tests
-@pytest.fixture(params=list(
-    generate_random_matrices(N_trials=1, N_max=200, d_scale=0.05, pos_def_only=True),
-))
-def A(request):
+@pytest.fixture(
+    params=list(
+        generate_random_matrices(
+            N_trials=1, N_max=200, d_scale=0.05, pos_def_only=True
+        ),
+    )
+)
+def Arandom(request):
     return request.param
 
 
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
-def test_itype_1D(A, itype):
+def test_itype_1D(Arandom, itype):
+    A = Arandom
     A.indptr = A.indptr.astype(itype)
     A.indices = A.indices.astype(itype)
     L, D = ldl(A)
@@ -143,7 +149,8 @@ def test_itype_1D(A, itype):
 
 
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
-def test_itype_2D(A, itype):
+def test_itype_2D(Arandom, itype):
+    A = Arandom
     A.indptr = A.indptr.astype(itype)
     A.indices = A.indices.astype(itype)
     L, D = ldl(A)
@@ -161,6 +168,29 @@ def test_itype_2D(A, itype):
     assert x.indices.dtype == itype
 
 
+# NOTE *exactly* singular matrices are not positive definite, so they fail in
+# the ldl() function.
+def test_nearly_singular(Arandom):
+    A = Arandom.todok()
+    N = A.shape[0]
+    lam0 = la.eigvalsh(A.toarray()).min()
+
+    # Make A nearly singular
+    A[:, -1] = 0.0
+    A[-1, :] = 0.0
+    A[-1, -1] = 0.5 * np.finfo(A.dtype).eps
+    A = A.tocsc()
+
+    lam1 = la.eigvalsh(A.toarray()).min()
+    print(f"\nMin eigenvalue: {lam0:.2e} -> {lam1:.2e}\n")
+
+    L, D = ldl(A)
+    expect_x = sparse.coo_array(np.arange(1, N + 1, dtype=A.dtype))
+    b = A @ expect_x
+    with pytest.raises(CholmodError, match="nearly singular"):
+        ldlsolve(L, D, b)
+
+
 # -----------------------------------------------------------------------------
 #         Test many random matrices of various dtypes
 # -----------------------------------------------------------------------------
@@ -174,71 +204,48 @@ test_As = [
 ]
 
 
-@pytest.mark.parametrize("A", test_As)
-@pytest.mark.parametrize("K", [0, 1, 3])  # arbitrary number of rhs
-def test_solve_dense(A, K):
+@pytest.fixture(params=test_As)
+def Am(request):
+    return request.param
+
+
+@pytest.fixture(params=[None, "amd"], ids=lambda x: f"order={x}")
+def ldl_decomp(Am, request):
+    order = request.param
+    if order is None:
+        L, D = ldl(Am)
+        p = None
+    else:
+        L, D, p = ldl(Am, order=order)
+    return Am, L, D, p, order
+
+
+@pytest.mark.parametrize("K", [0, 1, 3], ids=lambda k: f"K={k}")
+@pytest.mark.parametrize("is_sparse", [False, True], ids=["dense", "sparse"])
+def test_ldlsolve(ldl_decomp, K, is_sparse):
+    A, L, D, p, order = ldl_decomp
     atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
-    L, D = ldl(A)
+
+    # Build RHS
     N = A.shape[0]
     s = np.arange(1, N + 1, dtype=A.dtype)
+
     if K == 0:
         data = s  # (N,)
     else:
         data = np.array([i * s for i in range(1, K + 1)], dtype=A.dtype).T  # (N, K)
-    expect_x = np.asarray(data, dtype=A.dtype)
-    b = A @ expect_x
-    x = ldlsolve(L, D, b)
-    assert_allclose(x, expect_x, atol=atol)
 
-
-@pytest.mark.parametrize("A", test_As)
-@pytest.mark.parametrize("K", [0, 1, 3])  # arbitrary number of rhs
-def test_solve_sparse(A, K):
-    atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
-    L, D = ldl(A)
-    N = A.shape[0]
-    s = np.arange(1, N + 1, dtype=A.dtype)
-    if K == 0:
-        data = s  # (N,)
+    if is_sparse:
+        expect_x = sparse.coo_array(data, dtype=A.dtype)
     else:
-        data = np.array([i * s for i in range(1, K + 1)], dtype=A.dtype).T  # (N, K)
-    expect_x = sparse.coo_array(data, dtype=A.dtype)
-    b = A @ expect_x
-    x = ldlsolve(L, D, b)
-    assert_allclose(x.toarray(), expect_x.toarray(), atol=atol)
+        expect_x = np.asarray(data, dtype=A.dtype)
 
-
-@pytest.mark.parametrize("A", test_As)
-@pytest.mark.parametrize("K", [0, 1, 3])  # arbitrary number of rhs
-def test_solve_dense_permuted(A, K):
-    atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
-    L, D, p = ldl(A, order="default")
-    N = A.shape[0]
-    s = np.arange(1, N + 1, dtype=A.dtype)
-    if K == 0:
-        data = s  # (N,)
-    else:
-        data = np.array([i * s for i in range(1, K + 1)], dtype=A.dtype).T  # (N, K)
-    expect_x = np.asarray(data, dtype=A.dtype)
+    # Solve the system
     b = A @ expect_x
     x = ldlsolve(L, D, b, p)
-    assert_allclose(x, expect_x, atol=atol)
 
-
-@pytest.mark.parametrize("A", test_As)
-@pytest.mark.parametrize("K", [0, 1, 3])  # arbitrary number of rhs
-def test_solve_sparse_permuted(A, K):
-    atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
-    L, D, p = ldl(A, order="default")
-    N = A.shape[0]
-    s = np.arange(1, N + 1, dtype=A.dtype)
-    if K == 0:
-        data = s  # (N,)
+    # Compare
+    if is_sparse:
+        assert_allclose(x.toarray(), expect_x.toarray(), atol=atol)
     else:
-        data = np.array([i * s for i in range(1, K + 1)], dtype=A.dtype).T  # (N, K)
-    expect_x = sparse.coo_array(data, dtype=A.dtype)
-    b = A @ expect_x
-    x = ldlsolve(L, D, b, p)
-    assert_allclose(x.toarray(), expect_x.toarray(), atol=atol)
-
-
+        assert_allclose(x, expect_x, atol=atol)
