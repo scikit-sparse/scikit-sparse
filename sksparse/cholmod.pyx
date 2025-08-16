@@ -763,6 +763,24 @@ cdef void _set_ordering_method(object order, cholmod_common* cm):
         cm.postorder = (order == "postordered" or ordering != "natural")
 
 
+cdef bint _check_perm(np.ndarray p, bint use_int32, cholmod_common *cm):
+    """Check if the permutation array is valid."""
+    p = np.ascontiguousarray(p)
+    cdef size_t N = p.shape[0]
+
+    cdef bint ok
+    cdef int32_t[::1] p_mv_int32
+    cdef int64_t[::1] p_mv_int64
+
+    if use_int32:
+        p_mv_int32 = p
+        ok = cholmod_check_perm(&p_mv_int32[0], N, N, cm)
+    else:
+        p_mv_int64 = p
+        ok = cholmod_l_check_perm(&p_mv_int64[0], N, N, cm)
+
+    return ok
+
 # -----------------------------------------------------------------------------
 #         Cholesky and LDL Factorizations
 # -----------------------------------------------------------------------------
@@ -1181,6 +1199,24 @@ def ldlsolve(L, D, b, p=None):
     if b.shape[0] != N:
         raise ValueError("Right-hand side b must have the same number of rows as L.")
 
+    # Initialize the CHOLMOD common object
+    cdef cholmod_common cm
+    
+    if use_int32:
+        cholmod_start(&cm)
+    else:
+        cholmod_l_start(&cm)
+
+    if p is not None:
+        if not isinstance(p, np.ndarray) or p.shape != (N,):
+            raise ValueError("Permutation vector p must be a 1D array of length N.")
+
+        if not _check_perm(p, use_int32, &cm):
+            raise ValueError("Permutation vector p is not valid.")
+
+    # -------------------------------------------------------------------------
+    #         Special Cases
+    # -------------------------------------------------------------------------
     # Empty matrix
     if N == 0:
         if issparse(b):
@@ -1191,14 +1227,6 @@ def ldlsolve(L, D, b, p=None):
     if L.nnz == 0 or D.nnz == 0:
         raise CholmodError("Input matrix L or diagonal matrix D is empty.")
 
-    # Initialize the CHOLMOD common object
-    cdef cholmod_common cm
-    
-    if use_int32:
-        cholmod_start(&cm)
-    else:
-        cholmod_l_start(&cm)
-
     # -------------------------------------------------------------------------
     #         Get the b vector or matrix into CHOLMOD format
     # -------------------------------------------------------------------------
@@ -1206,8 +1234,6 @@ def ldlsolve(L, D, b, p=None):
     cdef cholmod_sparse* Bs = &Bspmatrix
     cdef cholmod_dense Bmatrix
     cdef cholmod_dense* Bd = &Bmatrix
-
-    cdef object ref  # keep a reference to b so it is not garbage collected
 
     # CHOLMOD expects at least a column vector for the RHS
     if b.ndim == 1:
@@ -1217,17 +1243,15 @@ def ldlsolve(L, D, b, p=None):
             b = b[:, np.newaxis]  # (N, 1)
 
     if p is not None:
-        if not isinstance(p, np.ndarray) or p.ndim != 1 or p.shape[0] != N:
-            raise ValueError("Permutation vector p must be a 1D array of length N.")
+        b = b[p]  # apply the permutation to b
 
-        # Apply the permutation to b
-        b = b[p]
+    cdef object b_ref  # keep a reference to b so it is not garbage collected
 
     if issparse(b):
         b, b_use_int32, _ = validate_csc_input(b)
-        ref = _cholmod_sparse_from_csc(b, 0, b_use_int32, &Bspmatrix)
+        b_ref = _cholmod_sparse_from_csc(b, 0, b_use_int32, &Bspmatrix)
     else:
-        ref = _cholmod_dense_from_ndarray(b, &Bmatrix)
+        b_ref = _cholmod_dense_from_ndarray(b, &Bmatrix)
 
     # -------------------------------------------------------------------------
     #         Create the CHOLMOD Factor from L and D
@@ -1243,7 +1267,7 @@ def ldlsolve(L, D, b, p=None):
     LD = L.copy()
     LD.setdiag(D.diagonal())
 
-    cdef object Lref = _cholmod_factor_from_csc(LD, use_int32, Lc, &cm)
+    cdef object L_ref = _cholmod_factor_from_csc(LD, use_int32, Lc, &cm)
 
     # -------------------------------------------------------------------------
     #         Solve the System

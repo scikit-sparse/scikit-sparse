@@ -200,3 +200,6 @@ cdef extern from "cholmod.h":
 
     void *cholmod_malloc(size_t n, size_t size, cholmod_common *Common)
     void *cholmod_l_malloc(size_t n, size_t size, cholmod_common *Common)
+
+    int cholmod_check_perm(int32_t *Perm, size_t len, size_t n, cholmod_common *Common)
+    int cholmod_l_check_perm(int64_t *Perm, size_t len, size_t n, cholmod_common *Common)
