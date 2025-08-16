@@ -748,6 +748,21 @@ cdef dict _ordering_methods = {
 }
 
 
+cdef void _set_ordering_method(object order, cholmod_common* cm):
+    """Set the ordering method in the CHOLMOD common struct."""
+    if order == "default":
+        cm.nmethods = 0
+    elif order == "best":
+        cm.nmethods = CHOLMOD_MAXMETHODS
+    else:
+        # CHOLMOD_POSTORDERED is not an input, but an output flag. We treat it
+        # as "natural" + postordering, per cholmod.h description.
+        ordering = "natural" if (order is None or order == "postordered") else order
+        cm.nmethods = 1
+        cm.method[0].ordering = _ordering_methods.get(ordering, CHOLMOD_NATURAL)
+        cm.postorder = (order == "postordered" or ordering != "natural")
+
+
 # -----------------------------------------------------------------------------
 #         Cholesky and LDL Factorizations
 # -----------------------------------------------------------------------------
@@ -803,17 +818,7 @@ def _cholesky_base(
 
     cm.quick_return_if_not_posdef = True
 
-    if order == "default":
-        cm.nmethods = 0
-    elif order == "best":
-        cm.nmethods = CHOLMOD_MAXMETHODS
-    else:
-        # CHOLMOD_POSTORDERED is not an input, but an output flag. We treat it
-        # as "natural" + postordering, per cholmod.h description.
-        ordering = "natural" if order is None or order == "postordered" else order
-        cm.nmethods = 1
-        cm.method[0].ordering = _ordering_methods[ordering]
-        cm.postorder = (order == "postordered" or ordering != "natural")
+    _set_ordering_method(order, &cm)
 
     # Get the input matrix into CHOLMOD format
     cdef cholmod_sparse Amatrix
