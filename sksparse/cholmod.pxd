@@ -203,6 +203,32 @@ cdef extern from "cholmod.h":
         cholmod_common *Common
     )
 
+    int cholmod_rowadd(
+        size_t k,
+        cholmod_sparse *R,
+        cholmod_factor *L,
+        cholmod_common *Common
+    )
+    int cholmod_l_rowadd(
+        size_t k,
+        cholmod_sparse *R,
+        cholmod_factor *L,
+        cholmod_common *Common
+    )
+
+    int cholmod_rowdel(
+        size_t k,
+        cholmod_sparse *R,
+        cholmod_factor *L,
+        cholmod_common *Common
+    )
+    int cholmod_l_rowdel(
+        size_t k,
+        cholmod_sparse *R,
+        cholmod_factor *L,
+        cholmod_common *Common
+    )
+
     double cholmod_rcond(cholmod_factor *L, cholmod_common *Common)
     double cholmod_l_rcond(cholmod_factor *L, cholmod_common *Common)
 

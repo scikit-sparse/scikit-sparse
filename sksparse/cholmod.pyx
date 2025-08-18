@@ -1873,7 +1873,7 @@ def ldlupdate(L, D, C, *, update=True):
     else:
         Lc = cholmod_l_allocate_factor(N, cm)
 
-    cdef object LD_ref = _ldlupdate_factor_from_csc(LD, use_int32, Lc, cm)
+    _ldlupdate_factor_from_csc(LD, use_int32, Lc, cm)
 
     # -------------------------------------------------------------------------
     #         Compute the Update
@@ -1887,6 +1887,162 @@ def ldlupdate(L, D, C, *, update=True):
 
     if not ok:
         raise CholmodError("Update or downdate failed.")
+
+    # Re-separate the updated L and D from the factorization
+    cdef cholmod_sparse* LDsparse
+
+    # Get the packed LD sparse matrix
+    if use_int32:
+        LDsparse = cholmod_factor_to_sparse(Lc, cm)
+    else:
+        LDsparse = cholmod_l_factor_to_sparse(Lc, cm)
+
+    # -------------------------------------------------------------------------
+    #         Return the Updated Factors
+    # -------------------------------------------------------------------------
+    L = _csc_from_cholmod_sparse(LDsparse, cm)
+    D = diags_array(L.diagonal())
+    L.setdiag(1.0)
+
+    # Free the CHOLMOD factor
+    if use_int32:
+        cholmod_free_factor(&Lc, cm)
+        cholmod_finish(cm)
+    else:
+        cholmod_l_free_factor(&Lc, cm)
+        cholmod_l_finish(cm)
+
+    return L, D
+
+
+def ldlrowmod(L, D, k, *, C=None):
+    """Add or delete a row from a sparse LDL factorization.
+
+    This function computes a rank-one update of a sparse LDL factorization. It
+    either "adds" a row by setting the :math:`k^{th}` row and column of the
+    original matrix to ``C``, or "deletes" a row by setting the :math:`k^{th}`
+    row and column of the original matrix to the identity.
+
+    Parameters
+    ----------
+    L : (N, N) csc_array
+        The lower triangular factor `L` from the LDL factorization, as
+        computed by :func:`.ldl`.
+    D : (N, N) dia_array
+        The diagonal matrix `D` from the LDL factorization, as computed by
+        :func:`.ldl`.
+    k : int
+        The row/column index to modify. Must be in the range ``0 <= k < N``.
+    C : (N, 1) csc_array, optional
+        If given, change the factorization such that row and column ``k`` of
+        the original matrix equal ``C``. The number of rows must match that of
+        ``L`` and ``D``.
+
+    Returns
+    -------
+    L' : (N, N) csc_array
+        The updated lower triangular factor `L'` of the LDL factorization.
+    D' : (N, N) dia_array
+        The updated diagonal matrix `D'` of the LDL factorization.
+    """
+    L, use_int32, _ = validate_csc_input(L, require_square=True)
+
+    if not issparse(D):
+        raise ValueError(f"Diagonal matrix D is type {type(D)}. "
+                         "Expected a scipy.sparse.dia_array or similar.")
+
+    if L.dtype != D.dtype:
+        raise ValueError(
+            f"Data types of L and D must match. Got {L.dtype} and {D.dtype}."
+        )
+
+    if D.shape != L.shape:
+        raise ValueError("Diagonal matrix D must match the size of L.")
+
+    N = L.shape[0]
+
+    if not (0 <= k < N):
+        raise ValueError(
+            f"Row index k={k} is out of bounds for matrix of size {N}."
+        )
+
+    if C is not None:
+        if not issparse(C) or C.ndim not in {1, 2}:
+            raise ValueError(
+                f"Update matrix C is type {type(C)}. Expected a 1D or 2D sparse array."
+            )
+
+        if C.shape[0] != N:
+            raise ValueError("Update matrix C must have the same number of rows as L.")
+
+    # -------------------------------------------------------------------------
+    #         Special Cases
+    # -------------------------------------------------------------------------
+    # Empty matrix
+    if N == 0:
+        return L.copy(), D.copy()
+
+    if L.nnz == 0 or D.nnz == 0:
+        raise CholmodError("Input matrix L or diagonal matrix D is empty.")
+
+    # -------------------------------------------------------------------------
+    #         Get the Inputs
+    # -------------------------------------------------------------------------
+    # Initialize the CHOLMOD common object
+    cdef cholmod_common Common
+    cdef cholmod_common *cm = &Common
+
+    if use_int32:
+        cholmod_start(cm)
+    else:
+        cholmod_l_start(cm)
+
+    rowadd = C is not None
+
+    cdef cholmod_sparse Cmatrix
+    cdef cholmod_sparse* Cc = &Cmatrix
+    cdef object C_ref  # keep a reference to C so it is not garbage collected
+    cdef int stype = 0  # use all of C
+
+    if rowadd:
+        # Ensure C is in CSC format
+        if C.ndim == 1:
+            C = C.reshape((-1, 1)).tocsc()  # (N, 1)
+
+        C, C_use_int32, _ = validate_csc_input(C)
+        C_ref = _cholmod_sparse_from_csc(C, stype, C_use_int32, &Cmatrix)
+
+    # Get a factor from the L and D matrices
+    LD = L
+    LD.setdiag(D.diagonal())
+
+    cdef cholmod_factor* Lc
+
+    if use_int32:
+        Lc = cholmod_allocate_factor(N, cm)
+    else:
+        Lc = cholmod_l_allocate_factor(N, cm)
+
+    _ldlupdate_factor_from_csc(LD, use_int32, Lc, cm)
+
+    # -------------------------------------------------------------------------
+    #         Compute the Update
+    # -------------------------------------------------------------------------
+    cdef int ok
+
+    if rowadd:
+        if use_int32:
+            ok = cholmod_rowadd(k, Cc, Lc, cm)
+        else:
+            ok = cholmod_l_rowadd(k, Cc, Lc, cm)
+    else:
+        if use_int32:
+            ok = cholmod_rowdel(k, NULL, Lc, cm)
+        else:
+            ok = cholmod_l_rowdel(k, NULL, Lc, cm)
+
+    if not ok:
+        raise CholmodError("ldlrowmod failed.")
 
     # Re-separate the updated L and D from the factorization
     cdef cholmod_sparse* LDsparse
