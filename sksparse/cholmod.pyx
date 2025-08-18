@@ -101,9 +101,9 @@ cdef _error_handler(int status) except * with gil:
 
     Raises
     ------
-    CholmodWarning
+    :exc:`CholmodWarning`
         Raises a warning for non-critical issues.
-    CholmodError or subclass
+    :exc:`CholmodError` or subclass
         Raises an appropriate Python exception based on the CHOLMOD status code.
     """
     if status == CHOLMOD_OK:
@@ -971,7 +971,9 @@ Parameters
 ----------
 A : (N, N) {{array_like, sparse array}}
     An array convertible to a sparse matrix in Compressed Sparse Column
-    (CSC) format. Must be symmetric, by may be indefinite.
+    (CSC) format. The matrix must be square and symmetric positive definite.
+    Only the upper or lower triangular part of the matrix is used, and no check
+    is made for symmetry.
 {beta_param}
 order : None or str in {{"default", "best", "natural", "metis", "nesdis", \
         "amd", "colamd", "postordered"}}, optional
@@ -1014,8 +1016,14 @@ p : ndarray of int, optional
 
 Raises
 ------
-CholmodNotPositiveDefiniteError
+:exc:`CholmodNotPositiveDefiniteError`
     If the input matrix is not positive definite.
+
+See Also
+--------
+{see_also}
+* :func:`.cholmod` : Solve a linear system using the Cholesky factorization.
+* :func:`.ldlsolve` : Solve a linear system using the LDL factorization.
 
 Notes
 -----
@@ -1054,11 +1062,15 @@ In this case, only the lower triangular part of `A` is used.
 """
 
 
+_cholesky_see_also = """* :func:`.ldl` : Factorize a matrix using LDL decomposition."""
+
+
 cholesky.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     intro=_cholesky_intro,
     beta_param="",
     ldl_D_output="",
-    doc_tag="#cholesky_h"
+    see_also=_cholesky_see_also,
+    doc_tag="#cholesky_h",
 )
 
 
@@ -1105,11 +1117,15 @@ _ldl_D_output = """D : dia_array
     The data type will match that of ``A``."""
 
 
+_ldl_see_also = """* :func:`.cholesky` : Factorize a matrix using Cholesky decomposition."""
+
+
 ldl.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     intro=_ldl_intro,
     beta_param=_beta_param,
     ldl_D_output=_ldl_D_output,
-    doc_tag="#ldl_h"
+    see_also=_ldl_see_also,
+    doc_tag="#ldl_h",
 )
 
 
@@ -1133,10 +1149,7 @@ def cholmod(A, b, *, order=None, p=None):
 
     .. math::
 
-        \begin{align*}
-        A x = b,
-        R^{\\top} R = P A P^{\\top}.
-        \end{align*}
+        P^{\\top} R^{\\top} R P x = b
 
     where `P` is the permutation matrix corresponding to the permutation
     vector. ``order`` should be one of the methods supported by
@@ -1147,13 +1160,36 @@ def cholmod(A, b, *, order=None, p=None):
     Parameters
     ----------
     A : (N, N) csc_array
-        The input matrix in Compressed Sparse Column (CSC) format.
+        The input matrix in Compressed Sparse Column (CSC) format. Must be
+        square, symmetric positive definite. Only the upper triangular part is
+        used, and no check is made for symmetry.
     b : (N, K) sparray or ndarray
         The right-hand side vector or matrix.
-    order : None or str in {"default", "best", "natural", "metis", "nesdis",
-                           "amd", "colamd", "postordered"}, optional
-        The permutation algorithm to use for the factorization. By default,
-        the natural ordering of the input matrix is used.
+    order : None or str in {"default", "best", "natural", "metis", "nesdis", \
+            "amd", "colamd", "postordered"}, optional
+        The permutation algorithm to use for the factorization. By default, the
+        natural ordering of the input matrix is used. The other options are:
+
+        * ``default``: Use the default method, which first tries AMD, then METIS.
+        * ``best``: Automatically select the best ordering based on the input.
+        * ``metis``: Use the METIS library for graph partitioning.
+        * ``nesdis``: Use the NESDIS library for nested dissection.
+        * ``amd``: Use the Approximate Minimum Degree (AMD) algorithm.
+        * ``colamd``: Use the Approximate Minimum Degree (AMD) algorithm for the
+            symmetric case, or the COLAMD algorithm for the unsymmetric case
+            (:math:`A A^{\\top}` or :math:`A^{\\top} A`).
+        * ``postordered``: Use natural ordering followed by postordering.
+
+        By default, methods other than ``natural`` will also be postordered.
+
+        .. warning::
+
+            The ordering method ``best`` may be quite slow for large matrices.
+
+    p : ndarray of int, optional
+        The permutation vector used in the factorization. This may be the
+        output of :func:`.cholesky` with ``order != None``. Only one of 
+        ``order`` or ``p`` should be provided.
 
     Returns
     -------
@@ -1163,7 +1199,9 @@ def cholmod(A, b, *, order=None, p=None):
 
     See Also
     --------
-    :func:`.cholesky`, :func:`.ldl`, :func:`.ldlsolve`
+    * :func:`.cholesky` : Factorize a matrix using Cholesky decomposition.
+    * :func:`.ldl` : Factorize a matrix using LDL decomposition.
+    * :func:`.ldlsolve` : Solve a linear system using the LDL factorization.
 
     Notes
     -----
@@ -1360,10 +1398,7 @@ def ldlsolve(L, D, b, p=None):
 
     .. math::
 
-        \begin{align*}
-        A x = b,
-        L D L^{\\top} = P A P^{\\top}.
-        \end{align*}
+        P^{\\top} L D L^{\\top} P x = b
 
     where `P` is the permutation matrix corresponding to the permutation
     vector. ``p`` should be the permutation vector returned by the :func:`ldl`
@@ -1392,7 +1427,9 @@ def ldlsolve(L, D, b, p=None):
 
     See Also
     --------
-    :func:`.cholesky`, :func:`.ldl`
+    * :func:`.cholesky` : Factorize a matrix using Cholesky decomposition.
+    * :func:`.cholmod` : Solve a linear system using the Cholesky factorization.
+    * :func:`.ldl` : Factorize a matrix using LDL decomposition.
 
     Notes
     -----

@@ -29,7 +29,8 @@ a fill-reducing permutation :math:`P`, such that:
 .. math::
     LL^{\top} = PAP^{\top}.
 
-For symmetric, indefinite matrices, compute the LDL factorization:
+For matrices that are symmetric but may be numerically close to semi-definite,
+the module can compute the LDL factorization:
 
 .. math::
    LDL^{\top} = PAP^{\top}.
@@ -90,15 +91,22 @@ Top-level functions
 The main function this module provides is :func:`cholesky`, for computing the
 Cholesy factor and optionally a fill-reducing permutation of a sparse matrix.
 
-.. autofunction:: cholesky
+To use the Cholesky factorization to solve a linear system, you can use
+:func:`cholmod`. This function behaves similarly to
+:func:`scipy.sparse.linalg.spsolve`, but is more efficient for sparse,
+symmetric, positive-definite matrices.
 
 For matrices that are symmetric but not positive-definite, the LDL factorization
 can be computed using the :func:`ldl` function.
 
-.. autofunction:: ldl
-
 Once the factorization has been computed, the resulting matrices can be used to
-solve linear systems using :func:`ldlsolve`:
+solve linear systems using :func:`ldlsolve`.
+
+.. autofunction:: cholesky
+
+.. autofunction:: cholmod
+
+.. autofunction:: ldl
 
 .. autofunction:: ldlsolve
 
