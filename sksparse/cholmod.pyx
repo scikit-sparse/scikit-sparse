@@ -545,6 +545,158 @@ cdef void _initialize_l_factor(cholmod_factor* L, size_t N):
     Lprev[0] = head
 
 
+cdef object _ldlupdate_factor_from_csc(
+    object LD_py,
+    bint use_int32,
+    cholmod_factor *L_static,
+    cholmod_common *cm
+):
+    """Create a CHOLMOD factor from a scipy.sparse.csc_array for ldlupdate.
+
+    See the ``ldlupdate.c`` function in [#ldlupdate_ref]_.
+
+    Parameters
+    ----------
+    LD_py : csc_array
+        The input sparse matrix in Compressed Sparse Column (CSC) format. This
+        should be a combination of the ``L`` and ``D`` factors computed from
+        :func:`ldl`.
+    use_int32 : bool
+        Whether to use 32-bit or 64-bit integers for indices and indptr.
+    L_static : cholmod_factor*
+        Pointer to a preallocated CHOLMOD factor structure. Contents need not
+        be initialized. Contains the CHOLMOD factor on output.
+    cm : cholmod_common*
+        Pointer to a CHOLMOD common structure for configuration and status.
+
+    Returns
+    -------
+    res : tuple
+        A reference to the underlying arrays whose data the CHOLMOD factor
+        references. There is no use for this object other than to prevent it
+        from being garbarge collected.
+
+    References
+    ----------
+    .. [#ldlupdate_ref] ``ldlupdate.c`` - CHOLMOD MATLAB utilities
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/ldlupdate.c
+    """
+    if not isinstance(LD_py, csc_array):
+        raise ValueError("Input must be a csc_array.")
+
+    cdef np.dtype dtype = LD_py.dtype
+
+    if dtype not in _supported_dtypes:
+        raise ValueError(f"Unsupported data type for CHOLMOD: {dtype}")
+
+    # Initialize the CHOLMOD factor
+    cdef cholmod_factor* L = L_static
+    assert L is not NULL
+
+    cdef size_t N = LD_py.shape[0]
+
+    L.ordering = CHOLMOD_NATURAL  # LD is already ordered
+
+    # Get views on the data
+    cdef int32_t[::1] LDp_mv_int32, LDi_mv_int32
+    cdef int64_t[::1] LDp_mv_int64, LDi_mv_int64
+
+    cdef float32_t[::1] LDx_mv_float32
+    cdef float64_t[::1] LDx_mv_float64
+    cdef complex64_t[::1] LDx_mv_complex64
+    cdef complex128_t[::1] LDx_mv_complex128
+
+    # Cast pointers for arithmetic and memcpy operations
+    cdef int32_t* Lp_int32
+    cdef int32_t* Li_int32
+
+    cdef int64_t* Lp_int64
+    cdef int64_t* Li_int64
+
+    cdef int32_t* ColCount_int32
+    cdef int64_t* ColCount_int64
+
+    cdef size_t j
+
+    # Set the ColCount array
+    if use_int32:
+        LDp_mv_int32 = LD_py.indptr
+        Lp_int32 = <int32_t*>&LDp_mv_int32[0]
+        ColCount_int32 = <int32_t*>L.ColCount
+        for j in range(N):
+            ColCount_int32[j] = Lp_int32[j + 1] - Lp_int32[j]
+    else:
+        LDp_mv_int64 = LD_py.indptr
+        Lp_int64 = <int64_t*>&LDp_mv_int64[0]
+        ColCount_int64 = <int64_t*>L.ColCount
+        for j in range(N):
+            ColCount_int64[j] = Lp_int64[j + 1] - Lp_int64[j]
+
+    # Allocate space for a CHOLMOD LDL.T packed factor
+    cdef int to_xtype = CHOLMOD_REAL
+    cdef int to_ll = False  # LDL.T
+    cdef int to_super = False
+    cdef int to_packed = True
+    cdef int to_monotonic = True
+
+    if use_int32:
+        cholmod_change_factor(to_xtype, to_ll, to_super, to_packed, to_monotonic, L, cm)
+    else:
+        cholmod_l_change_factor(to_xtype, to_ll, to_super, to_packed, to_monotonic, L, cm)
+
+    cdef size_t lnz = L.nzmax
+
+    # Copy the data from LD_py to the CHOLMOD factor
+    if use_int32:
+        LDi_mv_int32 = LD_py.indices
+        Lp_int32 = <int32_t*>L.p
+        Li_int32 = <int32_t*>L.i
+        memcpy(Lp_int32, &LDp_mv_int32[0], (N + 1) * sizeof(int32_t))
+        memcpy(Li_int32, &LDi_mv_int32[0], lnz * sizeof(int32_t))
+    else:
+        LDi_mv_int64 = LD_py.indices
+        Lp_int64 = <int64_t*>L.p
+        Li_int64 = <int64_t*>L.i
+        memcpy(Lp_int64, &LDp_mv_int64[0], (N + 1) * sizeof(int64_t))
+        memcpy(Li_int64, &LDi_mv_int64[0], lnz * sizeof(int64_t))
+
+    # Get the numerical values of LD
+    cdef float32_t* Lx_float32
+    cdef float64_t* Lx_float64
+    cdef complex64_t* Lx_complex64
+    cdef complex128_t* Lx_complex128
+
+    if dtype == np.float32:
+        LDx_mv_float32 = LD_py.data
+        Lx_float32 = &LDx_mv_float32[0]
+        memcpy(L.x, Lx_float32, lnz * sizeof(float32_t))
+    elif dtype == np.float64:
+        LDx_mv_float64 = LD_py.data
+        Lx_float64 = &LDx_mv_float64[0]
+        memcpy(L.x, Lx_float64, lnz * sizeof(float64_t))
+    elif dtype == np.complex64:
+        LDx_mv_complex64 = LD_py.data
+        Lx_complex64 = &LDx_mv_complex64[0]
+        memcpy(L.x, Lx_complex64, lnz * sizeof(complex64_t))
+    elif dtype == np.complex128:
+        LDx_mv_complex128 = LD_py.data
+        Lx_complex128 = &LDx_mv_complex128[0]
+        memcpy(L.x, Lx_complex128, lnz * sizeof(complex128_t))
+
+    cdef int32_t* Lnz_int32
+    cdef int64_t* Lnz_int64
+
+    if use_int32:
+        Lnz_int32 = <int32_t*>L.nz
+        for j in range(N):
+            Lnz_int32[j] = Lp_int32[j + 1] - Lp_int32[j]
+    else:
+        Lnz_int64 = <int64_t*>L.nz
+        for j in range(N):
+            Lnz_int64[j] = Lp_int64[j + 1] - Lp_int64[j]
+
+
+
 # -----------------------------------------------------------------------------
 #         CSC <==> CHOLMOD Dense
 # -----------------------------------------------------------------------------
@@ -1610,3 +1762,152 @@ def ldlsolve(L, D, b, p=None):
         cholmod_l_finish(&cm)
 
     return X
+
+
+def ldlupdate(L, D, C, *, update=True):
+    """Multiple-rank update or downdate of a sparse LDL factorization.
+
+    Update the Cholesky factorization of a sparse matrix `A`:
+
+    .. math::
+
+        L' D' L'^{\\top} = P A P^{\\top} \pm C C^{\\top}
+
+    where `L` is a lower triangular matrix with unit diagonal, and `D` is
+    a diagonal matrix. The input ``C`` is a sparse matrix representing the
+    update or downdate to the factorization. If ``update`` is True, the
+    factorization is updated (+ sign), otherwise it is downdated (- sign).
+
+    Parameters
+    ----------
+    L : (N, N) csc_array
+        The lower triangular factor `L` from the LDL factorization, as
+        computed by :func:`.ldl`.
+    D : (N, N) dia_array
+        The diagonal matrix `D` from the LDL factorization, as computed by
+        :func:`.ldl`.
+    C : (N, K) csc_array
+        The sparse matrix representing the rank-`k` update or downdate to the
+        factorization. The number of rows must match that of ``L`` and ``D``.
+    update : bool, optional
+        If True, perform an update to the factorization. If False, perform a
+        downdate. Default is True.
+
+    Returns
+    -------
+    L' : (N, N) csc_array
+        The updated lower triangular factor `L'` of the LDL factorization.
+    D' : (N, N) dia_array
+        The updated diagonal matrix `D'` of the LDL factorization.
+    """
+    L, use_int32, _ = validate_csc_input(L, require_square=True)
+
+    if not issparse(D):
+        raise ValueError(f"Diagonal matrix D is type {type(D)}. "
+                         "Expected a scipy.sparse.dia_array or similar.")
+
+    if L.dtype != D.dtype:
+        raise ValueError(
+            f"Data types of L and D must match. Got {L.dtype} and {D.dtype}."
+        )
+
+    if D.shape != L.shape:
+        raise ValueError("Diagonal matrix D must match the size of L.")
+
+    if not issparse(C) or C.ndim not in {1, 2}:
+        raise ValueError(f"Update matrix C is type {type(C)}. "
+                         "Expected a 1D or 2D sparse array.")
+
+    N = L.shape[0]
+    K = C.shape[1] if C.ndim == 2 else 0
+
+    if C.shape[0] != N:
+        raise ValueError("Update matrix C must have the same number of rows as L.")
+
+    # -------------------------------------------------------------------------
+    #         Special Cases
+    # -------------------------------------------------------------------------
+    # Empty matrix
+    if N == 0:
+        return L.copy(), D.copy()
+
+    if L.nnz == 0 or D.nnz == 0:
+        raise CholmodError("Input matrix L or diagonal matrix D is empty.")
+
+    # -------------------------------------------------------------------------
+    #         Get the Inputs
+    # -------------------------------------------------------------------------
+    # Initialize the CHOLMOD common object
+    cdef cholmod_common Common
+    cdef cholmod_common *cm = &Common
+
+    if use_int32:
+        cholmod_start(cm)
+    else:
+        cholmod_l_start(cm)
+
+    # Ensure C is in CSC format
+    if C.ndim == 1:
+        C = C.reshape((-1, 1)).tocsc()  # (N, 1)
+
+    cdef cholmod_sparse Cmatrix
+    cdef cholmod_sparse* Cc = &Cmatrix
+
+    cdef object C_ref  # keep a reference to C so it is not garbage collected
+    C, C_use_int32, _ = validate_csc_input(C)
+
+    cdef int stype = 0  # use all of C
+    C_ref = _cholmod_sparse_from_csc(C, stype, C_use_int32, &Cmatrix)
+
+    # Get a factor from the L and D matrices
+    LD = L
+    LD.setdiag(D.diagonal())
+
+    cdef cholmod_factor* Lc
+
+    if use_int32:
+        Lc = cholmod_allocate_factor(N, cm)
+    else:
+        Lc = cholmod_l_allocate_factor(N, cm)
+
+    cdef object LD_ref = _ldlupdate_factor_from_csc(LD, use_int32, Lc, cm)
+
+    # -------------------------------------------------------------------------
+    #         Compute the Update
+    # -------------------------------------------------------------------------
+    cdef int ok
+
+    if use_int32:
+        ok = cholmod_updown(update, Cc, Lc, cm)
+    else:
+        ok = cholmod_l_updown(update, Cc, Lc, cm)
+
+    if not ok:
+        raise CholmodError("Update or downdate failed.")
+
+    # Re-separate the updated L and D from the factorization
+    cdef cholmod_sparse* LDsparse
+
+    # Get the packed LD sparse matrix
+    if use_int32:
+        LDsparse = cholmod_factor_to_sparse(Lc, cm)
+    else:
+        LDsparse = cholmod_l_factor_to_sparse(Lc, cm)
+
+    # -------------------------------------------------------------------------
+    #         Return the Updated Factors
+    # -------------------------------------------------------------------------
+    L = _csc_from_cholmod_sparse(LDsparse, cm)
+    D = diags_array(L.diagonal())
+    L.setdiag(1.0)
+
+    # Free the CHOLMOD factor
+    if use_int32:
+        cholmod_free_factor(&Lc, cm)
+        cholmod_finish(cm)
+    else:
+        cholmod_l_free_factor(&Lc, cm)
+        cholmod_l_finish(cm)
+
+    return L, D
+

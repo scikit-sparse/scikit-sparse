@@ -11,7 +11,7 @@
 # cython: language_level=3
 
 from libc.stdint cimport int32_t, int64_t
-from libc.string cimport memset
+from libc.string cimport memcpy, memset
 from numpy cimport float32_t, float64_t, complex64_t, complex128_t
 
 
@@ -81,6 +81,7 @@ cdef extern from "cholmod.h":
         size_t n
         size_t minor
         void *Perm
+        void *ColCount
         size_t nzmax
         void *p
         void *i
@@ -189,6 +190,19 @@ cdef extern from "cholmod.h":
         cholmod_common *Common
     )
 
+    int cholmod_updown(
+        int update,
+        cholmod_sparse *C,
+        cholmod_factor *L,
+        cholmod_common *Common
+    )
+    int cholmod_l_updown(
+        int update,
+        cholmod_sparse *C,
+        cholmod_factor *L,
+        cholmod_common *Common
+    )
+
     double cholmod_rcond(cholmod_factor *L, cholmod_common *Common)
     double cholmod_l_rcond(cholmod_factor *L, cholmod_common *Common)
 
@@ -197,6 +211,25 @@ cdef extern from "cholmod.h":
 
     cholmod_factor* cholmod_allocate_factor(size_t n, cholmod_common *Common)
     cholmod_factor* cholmod_l_allocate_factor(size_t n, cholmod_common *Common)
+
+    int cholmod_change_factor(
+        int to_xtype,
+        int to_ll,
+        int to_super,
+        int to_packed,
+        int to_monotonic,
+        cholmod_factor *L,
+        cholmod_common *Common
+    ) 
+    int cholmod_l_change_factor(
+        int to_xtype,
+        int to_ll,
+        int to_super,
+        int to_packed,
+        int to_monotonic,
+        cholmod_factor *L,
+        cholmod_common *Common
+    ) 
 
     int cholmod_free_sparse(cholmod_sparse **A, cholmod_common *Common)
     int cholmod_l_free_sparse(cholmod_sparse **A, cholmod_common *Common)
