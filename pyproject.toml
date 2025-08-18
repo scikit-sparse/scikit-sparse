@@ -67,6 +67,13 @@ dev = [
 [tool.setuptools.exclude-package-data]
 sksparse = ["*.c", "*.pyx"]
 
+# [tool.setuptools.packages.find]
+# exclude = ["cython_debug"]
+
+[tool.cython]
+language_level = "3"
+# gdb_debug = true
+
 [tool.ruff]
 line-length = 88
 target-version = "py310"

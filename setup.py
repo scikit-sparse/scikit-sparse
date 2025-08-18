@@ -17,7 +17,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-from Cython.Build import cythonize
 from setuptools import Extension, setup
 
 
@@ -87,19 +86,16 @@ INCLUDE_DIRS.append("/usr/include/suitesparse")  # Linux default path
 
 extension_names = ["cholmod", "amd", "btf", "camd", "colamd", "ccolamd"]
 
-setup(
-    # You may specify the directory where CHOLMOD is installed using the
-    # library_dirs and include_dirs keywords in the lines below.
-    ext_modules=cythonize(
-        [
-            Extension(
-                f"sksparse.{name}",
-                [f"sksparse/{name}.pyx"],
-                include_dirs=INCLUDE_DIRS,
-                library_dirs=LIBRARY_DIRS,
-                libraries=[name],
-            )
-            for name in extension_names
-        ],
-    ),
-)
+extensions = [
+    Extension(
+        f"sksparse.{name}",
+        [f"sksparse/{name}.pyx"],
+        include_dirs=INCLUDE_DIRS,
+        library_dirs=LIBRARY_DIRS,
+        libraries=[name],
+    )
+    for name in extension_names
+]
+
+# No need to call "cythonize" here. Rely on pyproject.toml.
+setup(ext_modules=extensions)
