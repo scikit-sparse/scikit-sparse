@@ -84,11 +84,17 @@ class CholmodSmallDiagonalWarning(CholmodWarning):
     pass
 
 
-cdef _error_handler(int status) except * with gil:
+cdef _handle_errors(int status) except * with gil:
     """Handle CHOLMOD errors by raising Python exceptions or warnings.
 
-    This function should be set as the error handler in the CHOLMOD common
-    struct before passing to any CHOLMOD function.
+    This function should be called with cholmod_common->status after any
+    CHOLMOD C function that may fail.
+
+    .. note::
+
+        It is not a safe practice to pass a function like this as the
+        "error_handler" member of the cholmod_common struct, because CHOLMOD
+        may call it from C code that does not hold the Python GIL.
 
     Parameters
     ----------
@@ -889,7 +895,7 @@ def _cholesky_base(
             cholmod_l_factorize(Ac, Lc, &cm)
 
     # Check for errors
-    _error_handler(cm.status)
+    _handle_errors(cm.status)
 
     # -------------------------------------------------------------------------
     #         Convert to scipy csc_array
