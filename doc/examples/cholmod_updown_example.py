@@ -62,10 +62,21 @@ W = sparse.coo_array(
 
 C = W[p].tocsc()  # permuted version
 
-Lp, Dp = ldlupdate(L, D, C, update=True)
+Lc, Dc = ldlupdate(L, D, C, update=True)
 
-Ap = A + W @ W.T  # (N, N) + (N, 1) @ (1, N) = (N, N)
-Sp = S + C @ C.T
+Aw = A + W @ W.T  # (N, N) + (N, 1) @ (1, N) = (N, N)
+Sc = S + C @ C.T
 
 # Verify that the updated factorization is correct
-assert_allclose((Lp @ Dp @ Lp.T).toarray(), Sp.toarray(), atol=1e-12)
+assert_allclose((Lc @ Dc @ Lc.T).toarray(), Sc.toarray(), atol=1e-12)
+
+# -----------------------------------------------------------------------------
+#         Solve the updated system
+# -----------------------------------------------------------------------------
+x = ldlsolve(Lc, Dc, b, p=p)
+
+Pxs = sparse.linalg.spsolve(Aw[p][:, p], b.todok()[p])
+xs = Pxs[np.argsort(p)]
+
+assert_allclose((Aw @ x).toarray(), b.toarray(), atol=1e-12)
+assert_allclose(x.toarray(), xs, atol=1e-12)
