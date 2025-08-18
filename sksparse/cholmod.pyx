@@ -979,12 +979,13 @@ def _cholesky_base(
     #         Set up Data Structures
     # -------------------------------------------------------------------------
     # Create the CHOLMOD common object
-    cdef cholmod_common cm
+    cdef cholmod_common Common
+    cdef cholmod_common *cm = &Common
 
     if use_int32:
-        cholmod_start(&cm)
+        cholmod_start(cm)
     else:
-        cholmod_l_start(&cm)
+        cholmod_l_start(cm)
 
     # Convert to packed LL.T when done
     cm.final_asis = False
@@ -1001,7 +1002,7 @@ def _cholesky_base(
 
     cm.quick_return_if_not_posdef = True
 
-    _set_ordering_method(order, &cm)
+    _set_ordering_method(order, cm)
 
     # Get the input matrix into CHOLMOD format
     cdef cholmod_sparse Amatrix
@@ -1032,19 +1033,19 @@ def _cholesky_base(
     cdef cholmod_factor* Lc
 
     if use_int32:
-        Lc = cholmod_analyze(Ac, &cm)
+        Lc = cholmod_analyze(Ac, cm)
 
         if ldl:
-            cholmod_factorize_p(Ac, betac, NULL, 0, Lc, &cm)
+            cholmod_factorize_p(Ac, betac, NULL, 0, Lc, cm)
         else:
-            cholmod_factorize(Ac, Lc, &cm)
+            cholmod_factorize(Ac, Lc, cm)
     else:
-        Lc = cholmod_l_analyze(Ac, &cm)
+        Lc = cholmod_l_analyze(Ac, cm)
 
         if ldl:
-            cholmod_l_factorize_p(Ac, betac, NULL, 0, Lc, &cm)
+            cholmod_l_factorize_p(Ac, betac, NULL, 0, Lc, cm)
         else:
-            cholmod_l_factorize(Ac, Lc, &cm)
+            cholmod_l_factorize(Ac, Lc, cm)
 
     # Check for errors
     _handle_errors(cm.status)
@@ -1058,32 +1059,32 @@ def _cholesky_base(
     cdef cholmod_sparse* Rc
 
     if use_int32:
-        Lsparse = cholmod_factor_to_sparse(Lc, &cm)
+        Lsparse = cholmod_factor_to_sparse(Lc, cm)
     else:
-        Lsparse = cholmod_l_factor_to_sparse(Lc, &cm)
+        Lsparse = cholmod_l_factor_to_sparse(Lc, cm)
 
     if remove_zeros:
         # drop explicit zeros from Lsparse
         if use_int32:
-            cholmod_drop(0, Lsparse, &cm)
+            cholmod_drop(0, Lsparse, cm)
         else:
-            cholmod_l_drop(0, Lsparse, &cm)
+            cholmod_l_drop(0, Lsparse, cm)
 
     if lower:
         Rc = Lsparse
     else:
         # Convert to upper triangular (conjugate transpose)
         if use_int32:
-            Rc = cholmod_transpose(Lsparse, CHOLMOD_TRANS_CONJ, &cm)
-            cholmod_free_sparse(&Lsparse, &cm)
+            Rc = cholmod_transpose(Lsparse, CHOLMOD_TRANS_CONJ, cm)
+            cholmod_free_sparse(&Lsparse, cm)
         else:
-            Rc = cholmod_l_transpose(Lsparse, CHOLMOD_TRANS_CONJ, &cm)
-            cholmod_l_free_sparse(&Lsparse, &cm)
+            Rc = cholmod_l_transpose(Lsparse, CHOLMOD_TRANS_CONJ, cm)
+            cholmod_l_free_sparse(&Lsparse, cm)
 
     # -------------------------------------------------------------------------
     #         Create outputs
     # -------------------------------------------------------------------------
-    R = _csc_from_cholmod_sparse(Rc, &cm)
+    R = _csc_from_cholmod_sparse(Rc, cm)
     p = _array_from_cholmod_permutation(Lc, N, use_int32)
 
     # For LDL, we need to extract the diagonal matrix D
@@ -1096,11 +1097,11 @@ def _cholesky_base(
     # original input matrix A. The MATLAB interface creates a *new*
     # cholmod_sparse object, so it needs to be freed.
     if use_int32:
-        cholmod_free_factor(&Lc, &cm)
-        cholmod_finish(&cm)
+        cholmod_free_factor(&Lc, cm)
+        cholmod_finish(cm)
     else:
-        cholmod_l_free_factor(&Lc, &cm)
-        cholmod_l_finish(&cm)
+        cholmod_l_free_factor(&Lc, cm)
+        cholmod_l_finish(cm)
 
     if ldl:
         return (R, D) if order is None else (R, D, p)
@@ -1346,7 +1347,7 @@ def cholmod(A, b, *, order=None, p=None):
 
     p : ndarray of int, optional
         The permutation vector used in the factorization. This may be the
-        output of :func:`.cholesky` with ``order != None``. Only one of 
+        output of :func:`.cholesky` with ``order != None``. Only one of
         ``order`` or ``p`` should be provided.
 
     Returns
@@ -1378,7 +1379,7 @@ def cholmod(A, b, *, order=None, p=None):
 
     N = A.shape[0]
     K = b.shape[1] if b.ndim == 2 else 0
-    
+
     if b.shape[0] != N:
         raise ValueError("Right-hand side b must have the same number of rows as A.")
 
@@ -1391,7 +1392,7 @@ def cholmod(A, b, *, order=None, p=None):
 
     # Initialize the CHOLMOD common object
     cdef cholmod_common cm
-    
+
     if use_int32:
         cholmod_start(&cm)
     else:
@@ -1502,7 +1503,7 @@ def cholmod(A, b, *, order=None, p=None):
     #         Solve the System
     # -------------------------------------------------------------------------
     cdef cholmod_sparse* Xs
-    cdef cholmod_dense* Xd 
+    cdef cholmod_dense* Xd
 
     if issparse(b):
         # Solve the sparse system
@@ -1618,28 +1619,29 @@ def ldlsolve(L, D, b, p=None):
     if D.shape != L.shape:
         raise ValueError("Diagonal matrix D must match the size of L.")
 
-    if b.ndim not in {1, 2}:
+    if (not (isinstance(b, np.ndarray) or issparse(b)) or b.ndim not in {1, 2}):
         raise ValueError("Right-hand side b must be a vector or matrix.")
 
     N = L.shape[0]
     K = b.shape[1] if b.ndim == 2 else 0
-    
+
     if b.shape[0] != N:
         raise ValueError("Right-hand side b must have the same number of rows as L.")
 
     # Initialize the CHOLMOD common object
-    cdef cholmod_common cm
-    
+    cdef cholmod_common Common
+    cdef cholmod_common *cm = &Common
+
     if use_int32:
-        cholmod_start(&cm)
+        cholmod_start(cm)
     else:
-        cholmod_l_start(&cm)
+        cholmod_l_start(cm)
 
     if p is not None:
         if not isinstance(p, np.ndarray) or p.shape != (N,):
             raise ValueError("Permutation vector p must be a 1D array of length N.")
 
-        if not _check_perm(p, use_int32, &cm):
+        if not _check_perm(p, use_int32, cm):
             raise ValueError("Permutation vector p is not valid.")
 
     # -------------------------------------------------------------------------
@@ -1674,10 +1676,11 @@ def ldlsolve(L, D, b, p=None):
         b = b[p]  # apply the permutation to b
 
     cdef object b_ref  # keep a reference to b so it is not garbage collected
+    cdef int stype = 0  # symmetric
 
     if issparse(b):
         b, b_use_int32, _ = validate_csc_input(b)
-        b_ref = _cholmod_sparse_from_csc(b, 0, b_use_int32, &Bspmatrix)
+        b_ref = _cholmod_sparse_from_csc(b, stype, b_use_int32, &Bspmatrix)
     else:
         b_ref = _cholmod_dense_from_ndarray(b, &Bmatrix)
 
@@ -1687,38 +1690,38 @@ def ldlsolve(L, D, b, p=None):
     cdef cholmod_factor* Lc
 
     if use_int32:
-        Lc = cholmod_allocate_factor(N, &cm)
+        Lc = cholmod_allocate_factor(N, cm)
     else:
-        Lc = cholmod_l_allocate_factor(N, &cm)
+        Lc = cholmod_l_allocate_factor(N, cm)
 
     # Combine the input L and D into a CHOLMOD factor
     LD = L.copy()
     LD.setdiag(D.diagonal())
 
-    cdef object L_ref = _cholmod_factor_from_csc(LD, use_int32, Lc, &cm)
+    cdef object LD_ref = _cholmod_factor_from_csc(LD, use_int32, Lc, cm)
 
     # -------------------------------------------------------------------------
     #         Solve the System
     # -------------------------------------------------------------------------
     cdef cholmod_sparse* Xs
-    cdef cholmod_dense* Xd 
+    cdef cholmod_dense* Xd
 
     if issparse(b):
         # Solve the sparse system
         if use_int32:
-            Xs = cholmod_spsolve(CHOLMOD_LDLt, Lc, Bs, &cm)
+            Xs = cholmod_spsolve(CHOLMOD_LDLt, Lc, Bs, cm)
         else:
-            Xs = cholmod_l_spsolve(CHOLMOD_LDLt, Lc, Bs, &cm)
+            Xs = cholmod_l_spsolve(CHOLMOD_LDLt, Lc, Bs, cm)
 
-        X = _csc_from_cholmod_sparse(Xs, &cm)
+        X = _csc_from_cholmod_sparse(Xs, cm)
     else:
         # Solve the dense system
         if use_int32:
-            Xd = cholmod_solve(CHOLMOD_LDLt, Lc, Bd, &cm)
+            Xd = cholmod_solve(CHOLMOD_LDLt, Lc, Bd, cm)
         else:
-            Xd = cholmod_l_solve(CHOLMOD_LDLt, Lc, Bd, &cm)
+            Xd = cholmod_l_solve(CHOLMOD_LDLt, Lc, Bd, cm)
 
-        X = _ndarray_from_cholmod_dense(Xd, use_int32, &cm)
+        X = _ndarray_from_cholmod_dense(Xd, use_int32, cm)
 
     if p is not None:
         # Apply the inverse permutation to the solution before (possibly)
@@ -1733,9 +1736,9 @@ def ldlsolve(L, D, b, p=None):
     cdef double rcond
 
     if use_int32:
-        rcond = cholmod_rcond(Lc, &cm)
+        rcond = cholmod_rcond(Lc, cm)
     else:
-        rcond = cholmod_l_rcond(Lc, &cm)
+        rcond = cholmod_l_rcond(Lc, cm)
 
     if rcond == 0:
         raise CholmodNotPositiveDefiniteError(
@@ -1755,11 +1758,11 @@ def ldlsolve(L, D, b, p=None):
     # NOTE there is no need to free Bspmatrix or Bmatrix here, since they
     # are just pointers to the original input b.
     if use_int32:
-        cholmod_free_factor(&Lc, &cm)
-        cholmod_finish(&cm)
+        cholmod_free_factor(&Lc, cm)
+        cholmod_finish(cm)
     else:
-        cholmod_l_free_factor(&Lc, &cm)
-        cholmod_l_finish(&cm)
+        cholmod_l_free_factor(&Lc, cm)
+        cholmod_l_finish(cm)
 
     return X
 
