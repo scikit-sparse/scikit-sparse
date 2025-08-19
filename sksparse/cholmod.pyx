@@ -863,15 +863,13 @@ cdef object _ndarray_from_cholmod_dense(
     return arr
 
 
-cdef np.ndarray _array_from_cholmod_permutation(
-    cholmod_factor* L, size_t N, bint use_int32
-):
+cdef np.ndarray _ndarray_from_cholmod_intarray(void* ptr, size_t N, bint use_int32):
     """Create a NumPy array from the permutation vector in a CHOLMOD factor.
 
     Parameters
     ----------
-    L : cholmod_factor*
-        The CHOLMOD factor containing the permutation vector.
+    ptr : void*
+        A pointer to the C array.
     N : size_t
         The size of the permutation vector.
     use_int32 : bool
@@ -882,15 +880,12 @@ cdef np.ndarray _array_from_cholmod_permutation(
     p : ndarray
         The permutation vector as a NumPy array.
     """
-    if L is NULL or L.minor != N:
-        raise ValueError("CHOLMOD factorization failed, cannot get permutation.")
+    if ptr is NULL:
+        raise ValueError("ptr is NULL, cannot get array")
 
     cdef int np_itypenum = np.NPY_INT32 if use_int32 else np.NPY_INT64
-    cdef void* data_ptr = L.Perm
-    cdef np.ndarray p = np.PyArray_SimpleNewFromData(1, [N], np_itypenum, data_ptr)
-    # TODO Instead of returning a copy here, create a view and
-    # a _CholmodFactorDestructor object to retain a reference?
-    # Return a copy in case L is freed
+    cdef np.ndarray p = np.PyArray_SimpleNewFromData(1, [N], np_itypenum, ptr)
+    # Return a copy in case ptr is freed
     return p.copy()
 
 
@@ -1085,7 +1080,7 @@ def _cholesky_base(
     #         Create outputs
     # -------------------------------------------------------------------------
     R = _csc_from_cholmod_sparse(Rc, cm)
-    p = _array_from_cholmod_permutation(Lc, N, use_int32)
+    p = _ndarray_from_cholmod_intarray(Lc.Perm, N, use_int32)
 
     # For LDL, we need to extract the diagonal matrix D
     if ldl:
