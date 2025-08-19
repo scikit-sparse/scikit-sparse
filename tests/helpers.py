@@ -15,9 +15,11 @@ import pytest
 from scipy import sparse
 
 
-def is_valid_permutation(p):
+def is_valid_permutation(p, N=None):
     """Check if a vector is a valid permutation."""
-    return np.array_equal(np.sort(p), np.arange(len(p)))
+    if N is None:
+        N = len(p)
+    return np.array_equal(np.sort(p), np.arange(N))
 
 
 def generate_random_matrices(
