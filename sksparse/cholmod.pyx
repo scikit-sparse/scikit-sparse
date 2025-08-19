@@ -1103,6 +1103,7 @@ cdef np.ndarray _ndarray_from_cholmod_intarray(void* ptr, size_t N, bint use_int
 
     cdef int np_itypenum = np.NPY_INT32 if use_int32 else np.NPY_INT64
     cdef np.ndarray p = np.PyArray_SimpleNewFromData(1, [N], np_itypenum, ptr)
+    # TODO set destructor base object
     # Return a copy in case ptr is freed
     return p.copy()
 
@@ -2401,11 +2402,11 @@ def analyze(A, *, kind=None, order=None):
     # -------------------------------------------------------------------------
     if transpose:
         if use_int32:
-            C = cholmod_transpose(Ac, 0, cm)
+            C = cholmod_transpose(Ac, CHOLMOD_TRANS_PATTERN, cm)
             Lc = cholmod_analyze(C, cm)
             cholmod_free_sparse(&C, cm)
         else:
-            C = cholmod_l_transpose(Ac, 0, cm)
+            C = cholmod_l_transpose(Ac, CHOLMOD_TRANS_PATTERN, cm)
             Lc = cholmod_l_analyze(C, cm)
             cholmod_l_free_sparse(&C, cm)
     else:
@@ -2577,12 +2578,14 @@ def symbfact(A, *, kind=None, lower=False, return_factor=False):
         First = cholmod_l_malloc(N, sizeof(int64_t), cm)
         Level = cholmod_l_malloc(N, sizeof(int64_t), cm)
 
-    cdef cholmod_sparse *Fc, *Aup, *Alo
+    cdef cholmod_sparse *Fc
+    cdef cholmod_sparse *Aup
+    cdef cholmod_sparse *Alo
 
     if use_int32:
-        Fc = cholmod_transpose(Ac, 0, cm)
+        Fc = cholmod_transpose(Ac, CHOLMOD_TRANS_PATTERN, cm)
     else:
-        Fc = cholmod_l_transpose(Ac, 0, cm)
+        Fc = cholmod_l_transpose(Ac, CHOLMOD_TRANS_PATTERN, cm)
 
     if Ac.stype == 1 or col_etree:
         Aup = Ac
