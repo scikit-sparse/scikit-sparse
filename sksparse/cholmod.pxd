@@ -30,6 +30,11 @@ cdef extern from "cholmod.h":
     int CHOLMOD_SINGLE
     int CHOLMOD_DOUBLE
 
+    # supernodal types
+    int CHOLMOD_SIMPLICIAL
+    int CHOLMOD_AUTO
+    int CHOLMOD_SUPERNODAL
+
     # Ordering methods
     int CHOLMOD_MAXMETHODS
     int CHOLMOD_NATURAL
@@ -65,6 +70,7 @@ cdef extern from "cholmod.h":
         int ordering
 
     ctypedef struct cholmod_common:
+        int supernodal
         int final_asis
         int final_super
         int final_ll
