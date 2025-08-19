@@ -33,7 +33,7 @@ References
 import numpy as np
 cimport numpy as np
 
-from scipy.sparse import csc_array, diags_array, issparse
+from scipy.sparse import csc_array, diags_array, eye_array, issparse
 import warnings
 
 from .utils import validate_csc_input
@@ -695,6 +695,224 @@ cdef object _ldlupdate_factor_from_csc(
         for j in range(N):
             Lnz_int64[j] = Lp_int64[j + 1] - Lp_int64[j]
 
+
+cdef cholmod_sparse* _cholesky_pattern(
+    cholmod_sparse *A,
+    cholmod_sparse *F,
+    size_t N,
+    int32_t *Parent,
+    int32_t *ColCount,
+    bint col_etree,
+    cholmod_common *cm
+):
+    """Compute the Cholesky pattern from the given matrices.
+
+    Parameters
+    ----------
+    A, F : cholmod_sparse*
+        Pointers to the sparse matrices to analyze.
+    N : size_t
+        The number of rows or columns in A.
+    Parent : int32_t*
+        Pointer to the array of the elimination tree.
+    ColCount : int32_t*
+        Pointer to the array of column counts of the Cholesky factor.
+    col_etree : bint
+        If True, analyze the column case F @ F.T. Otherwise, determine the case
+        from ``A->stype``.
+    cm : cholmod_common*
+        Pointer to a CHOLMOD common structure for configuration and status.
+
+    Returns
+    -------
+    L : cholmod_sparse*
+        A pointer to the array containing the pattern of the Cholesky factor.
+    """
+    if A is NULL or F is NULL or cm is NULL:
+        raise ValueError("Input pointer is NULL.")
+
+    cdef cholmod_sparse *A_in = NULL
+    cdef cholmod_sparse *F_in = NULL
+
+    if A.stype == 1:
+        A_in = A
+    elif A.stype == -1:
+        A_in = F
+    elif col_etree:
+        # column case: analyze F @ F.T
+        A_in = F
+        F_in = A
+    else:
+        # row case: analyze A @ A.T
+        A_in = A
+        F_in = F
+
+    # Count the total number of entries in L
+    cdef int32_t lnz = 0
+    cdef size_t j
+
+    for j in range(N):
+        lnz += ColCount[j]
+
+    # Initialize the CHOLMOD sparse matrix for L
+    cdef cholmod_sparse *L = cholmod_allocate_sparse(
+        N, N, lnz, True, True, 0, CHOLMOD_PATTERN, cm
+    )
+
+    cdef int32_t *Lp = <int32_t*>L.p
+    cdef int32_t *Li = <int32_t*>L.i
+
+    # Initialize column pointers
+    lnz = 0
+
+    for j in range(N):
+        Lp[j] = lnz
+        lnz += ColCount[j]
+
+    Lp[N] = lnz
+
+    # Create a copy of the column pointers
+    cdef int32_t *W = <int32_t*>cholmod_malloc(N, sizeof(int32_t), cm)
+    memcpy(W, Lp, N * sizeof(int32_t))
+
+    # Get workspace for computing one row of L
+    cdef cholmod_sparse *R = cholmod_allocate_sparse(
+        N, 1, N, False, True, 0, CHOLMOD_PATTERN, cm
+    )
+
+    cdef int32_t *Rp = <int32_t*>R.p
+    cdef int32_t *Ri = <int32_t*>R.i
+    cdef size_t k
+    cdef size_t p
+    cdef size_t idx
+
+    for k in range(N):
+        # Get the kth row of L and store in the columns of L
+        cholmod_row_subtree(A_in, F_in, k, Parent, R, cm)
+
+        for p in range(Rp[1]):
+            idx = W[Ri[p]]
+            Li[idx] = k
+            W[Ri[p]] += 1
+
+        # Add the diagonal entry
+        idx = W[k]
+        Li[idx] = k
+        W[k] += 1
+
+    # Free the workspace
+    cholmod_free(N, sizeof(int32_t), W, cm)
+    cholmod_free_sparse(&R, cm)
+
+    return L
+
+
+cdef cholmod_sparse* _cholesky_l_pattern(
+    cholmod_sparse *A,
+    cholmod_sparse *F,
+    size_t N,
+    int64_t *Parent,
+    int64_t *ColCount,
+    bint col_etree,
+    cholmod_common *cm
+):
+    """Compute the Cholesky pattern from the given matrices.
+
+    Parameters
+    ----------
+    A, F : cholmod_sparse*
+        Pointers to the sparse matrices to analyze.
+    N : size_t
+        The number of rows or columns in A.
+    Parent : int64_t*
+        Pointer to the array of the elimination tree.
+    ColCount : int64_t*
+        Pointer to the array of column counts of the Cholesky factor.
+    col_etree : bint
+        If True, analyze the column case F @ F.T. Otherwise, determine the case
+        from ``A->stype``.
+    cm : cholmod_common*
+        Pointer to a CHOLMOD common structure for configuration and status.
+
+    Returns
+    -------
+    L : cholmod_sparse*
+        A pointer to the array containing the pattern of the Cholesky factor.
+    """
+    if A is NULL or F is NULL or cm is NULL:
+        raise ValueError("Input pointer is NULL.")
+
+    cdef cholmod_sparse *A_in = NULL
+    cdef cholmod_sparse *F_in = NULL
+
+    if A.stype == 1:
+        A_in = A
+    elif A.stype == -1:
+        A_in = F
+    elif col_etree:
+        # column case: analyze F @ F.T
+        A_in = F
+        F_in = A
+    else:
+        # row case: analyze A @ A.T
+        A_in = A
+        F_in = F
+
+    # Count the total number of entries in L
+    cdef int64_t lnz = 0
+    cdef size_t j
+
+    for j in range(N):
+        lnz += ColCount[j]
+
+    # Initialize the CHOLMOD sparse matrix for L
+    cdef cholmod_sparse *L = cholmod_l_allocate_sparse(
+        N, N, lnz, True, True, 0, CHOLMOD_PATTERN, cm
+    )
+
+    cdef int64_t *Lp = <int64_t*>L.p
+    cdef int64_t *Li = <int64_t*>L.i
+
+    # Initialize column pointers
+    lnz = 0
+
+    for j in range(N):
+        Lp[j] = lnz
+        lnz += ColCount[j]
+
+    Lp[N] = lnz
+
+    # Create a copy of the column pointers
+    cdef int64_t *W = <int64_t*>cholmod_l_malloc(N, sizeof(int64_t), cm)
+    memcpy(W, Lp, N * sizeof(int64_t))
+
+    # Get workspace for computing one row of L
+    cdef cholmod_sparse* R = cholmod_l_allocate_sparse(
+        N, 1, N, False, True, 0, CHOLMOD_PATTERN, cm
+    )
+
+    cdef int64_t *Rp = <int64_t*>R.p
+    cdef int64_t *Ri = <int64_t*>R.i
+    cdef size_t k, p, idx
+
+    for k in range(N):
+        # Get the kth row of L and store in the columns of L
+        cholmod_l_row_subtree(A_in, F_in, k, Parent, R, cm)
+
+        for p in range(Rp[1]):
+            idx = W[Ri[p]]
+            Li[idx] = k
+            W[Ri[p]] += 1
+
+        # Add the diagonal entry
+        idx = W[k]
+        Li[idx] = k
+        W[k] += 1
+
+    # Free the workspace
+    cholmod_l_free_sparse(&R, cm)
+
+    return L
 
 
 # -----------------------------------------------------------------------------
@@ -2211,3 +2429,278 @@ def analyze(A, *, kind=None, order=None):
         cholmod_l_finish(cm)
 
     return p, count
+
+
+def symbfact(A, *, kind=None, lower=False, return_factor=False):
+    """Symbolic factorization of a sparse matrix for Cholesky or LDL.
+
+    This function performs the symbolic factorization of a sparse matrix ``A``
+    for either Cholesky or LDL factorization. It computes the elimination
+    tree and analyzes the sparsity pattern of the matrix [#symbfact_c]_.
+
+    Parameters
+    ----------
+    A : (N, N) csc_array
+        The input matrix in Compressed Sparse Column (CSC) format. Must be
+        square and symmetric. No check is made for symmetry, so the upper (or
+        lower) triangular part of the matrix is used for the factorization, depending
+        on the ``lower`` parameter.
+    kind : str in {"sym", "row", "col"}, optional
+        The type of factorization for which to analyze the matrix:
+
+        * ``sym``: Symmetric factorization. Only the lower triangular part of
+          ``A`` is used, and no check is made for symmetry.
+        * ``row``: Unsymmetric factorization of :math:`A A^{\\top}`.
+        * ``col``: Unsymmetric factorization of :math:`A^{\\top} A`.
+        * ``lo``: Lower triangular factorization. Same as ``symbfact(A.T)``.
+          Only the lower triangular part of ``A`` is used, and no check is made
+          for symmetry.
+
+    lower : bool, optional
+        If True, the symbolic factorization is performed on the lower
+        triangular part of the matrix. If False, the upper triangular part is
+        used. Default is False (upper triangular).
+    return_factor : bool, optional
+        If True, the symbolic factorization returns the structure of the
+        Cholesky factor `L` (or `LD` for LDL factorization) as a sparse matrix.
+        Default is False.
+
+    Returns
+    -------
+    count : (N,) ndarray of int
+        The count of nonzeros in each column of the Cholesky factor.
+    h : int
+        The height of the elimination tree.
+    parent : (N,) ndarray of int
+        The parent of each node in the elimination tree. The root has no parent
+        (parent[0] = -1).
+    post : (N,) ndarray of int
+        The postorder of the elimination tree. The first node in the postorder
+        is the root of the tree.
+    L : (N, N) csc_array
+        The symbolic factorization of the matrix. Only returned if
+        ``return_factor`` is True.
+
+    References
+    ----------
+    .. [#symbfact_c] ``symbfact2.c`` - CHOLMOD MATLAB symbolic factorization function
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/symbfact2.c
+    """
+    A, use_int32, out_itype = validate_csc_input(A)
+
+    if kind is None:
+        kind = "sym"
+
+    if kind not in {"sym", "row", "col", "lo"}:
+        raise ValueError(f"Unknown factorization kind: {kind}")
+
+    cdef size_t M = A.shape[0]
+    cdef size_t N = A.shape[1]
+
+    if kind not in ["row", "col"] and M != N:
+        raise ValueError(f"Input matrix A must be square, got shape {A.shape}.")
+
+    # Special Cases
+    # sym: A = (0, 0)
+    # row: AA.T = (0, N) * (N, 0) = (0, 0)
+    # col: A.TA = (0, M) * (M, 0) = (0, 0)
+    if kind == "row" and M == 0 or N == 0:
+        empty = np.array([], dtype=out_itype)
+        count, h, parent, post, L = empty, 0, empty, empty, A.copy()
+        if return_factor:
+            return count, h, parent, post, L
+        else:
+            return count, h, parent, post
+
+    if A.nnz == 0:
+        D = N if kind == "col" else M
+        count = np.zeros(D, dtype=out_itype)
+        h = 1
+        parent = np.full(D, -1, dtype=out_itype)
+        post = np.arange(D, dtype=out_itype)
+        L = eye_array(D, dtype=A.dtype)
+        if return_factor:
+            return count, h, parent, post, L
+        else:
+            return count, h, parent, post
+
+    # -------------------------------------------------------------------------
+    #         Start the Analysis
+    # -------------------------------------------------------------------------
+    cdef cholmod_common Common
+    cdef cholmod_common *cm = &Common
+
+    if use_int32:
+        cholmod_start(cm)
+    else:
+        cholmod_l_start(cm)
+
+    cdef cholmod_sparse Amatrix
+    cdef cholmod_sparse* Ac = &Amatrix
+    cdef int stype = 1  # default kind="sym" uses triu(A) only
+    cdef bint col_etree = False
+
+    if kind == "row":
+        stype = 0  # use A * A.T
+    elif kind == "col":
+        stype = 0  # use A.T * A
+        col_etree = True
+    elif kind == "lo":
+        stype = -1  # use tril(A) only
+
+    # Get sparse *pattern*
+    cdef object A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
+    Ac.xtype = CHOLMOD_PATTERN
+    Ac.x = NULL
+
+    # -------------------------------------------------------------------------
+    #         Compute the Outputs
+    # -------------------------------------------------------------------------
+    N = Ac.nrow
+
+    cdef void *Parent
+    cdef void *Post
+    cdef void *ColCount
+    cdef void *First
+    cdef void *Level
+
+    if use_int32:
+        Parent = cholmod_malloc(N, sizeof(int32_t), cm)
+        Post = cholmod_malloc(N, sizeof(int32_t), cm)
+        ColCount = cholmod_malloc(N, sizeof(int32_t), cm)
+        First = cholmod_malloc(N, sizeof(int32_t), cm)
+        Level = cholmod_malloc(N, sizeof(int32_t), cm)
+    else: 
+        Parent = cholmod_l_malloc(N, sizeof(int64_t), cm)
+        Post = cholmod_l_malloc(N, sizeof(int64_t), cm)
+        ColCount = cholmod_l_malloc(N, sizeof(int64_t), cm)
+        First = cholmod_l_malloc(N, sizeof(int64_t), cm)
+        Level = cholmod_l_malloc(N, sizeof(int64_t), cm)
+
+    cdef cholmod_sparse *Fc, *Aup, *Alo
+
+    if use_int32:
+        Fc = cholmod_transpose(Ac, 0, cm)
+    else:
+        Fc = cholmod_l_transpose(Ac, 0, cm)
+
+    if Ac.stype == 1 or col_etree:
+        Aup = Ac
+        Alo = Fc
+    else:
+        Aup = Fc
+        Alo = Ac
+
+    if use_int32:
+        cholmod_etree(Aup, <int32_t*>Parent, cm)
+    else:
+        cholmod_l_etree(Aup, <int64_t*>Parent, cm)
+
+    _handle_errors(cm.status)
+
+    if use_int32:
+        if cholmod_postorder(<int32_t*>Parent, N, NULL, <int32_t*>Post, cm) != N:
+            raise CholmodError("Postordering failed.")
+    else:
+        if cholmod_l_postorder(<int64_t*>Parent, N, NULL, <int64_t*>Post, cm) != N:
+            raise CholmodError("Postordering failed.")
+
+    if use_int32:
+        cholmod_rowcolcounts(
+            Alo,
+            NULL,
+            0,
+            <int32_t*>Parent,
+            <int32_t*>Post,
+            NULL,
+            <int32_t*>ColCount,
+            <int32_t*>First,
+            <int32_t*>Level,
+            cm
+        )
+    else:
+        cholmod_l_rowcolcounts(
+            Alo,
+            NULL,
+            0,
+            <int64_t*>Parent,
+            <int64_t*>Post,
+            NULL,
+            <int64_t*>ColCount,
+            <int64_t*>First,
+            <int64_t*>Level,
+            cm
+        )
+
+    _handle_errors(cm.status)
+
+    # Return the results
+    count = _ndarray_from_cholmod_intarray(ColCount, N, use_int32)
+
+    # Compute height of the elimination tree
+    cdef int32_t h_int32 = 0
+    cdef int64_t h_int64 = 0
+    cdef size_t i
+
+    if use_int32:
+        for i in range(N):
+            h_int32 = max(h_int32, (<int32_t*>Level)[i])
+        h = h_int32 + 1
+    else:
+        for i in range(N):
+            h_int64 = max(h_int64, (<int64_t*>Level)[i])
+        h = h_int64 + 1
+
+    parent = _ndarray_from_cholmod_intarray(Parent, N, use_int32)
+    post = _ndarray_from_cholmod_intarray(Post, N, use_int32)
+
+    # Construct symbolic L if requested
+    cdef cholmod_sparse *Ls
+    cdef cholmod_sparse *Rs
+
+    if return_factor:
+        if use_int32:
+            Ls = _cholesky_pattern(
+                Ac, Fc, N, <int32_t*>Parent, <int32_t*>ColCount, col_etree, cm
+            )
+            if not lower:
+                Rs = cholmod_transpose(Ls, CHOLMOD_TRANS_PATTERN, cm)
+                cholmod_free_sparse(&Ls, cm)
+                Ls = Rs
+        else:
+            Ls = _cholesky_l_pattern(
+                Ac, Fc, N, <int64_t*>Parent, <int64_t*>ColCount, col_etree, cm
+            )
+            if not lower:
+                Rs = cholmod_l_transpose(Ls, CHOLMOD_TRANS_PATTERN, cm)
+                cholmod_l_free_sparse(&Ls, cm)
+                Ls = Rs
+
+        # Convert the symbolic L to a CSC array
+        L = _csc_from_cholmod_sparse(Ls, cm)
+
+        # Fill the L matrix data with boolean ones (for python)
+        L.data = np.ones(L.nnz, dtype=np.bool_)
+
+    # Free memory (arrays are copied to numpy)
+    if use_int32:
+        cholmod_free(N, sizeof(int32_t), Parent, cm)
+        cholmod_free(N, sizeof(int32_t), Post, cm)
+        cholmod_free(N, sizeof(int32_t), ColCount, cm)
+        cholmod_free(N, sizeof(int32_t), First, cm)
+        cholmod_free(N, sizeof(int32_t), Level, cm)
+        cholmod_free_sparse(&Fc, cm)
+        cholmod_finish(cm)
+    else:
+        cholmod_l_free(N, sizeof(int64_t), Parent, cm)
+        cholmod_l_free(N, sizeof(int64_t), Post, cm)
+        cholmod_l_free(N, sizeof(int64_t), ColCount, cm)
+        cholmod_l_free(N, sizeof(int64_t), First, cm)
+        cholmod_l_free(N, sizeof(int64_t), Level, cm)
+        cholmod_l_free_sparse(&Fc, cm)
+        cholmod_l_finish(cm)
+
+    if return_factor:
+        return count, h, parent, post, L
+    else:
+        return count, h, parent, post

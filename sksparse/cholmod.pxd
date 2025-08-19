@@ -241,6 +241,27 @@ cdef extern from "cholmod.h":
     cholmod_sparse* cholmod_factor_to_sparse(cholmod_factor *L, cholmod_common *Common)
     cholmod_sparse* cholmod_l_factor_to_sparse(cholmod_factor *L, cholmod_common *Common)
 
+    cholmod_sparse *cholmod_allocate_sparse(
+        size_t nrow,
+        size_t ncol,
+        size_t nzmax,
+        int sorted,
+        int packed,
+        int stype,
+        int xdtype,
+        cholmod_common *Common
+    )
+    cholmod_sparse *cholmod_l_allocate_sparse(
+        size_t nrow,
+        size_t ncol,
+        size_t nzmax,
+        int sorted,
+        int packed,
+        int stype,
+        int xdtype,
+        cholmod_common *Common
+    )
+
     cholmod_factor* cholmod_allocate_factor(size_t n, cholmod_common *Common)
     cholmod_factor* cholmod_l_allocate_factor(size_t n, cholmod_common *Common)
 
@@ -262,6 +283,87 @@ cdef extern from "cholmod.h":
         cholmod_factor *L,
         cholmod_common *Common
     ) 
+
+    int cholmod_etree(
+        cholmod_sparse *A,
+        int32_t *Parent,
+        cholmod_common *Common
+    )
+    int cholmod_l_etree(
+        cholmod_sparse *A,
+        int64_t *Parent,
+        cholmod_common *Common
+    )
+
+    int32_t cholmod_postorder(
+        int32_t *Parent,
+        size_t n,
+        int32_t *Weight,
+        int32_t *Post,
+        cholmod_common *Common
+    )
+    int64_t cholmod_l_postorder(
+        int64_t *Parent,
+        size_t n,
+        int64_t *Weight,
+        int64_t *Post,
+        cholmod_common *Common
+    )
+
+    int cholmod_rowcolcounts(
+        cholmod_sparse *A,
+        int32_t *fset,
+        size_t fsize,
+        int32_t *Parent,
+        int32_t *Post,
+        int32_t *RowCount,
+        int32_t *ColCount,
+        int32_t *First,
+        int32_t *Level,
+        cholmod_common *Common
+    )
+    int cholmod_l_rowcolcounts(
+        cholmod_sparse *A,
+        int64_t *fset,
+        size_t fsize,
+        int64_t *Parent,
+        int64_t *Post,
+        int64_t *RowCount,
+        int64_t *ColCount,
+        int64_t *First,
+        int64_t *Level,
+        cholmod_common *Common
+    )
+
+    int cholmod_row_subtree(
+        cholmod_sparse *A,
+        cholmod_sparse *F,
+        size_t krow,
+        int32_t *Parent,
+        cholmod_sparse *R,
+        cholmod_common *Common
+    )
+    int cholmod_l_row_subtree(
+        cholmod_sparse *A,
+        cholmod_sparse *F,
+        size_t krow,
+        int64_t *Parent,
+        cholmod_sparse *R,
+        cholmod_common *Common
+    )
+
+    void *cholmod_free(
+        size_t n,
+        size_t size,
+        void *p,
+        cholmod_common *Common
+    )
+    void *cholmod_l_free(
+        size_t n,
+        size_t size,
+        void *p,
+        cholmod_common *Common
+    )
 
     int cholmod_free_sparse(cholmod_sparse **A, cholmod_common *Common)
     int cholmod_l_free_sparse(cholmod_sparse **A, cholmod_common *Common)
