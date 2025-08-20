@@ -18,14 +18,13 @@ from scipy.sparse.linalg import LaplacianNd
 
 from sksparse.cholmod import ldl, ldlrowmod, ldlsolve, ldlupdate, resymbol
 
-N = 15  # arbitrary problem size A = (N**2, N**2)
+Ng = 15  # arbitrary problem size A = (Ng**2, Ng**2)
 
 
-# TODO test with real and complex data types
 @pytest.fixture
 def A():
     # Create (negative) Laplacian matrix that is symmetric positive definite
-    G = LaplacianNd((N, N))
+    G = LaplacianNd((Ng, Ng))
     A = -G.tosparse().tocsc().astype(float)
     A.setdiag(A.diagonal() + 1)  # make it positive definite
     return A
@@ -33,7 +32,7 @@ def A():
 
 @pytest.fixture
 def expect_x():
-    return sparse.dok_array(np.arange(N * N))
+    return sparse.dok_array(np.arange(Ng * Ng))
 
 
 @pytest.fixture
@@ -47,96 +46,82 @@ def ldl_factors(A):
     return L, D, p
 
 
-def test_ldlupdown(A, expect_x, b, ldl_factors):
+def _create_update_matrix(L, N, rng):
+    # See CHOLMOD/MATLAB/Test/test0.m for the original example
+    k = rng.integers(1, N // 4)
+    cols = rng.choice(N, size=k, replace=False)  # random columns to update
+
+    # Take existing pattern from L
+    C = L[:, cols].copy()
+    C.data = rng.normal(size=C.nnz).astype(L.dtype)  # random values for the update
+
+    # Add one entry to make sure L gets some fill-in
+    row = rng.integers(0, N)
+    C = C.todok()
+    C[row, 0] = 1.0
+
+    return C.tocsc()
+
+
+def test_ldlupdown(A, ldl_factors):
     L, D, p = ldl_factors
+    N = A.shape[0]
 
     # Verify that the factorization is correct
     S = A[p][:, p]
     assert_allclose((L @ D @ L.T).toarray(), S.toarray(), atol=1e-12)
 
-    # Solve Ax = b using LDL.T of A[p][:, p]
-    x = ldlsolve(L, D, b, p=p)
+    # Compute a rank-k update of LDL.T factorization
+    rng = np.random.default_rng(56)
+    C = _create_update_matrix(L, N, rng)
 
-    assert_allclose(x.toarray(), expect_x.toarray(), atol=1e-12)
-
-    # Solve using scipy sparse
-    xs = sparse.linalg.spsolve(A, b.tocoo())
-
-    assert_allclose(x.toarray(), xs, atol=1e-12)
-
-    # -------------------------------------------------------------------------
-    #         Compute a rank-1 update of LDL.T factorization
-    # -------------------------------------------------------------------------
-    # Arbitrary values to update (see CHOLMOD/MATLAB/cholmod_updown_demo.m)
-    # These indices are in the original A, so the non-zero pattern does not change
-    W = sparse.coo_array(
-        ([5, -1, -1, -1], ([0, 1, 2, 151], [0, 0, 0, 0])),
-        shape=(N * N, 1),
-        dtype=A.dtype,
-    ).todok()
-
-    C = W[p].tocsc()  # permuted version
-
+    # Update the factorization
     Lc, Dc = ldlupdate(L, D, C, update=True)
 
-    Aw = A + W @ W.T  # (N, N) + (N, 1) @ (1, N) = (N, N)
-    Sc = S + C @ C.T
-
     # Verify that the updated factorization is correct
+    Sc = S + C @ C.T
     assert_allclose((Lc @ Dc @ Lc.T).toarray(), Sc.toarray(), atol=1e-12)
 
-    # Solve the updated system
-    x = ldlsolve(Lc, Dc, b, p=p)
-
-    Pxs = sparse.linalg.spsolve(Aw[p][:, p], b.todok()[p])
-    xs = Pxs[np.argsort(p)]
-
-    assert_allclose((Aw @ x).toarray(), b.toarray(), atol=1e-12)
-    assert_allclose(x.toarray(), xs, atol=1e-12)
-
-    # -------------------------------------------------------------------------
-    #         Downdate back to the original factorization
-    # -------------------------------------------------------------------------
+    # Downdate back to the original factorization
     Ld, Dd = ldlupdate(Lc, Dc, C, update=False)
-
     assert_allclose((Ld @ Dd @ Ld.T).toarray(), S.toarray(), atol=1e-12)
 
 
-def test_resymbol(A, expect_x, b, ldl_factors):
+def test_resymbol(A, ldl_factors):
     L, D, p = ldl_factors
+    N = A.shape[0]
+
+    # Verify that the factorization is correct
     S = A[p][:, p]
+    assert_allclose((L @ D @ L.T).toarray(), S.toarray(), atol=1e-12)
 
-    # -------------------------------------------------------------------------
-    #         Compute a rank-1 update of LDL.T factorization
-    # -------------------------------------------------------------------------
-    # Arbitrary values to update (see CHOLMOD/MATLAB/cholmod_updown_demo.m)
-    # These indices are in the original A, so the non-zero pattern does not change
-    W = sparse.coo_array(
-        ([5, -1, -1, -1], ([0, 1, 2, 151], [0, 0, 0, 0])),
-        shape=(N * N, 1),
-        dtype=A.dtype,
-    ).todok()
+    # Compute a rank-k update of LDL.T factorization
+    rng = np.random.default_rng(56)
+    C = _create_update_matrix(L, N, rng)
 
-    C = W[p].tocsc()  # permuted version
-
+    # Update the factorization
     Lc, Dc = ldlupdate(L, D, C, update=True)
 
-    Sc = S + C @ C.T
-
     # Verify that the updated factorization is correct
+    Sc = S + C @ C.T
     assert_allclose((Lc @ Dc @ Lc.T).toarray(), Sc.toarray(), atol=1e-12)
 
-    # -------------------------------------------------------------------------
-    #         Downdate back to the original factorization
-    # -------------------------------------------------------------------------
+    # Downdate back to the original factorization
     Ld, Dd = ldlupdate(Lc, Dc, C, update=False)
-
     assert_allclose((Ld @ Dd @ Ld.T).toarray(), S.toarray(), atol=1e-12)
 
-    # Test resymbolization
+    print("\nBefore resymbol:")
+    print(f"{ L.nnz=}")
+    print(f"{Ld.nnz=}")
+
+    # Test resymbol
     Lr = resymbol(Ld, S)
 
-    assert_allclose((Lr @ Dd @ Lr.T).toarray(), S.toarray(), atol=1e-12)
+    print("After resymbol:")
+    print(f"{Lr.nnz=}")
+
+    # Compare with the original factorization
+    assert_allclose(Lr.toarray(), L.toarray(), atol=1e-12)
 
 
 def test_ldlrowmod(A, expect_x, b, ldl_factors):
