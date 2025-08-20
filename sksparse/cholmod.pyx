@@ -2081,7 +2081,7 @@ def ldlupdate(L, D, C, *, update=True):
     C_ref = _cholmod_sparse_from_csc(C, stype, C_use_int32, &Cmatrix)
 
     # Get a factor from the L and D matrices
-    LD = L
+    LD = L.copy()
     LD.setdiag(D.diagonal())
 
     cdef cholmod_factor* Lc
