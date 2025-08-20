@@ -2449,7 +2449,7 @@ def symbfact(A, *, kind=None, lower=False, return_factor=False):
     kind : str in {"sym", "row", "col"}, optional
         The type of factorization for which to analyze the matrix:
 
-        * ``sym``: Symmetric factorization. Only the lower triangular part of
+        * ``sym``: Symmetric factorization. Only the upper triangular part of
           ``A`` is used, and no check is made for symmetry.
         * ``row``: Unsymmetric factorization of :math:`A A^{\\top}`.
         * ``col``: Unsymmetric factorization of :math:`A^{\\top} A`.
@@ -2457,6 +2457,7 @@ def symbfact(A, *, kind=None, lower=False, return_factor=False):
           Only the lower triangular part of ``A`` is used, and no check is made
           for symmetry.
 
+        If ``kind`` is None, it defaults to ``sym``.
     lower : bool, optional
         If True, the symbolic factorization is performed on the lower
         triangular part of the matrix. If False, the upper triangular part is
@@ -2538,12 +2539,15 @@ def symbfact(A, *, kind=None, lower=False, return_factor=False):
 
     cdef cholmod_sparse Amatrix
     cdef cholmod_sparse* Ac = &Amatrix
+
+    N = A.shape[0]
     cdef int stype = 1  # default kind="sym" uses triu(A) only
     cdef bint col_etree = False
 
     if kind == "row":
         stype = 0  # use A * A.T
     elif kind == "col":
+        N = A.shape[1]
         stype = 0  # use A.T * A
         col_etree = True
     elif kind == "lo":
@@ -2557,8 +2561,6 @@ def symbfact(A, *, kind=None, lower=False, return_factor=False):
     # -------------------------------------------------------------------------
     #         Compute the Outputs
     # -------------------------------------------------------------------------
-    N = Ac.nrow
-
     cdef void *Parent
     cdef void *Post
     cdef void *ColCount
@@ -2707,3 +2709,180 @@ def symbfact(A, *, kind=None, lower=False, return_factor=False):
         return count, h, parent, post, L
     else:
         return count, h, parent, post
+
+
+def etree(A, *, kind=None, return_post=False):
+    """Symbolic factorization of a sparse matrix for Cholesky or LDL.
+
+    This function determines the elimination tree of a sparse matrix ``A``, and
+    optionally postorders the tree [#etree_c]_.
+
+    Parameters
+    ----------
+    A : (N, N) csc_array
+        The input matrix in Compressed Sparse Column (CSC) format. Must be
+        square and symmetric. No check is made for symmetry, so the upper (or
+        lower) triangular part of the matrix is used for the factorization, depending
+        on the ``lower`` parameter.
+    kind : str in {"sym", "row", "col"}, optional
+        The type of factorization for which to analyze the matrix:
+
+        * ``sym``: Symmetric factorization. Only the upper triangular part of
+          ``A`` is used, and no check is made for symmetry.
+        * ``row``: Unsymmetric factorization of :math:`A A^{\\top}`.
+        * ``col``: Unsymmetric factorization of :math:`A^{\\top} A`.
+        * ``lo``: Lower triangular factorization. Same as ``symbfact(A.T)``.
+          Only the lower triangular part of ``A`` is used, and no check is made
+          for symmetry.
+
+        If ``kind`` is None, it defaults to ``sym``.
+    return_post : bool, optional
+        If True, the function returns the postorder of the elimination tree.
+        Default is False.
+
+    Returns
+    -------
+    parent : (N,) ndarray of int
+        The parent of each node in the elimination tree. The root has no parent
+        (parent[0] = -1).
+    post : (N,) ndarray of int, optional
+        The postorder of the elimination tree. The first node in the postorder
+        is the root of the tree.
+
+    References
+    ----------
+    .. [#etree_c] ``etree2.c`` - CHOLMOD MATLAB symbolic factorization function
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/etree2.c
+    """
+    A, use_int32, out_itype = validate_csc_input(A)
+
+    if kind is None:
+        kind = "sym"
+
+    if kind not in {"sym", "row", "col", "lo"}:
+        raise ValueError(f"Unknown factorization kind: {kind}")
+
+    cdef size_t M = A.shape[0]
+    cdef size_t N = A.shape[1]
+
+    if kind not in ["row", "col"] and M != N:
+        raise ValueError(f"Input matrix A must be square, got shape {A.shape}.")
+
+    # Special Cases
+    # sym: A = (0, 0)
+    # row: AA.T = (0, N) * (N, 0) = (0, 0)
+    # col: A.TA = (0, M) * (M, 0) = (0, 0)
+    if kind == "row" and M == 0 or N == 0:
+        parent = np.array([], dtype=out_itype)
+        if return_post:
+            return parent, parent.copy()
+        else:
+            return parent
+
+    if A.nnz == 0:
+        D = N if kind == "col" else M
+        parent = np.full(D, -1, dtype=out_itype)
+        if return_post:
+            post = np.arange(D, dtype=out_itype)
+            return parent, post
+        else:
+            return parent
+
+    # -------------------------------------------------------------------------
+    #         Start the Analysis
+    # -------------------------------------------------------------------------
+    cdef cholmod_common Common
+    cdef cholmod_common *cm = &Common
+
+    if use_int32:
+        cholmod_start(cm)
+    else:
+        cholmod_l_start(cm)
+
+    cdef cholmod_sparse Amatrix
+    cdef cholmod_sparse* Ac = &Amatrix
+
+    cdef int stype = 1  # default kind="sym" uses triu(A) only
+    N = A.shape[0]
+    cdef bint col_etree = False
+
+    if kind == "row":
+        stype = 0  # use A * A.T
+    elif kind == "col":
+        N = A.shape[1]
+        stype = 0  # use A.T * A
+        col_etree = True
+    elif kind == "lo":
+        stype = -1  # use tril(A) only
+
+    # Get sparse *pattern*
+    cdef object A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
+    Ac.xtype = CHOLMOD_PATTERN
+    Ac.x = NULL
+
+    # -------------------------------------------------------------------------
+    #         Compute the Outputs
+    # -------------------------------------------------------------------------
+    cdef void *Parent
+    cdef void *Post
+
+    if use_int32:
+        Parent = cholmod_malloc(N, sizeof(int32_t), cm)
+    else: 
+        Parent = cholmod_l_malloc(N, sizeof(int64_t), cm)
+
+    cdef cholmod_sparse *Rc
+
+    if Ac.stype == 1 or col_etree:
+        # symmetric case: etree(A), using triu(A)
+        # column case: column etree of A, which is etree(A.T @ A)
+        if use_int32:
+            cholmod_etree(Ac, <int32_t*>Parent, cm)
+        else:
+            cholmod_l_etree(Ac, <int64_t*>Parent, cm)
+    else:
+        # symmetric case: etree(A), using tril(A)
+        # row case: row etree of A, which is etree(A @ A.T)
+        # R = A.T
+        if use_int32:
+            Rc = cholmod_transpose(Ac, CHOLMOD_TRANS_PATTERN, cm)
+            cholmod_etree(Rc, <int32_t*>Parent, cm)
+            cholmod_free_sparse(&Rc, cm)
+        else:
+            Rc = cholmod_l_transpose(Ac, CHOLMOD_TRANS_PATTERN, cm)
+            cholmod_l_etree(Rc, <int64_t*>Parent, cm)
+            cholmod_l_free_sparse(&Rc, cm)
+
+    _handle_errors(cm.status)
+
+    # Get the ndarray to return
+    parent = _ndarray_from_cholmod_intarray(Parent, N, use_int32)
+
+    if return_post:
+        if use_int32:
+            Post = cholmod_malloc(N, sizeof(int32_t), cm)
+            if cholmod_postorder(<int32_t*>Parent, N, NULL, <int32_t*>Post, cm) != N:
+                raise CholmodError("Postordering failed.")
+        else:
+            Post = cholmod_l_malloc(N, sizeof(int64_t), cm)
+            if cholmod_l_postorder(<int64_t*>Parent, N, NULL, <int64_t*>Post, cm) != N:
+                raise CholmodError("Postordering failed.")
+
+        post = _ndarray_from_cholmod_intarray(Post, N, use_int32)
+
+    # Free memory (arrays are copied to numpy)
+    if use_int32:
+        cholmod_free(N, sizeof(int32_t), Parent, cm)
+        if return_post:
+            cholmod_free(N, sizeof(int32_t), Post, cm)
+        cholmod_finish(cm)
+    else:
+        cholmod_l_free(N, sizeof(int64_t), Parent, cm)
+        if return_post:
+            cholmod_l_free(N, sizeof(int64_t), Post, cm)
+        cholmod_l_finish(cm)
+
+    if return_post:
+        return parent, post
+    else:
+        return parent
