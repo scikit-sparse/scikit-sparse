@@ -85,30 +85,71 @@ system:
   x = ldlsolve(L, D, b)  # solve Ax = b
 
 
-Top-level functions
--------------------
+Function Interface
+------------------
 
 The main function this module provides is :func:`cholesky`, for computing the
 Cholesy factor and optionally a fill-reducing permutation of a sparse matrix.
+
+The LDL factorization can be computed using the :func:`ldl` function. The LDL
+factors are particularly useful for updating the factorization when the system
+changes, such as when applying or changing boundary conditions in finite
+element methods.
+
+The functions :func:`ldlupdate` and :func:`ldlrowmod` allow
+you to update the LDL factorization efficiently when the matrix changes,
+without recomputing the entire factorization. The :func:`resymbol` function can
+be used to remove explicit zeros after multiple downdate operations.
+
+.. note::
+    In order to use the update functions, you must first compute the LDL
+    factorization using :func:`ldl` with the ``remove_zeros=False`` argument.
+    This ensures that the factorization retains the structure necessary for
+    efficient updates.
+
+
+Numerical Factorization
++++++++++++++++++++++++
+
+.. autofunction:: cholesky
+
+.. autofunction:: ldl
+
+.. autofunction:: ldlupdate
+
+.. autofunction:: ldlrowmod
+
+.. autofunction:: resymbol
+
+
+Solving Linear Systems
+++++++++++++++++++++++
 
 To use the Cholesky factorization to solve a linear system, you can use
 :func:`cholmod`. This function behaves similarly to
 :func:`scipy.sparse.linalg.spsolve`, but is more efficient for sparse,
 symmetric, positive-definite matrices.
 
-For matrices that are symmetric but not positive-definite, the LDL factorization
-can be computed using the :func:`ldl` function.
-
-Once the factorization has been computed, the resulting matrices can be used to
+If you already have an LDL factorization, the resulting matrices can be used to
 solve linear systems using :func:`ldlsolve`.
-
-.. autofunction:: cholesky
 
 .. autofunction:: cholmod
 
-.. autofunction:: ldl
-
 .. autofunction:: ldlsolve
+
+
+Symbolic Operations
++++++++++++++++++++
+
+In addition to numerical factorization, :mod:`.cholmod` provides symbolic
+operations that can be used to analyze the structure of the Cholesky
+factor and to compute fill-reducing permutations.
+
+.. autofunction:: analyze
+
+.. autofunction:: etree
+
+.. autofunction:: symbfact
 
 
 Error handling
