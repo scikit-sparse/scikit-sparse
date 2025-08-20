@@ -548,6 +548,7 @@ cdef void _initialize_l_factor(cholmod_factor* L, size_t N):
 cdef object _ldlupdate_factor_from_csc(
     object LD_py,
     bint use_int32,
+    int xtype,
     cholmod_factor *L_static,
     cholmod_common *cm
 ):
@@ -563,6 +564,9 @@ cdef object _ldlupdate_factor_from_csc(
         :func:`ldl`.
     use_int32 : bool
         Whether to use 32-bit or 64-bit integers for indices and indptr.
+    xtype : int in {CHOLMOD_REAL, CHOLMOD_COMPLEX}
+        The functions :func:`.ldlupdate` and :func:`.ldlrowmod` only use
+        CHOLMOD_REAL, whereas :func:`.resymbol` allows for real or complex.
     L_static : cholmod_factor*
         Pointer to a preallocated CHOLMOD factor structure. Contents need not
         be initialized. Contains the CHOLMOD factor on output.
@@ -633,7 +637,7 @@ cdef object _ldlupdate_factor_from_csc(
             ColCount_int64[j] = Lp_int64[j + 1] - Lp_int64[j]
 
     # Allocate space for a CHOLMOD LDL.T packed factor
-    cdef int to_xtype = CHOLMOD_REAL
+    cdef int to_xtype = xtype
     cdef int to_ll = False  # LDL.T
     cdef int to_super = False
     cdef int to_packed = True
@@ -2087,7 +2091,7 @@ def ldlupdate(L, D, C, *, update=True):
     else:
         Lc = cholmod_l_allocate_factor(N, cm)
 
-    _ldlupdate_factor_from_csc(LD, use_int32, Lc, cm)
+    _ldlupdate_factor_from_csc(LD, use_int32, CHOLMOD_REAL, Lc, cm)
 
     # -------------------------------------------------------------------------
     #         Compute the Update
@@ -2237,7 +2241,7 @@ def ldlrowmod(L, D, k, *, C=None):
     else:
         Lc = cholmod_l_allocate_factor(N, cm)
 
-    _ldlupdate_factor_from_csc(LD, use_int32, Lc, cm)
+    _ldlupdate_factor_from_csc(LD, use_int32, CHOLMOD_REAL, Lc, cm)
 
     # -------------------------------------------------------------------------
     #         Compute the Update
@@ -2886,3 +2890,117 @@ def etree(A, *, kind=None, return_post=False):
         return parent, post
     else:
         return parent
+
+
+def resymbol(L, A):
+    """Recompute the symbolic Cholesky factorization of a sparse matrix.
+
+    This function is useful after a series of downdates via :func:`.ldlupdate`
+    or :func:`.ldlrowmod`, since downdates do not remove any entries in ``L``
+    [#resymbol_c]_.
+
+    Parameters
+    ----------
+    L : (N, N) csc_array
+        The lower triangular factor ``L`` from the LDL factorization, as
+        computed by :func:`.cholesky` or :func:`.ldl`.
+    A : (N, N) csc_array
+        The input matrix in Compressed Sparse Column (CSC) format. Must be
+        square and symmetric. Only the lower triangular part of ``A`` is used,
+        and no check is made for symmetry. The numerical values of ``A`` are
+        ignored. Only its non-zero pattern is used.
+
+    Returns
+    -------
+    L : (N, N) csc_array
+        The updated lower triangular factor.
+
+    See Also
+    --------
+    :func:`.cholesky`, :func:`.ldl`, :func:`.ldlupdate`, :func:`.ldlrowmod`
+
+    References
+    ----------
+    .. [#resymbol_c] ``resymbol.c`` - CHOLMOD MATLAB resymbolization function
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/resymbol.c
+    """
+    A, use_int32, out_itype = validate_csc_input(A, require_square=True)
+    L, _, _ = validate_csc_input(L, require_square=True)
+
+    N = A.shape[0]
+
+    if L.shape != (N, N):
+        raise ValueError(
+            "Input matrix L must be square and match the size of A. "
+            f"Got shape {L.shape}."
+        )
+
+    if use_int32 and L.indptr.dtype != np.int32:
+        raise ValueError(
+            "A and L must have the same integer type. "
+            f"Got {A.indptr.dtype=}, and {L.indptr.dtype=}."
+        )
+
+    # Special Cases
+    if N == 0:
+        return L.copy()
+
+    if A.nnz == 0:
+        raise CholmodNotPositiveDefiniteError("Input matrix not positive definite.")
+
+
+    cdef cholmod_common Common
+    cdef cholmod_common *cm = &Common
+
+    if use_int32:
+        cholmod_start(cm)
+    else:
+        cholmod_l_start(cm)
+
+    # Get sparse *pattern*
+    cdef cholmod_sparse Amatrix
+    cdef cholmod_sparse* Ac = &Amatrix
+    cdef int stype = -1  # use tril(A) only
+
+    cdef object A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
+    Ac.xtype = CHOLMOD_PATTERN
+    Ac.x = NULL
+
+    # Get a factor from the L matrix
+    cdef cholmod_factor* Lc
+
+    if use_int32:
+        Lc = cholmod_allocate_factor(N, cm)
+    else:
+        Lc = cholmod_l_allocate_factor(N, cm)
+
+    cdef int xtype = _real_or_complex(A.dtype)
+
+    _ldlupdate_factor_from_csc(L, use_int32, xtype, Lc, cm)
+
+    # -------------------------------------------------------------------------
+    #         Resymbolic Factorization
+    # -------------------------------------------------------------------------
+    if use_int32:
+        cholmod_resymbol(Ac, NULL, 0, True, Lc, cm)
+    else:
+        cholmod_l_resymbol(Ac, NULL, 0, True, Lc, cm)
+
+    # Convert back to a CSC array
+    cdef cholmod_sparse* Lsparse
+
+    if use_int32:
+        Lsparse = cholmod_factor_to_sparse(Lc, cm)
+    else:
+        Lsparse = cholmod_l_factor_to_sparse(Lc, cm)
+
+    L = _csc_from_cholmod_sparse(Lsparse, cm)
+
+    if use_int32:
+        cholmod_free_factor(&Lc, cm)
+        cholmod_finish(cm)
+    else:
+        cholmod_l_free_factor(&Lc, cm)
+        cholmod_l_finish(cm)
+
+    return L

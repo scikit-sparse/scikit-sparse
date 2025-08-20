@@ -352,6 +352,23 @@ cdef extern from "cholmod.h":
         cholmod_common *Common
     )
 
+    int cholmod_resymbol(
+        cholmod_sparse *A,
+        int *fset,
+        size_t fsize,
+        int pack,
+        cholmod_factor *L,
+        cholmod_common *Common
+    )
+    int cholmod_l_resymbol(
+        cholmod_sparse *A,
+        int *fset,
+        size_t fsize,
+        int pack,
+        cholmod_factor *L,
+        cholmod_common *Common
+    )
+
     void *cholmod_free(
         size_t n,
         size_t size,
