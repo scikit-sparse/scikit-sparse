@@ -93,12 +93,12 @@ def test_itype(A_random, itype):
 # -----------------------------------------------------------------------------
 #         Test many random matrices of various dtypes
 # -----------------------------------------------------------------------------
-test_As = list(
+posdef_As = list(
     generate_random_matrices(N_trials=10, N_max=200, d_scale=0.05, pos_def_only=True)
 )
 
 
-@pytest.mark.parametrize("A", test_As)
+@pytest.mark.parametrize("A", posdef_As)
 @pytest.mark.parametrize(
     "order",
     [
@@ -122,10 +122,23 @@ def test_order(A, order):
     assert np.all(count <= N)
 
 
-@pytest.mark.parametrize("A", test_As)
-@pytest.mark.parametrize("kind", [None, "sym", "row", "col"])
-def test_kind(A, kind):
+@pytest.mark.parametrize("A", posdef_As)
+@pytest.mark.parametrize("kind", [None, "sym"])
+def test_kind_sym(A, kind):
     N = A.shape[0]
+    p, count = analyze(A, kind=kind)
+    assert is_valid_permutation(p)
+    assert len(count) == N
+    assert np.all(count >= 0)
+    assert np.all(count <= N)
+
+
+@pytest.mark.parametrize(
+    "A", list(generate_random_matrices(N_trials=10, N_max=200, d_scale=0.05))
+)
+@pytest.mark.parametrize("kind", ["row", "col"])
+def test_kind_rowcol(A, kind):
+    N = A.shape[0] if kind == "row" else A.shape[1]
     p, count = analyze(A, kind=kind)
     assert is_valid_permutation(p)
     assert len(count) == N
