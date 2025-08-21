@@ -29,6 +29,8 @@ Interfaces
 This wrapper handles both 32-bit and 64-bit integer indices, depending on the
 input matrix format.
 
+.. versionadded:: 0.5.0
+
 References
 ----------
 * SuiteSparse homepage:
@@ -142,6 +144,8 @@ class AMDInfo:
     Notes
     -----
     Field descriptions are adapted from SuiteSparse ``amd.h`` [#amd_h]_.
+
+    .. versionadded:: 0.5.0
 
     References
     ----------
@@ -370,6 +374,7 @@ def amd_default_control():
           are permuted to the end of the matrix.
         * 'aggressive': Whether to use aggressive absorption.
 
+    .. versionadded:: 0.5.0
     """
     cdef double[::1] ctrl_view = np.empty(AMD_CONTROL, dtype=np.float64)
     amd_defaults(&ctrl_view[0])

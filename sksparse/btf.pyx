@@ -23,6 +23,8 @@ Interfaces
 This wrapper handles both 32-bit and 64-bit integer types, depending on the
 input matrix format.
 
+.. versionadded:: 0.5.0
+
 References
 ----------
 * SuiteSparse homepage:
@@ -76,6 +78,8 @@ def maxtrans(A):
 
             If row ``i`` is not matched with any column,
             then ``jmatch[i] = -1``.
+
+    .. versionadded:: 0.5.0
 
     References
     ----------
@@ -174,6 +178,8 @@ def strongcomp(A, q=None):
         The array of indices of the start of each block in the permuted matrix.
         Block ``b`` is in rows/columns ``r[b]`` to ``r[b+1] - 1``.
         The number of blocks is ``len(r) - 1``.
+
+    .. versionadded:: 0.5.0
 
     References
     ----------
@@ -299,6 +305,8 @@ def btf(A):
         matched. If the matrix is structurally rank deficient, some of the
         entries on the diagonal of the permuted matrix will be zero.
 
+    .. versionadded:: 0.5.0
+
     References
     ----------
     .. [#btf_h] BTF header file:
@@ -412,6 +420,8 @@ def btf_q_permutation(q):
         j = (Q[k] < 0) ? -Q[k] - 2 : Q[k]
 
     This function is a Python equivalent of that macro.
+
+    .. versionadded:: 0.5.0
     """
     q = np.asarray(q)
 

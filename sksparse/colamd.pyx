@@ -25,6 +25,8 @@ Interfaces
 This wrapper handles both 32-bit and 64-bit integer indices, depending on the
 input matrix format.
 
+.. versionadded:: 0.5.0
+
 References
 ----------
 * SuiteSparse homepage:
@@ -159,6 +161,8 @@ class COLAMDStats:
     -----
     Field descriptions are adapted from SuiteSparse ``colamd.c``
     [#colamd_fields]_.
+
+    .. versionadded:: 0.5.0
 
     References
     ----------
@@ -405,6 +409,8 @@ stats : COLAMDStats, optional
     If ``return_info`` is True, returns an object containing statistics
     about the ordering.
 
+.. versionadded:: 0.5.0
+
 References
 ----------
 .. {reftag} ``colamd.c`` - SuiteSparse AMD source file.
@@ -493,6 +499,7 @@ def colamd_get_defaults():
         * 'dense_col_thresh': Like `dense_row_thresh`, but for columns.
         * 'aggressive': Default value for the aggressive knob.
 
+    .. versionadded:: 0.5.0
     """
     knobs = np.zeros(COLAMD_KNOBS, dtype=np.double)
     cdef double[::1] knobs_view = knobs
