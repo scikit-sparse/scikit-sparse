@@ -3380,3 +3380,147 @@ def nesdis(A, *, kind=None, return_separator=False):
         return p, cp, cmember
     else:
         return p
+
+
+def metis(A, *, kind=None):
+    """Nested dissection ordering of a sparse matrix using METIS.
+
+    Parameters
+    ----------
+    A : (M, N) csc_array
+        The input matrix in Compressed Sparse Column (CSC) format. Must be
+        square and symmetric if ``kind`` is None or ``"sym"``. No check is made
+        for symmetry.
+    kind : str in {"sym", "row", "col"}, optional
+        The type of factorization for which to analyze the matrix:
+
+        * ``sym``: Symmetric factorization. Only the upper triangular part of
+          ``A`` is used, and no check is made for symmetry.
+        * ``row``: Unsymmetric factorization of :math:`A A^{\\top}`.
+        * ``col``: Unsymmetric factorization of :math:`A^{\\top} A`.
+
+        If ``kind`` is None, it defaults to ``sym``.
+
+    Returns
+    -------
+    p : (M or N,) ndarray of int
+        The permutation vector that gives the nested dissection ordering of the
+        nodes in the graph represented by the sparse matrix ``A``.
+
+    See Also
+    --------
+    :func:`.bisect`, :func:`.nesdis`
+
+    Notes
+    -----
+    This function is based on the SuiteSparse CHOLMOD MATLAB interface
+    [#metis_c]_.
+
+    .. versionadded:: 0.5.0
+
+    References
+    ----------
+    .. [#metis_c] ``metis.c`` - CHOLMOD MATLAB metis function
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/metis.c
+    """
+    A, use_int32, out_itype = validate_csc_input(A)
+
+    if kind is None:
+        kind = "sym"
+
+    if kind not in {"sym", "row", "col"}:
+        raise ValueError(f"Unknown factorization kind: {kind}")
+
+    cdef size_t M = A.shape[0]
+    cdef size_t N = A.shape[1]
+
+    if kind not in ["row", "col"] and M != N:
+        raise ValueError(f"Input matrix A must be square, got shape {A.shape}.")
+
+    # Special Cases
+    # sym: A = (0, 0)
+    # row: AA.T = (0, N) * (N, 0) = (0, 0)
+    # col: A.TA = (0, M) * (M, 0) = (0, 0)
+    if kind == "row" and M == 0 or N == 0:
+        return np.array([], dtype=out_itype)
+
+    if A.nnz == 0:
+        D = N if kind == "col" else M
+        return np.arange(D, dtype=out_itype)
+
+    # -------------------------------------------------------------------------
+    #         Start the Analysis
+    # -------------------------------------------------------------------------
+    cdef cholmod_common Common
+    cdef cholmod_common *cm = &Common
+
+    if use_int32:
+        cholmod_start(cm)
+    else:
+        cholmod_l_start(cm)
+
+    cdef cholmod_sparse Amatrix
+    cdef cholmod_sparse* Ac = &Amatrix
+
+    cdef int stype = -1  # default kind="sym" uses tril(A) only
+    cdef bint transpose = False
+
+    if kind == "row":
+        stype = 0  # use A * A.T
+    elif kind == "col":
+        stype = 0  # use A.T * A
+        transpose = True
+    elif kind == "lo":
+        stype = -1  # use tril(A) only
+
+    # Get sparse *pattern*
+    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
+    Ac.xtype = CHOLMOD_PATTERN
+    Ac.x = NULL
+
+    # -------------------------------------------------------------------------
+    #         Compute the Outputs
+    # -------------------------------------------------------------------------
+    cdef void *Perm
+    cdef cholmod_sparse *C
+    cdef bint postorder = True  # TODO accept options inputs
+    cdef int64_t ok
+
+    if transpose:
+        # C = A.T, then metis C @ C.T
+        if use_int32:
+            C = cholmod_transpose(Ac, CHOLMOD_TRANS_PATTERN, cm)
+            N = C.nrow
+            Perm = cholmod_malloc(N, sizeof(int32_t), cm)
+            ok = cholmod_metis(C, NULL, 0, postorder, <int32_t*>Perm, cm)
+            cholmod_free_sparse(&C, cm)
+        else:
+            C = cholmod_l_transpose(Ac, CHOLMOD_TRANS_PATTERN, cm)
+            N = C.nrow
+            Perm = cholmod_l_malloc(N, sizeof(int64_t), cm)
+            ok = cholmod_l_metis(C, NULL, 0, postorder, <int64_t*>Perm, cm)
+            cholmod_l_free_sparse(&C, cm)
+    else:
+        N = Ac.nrow
+        if use_int32:
+            Perm = cholmod_malloc(N, sizeof(int32_t), cm)
+            ok = cholmod_metis(Ac, NULL, 0, postorder, <int32_t*>Perm, cm)
+        else:
+            Perm = cholmod_l_malloc(N, sizeof(int64_t), cm)
+            ok = cholmod_l_metis(Ac, NULL, 0, postorder, <int64_t*>Perm, cm)
+
+    if not ok:
+        raise CholmodError("metis failed.")
+
+    # Get the ndarray to return
+    p = _ndarray_from_cholmod_intarray(Perm, N, use_int32)
+
+    # Free memory (arrays are copied to numpy)
+    if use_int32:
+        cholmod_free(N, sizeof(int32_t), Perm, cm)
+        cholmod_finish(cm)
+    else:
+        cholmod_l_free(N, sizeof(int64_t), Perm, cm)
+        cholmod_l_finish(cm)
+
+    return p

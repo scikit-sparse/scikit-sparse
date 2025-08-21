@@ -405,6 +405,24 @@ cdef extern from "cholmod.h":
         cholmod_common *Common
     )
 
+    int cholmod_metis(
+        cholmod_sparse *A,
+        int32_t *fset,
+        size_t fsize,
+        int postorder,
+        int32_t *Perm,
+        cholmod_common *Common
+    )
+    int cholmod_l_metis(
+        cholmod_sparse *A,
+        int64_t *fset,
+        size_t fsize,
+        int postorder,
+        int64_t *Perm,
+        cholmod_common *Common
+    )
+
+
     void *cholmod_free(
         size_t n,
         size_t size,
