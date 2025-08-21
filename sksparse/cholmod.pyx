@@ -22,6 +22,8 @@ Interfaces
 This wrapper handles both 32-bit and 64-bit integer types, depending on the
 input matrix format.
 
+.. versionadded:: 0.5.0
+
 References
 ----------
 * SuiteSparse homepage:
@@ -37,6 +39,28 @@ from scipy.sparse import csc_array, diags_array, eye_array, issparse
 import warnings
 
 from .utils import validate_csc_input
+
+__all__ = [
+    "CholmodError",
+    "CholmodGpuProblemError",
+    "CholmodInvalidInputError",
+    "CholmodNotInstalledError",
+    "CholmodNotPositiveDefiniteError",
+    "CholmodOutOfMemoryError",
+    "CholmodOverflowError",
+    "CholmodSmallDiagonalWarning",
+    "CholmodWarning",
+    "analyze",
+    "cholesky",
+    "cholmod",
+    "etree",
+    "ldl",
+    "ldlrowmod",
+    "ldlsolve",
+    "ldlupdate",
+    "resymbol",
+    "symbfact",
+]
 
 
 # Define constants for the mode of cholmod_transpose (see cholmod.h)
@@ -1395,6 +1419,8 @@ This function is an interface to the CHOLMOD library, which is part of
 the SuiteSparse collection by Timothy A. Davis. For more details, see the
 documentation in the header file [{doc_tag}]_.
 
+.. versionadded:: 0.5.0
+
 References
 ----------
 .. [{doc_tag}] ``cholmod.h`` - SuiteSparse CHOLMOD header file.
@@ -1571,6 +1597,8 @@ def cholmod(A, b, *, order=None, p=None):
     -----
     This function uses the CHOLMOD library to solve the linear system. It is
     intended to replicate the MATLAB interface ``cholmod2.m`` [#cholmod_c]_.
+
+    .. versionadded:: 0.5.0
 
     References
     ----------
@@ -1800,6 +1828,8 @@ def ldlsolve(L, D, b, p=None):
     This function uses the CHOLMOD library to solve the linear system. It is
     intended to replicate the MATLAB interface ``ldlsolve.m`` [#ldlsolve_c]_.
 
+    .. versionadded:: 0.5.0
+
     References
     ----------
     .. [#ldlsolve_c] ``ldlsolve.c`` - CHOLMOD MATLAB interface
@@ -2007,6 +2037,8 @@ def ldlupdate(L, D, C, *, update=True):
         The updated lower triangular factor `L'` of the LDL factorization.
     D' : (N, N) dia_array
         The updated diagonal matrix `D'` of the LDL factorization.
+
+    .. versionadded:: 0.5.0
     """
     L, use_int32, _ = validate_csc_input(L, require_square=True)
 
@@ -2148,6 +2180,8 @@ def ldlrowmod(L, D, k, *, C=None):
         The updated lower triangular factor `L'` of the LDL factorization.
     D' : (N, N) dia_array
         The updated diagonal matrix `D'` of the LDL factorization.
+
+    .. versionadded:: 0.5.0
     """
     L, use_int32, _ = validate_csc_input(L, require_square=True)
 
@@ -2328,6 +2362,8 @@ def analyze(A, *, kind=None, order=None):
     count : (N,) ndarray of int
         The count of nonzeros in each column of the Cholesky factor.
 
+    .. versionadded:: 0.5.0
+
     References
     ----------
     .. [#analyze_c] ``analyze.c`` - CHOLMOD MATLA analyze function
@@ -2472,6 +2508,8 @@ def symbfact(A, *, kind=None, lower=False, return_factor=False):
     L : (N, N) csc_array
         The symbolic factorization of the matrix. Only returned if
         ``return_factor`` is True.
+
+    .. versionadded:: 0.5.0
 
     References
     ----------
@@ -2739,6 +2777,8 @@ def etree(A, *, kind=None, return_post=False):
         The postorder of the elimination tree. The first node in the postorder
         is the root of the tree.
 
+    .. versionadded:: 0.5.0
+
     References
     ----------
     .. [#etree_c] ``etree2.c`` - CHOLMOD MATLAB symbolic factorization function
@@ -2904,6 +2944,8 @@ def resymbol(L, A):
     See Also
     --------
     :func:`.cholesky`, :func:`.ldl`, :func:`.ldlupdate`, :func:`.ldlrowmod`
+
+    .. versionadded:: 0.5.0
 
     References
     ----------
