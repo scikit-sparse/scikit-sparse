@@ -127,7 +127,7 @@ html_theme = 'alabaster'
 # further.  For a list of options available for each theme, see the
 # documentation.
 html_theme_options = {
-    "github_user": "scikit-sparse",
+    "github_user": "broesler",
     "github_repo": "scikit-sparse",
     "github_banner": True}
 
