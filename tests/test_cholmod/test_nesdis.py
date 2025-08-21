@@ -176,6 +176,8 @@ def test_rowcol(A_example):
         assert_array_equal(x, y, strict=True)
 
 
+# TODO test options nd_small, etc.
+
 # -----------------------------------------------------------------------------
 #         Test many random matrices of various dtypes
 # -----------------------------------------------------------------------------

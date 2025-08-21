@@ -68,6 +68,10 @@ cdef extern from "cholmod.h":
 
     ctypedef struct cholmod_method_struct:
         int ordering
+        size_t nd_small
+        int nd_components
+        double nd_oksep
+        int nd_camd
 
     ctypedef struct cholmod_common:
         int supernodal

@@ -3189,7 +3189,16 @@ def bisect(A, *, kind=None):
 
 # TODO allow options arguments
 # TODO get defaults?
-def nesdis(A, *, kind=None, return_separator=False):
+def nesdis(
+    A,
+    *,
+    kind=None,
+    return_separator=False,
+    nd_small=None,
+    nd_components=None,
+    nd_oksep=None,
+    nd_camd=None,
+):
     """Nested dissection ordering of a sparse matrix.
 
     Parameters
@@ -3224,6 +3233,24 @@ def nesdis(A, *, kind=None, return_separator=False):
     cmember : (N,) ndarray of int, optional
         The component membership vector, where ``cmember[i]`` is the component
         to which node ``i`` belongs.
+
+    Other Parameters
+    ----------------
+    nd_small : int, optional
+        The smallest subgraph that should not be partitioned (default is 200).
+    nd_components : bool, optional
+        True if connected components should be split independently (default is
+        False).
+    nd_oksep : double, optional
+        Controls when a separator is kept. A separator is kept if
+        ``nsep < nd_oksep * n``, where ``nsep`` is the number of nodes in the
+        separator and ``n`` is the number of nodes in the graph being cut
+        (default is 1).
+    nd_camd : int, optional
+        Controls whether the smallest subgraphs should be ordered. If 0, they
+        are not ordered. For the "sym" case, 1 to order by ``camd``, 2 to order
+        by ``csymamd`` (default 1). For other cases: 0 to order naturally, or
+        1 to order by ``colamd``.
 
     See Also
     --------
@@ -3288,6 +3315,19 @@ def nesdis(A, *, kind=None, return_separator=False):
         cholmod_start(cm)
     else:
         cholmod_l_start(cm)
+
+    # Set the options for nested dissection
+    if nd_small is not None:
+        cm.method[0].nd_small = nd_small
+
+    if nd_components is not None:
+        cm.method[0].nd_components = nd_components
+
+    if nd_oksep is not None:
+        cm.method[0].nd_oksep = nd_oksep
+
+    if nd_camd is not None:
+        cm.method[0].nd_camd = nd_camd
 
     cdef cholmod_sparse Amatrix
     cdef cholmod_sparse* Ac = &Amatrix
