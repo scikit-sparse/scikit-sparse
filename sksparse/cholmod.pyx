@@ -3031,3 +3031,153 @@ def resymbol(L, A):
         cholmod_l_finish(cm)
 
     return L
+
+
+# -----------------------------------------------------------------------------
+#         Partition Functions
+# -----------------------------------------------------------------------------
+def bisect(A, *, kind=None):
+    """Compute a node separator for a sparse matrix graph.
+
+    Parameters
+    ----------
+    A : (M, N) csc_array
+        The input matrix in Compressed Sparse Column (CSC) format. Must be
+        square and symmetric if ``kind`` is None or ``"sym"``. No check is made
+        for symmetry.
+    kind : str in {"sym", "row", "col"}, optional
+        The type of factorization for which to analyze the matrix:
+
+        * ``sym``: Symmetric factorization. Only the upper triangular part of
+          ``A`` is used, and no check is made for symmetry.
+        * ``row``: Unsymmetric factorization of :math:`A A^{\\top}`.
+        * ``col``: Unsymmetric factorization of :math:`A^{\\top} A`.
+
+        If ``kind`` is None, it defaults to ``sym``.
+
+    Returns
+    -------
+    s : (K,) ndarray of int
+        The dimension ``K`` is either ``M`` or ``N``, depending on the
+        ``kind`` parameter. The output can take 3 values:
+        * ``0``: The node is in the left subgraph.
+        * ``1``: The node is in the right subgraph.
+        * ``2``: The node is in the separator.
+
+    Notes
+    -----
+    This function is based on the SuiteSparse CHOLMOD MATLAB interface
+    [#bisect_c]_.
+
+    .. versionadded:: 0.5.0
+
+    References
+    ----------
+    .. [#bisect_c] ``bisect.c`` - CHOLMOD MATLAB bisect function
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/bisect.c
+    """
+    A, use_int32, out_itype = validate_csc_input(A)
+
+    if kind is None:
+        kind = "sym"
+
+    if kind not in {"sym", "row", "col"}:
+        raise ValueError(f"Unknown factorization kind: {kind}")
+
+    cdef size_t M = A.shape[0]
+    cdef size_t N = A.shape[1]
+
+    if kind not in ["row", "col"] and M != N:
+        raise ValueError(f"Input matrix A must be square, got shape {A.shape}.")
+
+    # Special Cases
+    # sym: A = (0, 0)
+    # row: AA.T = (0, N) * (N, 0) = (0, 0)
+    # col: A.TA = (0, M) * (M, 0) = (0, 0)
+    if kind == "row" and M == 0 or N == 0:
+        return np.array([], dtype=out_itype)
+
+    if A.nnz == 0:
+        D = N if kind == "col" else M
+        s = np.empty(D, dtype=out_itype)
+        k = D // 2
+        s[:k] = 0  # left subgraph
+        s[k:] = 1  # right subgraph
+        s[-1] = 2  # separator
+        return s
+
+    # -------------------------------------------------------------------------
+    #         Start the Analysis
+    # -------------------------------------------------------------------------
+    cdef cholmod_common Common
+    cdef cholmod_common *cm = &Common
+
+    if use_int32:
+        cholmod_start(cm)
+    else:
+        cholmod_l_start(cm)
+
+    cdef cholmod_sparse Amatrix
+    cdef cholmod_sparse* Ac = &Amatrix
+
+    cdef int stype = -1  # default kind="sym" uses tril(A) only
+    cdef bint transpose = False
+
+    if kind == "row":
+        stype = 0  # use A * A.T
+    elif kind == "col":
+        stype = 0  # use A.T * A
+        transpose = True
+    elif kind == "lo":
+        stype = -1  # use tril(A) only
+
+    # Get sparse *pattern*
+    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
+    Ac.xtype = CHOLMOD_PATTERN
+    Ac.x = NULL
+
+    # -------------------------------------------------------------------------
+    #         Compute the Outputs
+    # -------------------------------------------------------------------------
+    cdef void *Partition
+    cdef cholmod_sparse *C
+    cdef int64_t ok
+
+    if transpose:
+        # C = A.T, then bisect C @ C.T
+        if use_int32:
+            C = cholmod_transpose(Ac, CHOLMOD_TRANS_PATTERN, cm)
+            N = C.nrow
+            Partition = cholmod_malloc(N, sizeof(int32_t), cm)
+            ok = (cholmod_bisect(C, NULL, 0, True, <int32_t*>Partition, cm) >= 0)
+            cholmod_free_sparse(&C, cm)
+        else:
+            C = cholmod_l_transpose(Ac, CHOLMOD_TRANS_PATTERN, cm)
+            N = C.nrow
+            Partition = cholmod_l_malloc(N, sizeof(int64_t), cm)
+            ok = (cholmod_l_bisect(C, NULL, 0, True, <int64_t*>Partition, cm) >= 0)
+            cholmod_l_free_sparse(&C, cm)
+    else:
+        N = Ac.nrow
+        if use_int32:
+            Partition = cholmod_malloc(N, sizeof(int32_t), cm)
+            ok = (cholmod_bisect(Ac, NULL, 0, True, <int32_t*>Partition, cm) >= 0)
+        else:
+            Partition = cholmod_l_malloc(N, sizeof(int64_t), cm)
+            ok = (cholmod_l_bisect(Ac, NULL, 0, True, <int64_t*>Partition, cm) >= 0)
+
+    if not ok:
+        raise CholmodError("Bisecting failed.")
+
+    # Get the ndarray to return
+    s = _ndarray_from_cholmod_intarray(Partition, N, use_int32)
+
+    # Free memory (arrays are copied to numpy)
+    if use_int32:
+        cholmod_free(N, sizeof(int32_t), Partition, cm)
+        cholmod_finish(cm)
+    else:
+        cholmod_l_free(N, sizeof(int64_t), Partition, cm)
+        cholmod_l_finish(cm)
+
+    return s
