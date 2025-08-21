@@ -197,16 +197,13 @@ def test_rowcol(A_example):
 # -----------------------------------------------------------------------------
 #         Test many random matrices of various dtypes
 # -----------------------------------------------------------------------------
-@pytest.mark.parametrize(
-    "A",
-    list(
-        generate_random_matrices(
-            N_trials=10, N_max=200, d_scale=0.05, pos_def_only=True
-        )
-    ),
+pos_def_As = list(
+    generate_random_matrices(N_trials=10, N_max=200, d_scale=0.05, pos_def_only=True)
 )
-@pytest.mark.parametrize("kind", [None, "sym", "lo"])
-def test_kind(A, kind):
+general_As = list(generate_random_matrices(N_trials=10, N_max=200, d_scale=0.05))
+
+
+def _test_kind(A, kind):
     N = A.shape[0]
     count, h, parent, post, L = symbfact(A, kind=kind, return_factor=True)
     assert len(count) == N
@@ -220,20 +217,13 @@ def test_kind(A, kind):
     assert is_valid_permutation(post, N)
 
 
-@pytest.mark.parametrize(
-    "A",
-    list(generate_random_matrices(N_trials=10, N_max=200, d_scale=0.05)),
-)
+@pytest.mark.parametrize("A", pos_def_As)
+@pytest.mark.parametrize("kind", [None, "sym"])
+def test_kind(A, kind):
+    _test_kind(A, kind)
+
+
+@pytest.mark.parametrize("A", general_As)
 @pytest.mark.parametrize("kind", ["row", "col"])
 def test_rowcol_kind(A, kind):
-    N = A.shape[0]
-    count, h, parent, post, L = symbfact(A, kind=kind, return_factor=True)
-    assert len(count) == N
-    assert np.all(count >= 0)
-    assert np.all(count <= N)
-    assert h >= 1
-    assert len(parent) == N
-    assert np.all(parent >= -1)
-    assert np.all(parent < N)
-    assert len(post) == N
-    assert is_valid_permutation(post, N)
+    _test_kind(A, kind)

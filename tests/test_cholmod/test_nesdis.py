@@ -179,35 +179,29 @@ def test_rowcol(A_example):
 # -----------------------------------------------------------------------------
 #         Test many random matrices of various dtypes
 # -----------------------------------------------------------------------------
-@pytest.mark.parametrize(
-    "A",
-    list(
-        generate_random_matrices(
-            N_trials=10, N_max=200, d_scale=0.05, pos_def_only=True
-        )
-    ),
+pos_def_As = list(
+    generate_random_matrices(N_trials=10, N_max=200, d_scale=0.05, pos_def_only=True)
 )
+general_As = list(generate_random_matrices(N_trials=10, N_max=200, d_scale=0.05))
+
+
+def _test_kind(A, kind):
+    N = A.shape[0]
+    p, cp, cmember = nesdis(A, kind=kind, return_separator=True)
+    assert is_valid_permutation(p, N)
+    assert len(cmember) == N
+    assert np.all(cmember >= 0)
+    assert np.all(cmember < N)
+    assert len(cp) == cmember.max() + 1
+
+
+@pytest.mark.parametrize("A", pos_def_As)
 @pytest.mark.parametrize("kind", [None, "sym"])
 def test_kind(A, kind):
-    N = A.shape[0]
-    p, cp, cmember = nesdis(A, kind=kind, return_separator=True)
-    assert is_valid_permutation(p, N)
-    assert len(cmember) == N
-    assert np.all(cmember >= 0)
-    assert np.all(cmember < N)
-    assert len(cp) == cmember.max() + 1
+    _test_kind(A, kind)
 
 
-@pytest.mark.parametrize(
-    "A",
-    list(generate_random_matrices(N_trials=10, N_max=200, d_scale=0.05)),
-)
+@pytest.mark.parametrize("A", general_As)
 @pytest.mark.parametrize("kind", ["row", "col"])
 def test_rowcol_kind(A, kind):
-    N = A.shape[0]
-    p, cp, cmember = nesdis(A, kind=kind, return_separator=True)
-    assert is_valid_permutation(p, N)
-    assert len(cmember) == N
-    assert np.all(cmember >= 0)
-    assert np.all(cmember < N)
-    assert len(cp) == cmember.max() + 1
+    _test_kind(A, kind)

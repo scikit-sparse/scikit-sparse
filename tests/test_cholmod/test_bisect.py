@@ -148,29 +148,26 @@ def test_rowcol(A_example):
 # -----------------------------------------------------------------------------
 #         Test many random matrices of various dtypes
 # -----------------------------------------------------------------------------
-@pytest.mark.parametrize(
-    "A",
-    list(
-        generate_random_matrices(
-            N_trials=10, N_max=200, d_scale=0.05, pos_def_only=True
-        )
-    ),
+pos_def_As = list(
+    generate_random_matrices(N_trials=10, N_max=200, d_scale=0.05, pos_def_only=True)
 )
+general_As = list(generate_random_matrices(N_trials=10, N_max=200, d_scale=0.05))
+
+
+def _test_kind(A, kind):
+    N = A.shape[0]
+    s = bisect(A, kind=kind)
+    assert len(s) == N
+    assert np.isin(s, [0, 1, 2]).all()
+
+
+@pytest.mark.parametrize("A", pos_def_As)
 @pytest.mark.parametrize("kind", [None, "sym"])
 def test_kind(A, kind):
-    N = A.shape[0]
-    s = bisect(A, kind=kind)
-    assert len(s) == N
-    assert np.isin(s, [0, 1, 2]).all()
+    _test_kind(A, kind)
 
 
-@pytest.mark.parametrize(
-    "A",
-    list(generate_random_matrices(N_trials=10, N_max=200, d_scale=0.05)),
-)
+@pytest.mark.parametrize("A", general_As)
 @pytest.mark.parametrize("kind", ["row", "col"])
 def test_rowcol_kind(A, kind):
-    N = A.shape[0]
-    s = bisect(A, kind=kind)
-    assert len(s) == N
-    assert np.isin(s, [0, 1, 2]).all()
+    _test_kind(A, kind)
