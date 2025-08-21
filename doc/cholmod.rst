@@ -152,6 +152,25 @@ factor and to compute fill-reducing permutations.
 .. autofunction:: symbfact
 
 
+Graph Partitioning
+++++++++++++++++++
+
+The :mod:`.cholmod` module also includes functions for graph partitioning and
+node reordering, which can be used like the :mod:`~sksparse.amd` and
+:mod:`~sksparse.colamd` (and their constrained counterparts) modules to reduce
+fill-in during factorization.
+
+These functions provide a direct inerface to the corresponding CHOLMOD
+functions that are used internally by :func:`cholesky` and :func:`ldl` when
+the ``order`` argument is specified.
+
+.. autofunction:: bisect
+
+.. autofunction:: nesdis
+
+.. autofunction:: metis
+
+
 Error handling
 --------------
 
