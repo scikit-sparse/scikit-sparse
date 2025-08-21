@@ -3064,6 +3064,10 @@ def bisect(A, *, kind=None):
         * ``1``: The node is in the right subgraph.
         * ``2``: The node is in the separator.
 
+    See Also
+    --------
+    :func:`.nesdis`, :func:`.metis`
+
     Notes
     -----
     This function is based on the SuiteSparse CHOLMOD MATLAB interface
@@ -3181,3 +3185,198 @@ def bisect(A, *, kind=None):
         cholmod_l_finish(cm)
 
     return s
+
+
+# TODO allow options arguments
+# TODO get defaults?
+def nesdis(A, *, kind=None, return_separator=False):
+    """Nested dissection ordering of a sparse matrix.
+
+    Parameters
+    ----------
+    A : (M, N) csc_array
+        The input matrix in Compressed Sparse Column (CSC) format. Must be
+        square and symmetric if ``kind`` is None or ``"sym"``. No check is made
+        for symmetry.
+    kind : str in {"sym", "row", "col"}, optional
+        The type of factorization for which to analyze the matrix:
+
+        * ``sym``: Symmetric factorization. Only the upper triangular part of
+          ``A`` is used, and no check is made for symmetry.
+        * ``row``: Unsymmetric factorization of :math:`A A^{\\top}`.
+        * ``col``: Unsymmetric factorization of :math:`A^{\\top} A`.
+
+        If ``kind`` is None, it defaults to ``sym``.
+    return_separator : bool, optional
+        If True, the function returns the separator tree and component
+        membership vector. Default is False.
+
+    Returns
+    -------
+    p : (M or N,) ndarray of int
+        The permutation vector that gives the nested dissection ordering of the
+        nodes in the graph represented by the sparse matrix ``A``.
+    cp : (C,) ndarray of int, optional
+        The separator tree, where ``C`` is the number of components found. The
+        value ``cp[c]`` is the parent of the component ``c`` in the separator
+        tree, or ``-1`` if ``c`` is the root of the tree. There is a maximum of
+        ``N`` components, where ``N`` is the dimension of the input matrix.
+    cmember : (N,) ndarray of int, optional
+        The component membership vector, where ``cmember[i]`` is the component
+        to which node ``i`` belongs.
+
+    See Also
+    --------
+    :func:`.bisect`, :func:`.metis`
+
+    Notes
+    -----
+    This function is based on the SuiteSparse CHOLMOD MATLAB interface
+    [#nesdis_c]_.
+
+    .. versionadded:: 0.5.0
+
+    References
+    ----------
+    .. [#nesdis_c] ``nesdis.c`` - CHOLMOD MATLAB nesdis function
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/nesdis.c
+    """
+    A, use_int32, out_itype = validate_csc_input(A)
+
+    if kind is None:
+        kind = "sym"
+
+    if kind not in {"sym", "row", "col"}:
+        raise ValueError(f"Unknown factorization kind: {kind}")
+
+    cdef size_t M = A.shape[0]
+    cdef size_t N = A.shape[1]
+
+    if kind not in ["row", "col"] and M != N:
+        raise ValueError(f"Input matrix A must be square, got shape {A.shape}.")
+
+    # Special Cases
+    # sym: A = (0, 0)
+    # row: AA.T = (0, N) * (N, 0) = (0, 0)
+    # col: A.TA = (0, M) * (M, 0) = (0, 0)
+    if kind == "row" and M == 0 or N == 0:
+        p = np.array([], dtype=out_itype)
+        cp = np.array([-1], dtype=out_itype)  # only one component
+        cmember = np.array([], dtype=out_itype)
+        if return_separator:
+            return p, cp, cmember
+        else:
+            return p
+
+    if A.nnz == 0:
+        D = N if kind == "col" else M
+        p = np.arange(D, dtype=out_itype)
+        cp = np.array([-1], dtype=out_itype)  # only one component
+        cmember = np.zeros(D, dtype=out_itype)
+        if return_separator:
+            return p, cp, cmember
+        else:
+            return p
+
+    # -------------------------------------------------------------------------
+    #         Start the Analysis
+    # -------------------------------------------------------------------------
+    cdef cholmod_common Common
+    cdef cholmod_common *cm = &Common
+
+    if use_int32:
+        cholmod_start(cm)
+    else:
+        cholmod_l_start(cm)
+
+    cdef cholmod_sparse Amatrix
+    cdef cholmod_sparse* Ac = &Amatrix
+
+    cdef int stype = -1  # default kind="sym" uses tril(A) only
+    cdef bint transpose = False
+
+    if kind == "row":
+        stype = 0  # use A * A.T
+    elif kind == "col":
+        stype = 0  # use A.T * A
+        transpose = True
+    elif kind == "lo":
+        stype = -1  # use tril(A) only
+
+    # Get sparse *pattern*
+    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
+    Ac.xtype = CHOLMOD_PATTERN
+    Ac.x = NULL
+
+    # -------------------------------------------------------------------------
+    #         Compute the Outputs
+    # -------------------------------------------------------------------------
+    cdef void *Perm
+    cdef void *CParent
+    cdef void *CMember
+    cdef cholmod_sparse *C
+    cdef int64_t ncomp
+
+    if transpose:
+        # C = A.T, then order C @ C.T
+        if use_int32:
+            C = cholmod_transpose(Ac, CHOLMOD_TRANS_PATTERN, cm)
+            N = C.nrow
+            Perm = cholmod_malloc(N, sizeof(int32_t), cm)
+            CParent = cholmod_malloc(N, sizeof(int32_t), cm)
+            CMember = cholmod_malloc(N, sizeof(int32_t), cm)
+            ncomp = cholmod_nested_dissection(
+                C, NULL, 0, <int32_t*>Perm, <int32_t*>CParent, <int32_t*>CMember, cm
+            )
+            cholmod_free_sparse(&C, cm)
+        else:
+            C = cholmod_l_transpose(Ac, CHOLMOD_TRANS_PATTERN, cm)
+            N = C.nrow
+            Perm = cholmod_l_malloc(N, sizeof(int64_t), cm)
+            CParent = cholmod_l_malloc(N, sizeof(int64_t), cm)
+            CMember = cholmod_l_malloc(N, sizeof(int64_t), cm)
+            ncomp = cholmod_l_nested_dissection(
+                C, NULL, 0, <int64_t*>Perm, <int64_t*>CParent, <int64_t*>CMember, cm
+            )
+            cholmod_l_free_sparse(&C, cm)
+    else:
+        N = Ac.nrow
+        if use_int32:
+            Perm = cholmod_malloc(N, sizeof(int32_t), cm)
+            CParent = cholmod_malloc(N, sizeof(int32_t), cm)
+            CMember = cholmod_malloc(N, sizeof(int32_t), cm)
+            ncomp = cholmod_nested_dissection(
+                Ac, NULL, 0, <int32_t*>Perm, <int32_t*>CParent, <int32_t*>CMember, cm
+            )
+        else:
+            Perm = cholmod_l_malloc(N, sizeof(int64_t), cm)
+            CParent = cholmod_l_malloc(N, sizeof(int64_t), cm)
+            CMember = cholmod_l_malloc(N, sizeof(int64_t), cm)
+            ncomp = cholmod_l_nested_dissection(
+                Ac, NULL, 0, <int64_t*>Perm, <int64_t*>CParent, <int64_t*>CMember, cm
+            )
+
+    if ncomp < 0:
+        raise CholmodError("Nested dissection failed.")
+
+    # Get the ndarrays to return
+    p = _ndarray_from_cholmod_intarray(Perm, N, use_int32)
+    cp = _ndarray_from_cholmod_intarray(CParent, ncomp, use_int32)
+    cmember = _ndarray_from_cholmod_intarray(CMember, N, use_int32)
+
+    # Free memory (arrays are copied to numpy)
+    if use_int32:
+        cholmod_free(N, sizeof(int32_t), Perm, cm)
+        cholmod_free(N, sizeof(int32_t), CParent, cm)
+        cholmod_free(N, sizeof(int32_t), CMember, cm)
+        cholmod_finish(cm)
+    else:
+        cholmod_l_free(N, sizeof(int64_t), Perm, cm)
+        cholmod_free(N, sizeof(int64_t), CParent, cm)
+        cholmod_free(N, sizeof(int64_t), CMember, cm)
+        cholmod_l_finish(cm)
+
+    if return_separator:
+        return p, cp, cmember
+    else:
+        return p

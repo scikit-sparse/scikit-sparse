@@ -386,6 +386,25 @@ cdef extern from "cholmod.h":
         cholmod_common *Common
     )
 
+    int64_t cholmod_nested_dissection(
+        cholmod_sparse *A,
+        int32_t *fset,
+        size_t fsize,
+        int32_t *Perm,
+        int32_t *CParent,
+        int32_t *Cmember,
+        cholmod_common *Common
+    )
+    int64_t cholmod_l_nested_dissection(
+        cholmod_sparse *A,
+        int64_t *fset,
+        size_t fsize,
+        int64_t *Perm,
+        int64_t *CParent,
+        int64_t *Cmember,
+        cholmod_common *Common
+    )
+
     void *cholmod_free(
         size_t n,
         size_t size,
