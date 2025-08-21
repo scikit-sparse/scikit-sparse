@@ -51,6 +51,17 @@ from dataclasses import dataclass
 
 from .utils import validate_csc_input
 
+__all__ = [
+    "CCOLAMDError",
+    "CCOLAMDValueError",
+    "CCOLAMDMemoryError",
+    "CCOLAMDInternalError",
+    "CCOLAMDStats",
+    "ccolamd",
+    "csymamd",
+    "ccolamd_get_defaults"
+]
+
 
 ctypedef fused index_t:
     int32_t

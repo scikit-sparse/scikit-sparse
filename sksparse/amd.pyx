@@ -51,6 +51,16 @@ from dataclasses import dataclass
 
 from .utils import validate_csc_input
 
+__all__ = [
+    "AMDError",
+    "AMDInvalidMatrixError",
+    "AMDMemoryError",
+    "AMDInfo",
+    "amd",
+    "amd_default_control"
+]
+
+
 ctypedef fused index_t:
     int32_t
     int64_t

@@ -51,6 +51,16 @@ from dataclasses import dataclass
 
 from .utils import validate_csc_input
 
+__all__ = [
+    "CAMDError",
+    "CAMDInvalidMatrixError",
+    "CAMDMemoryError",
+    "CAMDInfo",
+    "camd",
+    "camd_default_control"
+]
+
+
 ctypedef fused index_t:
     int32_t
     int64_t

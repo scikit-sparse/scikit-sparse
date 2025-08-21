@@ -44,6 +44,9 @@ import numpy as np
 
 from .utils import validate_csc_input
 
+__all__ = ['maxtrans', 'strongcomp', 'btf', 'btf_q_permutation']
+
+
 ctypedef fused index_t:
     int32_t
     int64_t

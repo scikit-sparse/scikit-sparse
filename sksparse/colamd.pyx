@@ -50,6 +50,17 @@ from dataclasses import dataclass
 
 from .utils import validate_csc_input
 
+__all__ = [
+    "COLAMDError",
+    "COLAMDValueError",
+    "COLAMDMemoryError",
+    "COLAMDInternalError",
+    "COLAMDStats",
+    "colamd",
+    "symamd",
+    "colamd_get_defaults"
+]
+
 
 ctypedef fused index_t:
     int32_t
@@ -418,12 +429,12 @@ References
 """
 
 # Define the docstrings
-colamd_reftag = "[#colamd_c]"
+_colamd_reftag = "[#colamd_c]"
 
-colamd_intro = f"""Compute the column approximate minimum degree ordering of
+_colamd_intro = f"""Compute the column approximate minimum degree ordering of
 a sparse matrix.
 
-Adapted from the COLAMD documentation {colamd_reftag}_:
+Adapted from the COLAMD documentation {_colamd_reftag}_:
 
     This function computes a column ordering for a sparse matrix `A` that
     is appropriate for LU factorization of symmetric or unsymmetric
@@ -439,22 +450,22 @@ Adapted from the COLAMD documentation {colamd_reftag}_:
     row interchanges.
 """
 
-colamd_A_param = """A : (M, N) {array_like, sparse matrix}
+_colamd_A_param = """A : (M, N) {array_like, sparse matrix}
     The input matrix for which to compute the column ordering.
     Must be 2D and convertible to CSC format. Need not be square."""
 
 colamd.__doc__ = _COLAMD_DOC_TEMPLATE.format(
-    intro=colamd_intro, A_param=colamd_A_param, reftag=colamd_reftag,
+    intro=_colamd_intro, A_param=_colamd_A_param, reftag=_colamd_reftag,
 )
 
 
 # Define the docstring for symamd
-symamd_reftag = "[#symamd_c]"
+_symamd_reftag = "[#symamd_c]"
 
-symamd_intro = f"""Compute the column approximate minimum degree ordering of
+_symamd_intro = f"""Compute the column approximate minimum degree ordering of
 a sparse symmetric matrix.
 
-Adapted from the COLAMD documentation {symamd_reftag}_:
+Adapted from the COLAMD documentation {_symamd_reftag}_:
 
     This function computes an approximate minimum degree ordering for
     Cholesky factorization of symmetric matrices.
@@ -468,7 +479,7 @@ Adapted from the COLAMD documentation {symamd_reftag}_:
     `A`.
 """
 
-symamd_A_param = """A : (N, N) {array_like, sparse matrix}
+_symamd_A_param = """A : (N, N) {array_like, sparse matrix}
     The input matrix for which to compute the column ordering.
     Must be 2D, square, and convertible to CSC format.
 
@@ -479,7 +490,7 @@ symamd_A_param = """A : (N, N) {array_like, sparse matrix}
 """
 
 symamd.__doc__ = _COLAMD_DOC_TEMPLATE.format(
-    intro=symamd_intro, A_param=symamd_A_param, reftag=symamd_reftag,
+    intro=_symamd_intro, A_param=_symamd_A_param, reftag=_symamd_reftag,
 )
 
 
