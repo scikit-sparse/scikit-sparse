@@ -251,22 +251,15 @@ cdef object _cholmod_sparse_from_csc(
     cdef complex64_t[::1] Ax_mv_complex64
     cdef complex128_t[::1] Ax_mv_complex128
 
-    # Declare array references to keep memory alive
-    cdef np.ndarray Ap, Ai, Ax
-
     # Create the index arrays
-    itype = np.int32 if use_int32 else np.int64
-    Ap = np.ascontiguousarray(A_py.indptr, dtype=itype)
-    Ai = np.ascontiguousarray(A_py.indices, dtype=itype)
-
     if use_int32:
-        Ap_mv_int32 = Ap
-        Ai_mv_int32 = Ai
+        Ap_mv_int32 = A_py.indptr
+        Ai_mv_int32 = A_py.indices
         A.p = &Ap_mv_int32[0]
         A.i = &Ai_mv_int32[0]
     else:
-        Ap_mv_int64 = Ap
-        Ai_mv_int64 = Ai
+        Ap_mv_int64 = A_py.indptr
+        Ai_mv_int64 = A_py.indices
         A.p = &Ap_mv_int64[0]
         A.i = &Ai_mv_int64[0]
 
@@ -276,22 +269,21 @@ cdef object _cholmod_sparse_from_csc(
         A.x = NULL
     else:
         A.xtype = _real_or_complex(dtype)
-        Ax = np.ascontiguousarray(A_py.data, dtype=dtype)
 
         if dtype == np.float32:
-            Ax_mv_float32 = Ax
+            Ax_mv_float32 = A_py.data
             A.x = &Ax_mv_float32[0]
         elif dtype == np.float64:
-            Ax_mv_float64 = Ax
+            Ax_mv_float64 = A_py.data
             A.x = &Ax_mv_float64[0]
         elif dtype == np.complex64:
-            Ax_mv_complex64 = Ax
+            Ax_mv_complex64 = A_py.data
             A.x = &Ax_mv_complex64[0]
         elif dtype == np.complex128:
-            Ax_mv_complex128 = Ax
+            Ax_mv_complex128 = A_py.data
             A.x = &Ax_mv_complex128[0]
 
-    return (A_py, Ap, Ai, Ax)
+    return A_py
 
 
 cdef class _CholmodSparseDestructor:
@@ -434,21 +426,14 @@ cdef object _cholmod_factor_from_csc(
     cdef complex64_t[::1] LDx_mv_complex64
     cdef complex128_t[::1] LDx_mv_complex128
 
-    # Declare array references to keep memory alive
-    cdef np.ndarray LDp, LDi, LDx
-
-    itype = np.int32 if use_int32 else np.int64
-    LDp = np.ascontiguousarray(LD_py.indptr, dtype=itype)
-    LDi = np.ascontiguousarray(LD_py.indices, dtype=itype)
-
     if use_int32:
-        LDp_mv_int32 = LDp
-        LDi_mv_int32 = LDi
+        LDp_mv_int32 = LD_py.indptr
+        LDi_mv_int32 = LD_py.indices
         L.p = &LDp_mv_int32[0]
         L.i = &LDi_mv_int32[0]
     else:
-        LDp_mv_int64 = LDp
-        LDi_mv_int64 = LDi
+        LDp_mv_int64 = LD_py.indptr
+        LDi_mv_int64 = LD_py.indices
         L.p = &LDp_mv_int64[0]
         L.i = &LDi_mv_int64[0]
 
@@ -457,19 +442,17 @@ cdef object _cholmod_factor_from_csc(
     L.dtype = _single_or_double(dtype)
     L.xtype = _real_or_complex(dtype)
 
-    LDx = np.ascontiguousarray(LD_py.data, dtype=dtype)
-
     if dtype == np.float32:
-        LDx_mv_float32 = LDx
+        LDx_mv_float32 = LD_py.data
         L.x = &LDx_mv_float32[0]
     elif dtype == np.float64:
-        LDx_mv_float64 = LDx
+        LDx_mv_float64 = LD_py.data
         L.x = &LDx_mv_float64[0]
     elif dtype == np.complex64:
-        LDx_mv_complex64 = LDx
+        LDx_mv_complex64 = LD_py.data
         L.x = &LDx_mv_complex64[0]
     elif dtype == np.complex128:
-        LDx_mv_complex128 = LDx
+        LDx_mv_complex128 = LD_py.data
         L.x = &LDx_mv_complex128[0]
 
     L.z = NULL
@@ -486,7 +469,7 @@ cdef object _cholmod_factor_from_csc(
         L.next = cholmod_l_malloc(N + 2, sizeof(int64_t), cm)
         _initialize_l_factor(L, N)
 
-    return (LD_py, LDp, LDi, LDx)
+    return LD_py
 
 
 cdef void _initialize_factor(cholmod_factor* L, size_t N):
