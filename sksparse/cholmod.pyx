@@ -627,9 +627,13 @@ cdef object _ldlupdate_factor_from_csc(
     cdef int to_monotonic = True
 
     if use_int32:
-        cholmod_change_factor(to_xtype, to_ll, to_super, to_packed, to_monotonic, L, cm)
+        cholmod_change_factor(
+            to_xtype, to_ll, to_super, to_packed, to_monotonic, L, cm
+        )
     else:
-        cholmod_l_change_factor(to_xtype, to_ll, to_super, to_packed, to_monotonic, L, cm)
+        cholmod_l_change_factor(
+            to_xtype, to_ll, to_super, to_packed, to_monotonic, L, cm
+        )
 
     cdef size_t lnz = L.nzmax
 
@@ -1024,7 +1028,6 @@ cdef class _CholmodDenseDestructor:
             cholmod_l_free_dense(&self._dense, self._common)
 
 
-
 cdef object _ndarray_from_cholmod_dense(
     cholmod_dense* X, bint use_int32, cholmod_common* common
 ):
@@ -1147,6 +1150,7 @@ cdef bint _check_perm(np.ndarray p, bint use_int32, cholmod_common *cm):
 
     return ok
 
+
 # -----------------------------------------------------------------------------
 #         Cholesky and LDL Factorizations
 # -----------------------------------------------------------------------------
@@ -1211,7 +1215,7 @@ def _cholesky_base(
 
     stype = -1 if lower else 1  # use lower or upper triangular part
     # Keep a reference to the input matrix to keep it alive
-    cdef object ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
+    cdef object _ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
 
     # Set stype and beta for LDL
     cdef double betac[2]
@@ -1477,7 +1481,7 @@ _ldl_D_output = """D : dia_array
     The data type will match that of ``A``."""
 
 
-_ldl_see_also = """* :func:`.cholesky` : Factorize a matrix using Cholesky decomposition."""
+_ldl_see_also = "* :func:`.cholesky` : Factorize a matrix using Cholesky decomposition."
 
 
 ldl.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
@@ -1634,7 +1638,7 @@ def cholmod(A, b, *, order=None, p=None):
     cdef cholmod_sparse* Ac = &Amatrix
     cdef int stype = 1  # use triu(A) only
 
-    cdef object A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
+    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
 
     # -------------------------------------------------------------------------
     #         Get the b vector or matrix into CHOLMOD format
@@ -1899,7 +1903,7 @@ def ldlsolve(L, D, b, p=None):
     LD = L.copy()
     LD.setdiag(D.diagonal())
 
-    cdef object LD_ref = _cholmod_factor_from_csc(LD, use_int32, Lc, cm)
+    cdef object _LD_ref = _cholmod_factor_from_csc(LD, use_int32, Lc, cm)
 
     # -------------------------------------------------------------------------
     #         Solve the System
@@ -1975,7 +1979,7 @@ def ldlupdate(L, D, C, *, update=True):
 
     .. math::
 
-        L' D' L'^{\\top} = P A P^{\\top} \pm C C^{\\top}
+        L' D' L'^{\\top} = P A P^{\\top} \\pm C C^{\\top}
 
     where `L` is a lower triangular matrix with unit diagonal, and `D` is
     a diagonal matrix. The input ``C`` is a sparse matrix representing the
@@ -2023,7 +2027,6 @@ def ldlupdate(L, D, C, *, update=True):
                          "Expected a 1D or 2D sparse array.")
 
     N = L.shape[0]
-    K = C.shape[1] if C.ndim == 2 else 0
 
     if C.shape[0] != N:
         raise ValueError("Update matrix C must have the same number of rows as L.")
@@ -2057,11 +2060,11 @@ def ldlupdate(L, D, C, *, update=True):
     cdef cholmod_sparse Cmatrix
     cdef cholmod_sparse* Cc = &Cmatrix
 
-    cdef object C_ref  # keep a reference to C so it is not garbage collected
+    cdef object _C_ref  # keep a reference to C so it is not garbage collected
     C, C_use_int32, _ = validate_csc_input(C)
 
     cdef int stype = 0  # use all of C
-    C_ref = _cholmod_sparse_from_csc(C, stype, C_use_int32, &Cmatrix)
+    _C_ref = _cholmod_sparse_from_csc(C, stype, C_use_int32, &Cmatrix)
 
     # Get a factor from the L and D matrices
     LD = L.copy()
@@ -2202,7 +2205,7 @@ def ldlrowmod(L, D, k, *, C=None):
 
     cdef cholmod_sparse Cmatrix
     cdef cholmod_sparse* Cc = &Cmatrix
-    cdef object C_ref  # keep a reference to C so it is not garbage collected
+    cdef object _C_ref  # keep a reference to C so it is not garbage collected
     cdef int stype = 0  # use all of C
 
     if rowadd:
@@ -2211,7 +2214,7 @@ def ldlrowmod(L, D, k, *, C=None):
             C = C.reshape((-1, 1)).tocsc()  # (N, 1)
 
         C, C_use_int32, _ = validate_csc_input(C)
-        C_ref = _cholmod_sparse_from_csc(C, stype, C_use_int32, &Cmatrix)
+        _C_ref = _cholmod_sparse_from_csc(C, stype, C_use_int32, &Cmatrix)
 
     # Get a factor from the L and D matrices
     LD = L
@@ -2382,7 +2385,7 @@ def analyze(A, *, kind=None, order=None):
     cdef cholmod_sparse* C
     cdef cholmod_factor* Lc
 
-    cdef object A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
+    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
 
     # -------------------------------------------------------------------------
     #         Analyze and Order
@@ -2541,7 +2544,7 @@ def symbfact(A, *, kind=None, lower=False, return_factor=False):
         stype = -1  # use tril(A) only
 
     # Get sparse *pattern*
-    cdef object A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
+    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
     Ac.xtype = CHOLMOD_PATTERN
     Ac.x = NULL
 
@@ -2560,7 +2563,7 @@ def symbfact(A, *, kind=None, lower=False, return_factor=False):
         ColCount = cholmod_malloc(N, sizeof(int32_t), cm)
         First = cholmod_malloc(N, sizeof(int32_t), cm)
         Level = cholmod_malloc(N, sizeof(int32_t), cm)
-    else: 
+    else:
         Parent = cholmod_l_malloc(N, sizeof(int64_t), cm)
         Post = cholmod_l_malloc(N, sizeof(int64_t), cm)
         ColCount = cholmod_l_malloc(N, sizeof(int64_t), cm)
@@ -2803,7 +2806,7 @@ def etree(A, *, kind=None, return_post=False):
         stype = -1  # use tril(A) only
 
     # Get sparse *pattern*
-    cdef object A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
+    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
     Ac.xtype = CHOLMOD_PATTERN
     Ac.x = NULL
 
@@ -2815,7 +2818,7 @@ def etree(A, *, kind=None, return_post=False):
 
     if use_int32:
         Parent = cholmod_malloc(N, sizeof(int32_t), cm)
-    else: 
+    else:
         Parent = cholmod_l_malloc(N, sizeof(int64_t), cm)
 
     cdef cholmod_sparse *Rc
@@ -2907,7 +2910,7 @@ def resymbol(L, A):
     .. [#resymbol_c] ``resymbol.c`` - CHOLMOD MATLAB resymbolization function
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/resymbol.c
     """
-    A, use_int32, out_itype = validate_csc_input(A, require_square=True)
+    A, use_int32, _ = validate_csc_input(A, require_square=True)
     L, _, _ = validate_csc_input(L, require_square=True)
 
     N = A.shape[0]
@@ -2931,7 +2934,6 @@ def resymbol(L, A):
     if A.nnz == 0:
         raise CholmodNotPositiveDefiniteError("Input matrix not positive definite.")
 
-
     cdef cholmod_common Common
     cdef cholmod_common *cm = &Common
 
@@ -2945,7 +2947,7 @@ def resymbol(L, A):
     cdef cholmod_sparse* Ac = &Amatrix
     cdef int stype = -1  # use tril(A) only
 
-    cdef object A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
+    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
     Ac.xtype = CHOLMOD_PATTERN
     Ac.x = NULL
 
