@@ -426,6 +426,24 @@ cdef extern from "cholmod.h":
         cholmod_common *Common
     )
 
+    int64_t cholmod_collapse_septree(
+        size_t n,
+        size_t ncomponents,
+        double nd_oksep,
+        size_t nd_small,
+        int32_t *CParent,
+        int32_t *Cmember,
+        cholmod_common *Common
+    )
+    int64_t cholmod_l_collapse_septree(
+        size_t n,
+        size_t ncomponents,
+        double nd_oksep,
+        size_t nd_small,
+        int64_t *CParent,
+        int64_t *Cmember,
+        cholmod_common *Common
+    )
 
     void *cholmod_free(
         size_t n,

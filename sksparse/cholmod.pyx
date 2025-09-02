@@ -3564,3 +3564,140 @@ def metis(A, *, kind=None):
         cholmod_l_finish(cm)
 
     return p
+
+
+def prune_septree(cp, cmember, *, nd_oksep=None, nd_small=None):
+    """Prune a separator tree.
+
+    Parameters
+    ----------
+    cp : (C,) ndarray of int
+        The separator tree, where ``C`` is the number of components found. The
+        value ``cp[c]`` is the parent of the component ``c`` in the separator
+        tree, or ``-1`` if ``c`` is the root of the tree. There is a maximum of
+        ``N`` components, where ``N`` is the dimension of the input matrix.
+    cmember : (N,) ndarray of int
+        The component membership vector, where ``cmember[i]`` is the component
+        to which node ``i`` belongs.
+
+    Returns
+    -------
+    cp : (C',) ndarray of int
+        The pruned separator tree, where ``C' <= C`` is the number of
+        components remaining after pruning.
+    cmember : (N,) ndarray of int
+        The updated component membership vector, where ``cmember[i]`` is the
+        component to which node ``i`` belongs.
+
+    Other Parameters
+    ----------------
+    nd_oksep : double in [0, 1], optional
+        Controls when a separator is kept. A separator is kept if
+        ``nsep < nd_oksep * n``, where ``nsep`` is the number of nodes in the
+        separator and ``n`` is the number of nodes in the graph being cut
+        (default is 1.0).
+    nd_small : int >= 0, optional
+        The smallest subgraph that should not be partitioned (default is 200).
+
+    Notes
+    -----
+    This function is based on the SuiteSparse CHOLMOD MATLAB interface
+    [#septree_c]_.
+
+    .. versionadded:: 0.5.0
+
+    References
+    ----------
+    .. [#septree_c] ``septree.c`` - CHOLMOD MATLAB septree function
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/septree.c
+    """
+    if cp.ndim != 1:
+        raise ValueError(f"Input cp must be one-dimensional, got shape {cp.shape}.")
+
+    if cmember.ndim != 1:
+        raise ValueError(
+            f"Input cmember must be one-dimensional, got shape {cmember.shape}."
+        )
+
+    if cp.dtype not in (np.int32, np.int64):
+        raise ValueError(f"Input cp must have integer dtype, got {cp.dtype}.")
+
+    if cmember.dtype not in (np.int32, np.int64):
+        raise ValueError(f"Input cmember must have integer dtype, got {cmember.dtype}.")
+
+    if cp.dtype != cmember.dtype:
+        raise ValueError(
+            f"Input cp and cmember must have the same integer dtype, got "
+            f"{cp.dtype=} and {cmember.dtype=}."
+        )
+
+    if nd_oksep is None:
+        nd_oksep = 1.0  # see CHOLMOD/MATLAB/nesdis.c
+
+    if nd_small is None:
+        nd_small = 200  # see CHOLMOD/MATLAB/nesdis.c
+
+    cdef bint use_int32 = cp.dtype == np.int32
+
+    cdef cholmod_common Common
+    cdef cholmod_common *cm = &Common
+
+    if use_int32:
+        cholmod_start(cm)
+    else:
+        cholmod_l_start(cm)
+
+    cdef size_t Nc = cp.size
+    cdef size_t N = cmember.size
+
+    if N < Nc:
+        raise ValueError(f"invalid input shapes, got {cp.size=}, {cmember.size=}.")
+
+    # Copy input arrays into new cholmod arrays (modified for output)
+    cdef void *CParent
+    cdef void *CMember
+
+    cdef int32_t[::1] cp_mv_int32, cmember_mv_int32
+    cdef int64_t[::1] cp_mv_int64, cmember_mv_int64
+
+    # TODO could do checks of each value in a for-loop here
+    if use_int32:
+        CParent = cholmod_malloc(Nc, sizeof(int32_t), cm)
+        CMember = cholmod_malloc(N, sizeof(int32_t), cm)
+        memcpy(<int32_t*>CParent, &cp_mv_int32[0], Nc * sizeof(int32_t))
+        memcpy(<int32_t*>CMember, &cmember_mv_int32[0], N * sizeof(int32_t))
+    else:
+        CParent = cholmod_l_malloc(Nc, sizeof(int64_t), cm)
+        CMember = cholmod_l_malloc(N, sizeof(int64_t), cm)
+        memcpy(<int64_t*>CParent, &cp_mv_int64[0], Nc * sizeof(int64_t))
+        memcpy(<int64_t*>CMember, &cmember_mv_int64[0], N * sizeof(int64_t))
+
+    cdef int64_t nc_new
+
+    if use_int32:
+        nc_new = cholmod_collapse_septree(
+            N, Nc, nd_oksep, nd_small, <int32_t*>CParent, <int32_t*>CMember, cm
+        )
+    else:
+        nc_new = cholmod_l_collapse_septree(
+            N, Nc, nd_oksep, nd_small, <int64_t*>CParent, <int64_t*>CMember, cm
+        )
+
+    if nc_new < 0:
+        raise CholmodError("Pruning the separator tree failed.")
+
+    # Get the ndarrays to return
+    cp_out = _ndarray_from_cholmod_intarray(CParent, nc_new, use_int32)
+    cmember_out = _ndarray_from_cholmod_intarray(CMember, N, use_int32)
+
+    # Free memory (arrays are copied to numpy)
+    if use_int32:
+        cholmod_free(Nc, sizeof(int32_t), CParent, cm)
+        cholmod_free(N, sizeof(int32_t), CMember, cm)
+        cholmod_finish(cm)
+    else:
+        cholmod_l_free(Nc, sizeof(int64_t), CParent, cm)
+        cholmod_l_free(N, sizeof(int64_t), CMember, cm)
+        cholmod_l_finish(cm)
+
+    return cp_out, cmember_out
