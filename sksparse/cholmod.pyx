@@ -52,6 +52,7 @@ __all__ = [
     "CholmodWarning",
     "SeparatorTree",
     "analyze",
+    "bisect",
     "cholesky",
     "cholmod",
     "etree",
@@ -59,6 +60,7 @@ __all__ = [
     "ldlrowmod",
     "ldlsolve",
     "ldlupdate",
+    "metis",
     "nesdis",
     "resymbol",
     "symbfact",
@@ -143,7 +145,6 @@ cdef _handle_errors(int status) except * with gil:
 
     status_msg = f"(code {status:d})"
 
-    # TODO include informative error messages.
     # Known Errors
     cdef dict error_map = {
         CHOLMOD_NOT_INSTALLED: (
@@ -282,12 +283,19 @@ cdef object _cholmod_sparse_from_csc(
         Ap_mv_int32 = A_py.indptr
         Ai_mv_int32 = A_py.indices
         A.p = &Ap_mv_int32[0]
-        A.i = &Ai_mv_int32[0]
+        # Handle empty matrices
+        if Ai_mv_int32.shape[0] == 0 and (A.nrow == 0 or A.ncol == 0):
+            A.i = <int32_t*>malloc(0)  # TODO needs to be freed
+        else:
+            A.i = &Ai_mv_int32[0]
     else:
         Ap_mv_int64 = A_py.indptr
         Ai_mv_int64 = A_py.indices
         A.p = &Ap_mv_int64[0]
-        A.i = &Ai_mv_int64[0]
+        if Ai_mv_int64.shape[0] == 0:
+            A.i = <int64_t*>malloc(0)
+        else:
+            A.i = &Ai_mv_int64[0]
 
     # Get the numerical values of A
     if dtype == np.bool_:
@@ -298,16 +306,28 @@ cdef object _cholmod_sparse_from_csc(
 
         if dtype == np.float32:
             Ax_mv_float32 = A_py.data
-            A.x = &Ax_mv_float32[0]
+            if Ax_mv_float32.shape[0] == 0 and (A.nrow == 0 or A.ncol == 0):
+                A.x = <float32_t*>malloc(0)
+            else:
+                A.x = &Ax_mv_float32[0]
         elif dtype == np.float64:
             Ax_mv_float64 = A_py.data
-            A.x = &Ax_mv_float64[0]
+            if Ax_mv_float64.shape[0] == 0 and (A.nrow == 0 or A.ncol == 0):
+                A.x = <float64_t*>malloc(0)
+            else:
+                A.x = &Ax_mv_float64[0]
         elif dtype == np.complex64:
             Ax_mv_complex64 = A_py.data
-            A.x = &Ax_mv_complex64[0]
+            if Ax_mv_complex64.shape[0] == 0 and (A.nrow == 0 or A.ncol == 0):
+                A.x = <complex64_t*>malloc(0)
+            else:
+                A.x = &Ax_mv_complex64[0]
         elif dtype == np.complex128:
             Ax_mv_complex128 = A_py.data
-            A.x = &Ax_mv_complex128[0]
+            if Ax_mv_complex128.shape[0] == 0 and (A.nrow == 0 or A.ncol == 0):
+                A.x = <complex128_t*>malloc(0)
+            else:
+                A.x = &Ax_mv_complex128[0]
 
     return A_py
 
@@ -389,6 +409,82 @@ cdef object _csc_from_cholmod_sparse(cholmod_sparse* A, cholmod_common* common):
         assert np.PyArray_ISWRITEABLE(array)
 
     return csc_array((data, indices, indptr), shape=(A.nrow, A.ncol))
+
+
+cdef object _csc_from_cholmod_factor(object py_factor):
+    """Build a sparse matrix from a CHOLMOD factor.
+
+    This function is similar to _csc_from_cholmod_sparse, but builds the matrix
+    directly from the factor, without the intermediate cholmod_factor_to_sparse
+    call.
+
+    Parameters
+    ----------
+    py_factor : CholeskyFactor
+        The input cholmod_factor and cholmod_common objects, wrapped in
+        a Python object.
+
+    Returns
+    -------
+    res : csc_array
+        L scipy.sparse.csc_array that is a view onto the CHOLMOD factor.
+
+    Notes
+    -----
+    The ``cholmod_factor_to_sparse`` function moves the memory from the
+    ``cholmod_factor`` to the newly-created ``cholmod_sparse`` struct, and sets
+    the ``xtype`` of the factor to ``CHOLMOD_PATTERN``. This behavior is fine
+    for standalone functions that return a matrix and no longer need the
+    factor. For our :obj:`CholeskyFactor` class, however, we need to keep the
+    factor intact for future updates or conversions to LL or LDL formats.
+    Therefore, we use this function to create a view onto the factor without
+    destroying it.
+    """
+    cdef CholeskyFactor factor_obj = py_factor
+    cdef cholmod_factor *L = factor_obj.factor
+    cdef cholmod_common *common = factor_obj.cm
+
+    if L is NULL:
+        raise ValueError("The factor pointer is NULL.")
+
+    # TODO handle below to return a symbolic factor
+    if L.xtype == CHOLMOD_PATTERN:
+        raise ValueError("The factor has no numerical values.")
+
+    # Ensure the factor is in simplicial, packed, monotonic format
+    cdef bint use_int32 = L.itype == CHOLMOD_INT
+
+    is_super = False  # simplicial format
+    is_packed = True
+    is_monotonic = True
+
+    change_factor = cholmod_change_factor if use_int32 else cholmod_l_change_factor
+    change_factor(
+        L.xtype, L.is_ll, is_super, is_packed, is_monotonic, L, common
+    )
+    _handle_errors(common.status)
+
+    # Create numpy arrays
+    cdef int np_itypenum = np.NPY_INT32 if use_int32 else np.NPY_INT64
+    cdef int np_dtypenum = _np_dtypenum_from_cholmod.get(
+        (L.xtype, L.dtype), np.NPY_OBJECT
+    )
+
+    cdef np.ndarray indptr = np.PyArray_SimpleNewFromData(
+        1, [L.n + 1], np_itypenum, L.p
+    )
+    cdef np.ndarray indices = np.PyArray_SimpleNewFromData(
+        1, [L.nzmax], np_itypenum, L.i
+    )
+    cdef np.ndarray data = np.PyArray_SimpleNewFromData(
+        1, [L.nzmax], np_dtypenum, L.x
+    )
+
+    # Take ownership of the data
+    for array in (indptr, indices, data):
+        np.set_array_base(array, factor_obj)
+
+    return csc_array((data, indices, indptr), shape=(L.n, L.n))
 
 
 cdef object _cholmod_factor_from_csc(
@@ -1124,6 +1220,35 @@ cdef np.ndarray _ndarray_from_cholmod_intarray(void* ptr, size_t N, bint use_int
     return p.copy()
 
 
+cdef np.ndarray _perm_from_cholmod_factor(object py_factor):
+    """Create a NumPy array from the permutation vector in a CHOLMOD factor.
+
+    Parameters
+    ----------
+    py_factor : CholeskyFactor
+        The CholeskyFactor object from which to extract the permutation.
+
+    Returns
+    -------
+    p : ndarray
+        The permutation vector as a NumPy array.
+    """
+    cdef CholeskyFactor factor_obj = py_factor
+    cdef cholmod_factor *L = factor_obj.factor
+
+    if L is NULL:
+        raise ValueError("The factor pointer is NULL.")
+
+    if L.Perm is NULL:
+        raise ValueError("The factor does not have a permutation.")
+
+    cdef int np_itypenum = np.NPY_INT32 if L.itype == CHOLMOD_INT else np.NPY_INT64
+    cdef np.ndarray p = np.PyArray_SimpleNewFromData(1, [L.n], np_itypenum, L.Perm)
+    np.set_array_base(p, factor_obj)  # keep factor_obj alive
+
+    return p
+
+
 # -----------------------------------------------------------------------------
 #         Utilities
 # -----------------------------------------------------------------------------
@@ -1178,178 +1303,495 @@ cdef bint _check_perm(np.ndarray p, bint use_int32, cholmod_common *cm):
 
 
 # -----------------------------------------------------------------------------
-#         Cholesky and LDL Factorizations
+#         CholeskyFactor Object
 # -----------------------------------------------------------------------------
-def _cholesky_base(
-    A, *, ldl=False, beta=None, lower=False, order=None, remove_zeros=True
-):
-    """Base function for Cholesky factorization."""
-    A, use_int32, out_itype = validate_csc_input(A, require_square=True)
-
-    N = A.shape[0]
-
-    # Check the input ordering method
-    if order is not None and order not in _ordering_methods:
-        raise ValueError(f"Unknown ordering method: {order}")
-
-    # Empty matrix
-    if N == 0:
-        R = csc_array((0, 0), dtype=A.dtype)
-        p = np.array([], dtype=out_itype)
-        if ldl:
-            D = diags_array((0,), shape=(0, 0), dtype=A.dtype)
-            return (R, D) if order is None else (R, D, p)
+cdef void _cleanup_factor(CholeskyFactor cf):
+    """Deallocate memory used by a CholeskyFactor."""
+    if cf.cm is not NULL:
+        if cf.use_int32:
+            if cf.factor is not NULL:
+                cholmod_free_factor(&cf.factor, cf.cm)
+            cholmod_finish(cf.cm)
         else:
-            return R if order is None else (R, p)
+            if cf.factor is not NULL:
+                cholmod_l_free_factor(&cf.factor, cf.cm)
+            cholmod_l_finish(cf.cm)
 
-    # Matrix of all zeros
-    if A.nnz == 0:
-        raise CholmodNotPositiveDefiniteError("Input matrix not positive definite.")
 
-    # -------------------------------------------------------------------------
-    #         Set up Data Structures
-    # -------------------------------------------------------------------------
-    # Create the CHOLMOD common object
+cdef class CholeskyFactor:
+    """The main object used for creating and manipulating a Cholesky factor.
+
+    Attributes
+    ----------
+    Common : cholmod_common
+        CHOLMOD common structure for configuration and status.
+    cm : cholmod_common*
+        A pointer to ``Common``.
+    factor : cholmod_factor*
+        The underlying C data structure.
+    use_int32 : bint
+        Whether to use 32-bit or 64-bit integers.
+    N : size_t
+        The number of rows and columns in the factor.
+    _beta : float or None
+        The value added to the diagonal of :math:`A A^{\\top}` before
+        factorization, or None if no value was added.
+    is_lower : bool
+        Whether the factor is lower triangular (True) or upper triangular
+        (False).
+    """
+
     cdef cholmod_common Common
-    cdef cholmod_common *cm = &Common
+    cdef cholmod_common *cm
+    cdef cholmod_factor *factor
+    cdef bint use_int32
+    cdef size_t N
+    cdef object _beta
+    cdef bint is_lower
 
-    if use_int32:
-        cholmod_start(cm)
-    else:
-        cholmod_l_start(cm)
+    def __cinit__(self, object A, object beta=None, int lower=False, object order=None):
+        """Construct a CholeskyFactor from a sparse matrix.
 
-    # Convert to packed LL.T when done
-    cm.final_asis = False
-    cm.final_super = False
-    cm.final_ll = not ldl  # LL.T for Cholesky, LDL.T for LDL
-    cm.final_pack = True
-    cm.final_monotonic = True
+        Parameters
+        ----------
+        A : (N, N) {{array_like, sparse array}}
+            An array convertible to a sparse matrix in Compressed Sparse Column
+            (CSC) format. The matrix must be square and symmetric positive
+            definite. Only the upper or lower triangular part of the matrix is
+            used, and no check is made for symmetry.
+        beta : float, optional
+            The scalar value to add to the diagonal of the symmetrized matrix
+            :math:`A A^{\\top}` before factorization. Default is None, which
+            computes the factorization of :math:`A` itself.
+        order : None or str in {{"default", "best", "natural", "metis", \
+                "nesdis", "amd", "colamd", "postordered"}}, optional
+            The permutation algorithm to use for the factorization. By default,
+            the natural ordering of the input matrix is used. The other options
+            are:
 
-    # TODO test if this is needed when we implement chol_update (see ldlchol.c)
-    # If we do *not* drop numerically zero entries from the symbolic pattern,
-    # we *do* need to drop entries that result from supernodal amalgamation.
-    # Otherwise, all zeros are dropped in cholmod_drop, so save the extra step.
-    cm.final_resymbol = not remove_zeros
+            * ``default``: Use the default method, which first tries AMD, then
+                METIS.
+            * ``best``: Automatically select the best ordering based on the
+                input.
+            * ``metis``: Use the METIS library for graph partitioning.
+            * ``nesdis``: Use the NESDIS library for nested dissection.
+            * ``amd``: Use the Approximate Minimum Degree (AMD) algorithm.
+            * ``colamd``: Use the Approximate Minimum Degree (AMD) algorithm
+                for the symmetric case, or the COLAMD algorithm for the
+                unsymmetric case
+                (:math:`A A^{{\\top}}` or :math:`A^{{\\top}} A`).
+            * ``postordered``: Use natural ordering followed by postordering.
 
-    cm.quick_return_if_not_posdef = True
+            By default, methods other than ``natural`` will also be
+            postordered.
 
-    _set_ordering_method(order, cm)
+            .. warning::
 
-    # Get the input matrix into CHOLMOD format
-    cdef cholmod_sparse Amatrix
-    cdef cholmod_sparse *Ac = &Amatrix
+                The ordering method ``best`` may be quite slow for large
+                matrices, but if the factorization is reused many times, it can
+                be worth it.
 
-    stype = -1 if lower else 1  # use lower or upper triangular part
-    # Keep a reference to the input matrix to keep it alive
-    cdef object _ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
+        lower : bool, optional
+            If True, return the lower triangular factor `L`.
+        """
+        A, use_int32, _ = validate_csc_input(A, require_square=True)
 
-    # Set stype and beta for LDL
-    cdef double betac[2]
+        # Check the input ordering method
+        if order is not None and order not in _ordering_methods:
+            raise ValueError(f"Unknown ordering method: {order}")
 
-    if ldl:
+        self.N = A.shape[0]
+        self.use_int32 = use_int32
+
+        # Matrix of all zeros
+        if self.N > 0 and A.nnz == 0:
+            raise CholmodNotPositiveDefiniteError("Input matrix not positive definite.")
+
+        # Get the input matrix into CHOLMOD format
+        cdef cholmod_sparse Amatrix
+        cdef cholmod_sparse *Ac = &Amatrix
+
+        # Use lower or upper triangular part of A
+        self.is_lower = lower
+        cdef int stype = -1 if self.is_lower else 1
+
+        # keep a reference to the input matrix
+        cdef object _ref = _cholmod_sparse_from_csc(A, stype, self.use_int32, &Amatrix)
+
+        # Analyze A @ A.T + beta*I if requested
         if beta is None:
-            Amatrix.stype = -1  # lower triangular
-            betac[0] = 0.0
-            betac[1] = 0.0
+            self._beta = None
         else:
             if not np.isscalar(beta):
                 raise ValueError("beta must be a scalar value.")
-            Amatrix.stype = 0  # symmetric, not triangular
-            betac[0] = beta
-            betac[1] = 0.0
+            self._beta = float(beta)
+
+        if self._beta is None:
+            Ac.stype = -1  # use lower triangular part of A
+        else:
+            Ac.stype = 0   # use all of A, factorizing A @ A.T
+
+        try:
+            self.cm = &self.Common
+
+            if self.use_int32:
+                cholmod_start(self.cm)
+            else:
+                cholmod_l_start(self.cm)
+
+            _set_ordering_method(order, self.cm)
+
+            # Analyze the matrix, but do not factorize yet
+            if self.use_int32:
+                self.factor = cholmod_analyze(Ac, self.cm)
+            else:
+                self.factor = cholmod_l_analyze(Ac, self.cm)
+
+            # Check for errors
+            _handle_errors(self.cm.status)
+
+        except Exception as e:
+            _cleanup_factor(self)
+            raise e
+
+    def __dealloc__(self):
+        """Deallocate memory used by the CholeskyFactor."""
+        _cleanup_factor(self)
 
     # -------------------------------------------------------------------------
-    #         Analyze and Factorize
+    #         Properties
     # -------------------------------------------------------------------------
-    cdef cholmod_factor* Lc
+    @property
+    def is_ll(self):
+        """Whether the factor is in LL.T form (True) or LDL.T form (False)."""
+        if self.factor is NULL:
+            raise ValueError("The factor pointer is NULL. Run `factorize` first.")
+        return self.factor.is_ll
 
-    if use_int32:
-        Lc = cholmod_analyze(Ac, cm)
+    # -------------------------------------------------------------------------
+    #         Public API
+    # -------------------------------------------------------------------------
+    def view_factor(self, kind=None):
+        """Return a view of the Cholesky factor in the specified format.
+
+        .. warning::
+
+            The returned matrix or matrices are views on the internal data of
+            the CHOLMOD factor. They will become invalid if the factor is
+            modified (*e.g.*, by calling ``factorize``).
+
+        Parameters
+        ----------
+        kind : None or str in {'LL', 'LDL'}, optional
+            The type of factor to return. If ``LL``, return the Cholesky
+            factor `L` such that :math:`L L^{\\top} = P A P^{\\top}`. If
+            ``LDL``, return the combined `LD` factor such that
+            :math:`L D L^{\\top} = P A P^{\\top}`. Default is None, which
+            uses the kind with which ``factorize`` was called.
+
+        Returns
+        -------
+        L : csc_array
+            The Cholesky factor in Compressed Sparse Column (CSC) format. If
+            ``kind="LL"``, the returned matrix is lower triangular. If
+            ``kind="LDL"``, the returned matrix contains the lower triangular
+            and the diagonal factors. The unit diagonal of `L` is not stored.
+        """
+        if kind is None:
+            kind = "LL" if self.is_ll else "LDL"
+
+        if kind not in ("LL", "LDL"):
+            raise ValueError("kind must be 'LL' or 'LDL'.")
+
+        self._convert_factor(kind)
+
+        return _csc_from_cholmod_factor(self)
+
+    def get_factor(self, kind=None, lower=None):
+        """Return a copy of the Cholesky factor in the specified format.
+
+        Parameters
+        ----------
+        kind : None or str in {'LL', 'LDL'}, optional
+            The type of factor to return. If ``LL``, return the Cholesky
+            factor `L` such that :math:`L L^{\\top} = P A P^{\\top}`. If
+            ``LDL``, return the combined `LD` factor such that
+            :math:`L D L^{\\top} = P A P^{\\top}`. Default is None, which
+            uses the kind with which ``factorize`` was called.
+        lower : None or bool, optional
+            If True, return the lower triangular factor `L`. If False, return
+            the upper triangular factor `R`. If None (default), return the
+            factor in the same triangular form as it was created with
+            ``factorize``.
+
+        Returns
+        -------
+        L : csc_array
+            The Cholesky factor in Compressed Sparse Column (CSC) format.
+        D : diags_array, optional
+            If ``kind="LDL"``, also returns the `D` factor.
+        """
+        if kind is None:
+            kind = "LL" if self.is_ll else "LDL"
+
+        if kind not in ("LL", "LDL"):
+            raise ValueError("kind must be 'LL' or 'LDL'.")
+
+        if lower is None:
+            lower = self.is_lower
+
+        Lv = self.view_factor(kind)
+
+        # Drop explicit zeros from returned copies
+        if kind == "LL":
+            L = Lv.copy()
+            L.eliminate_zeros()
+            if not lower:
+                L = L.T.conj()
+            return L
+        else:
+            # Extract L and D from combined LD factor
+            L = Lv.copy()
+            D = diags_array(L.diagonal())
+            L.setdiag(1.0)
+            L.eliminate_zeros()
+            if not lower:
+                L = L.T.conj()
+            return L, D
+
+    def view_perm(self):
+        """Return a view of permutation vector used in the factorization.
+
+        Returns
+        -------
+        p : ndarray
+            The permutation vector `p` such that :math:`P A P^{\\top}` is the
+            matrix that was factorized, where `P` is the permutation matrix
+            corresponding to `p`, *i.e.*, ``P = I[p]``.
+        """
+        return _perm_from_cholmod_factor(self)
+
+    def get_perm(self):
+        """Return a copy of the permutation vector used in the factorization.
+
+        Returns
+        -------
+        p : ndarray
+            The permutation vector `p` such that :math:`P A P^{\\top}` is the
+            matrix that was factorized, where `P` is the permutation matrix
+            corresponding to `p`, *i.e.*, ``P = I[p]``.
+        """
+        return self.view_perm().copy()
+
+    def factorize(self, object A, object ldl=None, object beta=None, bint lower=False):
+        """Compute the Cholesky factorization of a sparse matrix.
+
+        This function computes the Cholesky factorization of a symmetric
+        positive definite matrix `A`:
+
+        .. math::
+
+            R^{\\top} R = P A P^{\\top},
+
+        where `R` is an upper triangular matrix. Only the upper triangular part
+        of `A` is used. If ``lower`` is True, the lower triangular factor `L`
+        is returned instead, such that:
+
+        .. math::
+
+            L L^{\\top} = P A P^{\\top}.
+
+        In this case, only the lower triangular part of `A` is used.
+
+        Parameters
+        ----------
+        A : (N, N) {{array_like, sparse array}}
+            An array convertible to a sparse matrix in Compressed Sparse Column
+            (CSC) format. The matrix must be square and symmetric positive
+            definite. Only the upper or lower triangular part of the matrix is
+            used, and no check is made for symmetry. This matrix can be
+            numericaly different from the matrix used to initialize the
+            :obj:`CholeskyFactor` object, but it must have the same sparsity
+            pattern.
+        ldl : None or bool, optional
+            If True, compute the LDL factorization instead of the
+            Cholesky factorization. Default is None, which uses the same type of
+            factorization as the previous call to ``factorize``, or ``LL`` if
+            this is the first call.
+        beta : float, optional
+            The scalar value to add to the diagonal of the symmetrized matrix
+            :math:`A A^{\\top}` before factorization. Default is None, which
+            computes the factorization of :math:`A` itself.
+        lower : bool, optional
+            If True, only use the lower triangular part of `A`. Default is
+            False.
+        """
+        A, _, _ = validate_csc_input(A, require_square=True)
+
+        if ldl is None:
+            try:
+                ldl = not self.is_ll  # use the existing factor type
+            except ValueError:
+                ldl = False  # default to LL if no factor exists yet
+
+        if not isinstance(ldl, bool):
+            raise ValueError("ldl must be a boolean value.")
+
+        self.is_lower = lower
+
+        # Convert to packed LL.T when done
+        self.cm.final_asis = False
+        self.cm.final_super = False
+        self.cm.final_ll = not ldl  # LL.T for Cholesky, LDL.T for LDL
+        self.cm.final_pack = True
+        self.cm.final_monotonic = True
+
+        # If we do *not* drop numerically zero entries from the symbolic
+        # pattern, we *do* need to drop entries that result from supernodal
+        # amalgamation. Otherwise, all zeros are dropped in cholmod_drop, so
+        # save the extra step.
+        self.cm.final_resymbol = True
+
+        self.cm.quick_return_if_not_posdef = True
+
+        # Get the input matrix into CHOLMOD format
+        cdef cholmod_sparse Amatrix
+        cdef cholmod_sparse *Ac = &Amatrix
+
+        stype = -1 if lower else 1  # use lower or upper triangular part
+        # Keep a reference to the input matrix to keep it alive
+        cdef object _ref = _cholmod_sparse_from_csc(A, stype, self.use_int32, &Amatrix)
+
+        # Set stype and beta for LDL
+        cdef double betac[2]
+
+        if beta is None:
+            b = self._beta
+        else:
+            if not np.isscalar(beta):
+                raise ValueError("beta must be a scalar value.")
+            b = float(beta)
+            self._beta = b  # cache value
 
         if ldl:
-            cholmod_factorize_p(Ac, betac, NULL, 0, Lc, cm)
-        else:
-            cholmod_factorize(Ac, Lc, cm)
-    else:
-        Lc = cholmod_l_analyze(Ac, cm)
+            if b is None:
+                Ac.stype = -1    # use lower triangular part of A
+                betac[0] = 0.0
+                betac[1] = 0.0
+            else:
+                Ac.stype = 0     # use all of A, factorizing A @ A.T
+                betac[0] = b
+                betac[1] = 0.0
 
-        if ldl:
-            cholmod_l_factorize_p(Ac, betac, NULL, 0, Lc, cm)
+        # Factorize the matrix
+        if self.use_int32:
+            if ldl:
+                cholmod_factorize_p(Ac, betac, NULL, 0, self.factor, self.cm)
+            else:
+                cholmod_factorize(Ac, self.factor, self.cm)
         else:
-            cholmod_l_factorize(Ac, Lc, cm)
+            if ldl:
+                cholmod_l_factorize_p(Ac, betac, NULL, 0, self.factor, self.cm)
+            else:
+                cholmod_l_factorize(Ac, self.factor, self.cm)
 
-    # Check for errors
-    _handle_errors(cm.status)
+        # Check for errors
+        _handle_errors(self.cm.status)
+
+        return self  # for method chaining
 
     # -------------------------------------------------------------------------
-    #         Convert to scipy csc_array
+    #         Private API
     # -------------------------------------------------------------------------
-    # NOTE there is no need to keep "minor" here, since we just raise an error
-    # if the matrix is not positive definite.
-    cdef cholmod_sparse* Lsparse
-    cdef cholmod_sparse* Rc
+    def _convert_factor(self, kind):
+        """Convert the factor to the desired form in-place.
 
-    if use_int32:
-        Lsparse = cholmod_factor_to_sparse(Lc, cm)
-    else:
-        Lsparse = cholmod_l_factor_to_sparse(Lc, cm)
+        Parameters
+        ----------
+        kind : str in {'LL', 'LDL'}
+            The desired form of the factor. If ``'LL'``, convert to LL.T form.
+            If ``'LDL'``, convert to LDL.T form.
 
-    if remove_zeros:
-        # drop explicit zeros from Lsparse
-        if use_int32:
-            cholmod_drop(0, Lsparse, cm)
-        else:
-            cholmod_l_drop(0, Lsparse, cm)
+        Returns
+        -------
+        CholeskyFactor
+            The current object, for method chaining.
+        """
+        if kind not in ("LL", "LDL"):
+            raise ValueError("kind must be 'LL' or 'LDL'.")
 
-    if lower:
-        Rc = Lsparse
-    else:
-        # Convert to upper triangular (conjugate transpose)
-        if use_int32:
-            Rc = cholmod_transpose(Lsparse, CHOLMOD_TRANS_CONJ, cm)
-            cholmod_free_sparse(&Lsparse, cm)
-        else:
-            Rc = cholmod_l_transpose(Lsparse, CHOLMOD_TRANS_CONJ, cm)
-            cholmod_l_free_sparse(&Lsparse, cm)
+        to_xtype = self.factor.xtype
+        to_ll = kind == "LL"
 
-    # -------------------------------------------------------------------------
-    #         Create outputs
-    # -------------------------------------------------------------------------
-    R = _csc_from_cholmod_sparse(Rc, cm)
-    p = _ndarray_from_cholmod_intarray(Lc.Perm, N, use_int32)
+        # NOTE In CHOLMOD, supernodal factorizations are always LL.T. If we
+        # request to change to a supernodal LDL.T factorization,
+        # cholmod_change_factor will silently do nothing! So we can only stay
+        # supernodal when LL.T is requested.
+        to_super = self.factor.is_super and kind == "LL"
 
-    # For LDL, we need to extract the diagonal matrix D
+        to_packed = True
+        to_monotonic = self.factor.is_monotonic
+
+        if (kind == "LL" and not self.factor.is_ll) or (
+            kind == "LDL" and self.factor.is_ll
+        ):
+            # Convert LDL to LL
+            if self.use_int32:
+                change_factor = cholmod_change_factor
+            else:
+                change_factor = cholmod_l_change_factor
+
+            change_factor(
+                to_xtype,
+                to_ll,
+                to_super,
+                to_packed,
+                to_monotonic,
+                self.factor,
+                self.cm
+            )
+
+        return self
+
+
+# Interface functions
+def cho_factor(A, *, lower=False, order=None):
+    return CholeskyFactor(A, lower=lower, order=order).factorize(
+        A, ldl=False, lower=lower
+    )
+
+
+def ldl_factor(A, beta=None, *, lower=True, order=None):
+    return CholeskyFactor(A, beta=beta, lower=lower, order=order).factorize(
+        A, ldl=True, beta=beta, lower=lower
+    )
+
+
+# -----------------------------------------------------------------------------
+#         Cholesky and LDL Factorizations
+# -----------------------------------------------------------------------------
+def _cholesky_base(A, *, ldl=False, beta=None, lower=False, order=None):
+    """Base function for Cholesky factorization."""
+    f = CholeskyFactor(A, beta=beta, lower=lower, order=order).factorize(
+        A, ldl=ldl, beta=beta, lower=lower
+    )
+    kind = "LDL" if ldl else "LL"
+    R = f.get_factor(kind=kind, lower=lower)
+    p = f.get_perm()
+
     if ldl:
-        D = diags_array(R.diagonal())
-        R.setdiag(1.0)  # set unit diagonal
-
-    # Free everything else
-    # NOTE there is no need to free Ac here, since it is just a pointer to the
-    # original input matrix A. The MATLAB interface creates a *new*
-    # cholmod_sparse object, so it needs to be freed.
-    if use_int32:
-        cholmod_free_factor(&Lc, cm)
-        cholmod_finish(cm)
-    else:
-        cholmod_l_free_factor(&Lc, cm)
-        cholmod_l_finish(cm)
-
-    if ldl:
+        R, D = R
         return (R, D) if order is None else (R, D, p)
     else:
         return R if order is None else (R, p)
 
 
-def cholesky(A, *, lower=False, order=None, remove_zeros=True):
-    return _cholesky_base(
-        A, ldl=False, lower=lower, order=order, remove_zeros=remove_zeros
-    )
+def cholesky(A, *, lower=False, order=None):
+    return _cholesky_base(A, ldl=False, lower=lower, order=order)
 
 
-def ldl(A, beta=None, *, lower=True, order=None, remove_zeros=True):
-    return _cholesky_base(
-        A, ldl=True, beta=beta, lower=lower, order=order, remove_zeros=remove_zeros
-    )
+def ldl(A, beta=None, *, lower=True, order=None):
+    return _cholesky_base(A, ldl=True, beta=beta, lower=lower, order=order)
 
 
 # -----------------------------------------------------------------------------
@@ -1389,10 +1831,6 @@ order : None or str in {{"default", "best", "natural", "metis", "nesdis", \
 
 lower : bool, optional
     If True, return the lower triangular factor `L`.
-remove_zeros : bool, optional
-    If False, do not remove explicit zeros from the factor ``L`` or ``R``.
-    This flag allows use of the ``chol_update`` function afterwards.
-    Default is True, so that the output is in canonical form.
 
 Returns
 -------

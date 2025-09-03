@@ -10,6 +10,7 @@
 # distutils: language = c
 # cython: language_level=3
 
+from libc.stdlib cimport malloc
 from libc.stdint cimport int32_t, int64_t
 from libc.string cimport memcpy, memset
 from numpy cimport float32_t, float64_t, complex64_t, complex128_t
@@ -101,6 +102,9 @@ cdef extern from "cholmod.h":
         void *next
         void *prev
         int ordering
+        int is_ll
+        int is_super
+        int is_monotonic
         int itype
         int xtype
         int dtype
