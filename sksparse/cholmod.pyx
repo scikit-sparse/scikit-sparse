@@ -50,6 +50,7 @@ __all__ = [
     "CholmodOverflowError",
     "CholmodSmallDiagonalWarning",
     "CholmodWarning",
+    "SeparatorTree",
     "analyze",
     "cholesky",
     "cholmod",
@@ -58,6 +59,7 @@ __all__ = [
     "ldlrowmod",
     "ldlsolve",
     "ldlupdate",
+    "nesdis",
     "resymbol",
     "symbfact",
 ]
@@ -3187,7 +3189,145 @@ def bisect(A, *, kind=None):
     return s
 
 
-# TODO allow options arguments
+class SeparatorTree():
+    """The separator tree of a sparse matrix graph.
+
+    This object is typically created by :func:`.nesdis`.
+
+    Attributes
+    ----------
+    cp : (C,) ndarray of int, optional
+        The separator tree, where ``C`` is the number of components found. The
+        value ``cp[c]`` is the parent of the component ``c`` in the separator
+        tree, or ``-1`` if ``c`` is the root of the tree. There is a maximum of
+        ``N`` components, where ``N`` is the dimension of the input matrix.
+    cmember : (N,) ndarray of int, optional
+        The component membership vector, where ``cmember[i]`` is the component
+        to which node ``i`` belongs.
+    """
+    def __init__(self, cp, cmember):
+        self._cp = cp
+        self._cmember = cmember
+
+    @property
+    def cp(self):
+        """(C,) ndarray of int: The component parent array."""
+        return self._cp
+
+    @property
+    def cmember(self):
+        """(N,) ndarray of int: The component membership array."""
+        return self._cmember
+
+    def __repr__(self):
+        return f"SeparatorTree(components={len(self._cp)}, nodes={len(self._cmember)})"
+
+    def prune(self, *, nd_oksep=None, nd_small=None):
+        """Prune the separator tree.
+
+        Parameters
+        ----------------
+        nd_oksep : double in [0, 1], optional
+            Controls when a separator is kept. A separator is kept if
+            ``nsep < nd_oksep * n``, where ``nsep`` is the number of nodes in the
+            separator and ``n`` is the number of nodes in the graph being cut
+            (default is 1.0).
+        nd_small : int >= 0, optional
+            The smallest subgraph that should not be partitioned (default is 200).
+
+        Returns
+        -------
+        pruned_septree : SeparatorTree
+            The pruned separator tree. ``cp`` will be of length ``C'``, where
+            ``C' <= C`` is the number of components remaining after pruning.
+
+        Notes
+        -----
+        This function is based on the SuiteSparse CHOLMOD MATLAB interface
+        [#septree_c]_.
+
+        .. versionadded:: 0.5.0
+
+        References
+        ----------
+        .. [#septree_c] ``septree.c`` - CHOLMOD MATLAB septree function
+            https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/septree.c
+        """
+        if nd_oksep is None:
+            nd_oksep = 1.0  # see CHOLMOD/MATLAB/nesdis.c
+
+        if nd_small is None:
+            nd_small = 200  # see CHOLMOD/MATLAB/nesdis.c
+
+        cdef bint use_int32 = (
+            self._cp.dtype == np.int32 and self._cmember.dtype == np.int32
+        )
+
+        cdef cholmod_common Common
+        cdef cholmod_common *cm = &Common
+
+        if use_int32:
+            cholmod_start(cm)
+        else:
+            cholmod_l_start(cm)
+
+        cdef size_t Nc = self._cp.size
+        cdef size_t N = self._cmember.size
+
+        # Copy input arrays into new cholmod arrays (modified for output)
+        cdef void *CParent
+        cdef void *CMember
+
+        cdef int32_t[::1] cp_mv_int32, cmember_mv_int32
+        cdef int64_t[::1] cp_mv_int64, cmember_mv_int64
+
+        # TODO could do checks of each value in a for-loop here
+        if use_int32:
+            cp_mv_int32 = self._cp
+            cmember_mv_int32 = self._cmember
+            CParent = cholmod_malloc(Nc, sizeof(int32_t), cm)
+            CMember = cholmod_malloc(N, sizeof(int32_t), cm)
+            memcpy(<int32_t*>CParent, &cp_mv_int32[0], Nc * sizeof(int32_t))
+            memcpy(<int32_t*>CMember, &cmember_mv_int32[0], N * sizeof(int32_t))
+        else:
+            cp_mv_int64 = self._cp
+            cmember_mv_int64 = self._cmember
+            CParent = cholmod_l_malloc(Nc, sizeof(int64_t), cm)
+            CMember = cholmod_l_malloc(N, sizeof(int64_t), cm)
+            memcpy(<int64_t*>CParent, &cp_mv_int64[0], Nc * sizeof(int64_t))
+            memcpy(<int64_t*>CMember, &cmember_mv_int64[0], N * sizeof(int64_t))
+
+        cdef int64_t nc_new
+
+        if use_int32:
+            nc_new = cholmod_collapse_septree(
+                N, Nc, nd_oksep, nd_small, <int32_t*>CParent, <int32_t*>CMember, cm
+            )
+        else:
+            nc_new = cholmod_l_collapse_septree(
+                N, Nc, nd_oksep, nd_small, <int64_t*>CParent, <int64_t*>CMember, cm
+            )
+
+        if nc_new < 0:
+            raise CholmodError("Pruning the separator tree failed.")
+
+        # Get the ndarrays to return
+        cp_out = _ndarray_from_cholmod_intarray(CParent, nc_new, use_int32)
+        cmember_out = _ndarray_from_cholmod_intarray(CMember, N, use_int32)
+
+        # Free memory (arrays are copied to numpy)
+        if use_int32:
+            cholmod_free(Nc, sizeof(int32_t), CParent, cm)
+            cholmod_free(N, sizeof(int32_t), CMember, cm)
+            cholmod_finish(cm)
+        else:
+            cholmod_l_free(Nc, sizeof(int64_t), CParent, cm)
+            cholmod_l_free(N, sizeof(int64_t), CMember, cm)
+            cholmod_l_finish(cm)
+
+        return SeparatorTree(cp_out, cmember_out)
+
+
 # TODO get defaults?
 def nesdis(
     A,
@@ -3225,14 +3365,9 @@ def nesdis(
     p : (M or N,) ndarray of int
         The permutation vector that gives the nested dissection ordering of the
         nodes in the graph represented by the sparse matrix ``A``.
-    cp : (C,) ndarray of int, optional
-        The separator tree, where ``C`` is the number of components found. The
-        value ``cp[c]`` is the parent of the component ``c`` in the separator
-        tree, or ``-1`` if ``c`` is the root of the tree. There is a maximum of
-        ``N`` components, where ``N`` is the dimension of the input matrix.
-    cmember : (N,) ndarray of int, optional
-        The component membership vector, where ``cmember[i]`` is the component
-        to which node ``i`` belongs.
+    septree : SeparatorTree, optional
+        The separator tree and component membership vector, returned if
+        ``return_separator`` is True.
 
     Other Parameters
     ----------------
@@ -3288,20 +3423,20 @@ def nesdis(
     # col: A.TA = (0, M) * (M, 0) = (0, 0)
     if kind == "row" and M == 0 or N == 0:
         p = np.array([], dtype=out_itype)
-        cp = np.array([-1], dtype=out_itype)  # only one component
-        cmember = np.array([], dtype=out_itype)
         if return_separator:
-            return p, cp, cmember
+            cp = np.array([-1], dtype=out_itype)  # only one component
+            cmember = np.array([], dtype=out_itype)
+            return p, SeparatorTree(cp, cmember)
         else:
             return p
 
     if A.nnz == 0:
         D = N if kind == "col" else M
         p = np.arange(D, dtype=out_itype)
-        cp = np.array([-1], dtype=out_itype)  # only one component
-        cmember = np.zeros(D, dtype=out_itype)
         if return_separator:
-            return p, cp, cmember
+            cp = np.array([-1], dtype=out_itype)  # only one component
+            cmember = np.zeros(D, dtype=out_itype)
+            return p, SeparatorTree(cp, cmember)
         else:
             return p
 
@@ -3417,7 +3552,7 @@ def nesdis(
         cholmod_l_finish(cm)
 
     if return_separator:
-        return p, cp, cmember
+        return p, SeparatorTree(cp, cmember)
     else:
         return p
 
@@ -3564,140 +3699,3 @@ def metis(A, *, kind=None):
         cholmod_l_finish(cm)
 
     return p
-
-
-def prune_septree(cp, cmember, *, nd_oksep=None, nd_small=None):
-    """Prune a separator tree.
-
-    Parameters
-    ----------
-    cp : (C,) ndarray of int
-        The separator tree, where ``C`` is the number of components found. The
-        value ``cp[c]`` is the parent of the component ``c`` in the separator
-        tree, or ``-1`` if ``c`` is the root of the tree. There is a maximum of
-        ``N`` components, where ``N`` is the dimension of the input matrix.
-    cmember : (N,) ndarray of int
-        The component membership vector, where ``cmember[i]`` is the component
-        to which node ``i`` belongs.
-
-    Returns
-    -------
-    cp : (C',) ndarray of int
-        The pruned separator tree, where ``C' <= C`` is the number of
-        components remaining after pruning.
-    cmember : (N,) ndarray of int
-        The updated component membership vector, where ``cmember[i]`` is the
-        component to which node ``i`` belongs.
-
-    Other Parameters
-    ----------------
-    nd_oksep : double in [0, 1], optional
-        Controls when a separator is kept. A separator is kept if
-        ``nsep < nd_oksep * n``, where ``nsep`` is the number of nodes in the
-        separator and ``n`` is the number of nodes in the graph being cut
-        (default is 1.0).
-    nd_small : int >= 0, optional
-        The smallest subgraph that should not be partitioned (default is 200).
-
-    Notes
-    -----
-    This function is based on the SuiteSparse CHOLMOD MATLAB interface
-    [#septree_c]_.
-
-    .. versionadded:: 0.5.0
-
-    References
-    ----------
-    .. [#septree_c] ``septree.c`` - CHOLMOD MATLAB septree function
-        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/septree.c
-    """
-    if cp.ndim != 1:
-        raise ValueError(f"Input cp must be one-dimensional, got shape {cp.shape}.")
-
-    if cmember.ndim != 1:
-        raise ValueError(
-            f"Input cmember must be one-dimensional, got shape {cmember.shape}."
-        )
-
-    if cp.dtype not in (np.int32, np.int64):
-        raise ValueError(f"Input cp must have integer dtype, got {cp.dtype}.")
-
-    if cmember.dtype not in (np.int32, np.int64):
-        raise ValueError(f"Input cmember must have integer dtype, got {cmember.dtype}.")
-
-    if cp.dtype != cmember.dtype:
-        raise ValueError(
-            f"Input cp and cmember must have the same integer dtype, got "
-            f"{cp.dtype=} and {cmember.dtype=}."
-        )
-
-    if nd_oksep is None:
-        nd_oksep = 1.0  # see CHOLMOD/MATLAB/nesdis.c
-
-    if nd_small is None:
-        nd_small = 200  # see CHOLMOD/MATLAB/nesdis.c
-
-    cdef bint use_int32 = cp.dtype == np.int32
-
-    cdef cholmod_common Common
-    cdef cholmod_common *cm = &Common
-
-    if use_int32:
-        cholmod_start(cm)
-    else:
-        cholmod_l_start(cm)
-
-    cdef size_t Nc = cp.size
-    cdef size_t N = cmember.size
-
-    if N < Nc:
-        raise ValueError(f"invalid input shapes, got {cp.size=}, {cmember.size=}.")
-
-    # Copy input arrays into new cholmod arrays (modified for output)
-    cdef void *CParent
-    cdef void *CMember
-
-    cdef int32_t[::1] cp_mv_int32, cmember_mv_int32
-    cdef int64_t[::1] cp_mv_int64, cmember_mv_int64
-
-    # TODO could do checks of each value in a for-loop here
-    if use_int32:
-        CParent = cholmod_malloc(Nc, sizeof(int32_t), cm)
-        CMember = cholmod_malloc(N, sizeof(int32_t), cm)
-        memcpy(<int32_t*>CParent, &cp_mv_int32[0], Nc * sizeof(int32_t))
-        memcpy(<int32_t*>CMember, &cmember_mv_int32[0], N * sizeof(int32_t))
-    else:
-        CParent = cholmod_l_malloc(Nc, sizeof(int64_t), cm)
-        CMember = cholmod_l_malloc(N, sizeof(int64_t), cm)
-        memcpy(<int64_t*>CParent, &cp_mv_int64[0], Nc * sizeof(int64_t))
-        memcpy(<int64_t*>CMember, &cmember_mv_int64[0], N * sizeof(int64_t))
-
-    cdef int64_t nc_new
-
-    if use_int32:
-        nc_new = cholmod_collapse_septree(
-            N, Nc, nd_oksep, nd_small, <int32_t*>CParent, <int32_t*>CMember, cm
-        )
-    else:
-        nc_new = cholmod_l_collapse_septree(
-            N, Nc, nd_oksep, nd_small, <int64_t*>CParent, <int64_t*>CMember, cm
-        )
-
-    if nc_new < 0:
-        raise CholmodError("Pruning the separator tree failed.")
-
-    # Get the ndarrays to return
-    cp_out = _ndarray_from_cholmod_intarray(CParent, nc_new, use_int32)
-    cmember_out = _ndarray_from_cholmod_intarray(CMember, N, use_int32)
-
-    # Free memory (arrays are copied to numpy)
-    if use_int32:
-        cholmod_free(Nc, sizeof(int32_t), CParent, cm)
-        cholmod_free(N, sizeof(int32_t), CMember, cm)
-        cholmod_finish(cm)
-    else:
-        cholmod_l_free(Nc, sizeof(int64_t), CParent, cm)
-        cholmod_l_free(N, sizeof(int64_t), CMember, cm)
-        cholmod_l_finish(cm)
-
-    return cp_out, cmember_out
