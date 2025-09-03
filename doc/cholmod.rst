@@ -89,7 +89,7 @@ Function Interface
 ------------------
 
 The main function this module provides is :func:`cholesky`, for computing the
-Cholesy factor and optionally a fill-reducing permutation of a sparse matrix.
+Cholesky factor and optionally a fill-reducing permutation of a sparse matrix.
 
 The LDL factorization can be computed using the :func:`ldl` function. The LDL
 factors are particularly useful for updating the factorization when the system
@@ -160,7 +160,7 @@ node reordering, which can be used like the :mod:`~sksparse.amd` and
 :mod:`~sksparse.colamd` (and their constrained counterparts) modules to reduce
 fill-in during factorization.
 
-These functions provide a direct inerface to the corresponding CHOLMOD
+These functions provide a direct interface to the corresponding CHOLMOD
 functions that are used internally by :func:`cholesky` and :func:`ldl` when
 the ``order`` argument is specified.
 
@@ -170,6 +170,7 @@ the ``order`` argument is specified.
 
 .. autofunction:: metis
 
+.. autofunction:: prune_septree
 
 Error handling
 --------------
