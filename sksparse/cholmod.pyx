@@ -1700,6 +1700,127 @@ cdef class CholeskyFactor:
 
         return self  # for method chaining
 
+    # TODO accept an input permutation to override the one used in analysis
+    def solve(self, b):
+        """Solve the linear system A x = b using the factorization.
+
+        Parameters
+        ----------
+        b : (N,) or (N, K) ndarray or sparse matrix
+            The right-hand side vector or matrix.
+
+        Returns
+        -------
+        x : (N,) or (N, K) ndarray
+            The solution vector or matrix.
+        """
+        if self.factor is NULL:
+            raise ValueError("The factor pointer is NULL. Run `factorize` first.")
+
+        if not (isinstance(b, np.ndarray) or issparse(b)):
+            raise ValueError("b must be an ndarray or sparse matrix.")
+
+        if b.ndim not in (1, 2):
+            raise ValueError("b must be a 1D or 2D array.")
+
+        cdef size_t N = self.factor.n
+        cdef size_t K = b.shape[1] if b.ndim == 2 else 0
+
+        if b.shape[0] != N:
+            raise ValueError(
+                "Right-hand side b must have the same number of rows as L."
+            )
+
+        # Special case: empty matrix
+        if N == 0:
+            return type(b)(b.shape, dtype=b.dtype)
+
+        if issparse(b):
+            X = self._solve_sparse(b)
+        else:
+            X = self._solve_dense(b)
+
+        # For LDL, unpermute the solution
+        if not self.is_ll:
+            p = self.view_perm()
+            X = X[np.argsort(p)]
+
+        # Convert to 1D array if input b is 1D
+        if K == 0:
+            X = X[:, 0]
+
+        return X
+
+    cdef object _solve_sparse(self, object b):
+        """Solve the system A x = b with a sparse right-hand side."""
+        # Get the b vector or matrix into CHOLMOD format
+        cdef cholmod_sparse Bspmatrix
+        cdef cholmod_sparse* Bs = &Bspmatrix
+
+        # CHOLMOD expects at least a column vector for the RHS
+        if b.ndim == 1:
+            b = b.reshape((-1, 1)).tocsc()  # (N, 1)
+
+        # For LDL, permute the RHS
+        if not self.is_ll:
+            p = self.view_perm()
+            b = b[p]
+
+        cdef int stype = 0
+
+        b, b_use_int32, _ = validate_csc_input(b)
+
+        # keep a reference to b so it is not garbage collected
+        cdef object _b_ref = _cholmod_sparse_from_csc(b, stype, b_use_int32, &Bspmatrix)
+
+        # Check the condition number before solving
+        self._check_rcond()
+
+        # Solve the system
+        cdef cholmod_sparse* Xs
+
+        cdef int system = CHOLMOD_A if self.is_ll else CHOLMOD_LDLt
+
+        if self.use_int32:
+            Xs = cholmod_spsolve(system, self.factor, Bs, self.cm)
+        else:
+            Xs = cholmod_l_spsolve(system, self.factor, Bs, self.cm)
+
+        return _csc_from_cholmod_sparse(Xs, self.cm)
+
+    cdef np.ndarray _solve_dense(self, np.ndarray b):
+        """Solve the system A x = b with a dense right-hand side."""
+        # Get the b vector or matrix into CHOLMOD format
+        cdef cholmod_dense Bmatrix
+        cdef cholmod_dense* Bd = &Bmatrix
+
+        # CHOLMOD expects at least a column vector for the RHS
+        if b.ndim == 1:
+            b = b[:, np.newaxis]  # (N, 1)
+
+        # For LDL, permute the RHS
+        if not self.is_ll:
+            p = self.view_perm()
+            b = b[p]
+
+        # keep a reference to b so it is not garbage collected
+        cdef object _b_ref = _cholmod_dense_from_ndarray(b, &Bmatrix)
+
+        # Check the condition number before solving
+        self._check_rcond()
+
+        # Solve the system
+        cdef cholmod_dense* Xd
+
+        cdef int system = CHOLMOD_A if self.is_ll else CHOLMOD_LDLt
+
+        if self.use_int32:
+            Xd = cholmod_solve(system, self.factor, Bd, self.cm)
+        else:
+            Xd = cholmod_l_solve(system, self.factor, Bd, self.cm)
+
+        return _ndarray_from_cholmod_dense(Xd, self.use_int32, self.cm)
+
     # -------------------------------------------------------------------------
     #         Private API
     # -------------------------------------------------------------------------
@@ -1752,6 +1873,26 @@ cdef class CholeskyFactor:
             )
 
         return self
+
+    cdef void _check_rcond(self):
+        """Check the condition number."""
+        cdef double rcond
+        cdef double eps = np.finfo(np.float64).eps
+
+        if self.use_int32:
+            rcond = cholmod_rcond(self.factor, self.cm)
+        else:
+            rcond = cholmod_l_rcond(self.factor, self.cm)
+
+        if rcond == 0:
+            raise CholmodNotPositiveDefiniteError(
+                "Matrix is indefinite or singular to working precision."
+            )
+        elif rcond < eps:
+            raise CholmodNotPositiveDefiniteError(
+                "Matrix is nearly singular."
+                f"  Results may be inaccurate (rcond={rcond:.2e})."
+            )
 
 
 # Interface functions
