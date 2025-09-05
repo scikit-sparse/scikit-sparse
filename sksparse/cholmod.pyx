@@ -264,33 +264,17 @@ cdef object _cholmod_sparse_from_csc(
     A.dtype = _single_or_double(dtype)
     A.z = NULL
 
-    # Declare memoryviews for the index and data arrays
-    cdef int32_t[::1] Ap_mv_int32, Ai_mv_int32
-    cdef int64_t[::1] Ap_mv_int64, Ai_mv_int64
-
-    cdef float32_t[::1] Ax_mv_float32
-    cdef float64_t[::1] Ax_mv_float64
-    cdef complex64_t[::1] Ax_mv_complex64
-    cdef complex128_t[::1] Ax_mv_complex128
+    cdef np.ndarray indptr = A_py.indptr
+    cdef np.ndarray indices = A_py.indices
+    cdef np.ndarray data = A_py.data
 
     # Create the index arrays
     if use_int32:
-        Ap_mv_int32 = A_py.indptr
-        Ai_mv_int32 = A_py.indices
-        A.p = &Ap_mv_int32[0]
-        # Handle empty matrices
-        if Ai_mv_int32.shape[0] == 0 and (A.nrow == 0 or A.ncol == 0):
-            A.i = <int32_t*>malloc(0)  # TODO needs to be freed
-        else:
-            A.i = &Ai_mv_int32[0]
+        A.p = <int32_t*>indptr.data
+        A.i = <int32_t*>indices.data
     else:
-        Ap_mv_int64 = A_py.indptr
-        Ai_mv_int64 = A_py.indices
-        A.p = &Ap_mv_int64[0]
-        if Ai_mv_int64.shape[0] == 0:
-            A.i = <int64_t*>malloc(0)
-        else:
-            A.i = &Ai_mv_int64[0]
+        A.p = <int64_t*>indptr.data
+        A.i = <int64_t*>indices.data
 
     # Get the numerical values of A
     if dtype == np.bool_:
@@ -300,29 +284,13 @@ cdef object _cholmod_sparse_from_csc(
         A.xtype = _real_or_complex(dtype)
 
         if dtype == np.float32:
-            Ax_mv_float32 = A_py.data
-            if Ax_mv_float32.shape[0] == 0 and (A.nrow == 0 or A.ncol == 0):
-                A.x = <float32_t*>malloc(0)
-            else:
-                A.x = &Ax_mv_float32[0]
+            A.x = <float32_t*>data.data
         elif dtype == np.float64:
-            Ax_mv_float64 = A_py.data
-            if Ax_mv_float64.shape[0] == 0 and (A.nrow == 0 or A.ncol == 0):
-                A.x = <float64_t*>malloc(0)
-            else:
-                A.x = &Ax_mv_float64[0]
+            A.x = <float64_t*>data.data
         elif dtype == np.complex64:
-            Ax_mv_complex64 = A_py.data
-            if Ax_mv_complex64.shape[0] == 0 and (A.nrow == 0 or A.ncol == 0):
-                A.x = <complex64_t*>malloc(0)
-            else:
-                A.x = &Ax_mv_complex64[0]
+            A.x = <complex64_t*>data.data
         elif dtype == np.complex128:
-            Ax_mv_complex128 = A_py.data
-            if Ax_mv_complex128.shape[0] == 0 and (A.nrow == 0 or A.ncol == 0):
-                A.x = <complex128_t*>malloc(0)
-            else:
-                A.x = &Ax_mv_complex128[0]
+            A.x = <complex128_t*>data.data
 
     return A_py
 
@@ -729,58 +697,45 @@ cdef object _cholmod_dense_from_ndarray(np.ndarray X_py, cholmod_dense *X_static
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/sputil2.c
     """
     # NOTE cholmod_dense objects are stored in column-major order.
-    X_py = np.asfortranarray(X_py)
+    cdef np.ndarray Xd = np.asfortranarray(X_py)
 
-    if X_py.ndim != 2:
+    if Xd.ndim != 2:
         raise ValueError("Input must be a 2D array.")
 
-    dtype = X_py.dtype
+    dtype = Xd.dtype
 
     if dtype not in _supported_dtypes:
         raise ValueError(f"Unsupported data type for CHOLMOD: {dtype}")
 
     # Convert boolean to float64, as CHOLMOD does not support boolean dense
     if dtype == np.bool_:
-        X_py = X_py.astype(np.float64)
-        dtype = X_py.dtype
+        Xd = Xd.astype(np.float64)
+        dtype = Xd.dtype
 
     # Initialize the CHOLMOD dense matrix
     cdef cholmod_dense* X = X_static
     memset(X, 0, sizeof(cholmod_dense))
 
-    X.nrow = X_py.shape[0]
-    X.ncol = X_py.shape[1]
+    X.nrow = Xd.shape[0]
+    X.ncol = Xd.shape[1]
     X.d = X.nrow
     X.nzmax = X.nrow * X.ncol
     X.dtype = _single_or_double(dtype)
     X.z = NULL
 
-    # Declare memoryviews for the index and data arrays
-    cdef float32_t[::1] X_mv_float32
-    cdef float64_t[::1] X_mv_float64
-    cdef complex64_t[::1] X_mv_complex64
-    cdef complex128_t[::1] X_mv_complex128
-
     # Get the numerical values of X
     X.xtype = _real_or_complex(dtype)
 
-    # Flatten the array to a 1D array for CHOLMOD
-    X_py = X_py.ravel(order="F")
-
     if dtype == np.float32:
-        X_mv_float32 = X_py
-        X.x = &X_mv_float32[0]
+        X.x = <float32_t*>Xd.data
     elif dtype == np.float64:
-        X_mv_float64 = X_py
-        X.x = &X_mv_float64[0]
+        X.x = <float64_t*>Xd.data
     elif dtype == np.complex64:
-        X_mv_complex64 = X_py
-        X.x = &X_mv_complex64[0]
+        X.x = <complex64_t*>Xd.data
     elif dtype == np.complex128:
-        X_mv_complex128 = X_py
-        X.x = &X_mv_complex128[0]
+        X.x = <complex128_t*>Xd.data
 
-    return X_py
+    return Xd
 
 
 cdef class _CholmodDenseDestructor:
