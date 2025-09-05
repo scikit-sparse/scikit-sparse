@@ -1700,7 +1700,6 @@ cdef class CholeskyFactor:
 
         return self  # for method chaining
 
-    # TODO accept an input permutation to override the one used in analysis
     def solve(self, b):
         """Solve the linear system A x = b using the factorization.
 
@@ -1767,6 +1766,7 @@ cdef class CholeskyFactor:
             b = b[p]
 
         cdef int stype = 0
+        cdef bint b_use_int32
 
         b, b_use_int32, _ = validate_csc_input(b)
 
