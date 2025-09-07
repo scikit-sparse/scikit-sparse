@@ -1468,6 +1468,13 @@ cdef class CholeskyFactor:
             raise ValueError("The factor pointer is NULL. Run `factorize` first.")
         return self.factor.is_ll
 
+    @property
+    def N(self):
+        """The number of rows and columns in the factor."""
+        if self.factor is NULL:
+            raise ValueError("The factor pointer is NULL. Run `factorize` first.")
+        return self.factor.n
+
     # -------------------------------------------------------------------------
     #         Public API
     # -------------------------------------------------------------------------
