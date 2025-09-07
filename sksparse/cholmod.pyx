@@ -1959,22 +1959,21 @@ cdef class CholeskyFactor:
         if kind not in ("LL", "LDL"):
             raise ValueError("kind must be 'LL' or 'LDL'.")
 
-        to_xtype = self.factor.xtype
-        to_ll = kind == "LL"
+        cdef int to_xtype = self.factor.xtype
+        cdef int to_ll = kind == "LL"
 
         # NOTE In CHOLMOD, supernodal factorizations are always LL.T. If we
         # request to change to a supernodal LDL.T factorization,
         # cholmod_change_factor will silently do nothing! So we can only stay
         # supernodal when LL.T is requested.
-        to_super = self.factor.is_super and kind == "LL"
+        cdef int to_super = self.factor.is_super and kind == "LL"
 
-        to_packed = True
-        to_monotonic = self.factor.is_monotonic
+        cdef int to_packed = True
+        cdef int to_monotonic = self.factor.is_monotonic
 
         if (kind == "LL" and not self.factor.is_ll) or (
             kind == "LDL" and self.factor.is_ll
         ):
-            # Convert LDL to LL
             if self.use_int32:
                 change_factor = cholmod_change_factor
             else:
@@ -1989,6 +1988,8 @@ cdef class CholeskyFactor:
                 self.factor,
                 self.cm
             )
+            
+            _handle_errors(self.cm.status)
 
         return self
 
