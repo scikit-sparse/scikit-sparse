@@ -16,7 +16,7 @@ from numpy.testing import assert_allclose
 from scipy import sparse
 from scipy.sparse.linalg import LaplacianNd
 
-from sksparse.cholmod import ldl_factor, ldlsolve, ldlupdate, resymbol
+from sksparse.cholmod import ldl_factor, ldlsolve
 
 Ng = 15  # arbitrary problem size A = (Ng**2, Ng**2)
 
@@ -95,27 +95,29 @@ def test_ldlupdown(A, f):
     assert_allclose((Ld @ Dd @ Ld.T).toarray(), S.toarray(), atol=1e-12)
 
 
-@pytest.mark.skip(reason="TODO")
 def test_resymbol(A, f):
-    L, D, p = f
-    N = A.shape[0]
+    L, D = f.get_factor()
+    p = f.get_perm()
 
     # Verify that the factorization is correct
     S = A[p][:, p]
     assert_allclose((L @ D @ L.T).toarray(), S.toarray(), atol=1e-12)
 
     # Compute a rank-k update of LDL.T factorization
-    C = _create_update_matrix(L, N)
+    Cp = _create_update_matrix(L)
+    C = Cp[np.argsort(p), :]  # unpermute C into A space
 
     # Update the factorization
-    Lc, Dc = ldlupdate(L, D, C, update=True)
+    f.update(C, updown="up")
+    Lc, Dc = f.get_factor()
 
     # Verify that the updated factorization is correct
-    Sc = S + C @ C.T
+    Sc = S + Cp @ Cp.T
     assert_allclose((Lc @ Dc @ Lc.T).toarray(), Sc.toarray(), atol=1e-12)
 
     # Downdate back to the original factorization
-    Ld, Dd = ldlupdate(Lc, Dc, C, update=False)
+    f.update(C, updown="down")
+    Ld, Dd = f.get_factor()
     assert_allclose((Ld @ Dd @ Ld.T).toarray(), S.toarray(), atol=1e-12)
 
     print("\nBefore resymbol:")
@@ -123,7 +125,8 @@ def test_resymbol(A, f):
     print(f"{Ld.nnz=}")
 
     # Test resymbol
-    Lr = resymbol(Ld, S)
+    f.resymbol(A)
+    Lr = f.get_factor()[0]
 
     print("After resymbol:")
     print(f"{Lr.nnz=}")

@@ -1966,6 +1966,94 @@ cdef class CholeskyFactor:
 
         return self
 
+    def resymbol(self, object A):
+        """Recompute the symbolic Cholesky factorization of a sparse matrix.
+
+        This function is useful after a series of downdates via
+        :func:`.ldlupdate` or :func:`.ldlrowmod`, since downdates do not remove
+        any entries in ``L`` [#resymbol_c]_.
+
+        Parameters
+        ----------
+        A : (N, N) csc_array
+            The input matrix in Compressed Sparse Column (CSC) format. Must be
+            square and symmetric. Only the lower triangular part of ``A`` is
+            used, and no check is made for symmetry. The numerical values of
+            ``A`` are ignored. Only its non-zero pattern is used.
+
+            .. note :: This method expects the *unpermuted* matrix ``A`` as
+                input. If the factorization was computed for ``P A P.T``, where
+                ``P`` is the permutation matrix corresponding to
+                :meth:`.get_perm`, then ``A`` must be permuted back before
+                calling this method.
+
+        Returns
+        -------
+        CholeskyFactor
+            The current object, for method chaining.
+
+        See Also
+        --------
+        :func:`.cholesky`, :func:`.ldl`, :meth:`.update`, :meth:`.rowadd`,
+        :meth:`.rowdel`
+
+        .. versionadded:: 0.5.0
+
+        References
+        ----------
+        .. [#resymbol_c] ``resymbol.c`` - CHOLMOD MATLAB resymbolization function
+            https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/resymbol.c
+        """
+        cdef bint A_use_int32
+        A, A_use_int32, _ = validate_csc_input(A, require_square=True)
+
+        if A.shape[0] != self.N:
+            raise ValueError(
+                "Input matrix A must have the same number of rows as L."
+            )
+
+        if self.use_int32 and not A_use_int32:
+            raise ValueError(
+                "A and factor must have the same integer type. "
+                f"Got {A.indptr.dtype=}, but {self.use_int32=}."
+            )
+
+        # Special Cases
+        if self.N == 0:
+            return self
+
+        if A.nnz == 0:
+            raise CholmodNotPositiveDefiniteError("Input matrix not positive definite.")
+
+        # Get sparse *pattern*
+        cdef cholmod_sparse Amatrix
+        cdef cholmod_sparse* Ac = &Amatrix
+        cdef int stype = -1  # use tril(A) only
+
+        cdef object _A_ref = _cholmod_sparse_from_csc(
+            A, stype, self.use_int32, &Amatrix
+        )
+        Ac.xtype = CHOLMOD_PATTERN
+        Ac.x = NULL
+
+        # TODO permute A to "matrix" space?
+        # Currently, need to call 
+        #     f.resymbol(A)
+        # after updates, as opposed to calling
+        #     S = A[p][:, p]
+        #     f.resymbol(S).
+        # The function interface correct call is:
+        #     ldlresymbol(L, S)
+        # since it internally creates a "factor" from L, which is already in
+        # the permuted space.
+
+        if self.use_int32:
+            cholmod_resymbol(Ac, NULL, 0, True, self.factor, self.cm)
+        else:
+            cholmod_l_resymbol(Ac, NULL, 0, True, self.factor, self.cm)
+
+        return self
+
     # -------------------------------------------------------------------------
     #         Private API
     # -------------------------------------------------------------------------
