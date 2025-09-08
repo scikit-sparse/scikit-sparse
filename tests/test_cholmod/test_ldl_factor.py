@@ -21,6 +21,28 @@ from ..helpers import generate_random_matrices
 
 DTYPES = [np.float32, np.float64, np.complex64, np.complex128]
 
+
+@pytest.mark.parametrize("order", [None, "amd"])
+@pytest.mark.parametrize(
+    "A", generate_random_matrices(N_trials=1, N_max=10, d_scale=0.2, pos_def_only=True)
+)
+def test_view_vs_get(A, order):
+    f = ldl_factor(A)
+    LDv = f.view_factor()
+    pv = f.view_perm()
+    L, D = f.get_factor()
+    p = f.get_perm()
+    assert LDv is not L  # different objects
+    assert LDv is not D
+    assert pv is not p
+    # Split the view into L and D
+    Dv = sparse.diags_array(LDv.diagonal())
+    LDv.setdiag(1.0)
+    assert_allclose(LDv.toarray(), L.toarray(), atol=1e-15)
+    assert_allclose(Dv.toarray(), D.toarray(), atol=1e-15)
+    assert_allclose(pv, p, atol=1e-15)
+
+
 test_As = [
     A
     for dtype in DTYPES

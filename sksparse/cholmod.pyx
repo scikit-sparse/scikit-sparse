@@ -1141,7 +1141,8 @@ cdef class CholeskyFactor:
 
             The returned matrix or matrices are views on the internal data of
             the CHOLMOD factor. They will become invalid if the factor is
-            modified (*e.g.*, by calling ``factorize``).
+            modified (*e.g.*, by calling :meth:`.factorize`). To get a copy
+            that remains valid, use :meth:`.get_factor`.
 
         Parameters
         ----------
@@ -1159,6 +1160,10 @@ cdef class CholeskyFactor:
             ``kind="LL"``, the returned matrix is lower triangular. If
             ``kind="LDL"``, the returned matrix contains the lower triangular
             and the diagonal factors. The unit diagonal of `L` is not stored.
+
+            .. note :: The view is always in lower triangular form, even if the
+                factor was created using ``lower=False``. To get the upper
+                triangular factor, use :obj:`get_factor` with ``lower=False``.
         """
         if kind is None:
             kind = "LL" if self.is_ll else "LDL"
