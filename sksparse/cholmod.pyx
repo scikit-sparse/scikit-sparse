@@ -259,8 +259,7 @@ cdef object _cholmod_sparse_from_csc(
     cdef cholmod_sparse* A = A_static
     memset(A, 0, sizeof(cholmod_sparse))
 
-    A.nrow = A_py.shape[0]
-    A.ncol = A_py.shape[1]
+    A.nrow, A.ncol = A_py.shape
     A.nzmax = A_py.nnz
     A.packed = True
     A.sorted = True
@@ -383,10 +382,6 @@ cdef object _csc_from_cholmod_sparse(cholmod_sparse* A, cholmod_common* common):
     # object as base. So none of them will be deallocated until they have all
     # become unused. Then those are built into a csc_array.
 
-    # init destructor for cholmod data
-    cdef _CholmodSparseDestructor base = _CholmodSparseDestructor()
-    base.init(A, common)
-
     cdef int np_itypenum = np.NPY_INT32 if A.itype == CHOLMOD_INT else np.NPY_INT64
     cdef int np_dtypenum = _np_dtypenum_from_cholmod.get(
         (A.xtype, A.dtype), np.NPY_OBJECT
@@ -403,7 +398,9 @@ cdef object _csc_from_cholmod_sparse(cholmod_sparse* A, cholmod_common* common):
         1, [A.nzmax], np_dtypenum, A.x
     )
 
-    # set destructor and check if writeable
+    # Take ownership of the data
+    cdef _CholmodSparseDestructor base = _CholmodSparseDestructor()
+    base.init(A, common)
     for array in (indptr, indices, data):
         np.set_array_base(array, base)
         assert np.PyArray_ISWRITEABLE(array)
@@ -1194,7 +1191,7 @@ cdef object _ndarray_from_cholmod_dense(
 
 
 cdef np.ndarray _ndarray_from_cholmod_intarray(void* ptr, size_t N, bint use_int32):
-    """Create a NumPy array from the permutation vector in a CHOLMOD factor.
+    """Create a NumPy array from a pointer to an integer array.
 
     Parameters
     ----------
@@ -1817,22 +1814,22 @@ cdef class CholeskyFactor:
         # Keep a reference to C so it is not garbage collected
         cdef object _C_ref = _cholmod_sparse_from_csc(C, stype, C_use_int32, &Cmatrix)
 
-        # Permute C so it is accepted in "matrix" space 
+        # Permute C so it is accepted in "matrix" space
         # From Modify/cholmod_updown.c:
         #   Note that the fill-reducing permutation L->Perm is NOT used.  The row
         #   indices of C refer to the rows of L, not A.  If your original system is
         #   LDL' = PAP' (where P = L->Perm), and you want to compute the LDL'
         #   factorization of A+CC', then you must permute C first.  That is:
-        #   
+        #
         #        PAP' = LDL'
         #        P(A+CC')P' = PAP'+PCC'P' = LDL' + (PC)(PC)' = LDL' + Cnew*Cnew'
         #        where Cnew = P*C.
-        #   
+        #
         #   You can use the cholmod_submatrix routine in the MatrixOps module
         #   to permute C, with:
-        #   
+        #
         #   Cnew = cholmod_submatrix (C, L->Perm, L->n, NULL, -1, TRUE, TRUE, Common) ;
-        #   
+        #
         #   Note that the sorted input parameter to cholmod_submatrix must be TRUE,
         #   because cholmod_updown requires C with sorted columns.
         cdef cholmod_sparse *C_perm
@@ -2089,7 +2086,7 @@ cdef class CholeskyFactor:
                 self.factor,
                 self.cm
             )
-            
+
             _handle_errors(self.cm.status)
 
         return self
@@ -2115,7 +2112,8 @@ cdef class CholeskyFactor:
             )
 
 
-# Interface functions
+# Convenience functions
+# TODO docstrings -- same as cholesky/ldl, but different return values
 def cho_factor(A, *, lower=False, order=None):
     return CholeskyFactor(A, lower=lower, order=order).factorize(
         A, ldl=False, lower=lower
