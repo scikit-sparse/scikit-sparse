@@ -101,6 +101,33 @@ def test_itype(A_example, itype):
     assert_array_equal(count, expect_count, strict=True)
     assert f.nnz == 33  # == nnz(lchol(A)) in MATLAB (natural ordering)
 
+
+ORDERS = [
+    None,
+    "default",
+    "best",
+    "natural",
+    "amd",
+    "metis",
+    "nesdis",
+    "colamd",
+    "postordered",
+]
+
+
+@pytest.mark.parametrize("order", ORDERS)
+def test_ordering(A_example, order):
+    f = CholeskyFactor(A_example, order=order)
+    assert f.order in ORDERS
+    if order is None:
+        assert f.order == "natural"
+    elif order not in ("default", "best"):
+        # default and best may return any ordering
+        assert f.order == order
+    else:
+        print(order, f.order)  # still passes, but just for info
+
+
 # -----------------------------------------------------------------------------
 #         Test many random matrices of various dtypes
 # -----------------------------------------------------------------------------
@@ -110,20 +137,7 @@ posdef_As = list(
 
 
 @pytest.mark.parametrize("A", posdef_As)
-@pytest.mark.parametrize(
-    "order",
-    [
-        None,
-        "default",
-        "best",
-        "natural",
-        "amd",
-        "metis",
-        "nesdis",
-        "colamd",
-        "postordered",
-    ],
-)
+@pytest.mark.parametrize("order", ORDERS)
 def test_order(A, order):
     N = A.shape[0]
     f = CholeskyFactor(A, order=order)

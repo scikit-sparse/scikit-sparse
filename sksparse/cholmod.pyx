@@ -883,6 +883,11 @@ cdef dict _ordering_methods = {
 }
 
 
+cdef dict _ordering_methods_inv = {
+    v: k for k, v in _ordering_methods.items() if v is not None
+}
+
+
 cdef void _set_ordering_method(object order, cholmod_common* cm):
     """Set the ordering method in the CHOLMOD common struct."""
     if order == "default":
@@ -1091,7 +1096,20 @@ cdef class CholeskyFactor:
             raise ValueError("The factor pointer is NULL. Run `factorize` first.")
         return np.sum(self.get_colcount())
 
-    # TODO add property for ordering method used
+    @property
+    def order(self):
+        """The ordering method used in the factorization.
+
+        Returns
+        -------
+        order : str or int
+            The ordering method used in the factorization. If an unknown
+            ordering was used, returns the integer value.
+        """
+        if self.factor is NULL:
+            raise ValueError("The factor pointer is NULL. Run `factorize` first.")
+        cdef int iorder = self.factor.ordering
+        return _ordering_methods_inv.get(iorder, iorder)
 
     # -------------------------------------------------------------------------
     #         Public API
