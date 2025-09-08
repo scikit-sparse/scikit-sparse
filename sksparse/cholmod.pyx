@@ -921,12 +921,67 @@ cdef void _cleanup_factor(CholeskyFactor cf):
 cdef class CholeskyFactor:
     """The main object used for creating and manipulating a Cholesky factor.
 
+    The constructor computes the symbolic analysis of the matrix and
+    determines a fill-reducing ordering (if ``order`` is not ``None`` or
+    ``"natural"``) such that:
+
+    .. math ::
+
+        L L^{\\top} = P A P^{\\top}.
+
+    The numeric factorization is not computed until :meth:`.factorize` is
+    called.
+
     Attributes
     ----------
     N : int
         The number of rows and columns in the factor.
     is_ll : bool
         Whether the factor is in ``LL.T`` form (True) or ``LDL.T`` form (False).
+
+    Parameters
+    ----------
+    A : (N, N) {{array_like, sparse array}}
+        An array convertible to a sparse matrix in Compressed Sparse Column
+        (CSC) format. The matrix must be square and symmetric positive
+        definite. Only the upper or lower triangular part of the matrix is
+        used, and no check is made for symmetry.
+    kind : str in {"sym", "row", "col"}, optional
+        The type of factorization for which to analyze the matrix:
+
+        * ``sym``: Symmetric factorization. Only the lower triangular part of
+          ``A`` is used, and no check is made for symmetry.
+        * ``row``: Unsymmetric factorization of :math:`A A^{\\top}`.
+        * ``col``: Unsymmetric factorization of :math:`A^{\\top} A`.
+
+    lower : bool, optional
+        If True, use the lower triangular part of ``A``.
+    order : None or str in {{"default", "best", "natural", "metis", \
+            "nesdis", "amd", "colamd", "postordered"}}, optional
+        The permutation algorithm to use for the factorization. By default,
+        the natural ordering of the input matrix is used. The other options
+        are:
+
+        * ``default``: Use the default method, which first tries AMD, then
+            METIS.
+        * ``best``: Automatically select the best ordering based on the
+            input.
+        * ``metis``: Use the METIS library for graph partitioning.
+        * ``nesdis``: Use the NESDIS library for nested dissection.
+        * ``amd``: Use the Approximate Minimum Degree (AMD) algorithm.
+        * ``colamd``: Use the Approximate Minimum Degree (AMD) algorithm
+            for the symmetric case, or the COLAMD algorithm for the
+            unsymmetric case (:math:`A A^{{\\top}}` or :math:`A^{{\\top}} A`).
+        * ``postordered``: Use natural ordering followed by postordering.
+
+        By default, methods other than ``natural`` will also be
+        postordered.
+
+        .. warning::
+
+            The ordering method ``best`` may be quite slow for large
+            matrices, but if the factorization is reused many times, it can
+            be worth it.
     """
 
     cdef cholmod_common Common
@@ -938,50 +993,6 @@ cdef class CholeskyFactor:
     cdef bint is_lower
 
     def __cinit__(self, object A, object beta=None, int lower=False, object order=None):
-        """Construct a CholeskyFactor from a sparse matrix.
-
-        Parameters
-        ----------
-        A : (N, N) {{array_like, sparse array}}
-            An array convertible to a sparse matrix in Compressed Sparse Column
-            (CSC) format. The matrix must be square and symmetric positive
-            definite. Only the upper or lower triangular part of the matrix is
-            used, and no check is made for symmetry.
-        beta : float, optional
-            The scalar value to add to the diagonal of the symmetrized matrix
-            :math:`A A^{\\top}` before factorization. Default is None, which
-            computes the factorization of :math:`A` itself.
-        order : None or str in {{"default", "best", "natural", "metis", \
-                "nesdis", "amd", "colamd", "postordered"}}, optional
-            The permutation algorithm to use for the factorization. By default,
-            the natural ordering of the input matrix is used. The other options
-            are:
-
-            * ``default``: Use the default method, which first tries AMD, then
-                METIS.
-            * ``best``: Automatically select the best ordering based on the
-                input.
-            * ``metis``: Use the METIS library for graph partitioning.
-            * ``nesdis``: Use the NESDIS library for nested dissection.
-            * ``amd``: Use the Approximate Minimum Degree (AMD) algorithm.
-            * ``colamd``: Use the Approximate Minimum Degree (AMD) algorithm
-                for the symmetric case, or the COLAMD algorithm for the
-                unsymmetric case
-                (:math:`A A^{{\\top}}` or :math:`A^{{\\top}} A`).
-            * ``postordered``: Use natural ordering followed by postordering.
-
-            By default, methods other than ``natural`` will also be
-            postordered.
-
-            .. warning::
-
-                The ordering method ``best`` may be quite slow for large
-                matrices, but if the factorization is reused many times, it can
-                be worth it.
-
-        lower : bool, optional
-            If True, return the lower triangular factor `L`.
-        """
         A, use_int32, _ = validate_csc_input(A, require_square=True)
 
         # Check the input ordering method
@@ -1190,22 +1201,9 @@ cdef class CholeskyFactor:
     def factorize(self, object A, object ldl=None, object beta=None, bint lower=False):
         """Compute the Cholesky factorization of a sparse matrix.
 
-        This function computes the Cholesky factorization of a symmetric
-        positive definite matrix `A`:
-
-        .. math::
-
-            R^{\\top} R = P A P^{\\top},
-
-        where `R` is an upper triangular matrix. Only the upper triangular part
-        of `A` is used. If ``lower`` is True, the lower triangular factor `L`
-        is returned instead, such that:
-
-        .. math::
-
-            L L^{\\top} = P A P^{\\top}.
-
-        In this case, only the lower triangular part of `A` is used.
+        This method computes the :math:`P A P^{\\top} = R^{\\top} R` or
+        :math:`P A P^{\\top} = L L^{\\top}` decomposition of a Hermitian
+        positive-definite matrix `A`, with fill-reducing permutation `P`.
 
         Parameters
         ----------
@@ -1229,6 +1227,45 @@ cdef class CholeskyFactor:
         lower : bool, optional
             If True, only use the lower triangular part of `A`. Default is
             False.
+
+        Notes
+        -----
+        If ``ldl=False``, this function computes the Cholesky factorization of
+        a symmetric positive definite matrix `A`:
+
+        .. math::
+
+            R^{\\top} R = P A P^{\\top},
+
+        where `R` is an upper triangular matrix. Only the upper triangular part
+        of `A` is used. If ``lower`` is True, the lower triangular factor `L`
+        is computed instead, such that:
+
+        .. math::
+
+            L L^{\\top} = P A P^{\\top}.
+
+        In this case, only the lower triangular part of `A` is used.
+
+        If ``ldl=True``, compute the factorization:
+
+        .. math::
+
+            R^{\\top} D R = P A P^{\\top},
+
+        or
+
+        .. math::
+
+            L D L^{\\top} = P A P^{\\top},
+
+        respectively.
+
+        If ``beta`` is not None, the factorization is computed for the matrix:
+
+        .. math::
+
+            L D L^{\\top} = P A A^{\\top} P^{\\top} + \\beta I.
         """
         A, _, _ = validate_csc_input(A, require_square=True)
 
