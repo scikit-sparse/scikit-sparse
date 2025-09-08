@@ -702,10 +702,7 @@ cdef cholmod_sparse* _cholesky_l_pattern(
 # -----------------------------------------------------------------------------
 #         CSC <==> CHOLMOD Dense
 # -----------------------------------------------------------------------------
-cdef object _cholmod_dense_from_ndarray(
-    object X_py,
-    cholmod_dense *X_static,
-):
+cdef object _cholmod_dense_from_ndarray(np.ndarray X_py, cholmod_dense *X_static):
     """Create a CHOLMOD dense matrix from a numpy.ndarray.
 
     See the CHOLMOD MATLAB interface for details [#sputil_get_dense]_.
@@ -821,7 +818,7 @@ cdef class _CholmodDenseDestructor:
             cholmod_l_free_dense(&self._dense, self._common)
 
 
-cdef object _ndarray_from_cholmod_dense(
+cdef np.ndarray _ndarray_from_cholmod_dense(
     cholmod_dense* X, bint use_int32, cholmod_common* common
 ):
     """Build a numpy.ndarray that is a view onto a cholmod_dense object.
@@ -842,9 +839,6 @@ cdef object _ndarray_from_cholmod_dense(
         has a base with a destructor that frees the CHOLMOD dense matrix when
         the array is no longer in use.
     """
-    cdef _CholmodDenseDestructor base = _CholmodDenseDestructor()
-    base.init(X, use_int32, common)
-
     cdef int np_dtypenum = _np_dtypenum_from_cholmod.get(
         (X.xtype, X.dtype), np.NPY_OBJECT
     )
@@ -855,6 +849,8 @@ cdef object _ndarray_from_cholmod_dense(
     )
 
     # set destructor and check if writeable
+    cdef _CholmodDenseDestructor base = _CholmodDenseDestructor()
+    base.init(X, use_int32, common)
     np.set_array_base(arr, base)
     assert np.PyArray_ISWRITEABLE(arr)
 
@@ -889,7 +885,7 @@ cdef np.ndarray _ndarray_from_cholmod_intarray(void* ptr, size_t N, bint use_int
     return p.copy()  # return a copy in case ptr is freed
 
 
-cdef np.ndarray _perm_from_cholmod_factor(object py_factor):
+cdef np.ndarray _perm_from_cholmod_factor(CholeskyFactor py_factor):
     """Create a NumPy array from the permutation vector in a CHOLMOD factor.
 
     Parameters
@@ -902,8 +898,7 @@ cdef np.ndarray _perm_from_cholmod_factor(object py_factor):
     p : ndarray
         The permutation vector as a NumPy array.
     """
-    cdef CholeskyFactor factor_obj = py_factor
-    cdef cholmod_factor *L = factor_obj.factor
+    cdef cholmod_factor *L = py_factor.factor
 
     if L is NULL:
         raise ValueError("The factor pointer is NULL.")
@@ -913,7 +908,7 @@ cdef np.ndarray _perm_from_cholmod_factor(object py_factor):
 
     cdef int np_itypenum = np.NPY_INT32 if L.itype == CHOLMOD_INT else np.NPY_INT64
     cdef np.ndarray p = np.PyArray_SimpleNewFromData(1, [L.n], np_itypenum, L.Perm)
-    np.set_array_base(p, factor_obj)  # keep factor_obj alive
+    np.set_array_base(p, py_factor)  # keep factor object alive
 
     return p
 
@@ -1106,7 +1101,7 @@ cdef class CholeskyFactor:
         """Whether the factor is in LL.T form (True) or LDL.T form (False)."""
         if self.factor is NULL:
             raise ValueError("The factor pointer is NULL. Run `factorize` first.")
-        return self.factor.is_ll
+        return bool(self.factor.is_ll)
 
     @property
     def N(self):
