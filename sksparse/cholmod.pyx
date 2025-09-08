@@ -41,6 +41,7 @@ import warnings
 from .utils import validate_csc_input
 
 __all__ = [
+    "CholeskyFactor",
     "CholmodError",
     "CholmodGpuProblemError",
     "CholmodInvalidInputError",
@@ -54,15 +55,10 @@ __all__ = [
     "analyze",
     "bisect",
     "cholesky",
-    "cholmod",
     "etree",
     "ldl",
-    "ldlrowmod",
-    "ldlsolve",
-    "ldlupdate",
     "metis",
     "nesdis",
-    "resymbol",
     "symbfact",
 ]
 
@@ -876,23 +872,21 @@ cdef np.ndarray _ndarray_from_cholmod_intarray(void* ptr, size_t N, bint use_int
     ptr : void*
         A pointer to the C array.
     N : size_t
-        The size of the permutation vector.
+        The size of the vector.
     use_int32 : bool
-        Whether to use 32-bit or 64-bit integers for the permutation indices.
+        Whether to use 32-bit or 64-bit integers for the array indices.
 
     Returns
     -------
     p : ndarray
-        The permutation vector as a NumPy array.
+        A copy of the vector as a NumPy array.
     """
     if ptr is NULL:
         raise ValueError("ptr is NULL, cannot get array")
 
     cdef int np_itypenum = np.NPY_INT32 if use_int32 else np.NPY_INT64
     cdef np.ndarray p = np.PyArray_SimpleNewFromData(1, [N], np_itypenum, ptr)
-    # TODO set destructor base object
-    # Return a copy in case ptr is freed
-    return p.copy()
+    return p.copy()  # return a copy in case ptr is freed
 
 
 cdef np.ndarray _perm_from_cholmod_factor(object py_factor):
@@ -979,22 +973,10 @@ cdef class CholeskyFactor:
 
     Attributes
     ----------
-    Common : cholmod_common
-        CHOLMOD common structure for configuration and status.
-    cm : cholmod_common*
-        A pointer to ``Common``.
-    factor : cholmod_factor*
-        The underlying C data structure.
-    use_int32 : bint
-        Whether to use 32-bit or 64-bit integers.
-    N : size_t
+    N : int
         The number of rows and columns in the factor.
-    _beta : float or None
-        The value added to the diagonal of :math:`A A^{\\top}` before
-        factorization, or None if no value was added.
-    is_lower : bool
-        Whether the factor is lower triangular (True) or upper triangular
-        (False).
+    is_ll : bool
+        Whether the factor is in ``LL.T`` form (True) or ``LDL.T`` form (False).
     """
 
     cdef cholmod_common Common
@@ -1114,6 +1096,8 @@ cdef class CholeskyFactor:
         """Deallocate memory used by the CholeskyFactor."""
         _cleanup_factor(self)
 
+    # TODO __repr__ and __str__
+
     # -------------------------------------------------------------------------
     #         Properties
     # -------------------------------------------------------------------------
@@ -1130,6 +1114,8 @@ cdef class CholeskyFactor:
         if self.factor is NULL:
             raise ValueError("The factor pointer is NULL. Run `factorize` first.")
         return self.factor.n
+
+    # TODO add property for nnz in factor
 
     # -------------------------------------------------------------------------
     #         Public API
@@ -1369,7 +1355,38 @@ cdef class CholeskyFactor:
         return self  # for method chaining
 
     def solve(self, b):
-        """Solve the linear system A x = b using the factorization.
+        """Solve the linear system ``A @ x = b`` for ``x``, using the
+        factorization.
+
+        This function solves the linear system:
+
+        .. math::
+
+            R^{\\top} R x = b,
+
+        where `R` is the upper triangular factor from the Cholesky factorization
+        of `A`. The input `b` is either dense or sparse, vector or matrix.
+
+        If ``order`` was not ``natural`` when the factorization was computed,
+        solve the system:
+
+        .. math::
+
+            P^{\\top} R^{\\top} R P x = b
+
+        where `P` is the permutation matrix corresponding to the permutation
+        vector. Similarly, if ``lower`` was True when the factorization was
+        computed, the system solved is:
+
+        .. math::
+
+            P^{\\top} L L^{\\top} P x = b.
+
+        If the factorization is in LDL form, the system solved is:
+
+        .. math::
+
+            P^{\\top} L D L^{\\top} P x = b.
 
         Parameters
         ----------
@@ -1378,8 +1395,36 @@ cdef class CholeskyFactor:
 
         Returns
         -------
-        x : (N,) or (N, K) ndarray
-            The solution vector or matrix.
+        x : (N,) or (N, K) ndarray or sparse matrix
+            The solution vector or matrix, returned in the same format as `b`.
+
+        Raises
+        ------
+        CholmodNotPositiveDefiniteError
+            If the matrix `A` is exactly singular, or singular to working
+            precision.
+
+        See Also
+        --------
+        * :func:`.cholesky` : Factorize a matrix using Cholesky decomposition.
+        * :func:`.ldl` : Factorize a matrix using LDL decomposition.
+        * :func:`.cho_factor` : Factorize a matrix using Cholesky decomposition.
+        * :func:`.ldl_factor` : Factorize a matrix using LDL decomposition.
+
+        Notes
+        -----
+        This function uses the CHOLMOD library to solve the linear system. It
+        is intended to combine the MATLAB interfaces ``cholmod2.m``
+        [#cholmod_c]_, and ``ldlsolve.m`` [#ldlsolve_c]_.
+
+        .. versionadded:: 0.5.0
+
+        References
+        ----------
+        .. [#cholmod_c] ``cholmod2.c`` - CHOLMOD MATLAB interface
+            https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/cholmod2.c
+        .. [#ldlsolve_c] ``ldlsolve.c`` - CHOLMOD MATLAB interface
+            https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/ldlsolve.c
         """
         if self.factor is NULL:
             raise ValueError("The factor pointer is NULL. Run `factorize` first.")
@@ -1416,9 +1461,12 @@ cdef class CholeskyFactor:
         if K == 0:
             X = X[:, 0]
 
+        # TODO stats data structure
+
         return X
 
     # TODO docs from Modify/cholmod_updown.c on permutation of C.
+    # TODO separate into update and downdate public methods
     def update(self, C, updown="up"):
         """Multiple-rank update or downdate of a sparse LDL factorization.
 
@@ -1478,6 +1526,7 @@ cdef class CholeskyFactor:
         # Keep a reference to C so it is not garbage collected
         cdef object _C_ref = _cholmod_sparse_from_csc(C, stype, C_use_int32, &Cmatrix)
 
+        # TODO put these comments into docstrings
         # Permute C so it is accepted in "matrix" space
         # From Modify/cholmod_updown.c:
         #   Note that the fill-reducing permutation L->Perm is NOT used.  The row
@@ -1530,7 +1579,7 @@ cdef class CholeskyFactor:
         return self
 
     def rowadd(self, k, C):
-        """Add a row to a sparse LDL factorization.
+        r"""Add a row to a sparse LDL factorization.
 
         Compute a rank-1 update of a sparse LDL factorization. This method
         "adds" a row by setting the :math:`k^{th}` row and column of the
@@ -1538,8 +1587,8 @@ cdef class CholeskyFactor:
 
         Parameters
         ----------
-        k : int
-            The row/column index to modify. Must be in the range ``0 <= k < N``.
+        k : int :math:`\in [0, N)`
+            The row/column index to modify.
         C : (N, 1) csc_array, optional
             If given, change the factorization such that row and column ``k``
             of the original matrix equal ``C``. The number of rows must match
@@ -1595,7 +1644,7 @@ cdef class CholeskyFactor:
         return self
 
     def rowdel(self, k):
-        """Delete a row from a sparse LDL factorization.
+        r"""Delete a row from a sparse LDL factorization.
 
         Compute a rank-1 update of a sparse LDL factorization. This method
         "deletes" a row by setting the :math:`k^{th}` row and column of the
@@ -1603,8 +1652,8 @@ cdef class CholeskyFactor:
 
         Parameters
         ----------
-        k : int
-            The row/column index to modify. Must be in the range ``0 <= k < N``.
+        k : int :math:`\in [0, N)`
+            The row/column index to modify.
 
         Returns
         -------
@@ -1635,7 +1684,7 @@ cdef class CholeskyFactor:
         """Recompute the symbolic Cholesky factorization of a sparse matrix.
 
         This function is useful after a series of downdates via
-        :func:`.ldlupdate` or :func:`.ldlrowmod`, since downdates do not remove
+        :meth:`.update` or :meth:`.rowdel`, since downdates do not remove
         any entries in ``L`` [#resymbol_c]_.
 
         Parameters
@@ -1855,8 +1904,9 @@ cdef class CholeskyFactor:
             )
 
 
-# Convenience functions
-# TODO docstrings -- same as cholesky/ldl, but different return values
+# -----------------------------------------------------------------------------
+#         Convenience functions
+# -----------------------------------------------------------------------------
 def cho_factor(A, *, lower=False, order=None):
     return CholeskyFactor(A, lower=lower, order=order).factorize(
         A, ldl=False, lower=lower
@@ -1869,9 +1919,7 @@ def ldl_factor(A, beta=None, *, lower=True, order=None):
     )
 
 
-# -----------------------------------------------------------------------------
-#         Cholesky and LDL Factorizations
-# -----------------------------------------------------------------------------
+# Cholesky and LDL Factorizations
 def _cholesky_base(A, *, ldl=False, beta=None, lower=False, order=None):
     """Base function for Cholesky factorization."""
     f = CholeskyFactor(A, beta=beta, lower=lower, order=order).factorize(
@@ -1936,13 +1984,7 @@ lower : bool, optional
 
 Returns
 -------
-R : csc_array
-    The triangular factor of the Cholesky decomposition. The data type will
-    match that of ``A``.
-{ldl_D_output}
-p : ndarray of int, optional
-    The permutation vector used in the factorization. Only returned if the
-    ordering is not ``None``.
+{returns}
 
 Raises
 ------
@@ -1952,8 +1994,6 @@ Raises
 See Also
 --------
 {see_also}
-* :func:`.cholmod` : Solve a linear system using the Cholesky factorization.
-* :func:`.ldlsolve` : Solve a linear system using the LDL factorization.
 
 Notes
 -----
@@ -1969,6 +2009,15 @@ References
     https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/Include/cholmod.h
 """
 
+
+_CHOLESKY_RETURNS = """R : csc_array
+    The triangular factor of the Cholesky decomposition. The data type will
+    match that of ``A``.
+{ldl_D_output}
+p : ndarray of int, optional
+    The permutation vector used in the factorization. Only returned if the
+    ordering is not ``None``.
+"""
 
 # -----------------------------------------------------------------------------
 #         Cholesky Docstring
@@ -1994,17 +2043,32 @@ In this case, only the lower triangular part of `A` is used.
 """
 
 
-_cholesky_see_also = """* :func:`.ldl` : Factorize a matrix using LDL decomposition."""
+_cholesky_see_also = """
+  * :func:`.ldl` : Factorize a matrix using LDL decomposition.
+  * :func:`.ldl_factor` : Factorize a matrix using LDL decomposition."""
+
+
+_cho_factor_returns = """CholeskyFactor
+    The factorization object. Use its methods to solve linear systems
+    and manipulate the factorization.
+"""
+
+cho_factor.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
+    intro=_cholesky_intro,
+    beta_param="",
+    returns=_cho_factor_returns,
+    see_also=_cholesky_see_also,
+    doc_tag="#cho_factor_h",
+)
 
 
 cholesky.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     intro=_cholesky_intro,
     beta_param="",
-    ldl_D_output="",
+    returns=_CHOLESKY_RETURNS.format(ldl_D_output=""),
     see_also=_cholesky_see_also,
     doc_tag="#cholesky_h",
 )
-
 
 # -----------------------------------------------------------------------------
 #         LDL Docstring
@@ -2049,13 +2113,24 @@ _ldl_D_output = """D : dia_array
     The data type will match that of ``A``."""
 
 
-_ldl_see_also = "* :func:`.cholesky` : Factorize a matrix using Cholesky decomposition."
+_ldl_see_also = """
+    * :func:`.cholesky` : Factorize a matrix using Cholesky decomposition.
+    * :func:`.cho_factor` : Factorize a matrix using Cholesky decomposition."""
+
+
+ldl_factor.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
+    intro=_ldl_intro,
+    beta_param=_beta_param,
+    returns=_cho_factor_returns,
+    see_also=_ldl_see_also,
+    doc_tag="#ldl_factor_h",
+)
 
 
 ldl.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     intro=_ldl_intro,
     beta_param=_beta_param,
-    ldl_D_output=_ldl_D_output,
+    returns=_CHOLESKY_RETURNS.format(ldl_D_output=_ldl_D_output),
     see_also=_ldl_see_also,
     doc_tag="#ldl_h",
 )
@@ -2118,7 +2193,7 @@ def analyze(A, *, kind=None, order=None):
 
     References
     ----------
-    .. [#analyze_c] ``analyze.c`` - CHOLMOD MATLA analyze function
+    .. [#analyze_c] ``analyze.c`` - CHOLMOD MATLAB analyze function
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/analyze.c
     """
     A, use_int32, out_itype = validate_csc_input(A, require_square=True)
@@ -2697,6 +2772,7 @@ def bisect(A, *, kind=None):
     s : (K,) ndarray of int
         The dimension ``K`` is either ``M`` or ``N``, depending on the
         ``kind`` parameter. The output can take 3 values:
+
         * ``0``: The node is in the left subgraph.
         * ``1``: The node is in the right subgraph.
         * ``2``: The node is in the separator.
@@ -2963,7 +3039,6 @@ class SeparatorTree():
         return SeparatorTree(cp_out, cmember_out)
 
 
-# TODO get defaults?
 def nesdis(
     A,
     *,

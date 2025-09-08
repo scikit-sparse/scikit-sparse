@@ -9,7 +9,7 @@ scikit-sparse - Sparse matrix extensions for SciPy
 Contents:
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
 
    overview.rst
 

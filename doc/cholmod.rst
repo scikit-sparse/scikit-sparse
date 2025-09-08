@@ -78,64 +78,58 @@ system:
 
 .. code:: python
 
-  from sksparse.cholmod import ldl, ldlsolve
-  A = ...                # a symmetric, positive-definite sparse matrix
-  b = ...                # right-hand side
-  L, D = ldl(A)          # compute LDL^T factorization
-  x = ldlsolve(L, D, b)  # solve Ax = b
+  from sksparse.cholmod import ldl_factor
+  A = ...            # a symmetric, positive-definite sparse matrix
+  b = ...            # right-hand side
+  f = ldl_factor(A)  # compute LDL^T factorization
+  x = f.solve(b)     # solve Ax = b
 
 
 Function Interface
 ------------------
-
-The main function this module provides is :func:`cholesky`, for computing the
-Cholesky factor and optionally a fill-reducing permutation of a sparse matrix.
-
-The LDL factorization can be computed using the :func:`ldl` function. The LDL
-factors are particularly useful for updating the factorization when the system
-changes, such as when applying or changing boundary conditions in finite
-element methods.
-
-The functions :func:`ldlupdate` and :func:`ldlrowmod` allow
-you to update the LDL factorization efficiently when the matrix changes,
-without recomputing the entire factorization. The :func:`resymbol` function can
-be used to remove explicit zeros after multiple downdate operations.
-
-.. note::
-    In order to use the update functions, you must first compute the LDL
-    factorization using :func:`ldl` with the ``remove_zeros=False`` argument.
-    This ensures that the factorization retains the structure necessary for
-    efficient updates.
-
-
-Numerical Factorization
-+++++++++++++++++++++++
+For users who want to directly compute the factorization without needing to
+manipulate the :class:`CholeskyFactor` object, the :mod:`.cholmod` module
+provides the :func:`cholesky` and :func:`ldl` functions that perform both the
+symbolic analysis and the numerical factorization in one step, and return the
+matrices directly.
 
 .. autofunction:: cholesky
 
 .. autofunction:: ldl
 
-.. autofunction:: ldlupdate
 
-.. autofunction:: ldlrowmod
+Object Interface
+----------------
 
-.. autofunction:: resymbol
+For more advanced usage, users can instantiate the :class:`CholeskyFactor`
+class. This class can be instantiated directly using its constructor, or more
+conveniently using the :func:`cho_factor` or :func:`ldl_factor` functions.
 
+When instantiated directly, the constructor performs a symbolic analysis of the
+matrix, but does not compute the numerical factorization. The numerical
+factorization is then performed by calling the :meth:`CholeskyFactor.factorize` method.
 
-Solving Linear Systems
-++++++++++++++++++++++
+The :func:`cho_factor` and :func:`ldl_factor` functions perform both the
+symbolic analysis and the numerical factorization in one step, and return an
+instance of the :class:`CholeskyFactor` class.
 
-To use the Cholesky factorization to solve a linear system, you can use
-:func:`cholmod`. This function behaves similarly to
-:func:`scipy.sparse.linalg.spsolve`, but is more efficient for sparse,
-symmetric, positive-definite matrices.
+The resulting :class:`CholeskyFactor` object can then be used to solve linear
+systems using its :meth:`CholeskyFactor.solve` method, or to update the
+factorization in-place using the :meth:`CholeskyFactor.update`,
+:meth:`CholeskyFactor.rowadd`, :meth:`CholeskyFactor.rowdel`, and
+:meth:`CholeskyFactor.resymbol` methods.
 
-If you already have an LDL factorization, the resulting matrices can be used to
-solve linear systems using :func:`ldlsolve`.
+The :meth:`.factorize` method can be called again to factor a new matrix
+with the same sparsity pattern.
 
-.. autofunction:: cholmod
+.. autofunction:: cho_factor
 
-.. autofunction:: ldlsolve
+.. autofunction:: ldl_factor
+
+.. autoclass:: CholeskyFactor
+    :show-inheritance:
+    :members:
+    :undoc-members:
 
 
 Symbolic Operations
@@ -166,11 +160,15 @@ the ``order`` argument is specified.
 
 .. autofunction:: bisect
 
-.. autofunction:: nesdis
-
 .. autofunction:: metis
 
-.. autofunction:: prune_septree
+.. autofunction:: nesdis
+
+.. autoclass:: SeparatorTree
+    :show-inheritance:
+    :members:
+    :undoc-members:
+
 
 Error handling
 --------------
