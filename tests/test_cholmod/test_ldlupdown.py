@@ -16,7 +16,7 @@ from numpy.testing import assert_allclose
 from scipy import sparse
 from scipy.sparse.linalg import LaplacianNd
 
-from sksparse.cholmod import ldl_factor, ldlrowmod, ldlsolve, ldlupdate, resymbol
+from sksparse.cholmod import ldl_factor, ldlsolve, ldlupdate, resymbol
 
 Ng = 15  # arbitrary problem size A = (Ng**2, Ng**2)
 
@@ -132,9 +132,9 @@ def test_resymbol(A, f):
     assert_allclose(Lr.toarray(), L.toarray(), atol=1e-12)
 
 
-@pytest.mark.skip(reason="TODO")
 def test_ldlrowmod(A, expect_x, b, f):
-    L, D, p = f
+    L, D = f.get_factor()
+    p = f.get_perm()
     S = A[p][:, p]
 
     # -------------------------------------------------------------------------
@@ -157,7 +157,8 @@ def test_ldlrowmod(A, expect_x, b, f):
     Ak[:, [k]] = I[:, [k]]
 
     # Remove row and column k from the factorization
-    Lk, Dk = ldlrowmod(L, D, pk)
+    f.rowmod(pk)
+    Lk, Dk = f.get_factor()
 
     # Remove from the original matrix
     Sk = S.copy()
@@ -186,7 +187,8 @@ def test_ldlrowmod(A, expect_x, b, f):
     Sa[pk, :] = C.T
     Sa[:, [pk]] = C
 
-    La, Da = ldlrowmod(Lk, Dk, pk, C=C)
+    f.rowmod(pk, C=C)
+    La, Da = f.get_factor()
 
     assert_allclose((La @ Da @ La.T).toarray(), Sa.toarray(), atol=1e-12)
 

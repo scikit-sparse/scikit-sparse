@@ -1868,6 +1868,98 @@ cdef class CholeskyFactor:
 
         return self
 
+    # TODO separate into rowadd and rowdel methods
+    def rowmod(self, k, *, C=None):
+        """Add or delete a row from a sparse LDL factorization.
+
+        Compute a rank-1 update of a sparse LDL factorization. It either
+        "adds" a row by setting the :math:`k^{th}` row and column of the
+        original matrix to ``C``, or "deletes" a row by setting the
+        :math:`k^{th}` row and column of the original matrix to the identity.
+
+        Parameters
+        ----------
+        k : int
+            The row/column index to modify. Must be in the range ``0 <= k < N``.
+        C : (N, 1) csc_array, optional
+            If given, change the factorization such that row and column ``k``
+            of the original matrix equal ``C``. The number of rows must match
+            that of ``L`` and ``D``.
+
+        Returns
+        -------
+        CholeskyFactor
+            The current object, for method chaining.
+
+        .. versionadded:: 0.5.0
+        """
+        if not (0 <= k < self.N):
+            raise ValueError(
+                f"Row index k={k} is out of bounds for matrix of size {self.N}."
+            )
+
+        if C is not None:
+            if not issparse(C) or C.ndim not in {1, 2}:
+                raise ValueError(
+                    f"Update matrix C is type {type(C)}."
+                    "Expected a 1D or 2D sparse array."
+                )
+
+            if C.shape[0] != self.N:
+                raise ValueError(
+                    "Update matrix C must have the same number of rows as L."
+                )
+
+        # -------------------------------------------------------------------------
+        #         Special Cases
+        # -------------------------------------------------------------------------
+        # Empty matrix
+        if self.N == 0:
+            return self
+
+        # TODO?
+        # if L.nnz == 0 or D.nnz == 0:
+        #     raise CholmodError("Input matrix L or diagonal matrix D is empty.")
+
+        # ---------------------------------------------------------------------
+        #         Get C Matrix
+        # ---------------------------------------------------------------------
+        cdef bint rowadd = C is not None
+
+        cdef cholmod_sparse Cmatrix
+        cdef cholmod_sparse* Cc = &Cmatrix
+        cdef object _C_ref  # keep a reference to C so it is not garbage collected
+        cdef int stype = 0  # use all of C
+
+        if rowadd:
+            # Ensure C is in CSC format
+            if C.ndim == 1:
+                C = C.reshape((-1, 1)).tocsc()  # (N, 1)
+
+            C, C_use_int32, _ = validate_csc_input(C)
+            _C_ref = _cholmod_sparse_from_csc(C, stype, C_use_int32, &Cmatrix)
+
+        # -------------------------------------------------------------------------
+        #         Compute the Update
+        # -------------------------------------------------------------------------
+        cdef int ok
+
+        if rowadd:
+            if self.use_int32:
+                ok = cholmod_rowadd(k, Cc, self.factor, self.cm)
+            else:
+                ok = cholmod_l_rowadd(k, Cc, self.factor, self.cm)
+        else:
+            if self.use_int32:
+                ok = cholmod_rowdel(k, NULL, self.factor, self.cm)
+            else:
+                ok = cholmod_l_rowdel(k, NULL, self.factor, self.cm)
+
+        if not ok:
+            raise CholmodError("ldlrowmod failed.")
+
+        return self
+
     # -------------------------------------------------------------------------
     #         Private API
     # -------------------------------------------------------------------------
