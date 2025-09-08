@@ -16,7 +16,7 @@ from numpy.testing import assert_allclose
 from scipy import sparse
 from scipy.sparse.linalg import LaplacianNd
 
-from sksparse.cholmod import ldl_factor, ldlsolve
+from sksparse.cholmod import ldl_factor
 
 Ng = 15  # arbitrary problem size A = (Ng**2, Ng**2)
 
@@ -171,7 +171,7 @@ def test_ldlrowmod(A, expect_x, b, f):
     assert_allclose((Lk @ Dk @ Lk.T).toarray(), Sk.toarray(), atol=1e-12)
 
     # Solve the modified system
-    x = ldlsolve(Lk, Dk, b, p=p)
+    x = f.solve(b)
     xs = sparse.linalg.spsolve(Ak, b.tocoo())
 
     assert_allclose((Ak @ x).toarray(), b.toarray(), atol=1e-12)
@@ -196,7 +196,7 @@ def test_ldlrowmod(A, expect_x, b, f):
     assert_allclose((La @ Da @ La.T).toarray(), Sa.toarray(), atol=1e-12)
 
     # Solve the modified system
-    x = ldlsolve(La, Da, b, p=p)
+    x = f.solve(b)
     xs = sparse.linalg.spsolve(Aa, b.tocoo())
 
     assert_allclose((Aa @ x).toarray(), b.toarray(), atol=1e-12)
