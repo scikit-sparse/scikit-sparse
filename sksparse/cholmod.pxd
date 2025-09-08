@@ -243,6 +243,27 @@ cdef extern from "cholmod.h":
         cholmod_common *Common
     )
 
+    cholmod_sparse *cholmod_submatrix(
+        cholmod_sparse *A,
+        int32_t *rset,
+        int64_t rsize,
+        int32_t *cset,
+        int64_t csize,
+        int mode,
+        int sorted,
+        cholmod_common *Common
+    )
+    cholmod_sparse *cholmod_l_submatrix(
+        cholmod_sparse *A,
+        int64_t *rset,
+        int64_t rsize,
+        int64_t *cset,
+        int64_t csize,
+        int mode,
+        int sorted,
+        cholmod_common *Common
+    )
+
     double cholmod_rcond(cholmod_factor *L, cholmod_common *Common)
     double cholmod_l_rcond(cholmod_factor *L, cholmod_common *Common)
 

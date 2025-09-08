@@ -1757,6 +1757,120 @@ cdef class CholeskyFactor:
 
         return X
 
+    # TODO docs from Modify/cholmod_updown.c on permutation of C.
+    def update(self, C, updown="up"):
+        """Multiple-rank update or downdate of a sparse LDL factorization.
+
+        Update the Cholesky factorization of a sparse matrix `A`:
+
+        .. math::
+
+            L' D' L'^{\\top} = P A P^{\\top} \\pm C C^{\\top}
+
+        where `L` is a lower triangular matrix with unit diagonal, and `D` is
+        a diagonal matrix. The input ``C`` is a sparse matrix representing the
+        update or downdate to the factorization. If ``updown == "up"``, the
+        factorization is updated (+ sign), otherwise it is downdated (- sign).
+
+        Parameters
+        ----------
+        C : (N, K) csc_array
+            The sparse matrix representing the rank-`k` update or downdate to
+            the factorization.
+        update : str in {"up", "down"}, optional
+            If ``up``, perform an update to the factorization. If ``down``,
+            perform a downdate. Default is ``up``.
+
+        Returns
+        -------
+        CholeskyFactor
+            The current object, for method chaining.
+
+        .. versionadded:: 0.5.0
+        """
+        if self.factor is NULL:
+            raise ValueError("The factor pointer is NULL. Run `factorize` first.")
+
+        if updown not in ("up", "down"):
+            raise ValueError("updown must be 'up' or 'down'.")
+
+        if not issparse(C) or C.ndim not in {1, 2}:
+            raise ValueError(f"Update matrix C is type {type(C)}. "
+                             "Expected a 1D or 2D sparse array.")
+
+        cdef size_t N = self.factor.n
+
+        if C.shape[0] != N:
+            raise ValueError("Update matrix C must have the same number of rows as L.")
+
+        # Ensure C is in CSC format
+        if C.ndim == 1:
+            C = C.reshape((-1, 1)).tocsc()  # (N, 1)
+
+        cdef int stype = 0  # use all of C
+        cdef bint C_use_int32
+        C, C_use_int32, _ = validate_csc_input(C)
+
+        cdef cholmod_sparse Cmatrix
+        cdef cholmod_sparse* Cc = &Cmatrix
+
+        # Keep a reference to C so it is not garbage collected
+        cdef object _C_ref = _cholmod_sparse_from_csc(C, stype, C_use_int32, &Cmatrix)
+
+        # Permute C so it is accepted in "matrix" space 
+        # From Modify/cholmod_updown.c:
+        #   Note that the fill-reducing permutation L->Perm is NOT used.  The row
+        #   indices of C refer to the rows of L, not A.  If your original system is
+        #   LDL' = PAP' (where P = L->Perm), and you want to compute the LDL'
+        #   factorization of A+CC', then you must permute C first.  That is:
+        #   
+        #        PAP' = LDL'
+        #        P(A+CC')P' = PAP'+PCC'P' = LDL' + (PC)(PC)' = LDL' + Cnew*Cnew'
+        #        where Cnew = P*C.
+        #   
+        #   You can use the cholmod_submatrix routine in the MatrixOps module
+        #   to permute C, with:
+        #   
+        #   Cnew = cholmod_submatrix (C, L->Perm, L->n, NULL, -1, TRUE, TRUE, Common) ;
+        #   
+        #   Note that the sorted input parameter to cholmod_submatrix must be TRUE,
+        #   because cholmod_updown requires C with sorted columns.
+        cdef cholmod_sparse *C_perm
+
+        if self.use_int32:
+            C_perm = cholmod_submatrix(
+                Cc, <int32_t*>self.factor.Perm, N, NULL, -1, True, True, self.cm
+            )
+        else:
+            C_perm = cholmod_l_submatrix(
+                Cc, <int64_t*>self.factor.Perm, N, NULL, -1, True, True, self.cm
+            )
+
+        # Ensure the factor is in LDL form
+        self._convert_factor("LDL")
+
+        # Compute the update or downdate
+        cdef int update = updown == "up"
+        cdef int ok
+
+        if self.use_int32:
+            ok = cholmod_updown(update, C_perm, self.factor, self.cm)
+        else:
+            ok = cholmod_l_updown(update, C_perm, self.factor, self.cm)
+
+        if self.use_int32:
+            cholmod_free_sparse(&C_perm, self.cm)
+        else:
+            cholmod_l_free_sparse(&C_perm, self.cm)
+
+        if not ok:
+            raise CholmodError("Update or downdate failed.")
+
+        return self
+
+    # -------------------------------------------------------------------------
+    #         Private API
+    # -------------------------------------------------------------------------
     cdef object _solve_sparse(self, object b):
         """Solve the system A x = b with a sparse right-hand side."""
         # Get the b vector or matrix into CHOLMOD format
@@ -1828,10 +1942,7 @@ cdef class CholeskyFactor:
 
         return _ndarray_from_cholmod_dense(Xd, self.use_int32, self.cm)
 
-    # -------------------------------------------------------------------------
-    #         Private API
-    # -------------------------------------------------------------------------
-    def _convert_factor(self, kind):
+    cdef object _convert_factor(self, object kind):
         """Convert the factor to the desired form in-place.
 
         Parameters
