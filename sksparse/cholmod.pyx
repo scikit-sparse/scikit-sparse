@@ -989,11 +989,17 @@ cdef class CholeskyFactor:
     cdef cholmod_factor *factor
     cdef bint use_int32
     cdef size_t N
-    cdef object _beta
     cdef bint is_lower
 
-    def __cinit__(self, object A, object beta=None, int lower=False, object order=None):
+    # TODO add mode={'auto', 'simplicial', 'supernodal'}?
+    def __cinit__(self, object A, object kind=None, int lower=False, object order=None):
         A, use_int32, _ = validate_csc_input(A, require_square=True)
+
+        if kind is None:
+            kind = "sym"
+
+        if kind not in {"sym", "row", "col"}:
+            raise ValueError(f"Unknown factorization kind: {kind}")
 
         # Check the input ordering method
         if order is not None and order not in _ordering_methods:
@@ -1009,26 +1015,19 @@ cdef class CholeskyFactor:
         # Get the input matrix into CHOLMOD format
         cdef cholmod_sparse Amatrix
         cdef cholmod_sparse *Ac = &Amatrix
+        cdef cholmod_sparse *C
 
         # Use lower or upper triangular part of A
         self.is_lower = lower
         cdef int stype = -1 if self.is_lower else 1
+        cdef bint transpose = False
+
+        if kind in ["row", "col"]:
+            stype = 0                    # unsymmetric A @ A.T or A.T @ A
+            transpose = (kind == "col")  # A.T @ A
 
         # keep a reference to the input matrix
         cdef object _ref = _cholmod_sparse_from_csc(A, stype, self.use_int32, &Amatrix)
-
-        # Analyze A @ A.T + beta*I if requested
-        if beta is None:
-            self._beta = None
-        else:
-            if not np.isscalar(beta):
-                raise ValueError("beta must be a scalar value.")
-            self._beta = float(beta)
-
-        if self._beta is None:
-            Ac.stype = -1  # use lower triangular part of A
-        else:
-            Ac.stype = 0   # use all of A, factorizing A @ A.T
 
         try:
             self.cm = &self.Common
@@ -1041,10 +1040,20 @@ cdef class CholeskyFactor:
             _set_ordering_method(order, self.cm)
 
             # Analyze the matrix, but do not factorize yet
-            if self.use_int32:
-                self.factor = cholmod_analyze(Ac, self.cm)
+            if transpose:
+                if self.use_int32:
+                    C = cholmod_transpose(Ac, CHOLMOD_TRANS_PATTERN, self.cm)
+                    self.factor = cholmod_analyze(Ac, self.cm)
+                    cholmod_free_sparse(&C, self.cm)
+                else:
+                    C = cholmod_l_transpose(Ac, CHOLMOD_TRANS_PATTERN, self.cm)
+                    self.factor = cholmod_l_analyze(Ac, self.cm)
+                    cholmod_l_free_sparse(&C, self.cm)
             else:
-                self.factor = cholmod_l_analyze(Ac, self.cm)
+                if self.use_int32:
+                    self.factor = cholmod_analyze(Ac, self.cm)
+                else:
+                    self.factor = cholmod_l_analyze(Ac, self.cm)
 
             # Check for errors
             _handle_errors(self.cm.status)
@@ -1076,7 +1085,15 @@ cdef class CholeskyFactor:
             raise ValueError("The factor pointer is NULL. Run `factorize` first.")
         return self.factor.n
 
-    # TODO add property for nnz in factor
+    # TODO make a view?
+    def get_colcount(self):
+        """The number of nonzeros in each column of the factor."""
+        if self.factor is NULL:
+            raise ValueError("The factor pointer is NULL. Run `factorize` first.")
+        return _ndarray_from_cholmod_intarray(
+            self.factor.ColCount, self.factor.n, self.use_int32
+        )
+
 
     # -------------------------------------------------------------------------
     #         Public API
@@ -1306,22 +1323,17 @@ cdef class CholeskyFactor:
         # Set stype and beta for LDL
         cdef double betac[2]
 
-        if beta is None:
-            b = self._beta
-        else:
-            if not np.isscalar(beta):
-                raise ValueError("beta must be a scalar value.")
-            b = float(beta)
-            self._beta = b  # cache value
-
+        # TODO allow beta not just for ldl=True
         if ldl:
-            if b is None:
+            if beta is None:
                 Ac.stype = -1    # use lower triangular part of A
                 betac[0] = 0.0
                 betac[1] = 0.0
             else:
+                if not np.isscalar(beta):
+                    raise ValueError("beta must be a scalar value.")
                 Ac.stype = 0     # use all of A, factorizing A @ A.T
-                betac[0] = b
+                betac[0] = beta
                 betac[1] = 0.0
 
         # Factorize the matrix
@@ -1736,7 +1748,7 @@ cdef class CholeskyFactor:
         Ac.xtype = CHOLMOD_PATTERN
         Ac.x = NULL
 
-        # NOTE do *not* use the factor's existing permutation. We expect that 
+        # NOTE do *not* use the factor's existing permutation. We expect that
         # the input matrix will be the permuted matrix P A P.T.
         if self.use_int32:
             cholmod_resymbol_noperm(Ac, NULL, 0, True, self.factor, self.cm)
@@ -1901,34 +1913,26 @@ def cho_factor(A, *, lower=False, order=None):
 
 
 def ldl_factor(A, beta=None, *, lower=True, order=None):
-    return CholeskyFactor(A, beta=beta, lower=lower, order=order).factorize(
+    # Set kind based on beta, see SuiteSparse/CHOLMOD/MATLAB/ldlchol.c
+    kind = "row" if beta is not None else "sym"  # use A @ A.T if beta is given
+    return CholeskyFactor(A, kind=kind, lower=lower, order=order).factorize(
         A, ldl=True, beta=beta, lower=lower
     )
 
 
-# Cholesky and LDL Factorizations
-def _cholesky_base(A, *, ldl=False, beta=None, lower=False, order=None):
-    """Base function for Cholesky factorization."""
-    f = CholeskyFactor(A, beta=beta, lower=lower, order=order).factorize(
-        A, ldl=ldl, beta=beta, lower=lower
-    )
-    kind = "LDL" if ldl else "LL"
-    R = f.get_factor(kind=kind, lower=lower)
-    p = f.get_perm()
-
-    if ldl:
-        R, D = R
-        return (R, D) if order is None else (R, D, p)
-    else:
-        return R if order is None else (R, p)
-
-
+# csc_arrays from the factorization, and optionally the permutation
 def cholesky(A, *, lower=False, order=None):
-    return _cholesky_base(A, ldl=False, lower=lower, order=order)
+    f = cho_factor(A, lower=lower, order=order)
+    R = f.get_factor()
+    p = f.get_perm()
+    return R if order is None else (R, p)
 
 
 def ldl(A, beta=None, *, lower=True, order=None):
-    return _cholesky_base(A, ldl=True, beta=beta, lower=lower, order=order)
+    f = ldl_factor(A, beta=beta, lower=lower, order=order)
+    R, D = f.get_factor()
+    p = f.get_perm()
+    return (R, D) if order is None else (R, D, p)
 
 
 # -----------------------------------------------------------------------------
@@ -2126,6 +2130,7 @@ ldl.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
 # -----------------------------------------------------------------------------
 #         Symbolic Functions
 # -----------------------------------------------------------------------------
+# TODO just call CholeskyFactor().get_perm()/get_colcount()? Or remove?
 def analyze(A, *, kind=None, order=None):
     """Order and analyze a sparse matrix for Cholesky or LDL factorization.
 

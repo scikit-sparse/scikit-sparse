@@ -15,7 +15,7 @@ import pytest
 from numpy.testing import assert_array_equal
 from scipy import sparse
 
-from sksparse.cholmod import analyze
+from sksparse.cholmod import CholeskyFactor, CholmodNotPositiveDefiniteError
 
 from ..helpers import generate_random_matrices, is_valid_permutation
 
@@ -29,17 +29,19 @@ def A_default():
 
 def test_bad_kind(A_default):
     with pytest.raises(ValueError, match="Unknown factorization kind"):
-        analyze(A_default, kind="invalid")
+        CholeskyFactor(A_default, kind="invalid")
 
 
 def test_bad_order(A_default):
     with pytest.raises(ValueError, match="Unknown ordering method"):
-        analyze(A_default, order="invalid")
+        CholeskyFactor(A_default, order="invalid")
 
 
 def test_empty_input():
     empty_A = sparse.csc_array((0, 0))
-    p, count = analyze(empty_A)
+    f = CholeskyFactor(empty_A)
+    p = f.get_perm()
+    count = f.get_colcount()
     empty_p = np.array([], dtype=empty_A.indptr.dtype)
     assert_array_equal(p, empty_p, strict=True)
     assert_array_equal(count, empty_p, strict=True)
@@ -48,21 +50,23 @@ def test_empty_input():
 def test_zero_input():
     N = 10  # arbitrary
     zero_A = sparse.csc_array((N, N))
-    p, count = analyze(zero_A)
-    assert_array_equal(p, np.arange(N, dtype=zero_A.indptr.dtype), strict=True)
-    assert_array_equal(count, np.zeros(N, dtype=zero_A.indptr.dtype), strict=True)
+    with pytest.raises(CholmodNotPositiveDefiniteError, match="not positive definite"):
+        CholeskyFactor(zero_A)
 
 
 @pytest.mark.parametrize("dtype", DTYPES)
 def test_singleton(dtype):
     singleton_A = sparse.csc_array([[1]], dtype=dtype)
-    p, count = analyze(singleton_A)
+    f = CholeskyFactor(singleton_A)
+    p = f.get_perm()
+    count = f.get_colcount()
     expect_p = np.array([0], dtype=singleton_A.indptr.dtype)
     expect_count = np.array([1], dtype=singleton_A.indptr.dtype)
     assert_array_equal(p, expect_p, strict=True)
     assert_array_equal(count, expect_count, strict=True)
 
 
+# TODO change this test to use Davis Cholesky example matrix
 # Declare a single random matrix fixture for some tests
 @pytest.fixture(
     params=list(
@@ -81,7 +85,9 @@ def test_itype(A_random, itype):
     A.indptr = A.indptr.astype(itype)
     A.indices = A.indices.astype(itype)
     N = A.shape[0]
-    p, count = analyze(A)
+    f = CholeskyFactor(A)
+    p = f.get_perm()
+    count = f.get_colcount()
     assert p.dtype == itype
     assert count.dtype == itype
     assert is_valid_permutation(p)
@@ -115,7 +121,9 @@ posdef_As = list(
 )
 def test_order(A, order):
     N = A.shape[0]
-    p, count = analyze(A, order=order)
+    f = CholeskyFactor(A, order=order)
+    p = f.get_perm()
+    count = f.get_colcount()
     assert is_valid_permutation(p)
     assert len(count) == N
     assert np.all(count >= 0)
@@ -126,7 +134,9 @@ def test_order(A, order):
 @pytest.mark.parametrize("kind", [None, "sym"])
 def test_kind_sym(A, kind):
     N = A.shape[0]
-    p, count = analyze(A, kind=kind)
+    f = CholeskyFactor(A, kind=kind)
+    p = f.get_perm()
+    count = f.get_colcount()
     assert is_valid_permutation(p)
     assert len(count) == N
     assert np.all(count >= 0)
@@ -139,7 +149,9 @@ def test_kind_sym(A, kind):
 @pytest.mark.parametrize("kind", ["row", "col"])
 def test_kind_rowcol(A, kind):
     N = A.shape[0] if kind == "row" else A.shape[1]
-    p, count = analyze(A, kind=kind)
+    f = CholeskyFactor(A, kind=kind)
+    p = f.get_perm()
+    count = f.get_colcount()
     assert is_valid_permutation(p)
     assert len(count) == N
     assert np.all(count >= 0)
