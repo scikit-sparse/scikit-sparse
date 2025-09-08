@@ -372,7 +372,7 @@ cdef object _csc_from_cholmod_sparse(cholmod_sparse* A, cholmod_common* common):
     return csc_array((data, indices, indptr), shape=(A.nrow, A.ncol))
 
 
-cdef object _csc_from_cholmod_factor(object py_factor):
+cdef object _csc_from_cholmod_factor(CholeskyFactor py_factor):
     """Build a sparse matrix from a CHOLMOD factor.
 
     This function is similar to _csc_from_cholmod_sparse, but builds the matrix
@@ -401,9 +401,8 @@ cdef object _csc_from_cholmod_factor(object py_factor):
     Therefore, we use this function to create a view onto the factor without
     destroying it.
     """
-    cdef CholeskyFactor factor_obj = py_factor
-    cdef cholmod_factor *L = factor_obj.factor
-    cdef cholmod_common *common = factor_obj.cm
+    cdef cholmod_factor *L = py_factor.factor
+    cdef cholmod_common *common = py_factor.cm
 
     if L is NULL:
         raise ValueError("The factor pointer is NULL.")
@@ -443,7 +442,7 @@ cdef object _csc_from_cholmod_factor(object py_factor):
 
     # Take ownership of the data
     for array in (indptr, indices, data):
-        np.set_array_base(array, factor_obj)
+        np.set_array_base(array, py_factor)
 
     return csc_array((data, indices, indptr), shape=(L.n, L.n))
 
