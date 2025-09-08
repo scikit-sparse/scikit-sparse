@@ -157,7 +157,7 @@ def test_ldlrowmod(A, expect_x, b, f):
     Ak[:, [k]] = I[:, [k]]
 
     # Remove row and column k from the factorization
-    f.rowmod(pk)
+    f.rowdel(pk)
     Lk, Dk = f.get_factor()
 
     # Remove from the original matrix
@@ -187,7 +187,7 @@ def test_ldlrowmod(A, expect_x, b, f):
     Sa[pk, :] = C.T
     Sa[:, [pk]] = C
 
-    f.rowmod(pk, C=C)
+    f.rowadd(pk, C)
     La, Da = f.get_factor()
 
     assert_allclose((La @ Da @ La.T).toarray(), Sa.toarray(), atol=1e-12)
