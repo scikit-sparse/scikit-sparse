@@ -1084,6 +1084,18 @@ cdef class CholeskyFactor:
             raise ValueError("The factor pointer is NULL. Run `factorize` first.")
         return self.factor.n
 
+    @property
+    def nnz(self):
+        """The number of nonzeros in the factor."""
+        if self.factor is NULL:
+            raise ValueError("The factor pointer is NULL. Run `factorize` first.")
+        return np.sum(self.get_colcount())
+
+    # TODO add property for ordering method used
+
+    # -------------------------------------------------------------------------
+    #         Public API
+    # -------------------------------------------------------------------------
     # TODO make a view?
     def get_colcount(self):
         """The number of nonzeros in each column of the factor."""
@@ -1093,10 +1105,6 @@ cdef class CholeskyFactor:
             self.factor.ColCount, self.factor.n, self.use_int32
         )
 
-
-    # -------------------------------------------------------------------------
-    #         Public API
-    # -------------------------------------------------------------------------
     def view_factor(self, kind=None):
         """Return a view of the Cholesky factor in the specified format.
 

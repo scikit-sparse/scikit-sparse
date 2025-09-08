@@ -66,35 +66,40 @@ def test_singleton(dtype):
     assert_array_equal(count, expect_count, strict=True)
 
 
-# TODO change this test to use Davis Cholesky example matrix
-# Declare a single random matrix fixture for some tests
-@pytest.fixture(
-    params=list(
-        generate_random_matrices(
-            N_trials=1, N_max=200, d_scale=0.05, pos_def_only=True
-        ),
-    )
-)
-def A_random(request):
-    return request.param
+# Declare a single matrix fixture for some tests
+# See: Davis, Timothy A. (2006). Direct Methods for Sparse Linear Systems,
+# pp 708 (Equation 2.1).
+@pytest.fixture
+def A_example():
+    N = 11
+    rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
+    cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
+    vals = np.ones(len(rows), dtype=np.float64)
+    L = sparse.coo_array((vals, (rows, cols)), shape=(N, N))
+    A = (L + L.T).tocsc()  # make it symmetric
+    A.setdiag(1)
+    return A
 
 
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
-def test_itype(A_random, itype):
-    A = A_random
+def test_itype(A_example, itype):
+    A = A_example
     A.indptr = A.indptr.astype(itype)
     A.indices = A.indices.astype(itype)
     N = A.shape[0]
     f = CholeskyFactor(A)
     p = f.get_perm()
     count = f.get_colcount()
+    expect_count = np.array([3, 3, 4, 3, 3, 4, 4, 3, 3, 2, 1], dtype=itype)
+    # expect_count = sum(lchol(A) != 0, 1) in MATLAB (natural ordering)
     assert p.dtype == itype
     assert count.dtype == itype
     assert is_valid_permutation(p)
     assert len(count) == N
     assert np.all(count >= 0)
     assert np.all(count <= N)
-
+    assert_array_equal(count, expect_count, strict=True)
+    assert f.nnz == 33  # == nnz(lchol(A)) in MATLAB (natural ordering)
 
 # -----------------------------------------------------------------------------
 #         Test many random matrices of various dtypes
