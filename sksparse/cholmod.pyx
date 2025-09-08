@@ -1966,6 +1966,7 @@ cdef class CholeskyFactor:
 
         return self
 
+    # TODO add flag for perm/noperm?
     def resymbol(self, object A):
         """Recompute the symbolic Cholesky factorization of a sparse matrix.
 
@@ -1981,11 +1982,10 @@ cdef class CholeskyFactor:
             used, and no check is made for symmetry. The numerical values of
             ``A`` are ignored. Only its non-zero pattern is used.
 
-            .. note :: This method expects the *unpermuted* matrix ``A`` as
-                input. If the factorization was computed for ``P A P.T``, where
-                ``P`` is the permutation matrix corresponding to
-                :meth:`.get_perm`, then ``A`` must be permuted back before
-                calling this method.
+            .. note :: The input matrix ``A`` is expected to be the
+                permuted matrix :math:`P A P^{\\top}`, where `P` is the
+                permutation matrix corresponding to the permutation vector
+                returned by :meth:`.get_perm`.
 
         Returns
         -------
@@ -2036,21 +2036,12 @@ cdef class CholeskyFactor:
         Ac.xtype = CHOLMOD_PATTERN
         Ac.x = NULL
 
-        # TODO permute A to "matrix" space?
-        # Currently, need to call 
-        #     f.resymbol(A)
-        # after updates, as opposed to calling
-        #     S = A[p][:, p]
-        #     f.resymbol(S).
-        # The function interface correct call is:
-        #     ldlresymbol(L, S)
-        # since it internally creates a "factor" from L, which is already in
-        # the permuted space.
-
+        # NOTE do *not* use the factor's existing permutation. We expect that 
+        # the input matrix will be the permuted matrix P A P.T.
         if self.use_int32:
-            cholmod_resymbol(Ac, NULL, 0, True, self.factor, self.cm)
+            cholmod_resymbol_noperm(Ac, NULL, 0, True, self.factor, self.cm)
         else:
-            cholmod_l_resymbol(Ac, NULL, 0, True, self.factor, self.cm)
+            cholmod_l_resymbol_noperm(Ac, NULL, 0, True, self.factor, self.cm)
 
         return self
 

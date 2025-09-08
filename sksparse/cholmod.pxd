@@ -398,6 +398,23 @@ cdef extern from "cholmod.h":
         cholmod_common *Common
     )
 
+    int cholmod_resymbol_noperm(
+        cholmod_sparse *A,
+        int *fset,
+        size_t fsize,
+        int pack,
+        cholmod_factor *L,
+        cholmod_common *Common
+    )
+    int cholmod_l_resymbol_noperm(
+        cholmod_sparse *A,
+        int *fset,
+        size_t fsize,
+        int pack,
+        cholmod_factor *L,
+        cholmod_common *Common
+    )
+
     int64_t cholmod_bisect(
         cholmod_sparse *A,
         int32_t *fset,

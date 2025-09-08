@@ -125,7 +125,7 @@ def test_resymbol(A, f):
     print(f"{Ld.nnz=}")
 
     # Test resymbol
-    f.resymbol(A)
+    f.resymbol(S)
     Lr = f.get_factor()[0]
 
     print("After resymbol:")
