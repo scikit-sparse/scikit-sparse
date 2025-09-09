@@ -985,10 +985,8 @@ cdef class CholeskyFactor:
         Whether the factor is in supernodal (True) or simplicial (False) format.
     itype : np.dtype in {np.int32, np.int64}
         The integer type used for indices and indptr in the factor.
-    dtype : np.dtype in {np.float32, np.float64, np.complex64, np.complex128, \
-            np.bool_}
-        The data type used for numerical values in the factor.
     dtype : np.dtype
+        The data type used for numerical values in the factor.
     colcount : (N,) ndarray of int
         The number of nonzeros in each column of the factor.
     nnz : int

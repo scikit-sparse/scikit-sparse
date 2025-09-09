@@ -42,13 +42,16 @@ v0.5.0
 
   - The :code:`mode` parameter has been renamed to :code:`supernodal_mode`.
 
-  - The :code:`symmetry` parameter has been renamed to :code:`lower`. It
-    controls whether to use the lower or upper triangular part of the input
-    matrix, or whether to return a lower or upper triangular factor.
+  - The :code:`symmetric` parameter has been removed. It has been replaced by
+    two new parameters: :code:`lower`, and :code:`sym_kind`.
 
-  - The parameter :code:`sym_kind` has been added. It accepts a string argument
-    in :code:`{"sym", "row", "col"}`, which controls the symmetry structure of
-    the matrix to analyze.
+    * Parameter :code:`lower` controls whether to use the lower or upper
+      triangular part of the input matrix, or whether to return a lower or
+      upper triangular factor.
+
+    * Parameter :code:`sym_kind` has been added. It accepts a string argument
+      in :code:`{"sym", "row", "col"}`, which controls the symmetry structure
+      of the matrix to analyze.
 
   - The functions :code:`cholmod.analyze_AAt` and :code:`cholmod.cholesky_AAt`
     have been removed. Use :func:`~sksparse.cholmod.cho_factor` or
@@ -62,7 +65,7 @@ v0.5.0
     :meth:`~sksparse.cholmod.CholeskyFactor.get_perm`.
 
   - The property :code:`perm` and
-    method :meth:`~sksparse.cholmod.CholeskyFactor.view_factor` have been added
+    method :attr:`~sksparse.cholmod.CholeskyFactor.factor` have been added
     to return read-only views of the permutation vector and factor matrix,
     respectively.
 
@@ -71,6 +74,10 @@ v0.5.0
     have been removed in favor of the single
     :meth:`~sksparse.cholmod.CholeskyFactor.solve` method.
     The :obj:`~sksparse.cholmod.CholeskyFactor` is not callable.
+
+  - Add multiple properties to the :obj:`~sksparse.cholmod.CholeskyFactor`
+    class for convenient access to :code:`cholmod_factor` attributes. See the
+    full documentation for details.
 
 
 v0.4.4
