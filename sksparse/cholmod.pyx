@@ -1115,7 +1115,9 @@ cdef class CholeskyFactor:
             transpose = (sym_kind == "col")  # A.T @ A
 
         # keep a reference to the input matrix
-        cdef object _ref = _cholmod_sparse_from_csc(A, stype, self.use_int32, &Amatrix)
+        cdef object _ref = _cholmod_sparse_from_csc(A, stype, self.use_int32, Ac)
+
+        self._stype = Ac.stype
 
         try:
             self.cm = &self.Common
@@ -1402,7 +1404,7 @@ cdef class CholeskyFactor:
 
         stype = -1 if lower else 1  # use lower or upper triangular part
         # Keep a reference to the input matrix to keep it alive
-        cdef object _ref = _cholmod_sparse_from_csc(A, stype, self.use_int32, &Amatrix)
+        cdef object _ref = _cholmod_sparse_from_csc(A, stype, self.use_int32, Ac)
 
         # Set stype and beta
         cdef double betac[2]
@@ -1804,9 +1806,7 @@ cdef class CholeskyFactor:
         cdef cholmod_sparse* Ac = &Amatrix
         cdef int stype = -1  # use tril(A) only
 
-        cdef object _A_ref = _cholmod_sparse_from_csc(
-            A, stype, self.use_int32, &Amatrix
-        )
+        cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, self.use_int32, Ac)
         Ac.xtype = CHOLMOD_PATTERN
         Ac.x = NULL
 
@@ -2333,7 +2333,7 @@ def symbfact(A, *, kind=None, lower=False, return_factor=False):
         stype = -1  # use tril(A) only
 
     # Get sparse *pattern*
-    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
+    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, Ac)
     Ac.xtype = CHOLMOD_PATTERN
     Ac.x = NULL
 
@@ -2597,7 +2597,7 @@ def etree(A, *, kind=None, return_post=False):
         stype = -1  # use tril(A) only
 
     # Get sparse *pattern*
-    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
+    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, Ac)
     Ac.xtype = CHOLMOD_PATTERN
     Ac.x = NULL
 
@@ -2773,7 +2773,7 @@ def bisect(A, *, kind=None):
         stype = -1  # use tril(A) only
 
     # Get sparse *pattern*
-    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
+    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, Ac)
     Ac.xtype = CHOLMOD_PATTERN
     Ac.x = NULL
 
@@ -3113,7 +3113,7 @@ def nesdis(
         stype = -1  # use tril(A) only
 
     # Get sparse *pattern*
-    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
+    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, Ac)
     Ac.xtype = CHOLMOD_PATTERN
     Ac.x = NULL
 
@@ -3283,7 +3283,7 @@ def metis(A, *, kind=None):
         stype = -1  # use tril(A) only
 
     # Get sparse *pattern*
-    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, &Amatrix)
+    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, Ac)
     Ac.xtype = CHOLMOD_PATTERN
     Ac.x = NULL
 
