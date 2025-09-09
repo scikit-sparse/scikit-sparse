@@ -2904,9 +2904,10 @@ class SeparatorTree():
         if nd_small is None:
             nd_small = 200  # see CHOLMOD/MATLAB/nesdis.c
 
-        cdef bint use_int32 = (
-            self._cp.dtype == np.int32 and self._cmember.dtype == np.int32
-        )
+        cdef np.ndarray cp = self._cp
+        cdef np.ndarray cmember = self._cmember
+
+        cdef bint use_int32 = cp.dtype == np.int32 and cmember.dtype == np.int32
 
         cdef cholmod_common Common
         cdef cholmod_common *cm = &Common
@@ -2916,31 +2917,24 @@ class SeparatorTree():
         else:
             cholmod_l_start(cm)
 
-        cdef size_t Nc = self._cp.size
-        cdef size_t N = self._cmember.size
+        cdef size_t Nc = cp.size
+        cdef size_t N = cmember.size
 
         # Copy input arrays into new cholmod arrays (modified for output)
         cdef void *CParent
         cdef void *CMember
 
-        cdef int32_t[::1] cp_mv_int32, cmember_mv_int32
-        cdef int64_t[::1] cp_mv_int64, cmember_mv_int64
-
         # TODO could do checks of each value in a for-loop here
         if use_int32:
-            cp_mv_int32 = self._cp
-            cmember_mv_int32 = self._cmember
             CParent = cholmod_malloc(Nc, sizeof(int32_t), cm)
             CMember = cholmod_malloc(N, sizeof(int32_t), cm)
-            memcpy(<int32_t*>CParent, &cp_mv_int32[0], Nc * sizeof(int32_t))
-            memcpy(<int32_t*>CMember, &cmember_mv_int32[0], N * sizeof(int32_t))
+            memcpy(<int32_t*>CParent, <int32_t*>cp.data, Nc * sizeof(int32_t))
+            memcpy(<int32_t*>CMember, <int32_t*>cmember.data, N * sizeof(int32_t))
         else:
-            cp_mv_int64 = self._cp
-            cmember_mv_int64 = self._cmember
             CParent = cholmod_l_malloc(Nc, sizeof(int64_t), cm)
             CMember = cholmod_l_malloc(N, sizeof(int64_t), cm)
-            memcpy(<int64_t*>CParent, &cp_mv_int64[0], Nc * sizeof(int64_t))
-            memcpy(<int64_t*>CMember, &cmember_mv_int64[0], N * sizeof(int64_t))
+            memcpy(<int64_t*>CParent, <int64_t*>cp.data, Nc * sizeof(int64_t))
+            memcpy(<int64_t*>CMember, <int64_t*>cmember.data, N * sizeof(int64_t))
 
         cdef int64_t nc_new
 
