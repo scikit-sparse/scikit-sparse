@@ -879,6 +879,13 @@ cdef np.ndarray _ndarray_view_from_factor(
 # -----------------------------------------------------------------------------
 #         Utilities
 # -----------------------------------------------------------------------------
+cdef dict _supernodal_modes = {
+    "auto": CHOLMOD_AUTO,
+    "simplicial": CHOLMOD_SIMPLICIAL,
+    "supernodal": CHOLMOD_SUPERNODAL,
+}
+
+
 cdef dict _ordering_methods = {
     "default": None,
     "best": None,
@@ -1021,19 +1028,40 @@ cdef class CholeskyFactor:
     cdef size_t N
     cdef bint is_lower
 
-    # TODO add mode={'auto', 'simplicial', 'supernodal'}?
-    def __cinit__(self, object A, object kind=None, int lower=False, object order=None):
+    def __cinit__(
+        self,
+        object A,
+        bint lower=False,
+        object order=None,
+        object sym_kind=None,
+        object supernodal_mode=None,
+    ):
         A, use_int32, _ = validate_csc_input(A, require_square=True)
 
-        if kind is None:
-            kind = "sym"
+        if sym_kind is None:
+            sym_kind = "sym"
 
-        if kind not in {"sym", "row", "col"}:
-            raise ValueError(f"Unknown factorization kind: {kind}")
+        if supernodal_mode is None:
+            supernodal_mode = "auto"
+
+        if sym_kind not in {"sym", "row", "col"}:
+            raise ValueError(
+                f"Unknown symmetry kind: {sym_kind}. "
+                "Must be one of 'sym', 'row', 'col'."
+            )
+
+        if supernodal_mode not in _supernodal_modes:
+            raise ValueError(
+                f"Unknown factorization mode: {supernodal_mode}. "
+                f"Must be one of {set(_supernodal_modes.keys())}."
+            )
 
         # Check the input ordering method
         if order is not None and order not in _ordering_methods:
-            raise ValueError(f"Unknown ordering method: {order}")
+            raise ValueError(
+                f"Unknown ordering method: {order}. "
+                f"Must be one of {set(_ordering_methods.keys())}."
+            )
 
         self.N = A.shape[0]
         self.use_int32 = use_int32
@@ -1052,9 +1080,9 @@ cdef class CholeskyFactor:
         cdef int stype = -1 if self.is_lower else 1
         cdef bint transpose = False
 
-        if kind in ["row", "col"]:
+        if sym_kind in ["row", "col"]:
             stype = 0                    # unsymmetric A @ A.T or A.T @ A
-            transpose = (kind == "col")  # A.T @ A
+            transpose = (sym_kind == "col")  # A.T @ A
 
         # keep a reference to the input matrix
         cdef object _ref = _cholmod_sparse_from_csc(A, stype, self.use_int32, &Amatrix)
@@ -1067,6 +1095,7 @@ cdef class CholeskyFactor:
             else:
                 cholmod_l_start(self.cm)
 
+            self.cm.supernodal = _supernodal_modes[supernodal_mode]
             _set_ordering_method(order, self.cm)
 
             # Analyze the matrix, but do not factorize yet
@@ -1105,6 +1134,10 @@ cdef class CholeskyFactor:
     def is_ll(self):
         """Whether the factor is in LL.T form (True) or LDL.T form (False)."""
         return bool(self.factor.is_ll)
+
+    @property
+    def is_super(self):
+        return bool(self.factor.is_super)
 
     @property
     def N(self):
@@ -1939,30 +1972,43 @@ cdef class CholeskyFactor:
 # -----------------------------------------------------------------------------
 #         Convenience functions
 # -----------------------------------------------------------------------------
-def cho_factor(A, *, lower=False, order=None):
-    return CholeskyFactor(A, lower=lower, order=order).factorize(
-        A, ldl=False, lower=lower
-    )
+# TODO add beta option to cho/ldl_factor? or just direct users to use
+# the CholeskyFactor class directly?
+
+def cho_factor(A, *, lower=False, order=None, sym_kind=None, supernodal_mode=None):
+    return CholeskyFactor(
+        A, lower=lower, order=order, sym_kind=sym_kind, supernodal_mode=supernodal_mode
+    ).factorize(A, ldl=False, lower=lower)
 
 
-def ldl_factor(A, beta=None, *, lower=True, order=None):
-    # Set kind based on beta, see SuiteSparse/CHOLMOD/MATLAB/ldlchol.c
-    kind = "row" if beta is not None else "sym"  # use A @ A.T if beta is given
-    return CholeskyFactor(A, kind=kind, lower=lower, order=order).factorize(
-        A, ldl=True, beta=beta, lower=lower
-    )
+def ldl_factor(
+    A, beta=None, *, lower=True, order=None, sym_kind=None, supernodal_mode=None
+):
+    sym_kind = "row" if beta is not None else "sym"
+    return CholeskyFactor(
+        A, lower=lower, order=order, sym_kind=sym_kind, supernodal_mode=supernodal_mode
+    ).factorize(A, ldl=True, beta=beta, lower=lower)
 
 
 # csc_arrays from the factorization, and optionally the permutation
-def cholesky(A, *, lower=False, order=None):
-    f = cho_factor(A, lower=lower, order=order)
+def cholesky(A, *, lower=False, order=None, sym_kind=None, supernodal_mode=None):
+    f = cho_factor(
+        A, lower=lower, order=order, sym_kind=sym_kind, supernodal_mode=supernodal_mode
+    )
     R = f.get_factor()
     p = f.get_perm()
     return R if order is None else (R, p)
 
 
-def ldl(A, beta=None, *, lower=True, order=None):
-    f = ldl_factor(A, beta=beta, lower=lower, order=order)
+def ldl(A, beta=None, *, lower=True, order=None, sym_kind=None, supernodal_mode=None):
+    f = ldl_factor(
+        A,
+        beta=beta,
+        lower=lower,
+        order=order,
+        sym_kind=sym_kind,
+        supernodal_mode=supernodal_mode,
+    )
     R, D = f.get_factor()
     p = f.get_perm()
     return (R, D) if order is None else (R, D, p)

@@ -28,8 +28,13 @@ def A_default():
 
 
 def test_bad_kind(A_default):
-    with pytest.raises(ValueError, match="Unknown factorization kind"):
-        CholeskyFactor(A_default, kind="invalid")
+    with pytest.raises(ValueError, match="Unknown symmetry kind"):
+        CholeskyFactor(A_default, sym_kind="invalid")
+
+
+def test_bad_supernodal(A_default):
+    with pytest.raises(ValueError, match="Unknown factorization mode"):
+        CholeskyFactor(A_default, supernodal_mode="invalid")
 
 
 def test_bad_order(A_default):
@@ -137,6 +142,21 @@ posdef_As = list(
 
 
 @pytest.mark.parametrize("A", posdef_As)
+@pytest.mark.parametrize("supernodal_mode", [None, "auto", "simplicial", "supernodal"])
+def test_supernodal_mode(A, supernodal_mode):
+    N = A.shape[0]
+    f = CholeskyFactor(A, supernodal_mode=supernodal_mode)
+    p = f.perm
+    count = f.colcount
+    if supernodal_mode not in (None, "auto"):
+        assert f.is_super == (supernodal_mode == "supernodal")
+    assert is_valid_permutation(p)
+    assert len(count) == N
+    assert np.all(count >= 0)
+    assert np.all(count <= N)
+
+
+@pytest.mark.parametrize("A", posdef_As)
 @pytest.mark.parametrize("order", ORDERS)
 def test_order(A, order):
     N = A.shape[0]
@@ -150,10 +170,10 @@ def test_order(A, order):
 
 
 @pytest.mark.parametrize("A", posdef_As)
-@pytest.mark.parametrize("kind", [None, "sym"])
-def test_kind_sym(A, kind):
+@pytest.mark.parametrize("sym_kind", [None, "sym"])
+def test_kind_sym(A, sym_kind):
     N = A.shape[0]
-    f = CholeskyFactor(A, kind=kind)
+    f = CholeskyFactor(A, sym_kind=sym_kind)
     p = f.perm
     count = f.colcount
     assert is_valid_permutation(p)
@@ -165,10 +185,10 @@ def test_kind_sym(A, kind):
 @pytest.mark.parametrize(
     "A", list(generate_random_matrices(N_trials=10, N_max=200, d_scale=0.05))
 )
-@pytest.mark.parametrize("kind", ["row", "col"])
-def test_kind_rowcol(A, kind):
-    N = A.shape[0] if kind == "row" else A.shape[1]
-    f = CholeskyFactor(A, kind=kind)
+@pytest.mark.parametrize("sym_kind", ["row", "col"])
+def test_kind_rowcol(A, sym_kind):
+    N = A.shape[0] if sym_kind == "row" else A.shape[1]
+    f = CholeskyFactor(A, sym_kind=sym_kind)
     p = f.perm
     count = f.colcount
     assert is_valid_permutation(p)
