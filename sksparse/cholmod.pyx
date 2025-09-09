@@ -411,7 +411,7 @@ cdef object _csc_from_cholmod_factor(CholeskyFactor py_factor):
     Therefore, we use this function to create a view onto the factor without
     destroying it.
     """
-    cdef cholmod_factor *L = py_factor.factor
+    cdef cholmod_factor *L = py_factor._factor
     cdef cholmod_common *common = py_factor.cm
 
     if L is NULL:
@@ -870,7 +870,7 @@ cdef np.ndarray _ndarray_view_from_factor(
         The permutation vector as a NumPy array. This array is *read-only*,
         so attempts to modify it will raise an error.
     """
-    cdef cholmod_factor *L = py_factor.factor
+    cdef cholmod_factor *L = py_factor._factor
 
     if L is NULL:
         raise ValueError("The factor pointer is NULL.")
@@ -939,12 +939,12 @@ cdef void _cleanup_factor(CholeskyFactor cf):
     """Deallocate memory used by a CholeskyFactor."""
     if cf.cm is not NULL:
         if cf.use_int32:
-            if cf.factor is not NULL:
-                cholmod_free_factor(&cf.factor, cf.cm)
+            if cf._factor is not NULL:
+                cholmod_free_factor(&cf._factor, cf.cm)
             cholmod_finish(cf.cm)
         else:
-            if cf.factor is not NULL:
-                cholmod_l_free_factor(&cf.factor, cf.cm)
+            if cf._factor is not NULL:
+                cholmod_l_free_factor(&cf._factor, cf.cm)
             cholmod_l_finish(cf.cm)
 
 
@@ -1062,7 +1062,7 @@ cdef class CholeskyFactor:
 
     cdef cholmod_common Common
     cdef cholmod_common *cm
-    cdef cholmod_factor *factor
+    cdef cholmod_factor *_factor
     cdef bint use_int32
     cdef size_t N
     cdef bint is_lower
@@ -1144,17 +1144,17 @@ cdef class CholeskyFactor:
             if transpose:
                 if self.use_int32:
                     C = cholmod_transpose(Ac, CHOLMOD_TRANS_PATTERN, self.cm)
-                    self.factor = cholmod_analyze(Ac, self.cm)
+                    self._factor = cholmod_analyze(Ac, self.cm)
                     cholmod_free_sparse(&C, self.cm)
                 else:
                     C = cholmod_l_transpose(Ac, CHOLMOD_TRANS_PATTERN, self.cm)
-                    self.factor = cholmod_l_analyze(Ac, self.cm)
+                    self._factor = cholmod_l_analyze(Ac, self.cm)
                     cholmod_l_free_sparse(&C, self.cm)
             else:
                 if self.use_int32:
-                    self.factor = cholmod_analyze(Ac, self.cm)
+                    self._factor = cholmod_analyze(Ac, self.cm)
                 else:
-                    self.factor = cholmod_l_analyze(Ac, self.cm)
+                    self._factor = cholmod_l_analyze(Ac, self.cm)
 
             # Check for errors
             _handle_errors(self.cm.status)
@@ -1174,19 +1174,19 @@ cdef class CholeskyFactor:
     # -------------------------------------------------------------------------
     @property
     def is_ll(self):
-        return bool(self.factor.is_ll)
+        return bool(self._factor.is_ll)
 
     @property
     def is_super(self):
-        return bool(self.factor.is_super)
+        return bool(self._factor.is_super)
 
     @property
     def N(self):
-        return self.factor.n
+        return self._factor.n
 
     @property
     def colcount(self):
-        return _ndarray_view_from_factor(self.factor.ColCount, self.factor.n, self)
+        return _ndarray_view_from_factor(self._factor.ColCount, self._factor.n, self)
 
     @property
     def nnz(self):
@@ -1194,57 +1194,43 @@ cdef class CholeskyFactor:
 
     @property
     def order(self):
-        cdef int iorder = self.factor.ordering
+        cdef int iorder = self._factor.ordering
         return _ordering_methods_inv.get(iorder, iorder)
 
     @property
     def perm(self):
-        return _ndarray_view_from_factor(self.factor.Perm, self.factor.n, self)
+        return _ndarray_view_from_factor(self._factor.Perm, self._factor.n, self)
 
-    # -------------------------------------------------------------------------
-    #         Public API
-    # -------------------------------------------------------------------------
-    def view_factor(self, kind=None):
-        """Return a view of the Cholesky factor in the specified format.
+    @property
+    def factor(self):
+        """Return a view of the Cholesky factor.
 
         .. warning::
 
-            The returned matrix or matrices are views on the internal data of
-            the CHOLMOD factor. They will become invalid if the factor is
-            modified (*e.g.*, by calling :meth:`.factorize`). To get a copy
-            that remains valid, use :meth:`.get_factor`.
-
-        Parameters
-        ----------
-        kind : None or str in {'LL', 'LDL'}, optional
-            The type of factor to return. If ``LL``, return the Cholesky
-            factor `L` such that :math:`L L^{\\top} = P A P^{\\top}`. If
-            ``LDL``, return the combined `LD` factor such that
-            :math:`L D L^{\\top} = P A P^{\\top}`. Default is None, which
-            uses the kind with which ``factorize`` was called.
+            The returned matrix is a view on the internal data of the CHOLMOD
+            factor. It will be modified if the factor is modified (*e.g.*, by
+            calling :meth:`.factorize`). To get a copy, use
+            :meth:`.get_factor`.
 
         Returns
         -------
         L : csc_array
             The Cholesky factor in Compressed Sparse Column (CSC) format. If
-            ``kind="LL"``, the returned matrix is lower triangular. If
-            ``kind="LDL"``, the returned matrix contains the lower triangular
-            and the diagonal factors. The unit diagonal of `L` is not stored.
+            ``self.is_ll``, the returned matrix is lower triangular. Otherwise,
+            the matrix view contains the lower triangular and the diagonal
+            factors combined.
 
-            .. note :: The view is always in lower triangular form, even if the
-                factor was created using ``lower=False``. To get the upper
-                triangular factor, use :obj:`get_factor` with ``lower=False``.
+        .. note :: The view is always in lower triangular form, even if the
+            factor was created using ``lower=False``. To get the upper
+            triangular factor, use :obj:`get_factor` with ``lower=False``. To
+            get the split `L` and `D` factors, use :obj:`get_factor` with
+            ``kind="LDL"``.
         """
-        if kind is None:
-            kind = "LL" if self.is_ll else "LDL"
-
-        if kind not in ("LL", "LDL"):
-            raise ValueError("kind must be 'LL' or 'LDL'.")
-
-        self._convert_factor(kind)
-
         return _csc_from_cholmod_factor(self)
 
+    # -------------------------------------------------------------------------
+    #         Public Methods
+    # -------------------------------------------------------------------------
     def get_factor(self, kind=None, lower=None):
         """Return a copy of the Cholesky factor in the specified format.
 
@@ -1278,18 +1264,18 @@ cdef class CholeskyFactor:
         if lower is None:
             lower = self.is_lower
 
-        Lv = self.view_factor(kind)
+        self._convert_factor(kind)
 
         # Drop explicit zeros from returned copies
         if kind == "LL":
-            L = Lv.copy()
+            L = self.factor.copy()
             L.eliminate_zeros()
             if not lower:
                 L = L.T.conj()
             return L
         else:
             # Extract L and D from combined LD factor
-            L = Lv.copy()
+            L = self.factor.copy()
             D = diags_array(L.diagonal())
             L.setdiag(1.0)
             L.eliminate_zeros()
@@ -1378,7 +1364,7 @@ cdef class CholeskyFactor:
 
             L D L^{\\top} = P A A^{\\top} P^{\\top} + \\beta I.
         """
-        assert self.factor is not NULL, "The factor has not been initialized."
+        assert self._factor is not NULL, "The factor has not been initialized."
 
         A, _, _ = validate_csc_input(A, require_square=True)
 
@@ -1432,9 +1418,9 @@ cdef class CholeskyFactor:
 
         # Factorize the matrix
         if self.use_int32:
-            cholmod_factorize_p(Ac, betac, NULL, 0, self.factor, self.cm)
+            cholmod_factorize_p(Ac, betac, NULL, 0, self._factor, self.cm)
         else:
-            cholmod_l_factorize_p(Ac, betac, NULL, 0, self.factor, self.cm)
+            cholmod_l_factorize_p(Ac, betac, NULL, 0, self._factor, self.cm)
 
         # Check for errors
         _handle_errors(self.cm.status)
@@ -1512,7 +1498,7 @@ cdef class CholeskyFactor:
         if b.ndim not in (1, 2):
             raise ValueError("b must be a 1D or 2D array.")
 
-        cdef size_t N = self.factor.n
+        cdef size_t N = self._factor.n
         cdef size_t K = b.shape[1] if b.ndim == 2 else 0
 
         if b.shape[0] != N:
@@ -1580,7 +1566,7 @@ cdef class CholeskyFactor:
             raise ValueError(f"Update matrix C is type {type(C)}. "
                              "Expected a 1D or 2D sparse array.")
 
-        cdef size_t N = self.factor.n
+        cdef size_t N = self._factor.n
 
         if C.shape[0] != N:
             raise ValueError("Update matrix C must have the same number of rows as L.")
@@ -1622,11 +1608,11 @@ cdef class CholeskyFactor:
 
         if self.use_int32:
             C_perm = cholmod_submatrix(
-                Cc, <int32_t*>self.factor.Perm, N, NULL, -1, True, True, self.cm
+                Cc, <int32_t*>self._factor.Perm, N, NULL, -1, True, True, self.cm
             )
         else:
             C_perm = cholmod_l_submatrix(
-                Cc, <int64_t*>self.factor.Perm, N, NULL, -1, True, True, self.cm
+                Cc, <int64_t*>self._factor.Perm, N, NULL, -1, True, True, self.cm
             )
 
         # Ensure the factor is in LDL form
@@ -1637,9 +1623,9 @@ cdef class CholeskyFactor:
         cdef int ok
 
         if self.use_int32:
-            ok = cholmod_updown(update, C_perm, self.factor, self.cm)
+            ok = cholmod_updown(update, C_perm, self._factor, self.cm)
         else:
-            ok = cholmod_l_updown(update, C_perm, self.factor, self.cm)
+            ok = cholmod_l_updown(update, C_perm, self._factor, self.cm)
 
         if self.use_int32:
             cholmod_free_sparse(&C_perm, self.cm)
@@ -1707,9 +1693,9 @@ cdef class CholeskyFactor:
         cdef int ok
 
         if self.use_int32:
-            ok = cholmod_rowadd(k, Cc, self.factor, self.cm)
+            ok = cholmod_rowadd(k, Cc, self._factor, self.cm)
         else:
-            ok = cholmod_l_rowadd(k, Cc, self.factor, self.cm)
+            ok = cholmod_l_rowadd(k, Cc, self._factor, self.cm)
 
         if not ok:
             raise CholmodError("cholmod_rowadd failed.")
@@ -1743,9 +1729,9 @@ cdef class CholeskyFactor:
         cdef int ok
 
         if self.use_int32:
-            ok = cholmod_rowdel(k, NULL, self.factor, self.cm)
+            ok = cholmod_rowdel(k, NULL, self._factor, self.cm)
         else:
-            ok = cholmod_l_rowdel(k, NULL, self.factor, self.cm)
+            ok = cholmod_l_rowdel(k, NULL, self._factor, self.cm)
 
         if not ok:
             raise CholmodError("cholmod_rowdel failed.")
@@ -1823,9 +1809,9 @@ cdef class CholeskyFactor:
         # NOTE do *not* use the factor's existing permutation. We expect that
         # the input matrix will be the permuted matrix P A P.T.
         if self.use_int32:
-            cholmod_resymbol_noperm(Ac, NULL, 0, True, self.factor, self.cm)
+            cholmod_resymbol_noperm(Ac, NULL, 0, True, self._factor, self.cm)
         else:
-            cholmod_l_resymbol_noperm(Ac, NULL, 0, True, self.factor, self.cm)
+            cholmod_l_resymbol_noperm(Ac, NULL, 0, True, self._factor, self.cm)
 
         return self
 
@@ -1863,9 +1849,9 @@ cdef class CholeskyFactor:
         cdef int system = CHOLMOD_A if self.is_ll else CHOLMOD_LDLt
 
         if self.use_int32:
-            Xs = cholmod_spsolve(system, self.factor, Bs, self.cm)
+            Xs = cholmod_spsolve(system, self._factor, Bs, self.cm)
         else:
-            Xs = cholmod_l_spsolve(system, self.factor, Bs, self.cm)
+            Xs = cholmod_l_spsolve(system, self._factor, Bs, self.cm)
 
         return _csc_from_cholmod_sparse(Xs, self.cm)
 
@@ -1895,9 +1881,9 @@ cdef class CholeskyFactor:
         cdef int system = CHOLMOD_A if self.is_ll else CHOLMOD_LDLt
 
         if self.use_int32:
-            Xd = cholmod_solve(system, self.factor, Bd, self.cm)
+            Xd = cholmod_solve(system, self._factor, Bd, self.cm)
         else:
-            Xd = cholmod_l_solve(system, self.factor, Bd, self.cm)
+            Xd = cholmod_l_solve(system, self._factor, Bd, self.cm)
 
         return _ndarray_from_cholmod_dense(Xd, self.use_int32, self.cm)
 
@@ -1918,20 +1904,20 @@ cdef class CholeskyFactor:
         if kind not in ("LL", "LDL"):
             raise ValueError("kind must be 'LL' or 'LDL'.")
 
-        cdef int to_xtype = self.factor.xtype
+        cdef int to_xtype = self._factor.xtype
         cdef int to_ll = kind == "LL"
 
         # NOTE In CHOLMOD, supernodal factorizations are always LL.T. If we
         # request to change to a supernodal LDL.T factorization,
         # cholmod_change_factor will silently do nothing! So we can only stay
         # supernodal when LL.T is requested.
-        cdef int to_super = self.factor.is_super and kind == "LL"
+        cdef int to_super = self._factor.is_super and kind == "LL"
 
         cdef int to_packed = True
-        cdef int to_monotonic = self.factor.is_monotonic
+        cdef int to_monotonic = self._factor.is_monotonic
 
-        if (kind == "LL" and not self.factor.is_ll) or (
-            kind == "LDL" and self.factor.is_ll
+        if (kind == "LL" and not self._factor.is_ll) or (
+            kind == "LDL" and self._factor.is_ll
         ):
             if self.use_int32:
                 change_factor = cholmod_change_factor
@@ -1944,7 +1930,7 @@ cdef class CholeskyFactor:
                 to_super,
                 to_packed,
                 to_monotonic,
-                self.factor,
+                self._factor,
                 self.cm
             )
 
@@ -1958,9 +1944,9 @@ cdef class CholeskyFactor:
         cdef double eps = np.finfo(np.float64).eps
 
         if self.use_int32:
-            rcond = cholmod_rcond(self.factor, self.cm)
+            rcond = cholmod_rcond(self._factor, self.cm)
         else:
-            rcond = cholmod_l_rcond(self.factor, self.cm)
+            rcond = cholmod_l_rcond(self._factor, self.cm)
 
         if rcond == 0:
             raise CholmodNotPositiveDefiniteError(

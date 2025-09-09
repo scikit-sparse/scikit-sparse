@@ -28,7 +28,7 @@ DTYPES = [np.float32, np.float64, np.complex64, np.complex128]
 )
 def test_view_vs_get(A, order):
     f = ldl_factor(A)
-    LDv = f.view_factor()
+    LDv = f.factor
     pv = f.perm
     L, D = f.get_factor()
     p = f.get_perm()
