@@ -123,5 +123,5 @@ def test_beta(A):
     N = A.shape[0]
     beta = 17.0  # arbitrary positive value
     L, D = ldl(A, beta)
-    expect_LDL = (A @ A.T.conj() + beta * sparse.eye(N)).toarray()
+    expect_LDL = (A @ A.T.conj() + beta * sparse.eye_array(N)).toarray()
     assert_allclose((L @ D @ L.T.conj()).toarray(), expect_LDL, atol=atol)

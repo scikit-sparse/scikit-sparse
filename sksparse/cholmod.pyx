@@ -1056,6 +1056,7 @@ cdef class CholeskyFactor:
     cdef bint use_int32
     cdef size_t N
     cdef bint is_lower
+    cdef int _stype
 
     def __cinit__(
         self,
@@ -1110,7 +1111,7 @@ cdef class CholeskyFactor:
         cdef bint transpose = False
 
         if sym_kind in ["row", "col"]:
-            stype = 0                    # unsymmetric A @ A.T or A.T @ A
+            stype = 0                        # unsymmetric A @ A.T or A.T @ A
             transpose = (sym_kind == "col")  # A.T @ A
 
         # keep a reference to the input matrix
@@ -1319,9 +1320,9 @@ cdef class CholeskyFactor:
             factorization as the previous call to ``factorize``, or ``LL`` if
             this is the first call.
         beta : float, optional
-            The scalar value to add to the diagonal of the symmetrized matrix
-            :math:`A A^{\\top}` before factorization. Default is None, which
-            computes the factorization of :math:`A` itself.
+            The scalar value to add to the diagonal of the matrix before
+            factorization. Default is None, which computes the factorization of
+            :math:`A` itself.
         lower : bool, optional
             If True, only use the lower triangular part of `A`. Otherwise, use
             the upper triangular part. Default is False.
@@ -1403,33 +1404,25 @@ cdef class CholeskyFactor:
         # Keep a reference to the input matrix to keep it alive
         cdef object _ref = _cholmod_sparse_from_csc(A, stype, self.use_int32, &Amatrix)
 
-        # Set stype and beta for LDL
+        # Set stype and beta
         cdef double betac[2]
 
-        # TODO allow beta not just for ldl=True
-        if ldl:
-            if beta is None:
-                Ac.stype = -1    # use lower triangular part of A
-                betac[0] = 0.0
-                betac[1] = 0.0
-            else:
-                if not np.isscalar(beta):
-                    raise ValueError("beta must be a scalar value.")
-                Ac.stype = 0     # use all of A, factorizing A @ A.T
-                betac[0] = beta
-                betac[1] = 0.0
+        if beta is None:
+            betac[0] = 0.0
+            betac[1] = 0.0
+        else:
+            if not np.isscalar(beta):
+                raise ValueError("beta must be a scalar value.")
+            betac[0] = beta
+            betac[1] = 0.0
+
+        Ac.stype = self._stype  # set in __cinit__ with sym_kind
 
         # Factorize the matrix
         if self.use_int32:
-            if ldl:
-                cholmod_factorize_p(Ac, betac, NULL, 0, self.factor, self.cm)
-            else:
-                cholmod_factorize(Ac, self.factor, self.cm)
+            cholmod_factorize_p(Ac, betac, NULL, 0, self.factor, self.cm)
         else:
-            if ldl:
-                cholmod_l_factorize_p(Ac, betac, NULL, 0, self.factor, self.cm)
-            else:
-                cholmod_l_factorize(Ac, self.factor, self.cm)
+            cholmod_l_factorize_p(Ac, betac, NULL, 0, self.factor, self.cm)
 
         # Check for errors
         _handle_errors(self.cm.status)
@@ -1973,13 +1966,12 @@ cdef class CholeskyFactor:
 # -----------------------------------------------------------------------------
 #         Convenience functions
 # -----------------------------------------------------------------------------
-# TODO add beta option to cho/ldl_factor? or just direct users to use
-# the CholeskyFactor class directly?
-
-def cho_factor(A, *, lower=False, order=None, sym_kind=None, supernodal_mode=None):
+def cho_factor(
+    A, beta=None, *, lower=False, order=None, sym_kind=None, supernodal_mode=None
+):
     return CholeskyFactor(
         A, lower=lower, order=order, sym_kind=sym_kind, supernodal_mode=supernodal_mode
-    ).factorize(A, ldl=False, lower=lower)
+    ).factorize(A, ldl=False, beta=beta, lower=lower)
 
 
 def ldl_factor(
@@ -1992,9 +1984,16 @@ def ldl_factor(
 
 
 # csc_arrays from the factorization, and optionally the permutation
-def cholesky(A, *, lower=False, order=None, sym_kind=None, supernodal_mode=None):
+def cholesky(
+    A, beta=None, *, lower=False, order=None, sym_kind=None, supernodal_mode=None
+):
     f = cho_factor(
-        A, lower=lower, order=order, sym_kind=sym_kind, supernodal_mode=supernodal_mode
+        A,
+        beta=beta,
+        lower=lower,
+        order=order,
+        sym_kind=sym_kind,
+        supernodal_mode=supernodal_mode,
     )
     R = f.get_factor()
     p = f.get_perm()
