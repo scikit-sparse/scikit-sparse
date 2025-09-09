@@ -30,10 +30,8 @@ p = amd(A)         # compute the AMD ordering
 PAPT = A[p][:, p]  # apply the ordering to the matrix
 
 # Compute the Cholesky factorization of each matrix
-A_factor = cholesky(A)
-PAPT_factor = cholesky(PAPT)
-L = A_factor.L()
-Lp = PAPT_factor.L()
+L = cholesky(A, lower=True)
+Lp = cholesky(PAPT, lower=True)
 
 # Plot the original and permuted matrices
 plt.rcParams.update({'font.size': 10})
