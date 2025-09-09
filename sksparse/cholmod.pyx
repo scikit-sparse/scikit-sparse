@@ -943,6 +943,9 @@ cdef class CholeskyFactor:
     The numeric factorization is not computed until :meth:`.factorize` is
     called.
 
+    The analysis follows that of the SuiteSparse ``analyze`` MATLAB function
+    [#analyze_c]_.
+
     Attributes
     ----------
     N : int
@@ -993,6 +996,20 @@ cdef class CholeskyFactor:
             The ordering method ``best`` may be quite slow for large
             matrices, but if the factorization is reused many times, it can
             be worth it.
+
+    Raises
+    ------
+    CholmodNotPositiveDefiniteError
+        If the input matrix is structurally singular (*e.g.*, if it is the zero
+        matrix). The input *may* be numerically indefinite, but this property
+        is not checked until :meth:`.factorize` is called.
+
+    .. versionadded:: 0.5.0
+
+    References
+    ----------
+    .. [#analyze_c] ``analyze.c`` - CHOLMOD MATLAB analyze function
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/analyze.c
     """
 
     cdef cholmod_common Common
