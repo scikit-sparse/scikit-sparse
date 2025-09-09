@@ -29,7 +29,7 @@ DTYPES = [np.float32, np.float64, np.complex64, np.complex128]
 def test_view_vs_get(A, order):
     f = cho_factor(A, lower=True, order=order)
     Lv = f.view_factor()
-    pv = f.view_perm()
+    pv = f.perm
     L = f.get_factor()
     p = f.get_perm()
     assert Lv is not L  # different objects

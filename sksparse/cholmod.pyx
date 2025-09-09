@@ -839,11 +839,17 @@ cdef np.ndarray _ndarray_from_cholmod_intarray(void* ptr, size_t N, bint use_int
     return p.copy()  # return a copy in case ptr is freed
 
 
-cdef np.ndarray _perm_from_cholmod_factor(CholeskyFactor py_factor):
+cdef np.ndarray _ndarray_view_from_factor(
+    void* ptr, size_t N, CholeskyFactor py_factor
+):
     """Create a NumPy array from the permutation vector in a CHOLMOD factor.
 
     Parameters
     ----------
+    ptr : void*
+        A pointer to the C array, *e.g.* ``cholmod_factor.Perm``.
+    N : size_t
+        The size of the vector.
     py_factor : CholeskyFactor
         The CholeskyFactor object from which to extract the permutation.
 
@@ -857,12 +863,13 @@ cdef np.ndarray _perm_from_cholmod_factor(CholeskyFactor py_factor):
     if L is NULL:
         raise ValueError("The factor pointer is NULL.")
 
-    if L.Perm is NULL:
-        raise ValueError("The factor does not have a permutation.")
+    if ptr is NULL:
+        raise ValueError("The input pointer is NULL.")
 
     cdef int np_itypenum = np.NPY_INT32 if L.itype == CHOLMOD_INT else np.NPY_INT64
-    cdef np.ndarray p = np.PyArray_SimpleNewFromData(1, [L.n], np_itypenum, L.Perm)
-    np.set_array_base(p, py_factor)  # keep factor object alive
+    cdef np.ndarray p = np.PyArray_SimpleNewFromData(1, [N], np_itypenum, ptr)
+    np.set_array_base(p, py_factor)                   # keep object alive
+    np.PyArray_CLEARFLAGS(p, np.NPY_ARRAY_WRITEABLE)  # set to be read-only
 
     return p
 
@@ -1090,11 +1097,18 @@ cdef class CholeskyFactor:
         return self.factor.n
 
     @property
+    def colcount(self):
+        """The number of nonzeros in each column of the factor."""
+        if self.factor is NULL:
+            raise ValueError("The factor pointer is NULL. Run `factorize` first.")
+        return _ndarray_view_from_factor(self.factor.ColCount, self.factor.n, self)
+
+    @property
     def nnz(self):
         """The number of nonzeros in the factor."""
         if self.factor is NULL:
             raise ValueError("The factor pointer is NULL. Run `factorize` first.")
-        return np.sum(self.get_colcount())
+        return np.sum(self.colcount)
 
     @property
     def order(self):
@@ -1111,18 +1125,22 @@ cdef class CholeskyFactor:
         cdef int iorder = self.factor.ordering
         return _ordering_methods_inv.get(iorder, iorder)
 
+    @property
+    def perm(self):
+        """Return a view of permutation vector used in the factorization.
+
+        Returns
+        -------
+        p : ndarray
+            The permutation vector `p` such that :math:`P A P^{\\top}` is the
+            matrix that was factorized, where `P` is the permutation matrix
+            corresponding to `p`, *i.e.*, ``P = I[p]``.
+        """
+        return _ndarray_view_from_factor(self.factor.Perm, self.factor.n, self)
+
     # -------------------------------------------------------------------------
     #         Public API
     # -------------------------------------------------------------------------
-    # TODO make a view?
-    def get_colcount(self):
-        """The number of nonzeros in each column of the factor."""
-        if self.factor is NULL:
-            raise ValueError("The factor pointer is NULL. Run `factorize` first.")
-        return _ndarray_from_cholmod_intarray(
-            self.factor.ColCount, self.factor.n, self.use_int32
-        )
-
     def view_factor(self, kind=None):
         """Return a view of the Cholesky factor in the specified format.
 
@@ -1216,18 +1234,6 @@ cdef class CholeskyFactor:
                 L = L.T.conj()
             return L, D
 
-    def view_perm(self):
-        """Return a view of permutation vector used in the factorization.
-
-        Returns
-        -------
-        p : ndarray
-            The permutation vector `p` such that :math:`P A P^{\\top}` is the
-            matrix that was factorized, where `P` is the permutation matrix
-            corresponding to `p`, *i.e.*, ``P = I[p]``.
-        """
-        return _perm_from_cholmod_factor(self)
-
     def get_perm(self):
         """Return a copy of the permutation vector used in the factorization.
 
@@ -1238,7 +1244,7 @@ cdef class CholeskyFactor:
             matrix that was factorized, where `P` is the permutation matrix
             corresponding to `p`, *i.e.*, ``P = I[p]``.
         """
-        return self.view_perm().copy()
+        return self.perm.copy()
 
     def factorize(self, object A, object ldl=None, object beta=None, bint lower=False):
         """Compute the Cholesky factorization of a sparse matrix.
@@ -1478,8 +1484,7 @@ cdef class CholeskyFactor:
 
         # For LDL, unpermute the solution
         if not self.is_ll:
-            p = self.view_perm()
-            X = X[np.argsort(p)]
+            X = X[np.argsort(self.perm)]
 
         # Convert to 1D array if input b is 1D
         if K == 0:
@@ -1797,8 +1802,7 @@ cdef class CholeskyFactor:
 
         # For LDL, permute the RHS
         if not self.is_ll:
-            p = self.view_perm()
-            b = b[p]
+            b = b[self.perm]
 
         cdef int stype = 0
         cdef bint b_use_int32
@@ -1835,8 +1839,7 @@ cdef class CholeskyFactor:
 
         # For LDL, permute the RHS
         if not self.is_ll:
-            p = self.view_perm()
-            b = b[p]
+            b = b[self.perm]
 
         # keep a reference to b so it is not garbage collected
         cdef object _b_ref = _cholmod_dense_from_ndarray(b, &Bmatrix)
