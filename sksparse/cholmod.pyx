@@ -1085,29 +1085,21 @@ cdef class CholeskyFactor:
     @property
     def is_ll(self):
         """Whether the factor is in LL.T form (True) or LDL.T form (False)."""
-        if self.factor is NULL:
-            raise ValueError("The factor pointer is NULL. Run `factorize` first.")
         return bool(self.factor.is_ll)
 
     @property
     def N(self):
         """The number of rows and columns in the factor."""
-        if self.factor is NULL:
-            raise ValueError("The factor pointer is NULL. Run `factorize` first.")
         return self.factor.n
 
     @property
     def colcount(self):
         """The number of nonzeros in each column of the factor."""
-        if self.factor is NULL:
-            raise ValueError("The factor pointer is NULL. Run `factorize` first.")
         return _ndarray_view_from_factor(self.factor.ColCount, self.factor.n, self)
 
     @property
     def nnz(self):
         """The number of nonzeros in the factor."""
-        if self.factor is NULL:
-            raise ValueError("The factor pointer is NULL. Run `factorize` first.")
         return np.sum(self.colcount)
 
     @property
@@ -1120,8 +1112,6 @@ cdef class CholeskyFactor:
             The ordering method used in the factorization. If an unknown
             ordering was used, returns the integer value.
         """
-        if self.factor is NULL:
-            raise ValueError("The factor pointer is NULL. Run `factorize` first.")
         cdef int iorder = self.factor.ordering
         return _ordering_methods_inv.get(iorder, iorder)
 
@@ -1315,6 +1305,8 @@ cdef class CholeskyFactor:
 
             L D L^{\\top} = P A A^{\\top} P^{\\top} + \\beta I.
         """
+        assert self.factor is not NULL, "The factor has not been initialized."
+
         A, _, _ = validate_csc_input(A, require_square=True)
 
         if ldl is None:
@@ -1456,9 +1448,6 @@ cdef class CholeskyFactor:
         .. [#ldlsolve_c] ``ldlsolve.c`` - CHOLMOD MATLAB interface
             https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/ldlsolve.c
         """
-        if self.factor is NULL:
-            raise ValueError("The factor pointer is NULL. Run `factorize` first.")
-
         if not (isinstance(b, np.ndarray) or issparse(b)):
             raise ValueError("b must be an ndarray or sparse matrix.")
 
@@ -1526,9 +1515,6 @@ cdef class CholeskyFactor:
 
         .. versionadded:: 0.5.0
         """
-        if self.factor is NULL:
-            raise ValueError("The factor pointer is NULL. Run `factorize` first.")
-
         if updown not in ("up", "down"):
             raise ValueError("updown must be 'up' or 'down'.")
 
@@ -1910,7 +1896,7 @@ cdef class CholeskyFactor:
 
         return self
 
-    cdef void _check_rcond(self):
+    cdef void _check_rcond(self) except *:
         """Check the condition number."""
         cdef double rcond
         cdef double eps = np.finfo(np.float64).eps
