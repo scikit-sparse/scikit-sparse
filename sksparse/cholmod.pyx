@@ -1183,7 +1183,31 @@ cdef class CholeskyFactor:
         """Deallocate memory used by the CholeskyFactor."""
         _cleanup_factor(self)
 
-    # TODO __repr__ and __str__
+    def __repr__(self):
+        return (
+            f"CholeskyFactor("
+            f"N={self.N}, "
+            f"nnz={self.nnz}, "
+            f"is_ll={self.is_ll}, "
+            f"is_super={self.is_super}, "
+            f"itype=np.{self.itype.name}, "
+            f"dtype=np.{self.dtype.name}, "
+            f"order={self.order}"
+            ")"
+        )
+
+    def __str__(self):
+        lines = [
+            f"Cholesky factorization of size {self.N}x{self.N}",
+            f"  Nonzeros: {self.nnz}",
+            f"  Form:     {'LL.T' if self.is_ll else 'LDL.T'}",
+            f"  Triangle: {'lower' if self.is_lower else 'upper'}",
+            f"  Storage:  {'supernodal' if self.is_super else 'simplicial'}",
+            f"  itype:    np.{self.itype.name}",
+            f"  dtype:    np.{self.dtype.name}",
+            f"  order:    {self.order}",
+        ]
+        return "\n".join(lines)
 
     # -------------------------------------------------------------------------
     #         Properties
