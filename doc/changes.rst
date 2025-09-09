@@ -10,8 +10,51 @@ v0.5.0
   Cython code has been refactored to provide greater type safety and
   performance.
 
-  - The :func:`~.cholmod.cholesky` and :code:`cholesky_AAt` functions are
-    now combined into single functions with the ``symmetric`` kwarg.
+  - The :code:`cholmod.Factor` class has been renamed to
+    :obj:`~sksparse.cholmod.CholeskyFactor`.
+
+  - The :code:`cholmod.Common` class has been removed. Its attributes have been
+    subsumed into the :code:`CholeskyFactor` class.
+
+  - The :func:`~sksparse.cholmod.cholesky` function now returns
+    a :obj:`~scipy.sparse.csc_array` instead of a :code:`Factor` object, and an
+    optional :obj:`~numpy.ndarray` containing the permutation vector.
+
+  - The :func:`~sksparse.cholmod.ldl` function has been added. It returns
+    a tuple (:obj:`~scipy.sparse.csc_array`, :obj:`~scipy.sparse.csc_array`),
+    and an optional :obj:`~numpy.ndarray` containing the permutation vector.
+
+  - A :func:`~sksparse.cholmod.cho_factor` function has been added to perform
+    the numeric Cholesky factorization and return
+    a :obj:`~sksparse.cholmod.CholeskyFactor` object.
+
+  - Similarly, a :func:`~sksparse.cholmod.ldl_factor` function has been added
+    to perform the numeric LDL factorization and return
+    a :obj:`~sksparse.cholmod.CholeskyFactor` object.
+
+  - The :code:`cholmod.analyze` function has been removed. The analysis step is
+    now performed when calling the constructor of
+    :obj:`~sksparse.cholmod.CholeskyFactor`.
+
+  - The :code:`use_long` parameter has been removed from the
+    :func:`~sksparse.cholmod.cholesky` and :func:`~sksparse.cholmod.ldl`
+    functions. The type of indices is now inferred from the input matrix.
+
+  - The :code:`mode` parameter has been renamed to :code:`supernodal_mode`.
+
+  - The :code:`symmetry` parameter has been renamed to :code:`lower`. It
+    controls whether to use the lower or upper triangular part of the input
+    matrix, or whether to return a lower or upper triangular factor.
+
+  - The parameter :code:`sym_kind` has been added. It accepts a string argument
+    in :code:`{"sym", "row", "col"}`, which controls the symmetry structure of
+    the matrix to analyze.
+
+  - The functions :code:`cholmod.analyze_AAt` and :code:`cholmod.cholesky_AAt`
+    have been removed. Use :func:`~sksparse.cholmod.cho_factor` or
+    :func:`~sksparse.cholmod.cholesky` with :code:`sym_kind="row"` instead.
+
+  - The :code:`ordering_method` parameter has been renamed to :code:`order`.
 
 v0.4.4
 ------

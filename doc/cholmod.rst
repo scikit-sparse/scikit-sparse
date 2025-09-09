@@ -129,7 +129,6 @@ with the same sparsity pattern.
 .. autoclass:: CholeskyFactor
     :show-inheritance:
     :members:
-    :undoc-members:
 
 
 Symbolic Operations
@@ -138,8 +137,6 @@ Symbolic Operations
 In addition to numerical factorization, :mod:`.cholmod` provides symbolic
 operations that can be used to analyze the structure of the Cholesky
 factor and to compute fill-reducing permutations.
-
-.. autofunction:: analyze
 
 .. autofunction:: etree
 
@@ -167,7 +164,6 @@ the ``order`` argument is specified.
 .. autoclass:: SeparatorTree
     :show-inheritance:
     :members:
-    :undoc-members:
 
 
 Error handling

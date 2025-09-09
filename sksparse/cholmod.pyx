@@ -961,15 +961,26 @@ cdef class CholeskyFactor:
         The number of rows and columns in the factor.
     is_ll : bool
         Whether the factor is in ``LL.T`` form (True) or ``LDL.T`` form (False).
+    is_super : bool
+        Whether the factor is in supernodal (True) or simplicial (False) format.
+    colcount : (N,) ndarray of int
+        The number of nonzeros in each column of the factor.
+    nnz : int
+        The number of nonzeros in the factor.
+    order : str or int
+        The ordering method used for the factorization. If an unknown ordering
+        was used, returns the integer value.
+    perm : (N,) ndarray of int
+        A read-only view of the permutation vector used for the factorization.
 
     Parameters
     ----------
-    A : (N, N) {{array_like, sparse array}}
+    A : (N, N) {array_like, sparse array}
         An array convertible to a sparse matrix in Compressed Sparse Column
         (CSC) format. The matrix must be square and symmetric positive
         definite. Only the upper or lower triangular part of the matrix is
         used, and no check is made for symmetry.
-    kind : str in {"sym", "row", "col"}, optional
+    sym_kind : str in {"sym", "row", "col"}, optional
         The type of factorization for which to analyze the matrix:
 
         * ``sym``: Symmetric factorization. Only the lower triangular part of
@@ -977,10 +988,21 @@ cdef class CholeskyFactor:
         * ``row``: Unsymmetric factorization of :math:`A A^{\\top}`.
         * ``col``: Unsymmetric factorization of :math:`A^{\\top} A`.
 
+    supernodal_mode : str in {"auto", "simplicial", "supernodal"}, optional
+        The type of factorization to use:
+
+        * ``auto``: Automatically select the factorization type.
+        * ``simplicial``: Use a simplicial factorization.
+        * ``supernodal``: Use a supernodal factorization.
+
+        Default is ``auto``. This mode also applies to any subsequent calls to
+        :meth:`.factorize`. Note that the ``simplicial`` mode may be slow for
+        large matrices.
+
     lower : bool, optional
         If True, use the lower triangular part of ``A``.
-    order : None or str in {{"default", "best", "natural", "metis", \
-            "nesdis", "amd", "colamd", "postordered"}}, optional
+    order : str in {"default", "best", "natural", "metis", \
+            "nesdis", "amd", "colamd", "postordered"}, optional
         The permutation algorithm to use for the factorization. By default,
         the natural ordering of the input matrix is used. The other options
         are:
@@ -1012,6 +1034,13 @@ cdef class CholeskyFactor:
         If the input matrix is structurally singular (*e.g.*, if it is the zero
         matrix). The input *may* be numerically indefinite, but this property
         is not checked until :meth:`.factorize` is called.
+
+    See Also
+    --------
+    * :func:`.cholesky` : Factorize a matrix using Cholesky decomposition.
+    * :func:`.ldl` : Factorize a matrix using LDL decomposition.
+    * :func:`.cho_factor` : Factorize a matrix using Cholesky decomposition.
+    * :func:`.ldl_factor` : Factorize a matrix using LDL decomposition.
 
     .. versionadded:: 0.5.0
 
@@ -1132,7 +1161,6 @@ cdef class CholeskyFactor:
     # -------------------------------------------------------------------------
     @property
     def is_ll(self):
-        """Whether the factor is in LL.T form (True) or LDL.T form (False)."""
         return bool(self.factor.is_ll)
 
     @property
@@ -1141,43 +1169,23 @@ cdef class CholeskyFactor:
 
     @property
     def N(self):
-        """The number of rows and columns in the factor."""
         return self.factor.n
 
     @property
     def colcount(self):
-        """The number of nonzeros in each column of the factor."""
         return _ndarray_view_from_factor(self.factor.ColCount, self.factor.n, self)
 
     @property
     def nnz(self):
-        """The number of nonzeros in the factor."""
         return np.sum(self.colcount)
 
     @property
     def order(self):
-        """The ordering method used in the factorization.
-
-        Returns
-        -------
-        order : str or int
-            The ordering method used in the factorization. If an unknown
-            ordering was used, returns the integer value.
-        """
         cdef int iorder = self.factor.ordering
         return _ordering_methods_inv.get(iorder, iorder)
 
     @property
     def perm(self):
-        """Return a view of permutation vector used in the factorization.
-
-        Returns
-        -------
-        p : ndarray
-            The permutation vector `p` such that :math:`P A P^{\\top}` is the
-            matrix that was factorized, where `P` is the permutation matrix
-            corresponding to `p`, *i.e.*, ``P = I[p]``.
-        """
         return _ndarray_view_from_factor(self.factor.Perm, self.factor.n, self)
 
     # -------------------------------------------------------------------------
@@ -1315,8 +1323,8 @@ cdef class CholeskyFactor:
             :math:`A A^{\\top}` before factorization. Default is None, which
             computes the factorization of :math:`A` itself.
         lower : bool, optional
-            If True, only use the lower triangular part of `A`. Default is
-            False.
+            If True, only use the lower triangular part of `A`. Otherwise, use
+            the upper triangular part. Default is False.
 
         Notes
         -----
@@ -1477,13 +1485,6 @@ cdef class CholeskyFactor:
         CholmodNotPositiveDefiniteError
             If the matrix `A` is exactly singular, or singular to working
             precision.
-
-        See Also
-        --------
-        * :func:`.cholesky` : Factorize a matrix using Cholesky decomposition.
-        * :func:`.ldl` : Factorize a matrix using LDL decomposition.
-        * :func:`.cho_factor` : Factorize a matrix using Cholesky decomposition.
-        * :func:`.ldl_factor` : Factorize a matrix using LDL decomposition.
 
         Notes
         -----
