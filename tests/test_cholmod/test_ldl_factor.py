@@ -37,6 +37,9 @@ def test_view_vs_get(A, order):
     assert pv is not p
     # Split the view into L and D
     Dv = sparse.diags_array(LDv.diagonal())
+    with pytest.raises(ValueError, match="read-only"):
+        LDv.setdiag(1.0)
+    LDv = LDv.copy()
     LDv.setdiag(1.0)
     assert_allclose(LDv.toarray(), L.toarray(), atol=1e-15)
     assert_allclose(Dv.toarray(), D.toarray(), atol=1e-15)

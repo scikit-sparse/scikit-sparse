@@ -388,7 +388,8 @@ cdef object _csc_from_cholmod_factor(CholeskyFactor py_factor):
     Returns
     -------
     res : csc_array
-        L scipy.sparse.csc_array that is a view onto the CHOLMOD factor.
+        L scipy.sparse.csc_array that is a view onto the CHOLMOD factor. This
+        array is *read-only*, so attempts to modify it will raise an error.
 
     Notes
     -----
@@ -414,9 +415,9 @@ cdef object _csc_from_cholmod_factor(CholeskyFactor py_factor):
     # Ensure the factor is in simplicial, packed, monotonic format
     cdef bint use_int32 = L.itype == CHOLMOD_INT
 
-    is_super = False  # simplicial format
-    is_packed = True
-    is_monotonic = True
+    cdef int is_super = False  # simplicial format
+    cdef int is_packed = True
+    cdef int is_monotonic = True
 
     change_factor = cholmod_change_factor if use_int32 else cholmod_l_change_factor
     change_factor(
@@ -443,6 +444,7 @@ cdef object _csc_from_cholmod_factor(CholeskyFactor py_factor):
     # Take ownership of the data
     for array in (indptr, indices, data):
         np.set_array_base(array, py_factor)
+        np.PyArray_CLEARFLAGS(array, np.NPY_ARRAY_WRITEABLE)  # make read-only
 
     return csc_array((data, indices, indptr), shape=(L.n, L.n))
 
@@ -842,7 +844,7 @@ cdef np.ndarray _ndarray_from_cholmod_intarray(void* ptr, size_t N, bint use_int
 cdef np.ndarray _ndarray_view_from_factor(
     void* ptr, size_t N, CholeskyFactor py_factor
 ):
-    """Create a NumPy array from the permutation vector in a CHOLMOD factor.
+    """Create a NumPy array from the an integer vector in a CHOLMOD factor.
 
     Parameters
     ----------
@@ -856,7 +858,8 @@ cdef np.ndarray _ndarray_view_from_factor(
     Returns
     -------
     p : ndarray
-        The permutation vector as a NumPy array.
+        The permutation vector as a NumPy array. This array is *read-only*,
+        so attempts to modify it will raise an error.
     """
     cdef cholmod_factor *L = py_factor.factor
 
