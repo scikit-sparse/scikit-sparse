@@ -17,7 +17,15 @@ the Cholesky factorization of a sparse matrix, and solves linear systems.
 Interfaces
 ----------
 * `cholesky`: Computes the Cholesky factorization of a sparse matrix.
-* `solve`: Solves a linear system using the Cholesky factorization.
+* `ldl`: Computes the LDL.T factorization of a sparse matrix.
+* `CholeskyFactor`: Class representing a Cholesky factorization.
+* `cho_factor`: Computes the Cholesky factorization of a sparse matrix.
+* `ldl_factor`: Computes the LDL.T factorization of a sparse matrix.
+* `symbfact`: Computes the symbolic factorization of a sparse matrix.
+* `etree`: Computes the elimination tree of a sparse matrix.
+* `bisect`: Bisects a graph using nested dissection.
+* `metis`: Computes a fill-reducing ordering using METIS.
+* `nesdis`: Computes a fill-reducing ordering using NESDIS.
 
 This wrapper handles both 32-bit and 64-bit integer types, depending on the
 input matrix format.
@@ -53,9 +61,11 @@ __all__ = [
     "CholmodWarning",
     "SeparatorTree",
     "bisect",
+    "cho_factor",
     "cholesky",
     "etree",
     "ldl",
+    "ldl_factor",
     "metis",
     "nesdis",
     "symbfact",

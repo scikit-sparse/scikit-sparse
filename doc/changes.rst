@@ -56,6 +56,23 @@ v0.5.0
 
   - The :code:`ordering_method` parameter has been renamed to :code:`order`.
 
+  - The :code:`Factor` methods :code:`L`, :code:`D`, :code:`LD`, :code:`L_D`,
+    and :code:`P`, have been removed in factor of the methods
+    :meth:`~sksparse.cholmod.CholeskyFactor.get_factor` and
+    :meth:`~sksparse.cholmod.CholeskyFactor.get_perm`.
+
+  - The property :code:`perm` and
+    method :meth:`~sksparse.cholmod.CholeskyFactor.view_factor` have been added
+    to return read-only views of the permutation vector and factor matrix,
+    respectively.
+
+  - The :code:`Factor` methods :code:`solve_LDLt`, :code:`solve_LD`,
+    :code:`solve_DLt`, :code:`solve_L`, :code:`solve_Lt`, and :code:`solve_D`
+    have been removed in favor of the single
+    :meth:`~sksparse.cholmod.CholeskyFactor.solve` method.
+    The :obj:`~sksparse.cholmod.CholeskyFactor` is not callable.
+
+
 v0.4.4
 ------
 * Bug in solve with dense array, where base of result is not set correctly, fixed.
