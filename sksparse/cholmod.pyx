@@ -932,6 +932,16 @@ cdef void _set_ordering_method(object order, cholmod_common* cm):
         )
 
 
+cdef dict _npdtypeclass_from_cholmod = {
+    (CHOLMOD_REAL, CHOLMOD_SINGLE): np.float32,
+    (CHOLMOD_REAL, CHOLMOD_DOUBLE): np.float64,
+    (CHOLMOD_COMPLEX, CHOLMOD_SINGLE): np.complex64,
+    (CHOLMOD_COMPLEX, CHOLMOD_DOUBLE): np.complex128,
+    (CHOLMOD_PATTERN, CHOLMOD_SINGLE): np.bool_,
+    (CHOLMOD_PATTERN, CHOLMOD_DOUBLE): np.bool_,
+}
+
+
 # -----------------------------------------------------------------------------
 #         CholeskyFactor Object
 # -----------------------------------------------------------------------------
@@ -973,6 +983,12 @@ cdef class CholeskyFactor:
         Whether the factor is in ``LL.T`` form (True) or ``LDL.T`` form (False).
     is_super : bool
         Whether the factor is in supernodal (True) or simplicial (False) format.
+    itype : np.dtype in {np.int32, np.int64}
+        The integer type used for indices and indptr in the factor.
+    dtype : np.dtype in {np.float32, np.float64, np.complex64, np.complex128, \
+            np.bool_}
+        The data type used for numerical values in the factor.
+    dtype : np.dtype
     colcount : (N,) ndarray of int
         The number of nonzeros in each column of the factor.
     nnz : int
@@ -1177,8 +1193,26 @@ cdef class CholeskyFactor:
         return bool(self._factor.is_ll)
 
     @property
+    def is_lower(self):
+        return bool(self.is_lower)
+
+    @property
     def is_super(self):
         return bool(self._factor.is_super)
+
+    @property
+    def itype(self):
+        return np.dtype(np.int32 if self._factor.itype == CHOLMOD_INT else np.int64)
+
+    @property
+    def dtype(self):
+        # "np.int32" etc. are dtype classes, not actual dtypes. numpy handles
+        # both well, but be explicit and return a dtype object.
+        return np.dtype(
+            _npdtypeclass_from_cholmod.get(
+                (self._factor.xtype, self._factor.dtype), None
+            )
+        )
 
     @property
     def N(self):
