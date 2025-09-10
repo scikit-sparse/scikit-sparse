@@ -210,8 +210,11 @@ of type :exc:`CholmodError` or an appropriate subclass.
 
 .. _cholesky-example:
 
-Example
--------
+Examples
+--------
+
+Cholesky Example
+++++++++++++++++
 
 This figure shows the effect of AMD ordering that reduces the fill-in of the
 Cholesky factorization of a sparse matrix.
@@ -227,4 +230,24 @@ Cholesky factorization of a sparse matrix.
 The source code for this example is:
 
 .. literalinclude:: examples/cholmod_example.py
+   :language: python
+
+Nested Dissection Example
++++++++++++++++++++++++++
+
+This figure shows the effect of nested dissection ordering that reduces the
+fill-in of the LU factorization of a sparse matrix in a case where the AMD
+order *does not* help.
+
+.. figure:: examples/nesdis_example.svg
+   :alt: LU Example with Nesdis Ordering
+   :align: center
+   :width: 90%
+
+   The number of non-zeros in the LU factorization of the original matrix
+   and the permuted matrix using AMD and nested dissection ordering.
+
+The source code for this example is:
+
+.. literalinclude:: examples/nesdis_example.py
    :language: python
