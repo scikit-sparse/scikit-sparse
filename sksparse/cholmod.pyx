@@ -1767,8 +1767,7 @@ cdef class CholeskyFactor:
 
         return self
 
-    # TODO add flag for perm/noperm?
-    def resymbol(self, object A):
+    def resymbol(self, object A, bint is_permuted=True):
         """Recompute the symbolic Cholesky factorization of a sparse matrix.
 
         This function is useful after a series of downdates via
@@ -1787,6 +1786,12 @@ cdef class CholeskyFactor:
                 permuted matrix :math:`P A P^{\\top}`, where `P` is the
                 permutation matrix corresponding to the permutation vector
                 returned by :meth:`.get_perm`.
+
+        is_permuted : bool
+            If True (default), the input matrix ``A`` is assumed to be
+            permuted by the fill-reducing permutation used in the factorization:
+            :math:`P A P^{\\top}`. If False, ``A`` is assumed to be in the
+            original ordering.
 
         Returns
         -------
@@ -1835,12 +1840,19 @@ cdef class CholeskyFactor:
         Ac.xtype = CHOLMOD_PATTERN
         Ac.x = NULL
 
-        # NOTE do *not* use the factor's existing permutation. We expect that
-        # the input matrix will be the permuted matrix P A P.T.
+        # NOTE the "noperm" version expects that A is already permuted by
+        # self._factor.Perm (i.e., A = A[p][:, p]). The regular version uses
+        # self._factor.Perm to permute A internally.
         if self._use_int32:
-            cholmod_resymbol_noperm(Ac, NULL, 0, True, self._factor, self._cm)
+            if is_permuted:
+                cholmod_resymbol_noperm(Ac, NULL, 0, True, self._factor, self._cm)
+            else:
+                cholmod_resymbol(Ac, NULL, 0, True, self._factor, self._cm)
         else:
-            cholmod_l_resymbol_noperm(Ac, NULL, 0, True, self._factor, self._cm)
+            if is_permuted:
+                cholmod_l_resymbol_noperm(Ac, NULL, 0, True, self._factor, self._cm)
+            else:
+                cholmod_l_resymbol(Ac, NULL, 0, True, self._factor, self._cm)
 
         return self
 
