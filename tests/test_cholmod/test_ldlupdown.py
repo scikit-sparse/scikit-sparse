@@ -82,7 +82,7 @@ def test_ldlupdown(A, f):
     # Probably something in CHOLMOD itself.
 
     # Update the factorization
-    f.update(C, updown="up")
+    f.update(C)
     Lc, Dc = f.get_factor()
 
     # Verify that the updated factorization is correct
@@ -90,7 +90,7 @@ def test_ldlupdown(A, f):
     assert_allclose((Lc @ Dc @ Lc.T).toarray(), Sc.toarray(), atol=1e-12)
 
     # Downdate back to the original factorization
-    f.update(C, updown="down")
+    f.downdate(C)
     Ld, Dd = f.get_factor()
     assert_allclose((Ld @ Dd @ Ld.T).toarray(), S.toarray(), atol=1e-12)
 
@@ -108,7 +108,7 @@ def test_resymbol(A, f):
     C = Cp[np.argsort(p), :]  # unpermute C into A space
 
     # Update the factorization
-    f.update(C, updown="up")
+    f.update(C)
     Lc, Dc = f.get_factor()
 
     # Verify that the updated factorization is correct
@@ -116,7 +116,7 @@ def test_resymbol(A, f):
     assert_allclose((Lc @ Dc @ Lc.T).toarray(), Sc.toarray(), atol=1e-12)
 
     # Downdate back to the original factorization
-    f.update(C, updown="down")
+    f.downdate(C)
     Ld, Dd = f.get_factor()
     assert_allclose((Ld @ Dd @ Ld.T).toarray(), S.toarray(), atol=1e-12)
 

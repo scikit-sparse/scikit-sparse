@@ -1583,40 +1583,14 @@ cdef class CholeskyFactor:
 
         return X
 
-    # TODO docs from Modify/cholmod_updown.c on permutation of C.
-    # TODO separate into update and downdate public methods
-    def update(self, C, updown="up"):
-        """Multiple-rank update or downdate of a sparse LDL factorization.
+    def update(self, C):
+        return self._update(C, updown="up")
 
-        Update the Cholesky factorization of a sparse matrix `A`:
+    def downdate(self, C):
+        return self._update(C, updown="down")
 
-        .. math::
-
-            L' D' L'^{\\top} = P A P^{\\top} \\pm C C^{\\top}
-
-        where `L` is a lower triangular matrix with unit diagonal, and `D` is
-        a diagonal matrix. The input ``C`` is a sparse matrix representing the
-        update or downdate to the factorization. If ``updown == "up"``, the
-        factorization is updated (+ sign), otherwise it is downdated (- sign).
-
-        Parameters
-        ----------
-        C : (N, K) csc_array
-            The sparse matrix representing the rank-`k` update or downdate to
-            the factorization.
-        update : str in {"up", "down"}, optional
-            If ``up``, perform an update to the factorization. If ``down``,
-            perform a downdate. Default is ``up``.
-
-        Returns
-        -------
-        CholeskyFactor
-            The current object, for method chaining.
-
-        .. versionadded:: 0.5.0
-        """
-        if updown not in ("up", "down"):
-            raise ValueError("updown must be 'up' or 'down'.")
+    def _update(self, C, updown="up"):
+        assert updown in ("up", "down")
 
         if not issparse(C) or C.ndim not in {1, 2}:
             raise ValueError(f"Update matrix C is type {type(C)}. "
@@ -1641,8 +1615,7 @@ cdef class CholeskyFactor:
         # Keep a reference to C so it is not garbage collected
         cdef object _C_ref = _cholmod_sparse_from_csc(C, stype, C_use_int32, &Cmatrix)
 
-        # TODO put these comments into docstrings
-        # Permute C so it is accepted in "matrix" space
+        # Permute C so it is accepted in "matrix" space.
         # From Modify/cholmod_updown.c:
         #   Note that the fill-reducing permutation L->Perm is NOT used.  The row
         #   indices of C refer to the rows of L, not A.  If your original system is
@@ -2013,6 +1986,52 @@ cdef class CholeskyFactor:
                 "Matrix is nearly singular."
                 f"  Results may be inaccurate (rcond={rcond:.2e})."
             )
+
+
+# -----------------------------------------------------------------------------
+#         Docstrings for CholeskyFactor
+# -----------------------------------------------------------------------------
+_DOC_UPDATE_TEMPLATE = """
+Multiple-rank {direction} of a sparse LDL factorization.
+
+Compute a {direction} to the factorization of a sparse matrix `A` [#{tag}]_:
+
+.. math::
+
+    L' D' L'^{{\\top}} = P (A {sign} C C^{{\\top}}) P^{{\\top}}
+
+where `L` is a lower triangular matrix with unit diagonal, and `D` is
+a diagonal matrix. The input ``C`` is a sparse matrix representing the
+{direction} to the factorization. The fill-reducing permutation is *not*
+recomputed from the original `A`.
+
+Parameters
+----------
+C : (N, K) csc_array
+    The sparse matrix representing the rank-`k` update or downdate to
+    the matrix.
+
+Returns
+-------
+CholeskyFactor
+    The current object, for method chaining.
+
+References
+----------
+.. [#{tag}] ``cholmod_updown.c`` - CHOLMOD up/downdate function
+    https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/Modify/cholmod_updown.c
+
+.. versionadded:: 0.5.0
+"""
+
+# Assign the docstrings
+CholeskyFactor.update.__doc__ = _DOC_UPDATE_TEMPLATE.format(
+    direction="update", sign="+", tag="update_c",
+)
+
+CholeskyFactor.downdate.__doc__ = _DOC_UPDATE_TEMPLATE.format(
+    direction="downdate", sign="-", tag="downdate_c",
+)
 
 
 # -----------------------------------------------------------------------------
