@@ -22,11 +22,31 @@ from ..helpers import generate_random_matrices
 DTYPES = [np.float32, np.float64, np.complex64, np.complex128]
 
 
+# Declare a single matrix fixture for some tests
+# See: Davis, Timothy A. (2006). Direct Methods for Sparse Linear Systems,
+# pp 708 (Equation 2.1).
+@pytest.fixture
+def A_example():
+    N = 11
+    rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
+    cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
+    vals = np.ones(len(rows), dtype=np.float64)
+    L = sparse.coo_array((vals, (rows, cols)), shape=(N, N))
+    A = (L + L.T).tocsc()  # make it symmetric
+    A.setdiag(N)
+    return A
+
+
+def test_convert_factor(A_example):
+    A = A_example
+    f = ldl_factor(A)
+    L = f.get_factor(kind="LL")
+    assert_allclose((L @ L.T.conj()).toarray(), A.toarray(), atol=1e-15)
+
+
 @pytest.mark.parametrize("order", [None, "amd"])
-@pytest.mark.parametrize(
-    "A", generate_random_matrices(N_trials=1, N_max=10, d_scale=0.2, pos_def_only=True)
-)
-def test_view_vs_get(A, order):
+def test_view_vs_get(A_example, order):
+    A = A_example
     f = ldl_factor(A)
     LDv = f.factor
     pv = f.perm

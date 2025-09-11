@@ -390,8 +390,8 @@ cdef object _csc_from_cholmod_sparse(cholmod_sparse* A, cholmod_common* common):
     return csc_array((data, indices, indptr), shape=(A.nrow, A.ncol))
 
 
-cdef object _csc_from_cholmod_factor(CholeskyFactor py_factor):
-    """Build a sparse matrix from a CHOLMOD factor.
+cdef object _csc_view_from_cholmod_factor(CholeskyFactor py_factor, object ldl=None):
+    """Create a sparse matrix from a CHOLMOD factor.
 
     This function is similar to _csc_from_cholmod_sparse, but builds the matrix
     directly from the factor, without the intermediate cholmod_factor_to_sparse
@@ -402,6 +402,9 @@ cdef object _csc_from_cholmod_factor(CholeskyFactor py_factor):
     py_factor : CholeskyFactor
         The input cholmod_factor and cholmod_common objects, wrapped in
         a Python object.
+    ldl : None or bool, optional
+        If True, return the LDL.T form, otherwise return the LL.T form. Default
+        is to use the form of the existing factor ``py_factor._factor.is_ll``.
 
     Returns
     -------
@@ -433,13 +436,14 @@ cdef object _csc_from_cholmod_factor(CholeskyFactor py_factor):
     # Ensure the factor is in simplicial, packed, monotonic format
     cdef bint use_int32 = L.itype == CHOLMOD_INT
 
-    cdef int is_super = False  # simplicial format
-    cdef int is_packed = True
-    cdef int is_monotonic = True
+    cdef int to_ll = L.is_ll if ldl is None else not ldl
+    cdef int to_super = False  # simplicial format
+    cdef int to_packed = True
+    cdef int to_monotonic = True
 
     change_factor = cholmod_change_factor if use_int32 else cholmod_l_change_factor
     change_factor(
-        L.xtype, L.is_ll, is_super, is_packed, is_monotonic, L, common
+        L.xtype, to_ll, to_super, to_packed, to_monotonic, L, common
     )
     _handle_errors(common.status)
 
@@ -1368,7 +1372,7 @@ cdef class CholeskyFactor:
             get the split `L` and `D` factors, use :obj:`get_factor` with
             ``kind="LDL"``.
         """
-        return _csc_from_cholmod_factor(self)
+        return _csc_view_from_cholmod_factor(self)
 
     # -------------------------------------------------------------------------
     #         Public Methods
@@ -1444,18 +1448,16 @@ cdef class CholeskyFactor:
         if lower is None:
             lower = self._is_lower
 
-        self._convert_factor(kind)
-
         # Drop explicit zeros from returned copies
         if kind == "LL":
-            L = self.factor.copy()
+            L = _csc_view_from_cholmod_factor(self, ldl=False).copy()
             L.eliminate_zeros()
             if not lower:
                 L = L.T.conj()
             return L
         else:
             # Extract L and D from combined LD factor
-            L = self.factor.copy()
+            L = _csc_view_from_cholmod_factor(self, ldl=True).copy()
             D = diags_array(L.diagonal())
             L.setdiag(1.0)
             L.eliminate_zeros()
@@ -1559,18 +1561,16 @@ cdef class CholeskyFactor:
 
         self._is_lower = lower
 
-        # TODO check that this is ok for ldlupdate
-        # Convert to packed LL.T when done
+        # See CHOLMOD/MATLAB/ldlchol.c and/or lchol.c for details
         self._cm.final_asis = False
         self._cm.final_super = False
         self._cm.final_ll = not ldl  # LL.T for Cholesky, LDL.T for LDL
         self._cm.final_pack = True
         self._cm.final_monotonic = True
 
-        # If we do *not* drop numerically zero entries from the symbolic
-        # pattern, we *do* need to drop entries that result from supernodal
-        # amalgamation. Otherwise, all zeros are dropped in cholmod_drop, so
-        # save the extra step.
+        # We do *not* drop numerically zero entries from the symbolic
+        # pattern, so that the resulting factor can be updated by `.update`.
+        # We *do* drop entries that result from supernodal amalgamation.
         self._cm.final_resymbol = True
 
         self._cm.quick_return_if_not_posdef = True
@@ -1768,9 +1768,6 @@ cdef class CholeskyFactor:
             C_perm = cholmod_l_submatrix(
                 Cc, <int64_t*>self._factor.Perm, N, NULL, -1, True, True, self._cm
             )
-
-        # Ensure the factor is in LDL form
-        self._convert_factor("LDL")
 
         # Compute the update or downdate
         cdef int update = updown == "up"
@@ -2052,57 +2049,6 @@ cdef class CholeskyFactor:
             Xd = cholmod_l_solve(system, self._factor, Bd, self._cm)
 
         return _ndarray_from_cholmod_dense(Xd, self._use_int32, self._cm)
-
-    cdef object _convert_factor(self, object kind):
-        """Convert the factor to the desired form in-place.
-
-        Parameters
-        ----------
-        kind : str in {'LL', 'LDL'}
-            The desired form of the factor. If ``'LL'``, convert to LL.T form.
-            If ``'LDL'``, convert to LDL.T form.
-
-        Returns
-        -------
-        CholeskyFactor
-            The current object, for method chaining.
-        """
-        if kind not in ("LL", "LDL"):
-            raise ValueError("kind must be 'LL' or 'LDL'.")
-
-        cdef int to_xtype = self._factor.xtype
-        cdef int to_ll = kind == "LL"
-
-        # NOTE In CHOLMOD, supernodal factorizations are always LL.T. If we
-        # request to change to a supernodal LDL.T factorization,
-        # cholmod_change_factor will silently do nothing! So we can only stay
-        # supernodal when LL.T is requested.
-        cdef int to_super = self._factor.is_super and kind == "LL"
-
-        cdef int to_packed = True
-        cdef int to_monotonic = self._factor.is_monotonic
-
-        if (kind == "LL" and not self._factor.is_ll) or (
-            kind == "LDL" and self._factor.is_ll
-        ):
-            if self._use_int32:
-                change_factor = cholmod_change_factor
-            else:
-                change_factor = cholmod_l_change_factor
-
-            change_factor(
-                to_xtype,
-                to_ll,
-                to_super,
-                to_packed,
-                to_monotonic,
-                self._factor,
-                self._cm
-            )
-
-            _handle_errors(self._cm.status)
-
-        return self
 
     cdef void _check_rcond(self) except *:
         """Check the condition number."""
