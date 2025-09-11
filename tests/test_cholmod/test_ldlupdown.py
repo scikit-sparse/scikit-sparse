@@ -135,6 +135,25 @@ def test_resymbol(A, f):
     assert_allclose(Lr.toarray(), L.toarray(), atol=1e-12)
 
 
+def test_resymbol_perm(A, f):
+    L, D = f.get_factor()
+    p = f.get_perm()
+    S = A[p][:, p]
+    Cp = _create_update_matrix(L)
+    C = Cp[np.argsort(p), :]  # unpermute C into A space
+    f.update(C)
+    f.downdate(C)
+    g = f.copy()
+    assert g is not f
+    f.resymbol(S, is_permuted=True)
+    g.resymbol(A, is_permuted=False)
+    # Both factorizations should be identical
+    Lf, Df = f.get_factor()
+    Lg, Dg = g.get_factor()
+    assert_allclose(Lf.toarray(), Lg.toarray(), atol=1e-15)
+    assert_allclose(Df.toarray(), Dg.toarray(), atol=1e-15)
+
+
 def test_ldlrowmod(A, expect_x, b, f):
     L, D = f.get_factor()
     p = f.get_perm()

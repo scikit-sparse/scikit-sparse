@@ -945,6 +945,59 @@ cdef dict _npdtypeclass_from_cholmod = {
 # -----------------------------------------------------------------------------
 #         CholeskyFactor Object
 # -----------------------------------------------------------------------------
+cdef void _copy_cholmod_common(cholmod_common* dest, cholmod_common* src):
+    """Copy the contents of one cholmod_common struct to another."""
+    if dest is NULL or src is NULL:
+        raise ValueError("Input pointer is NULL.")
+
+    # Copy known input fields, ignore others
+    dest.supernodal = src.supernodal
+    dest.quick_return_if_not_posdef = src.quick_return_if_not_posdef
+
+    # Ordering
+    dest.nmethods = src.nmethods
+    dest.current = src.current
+    dest.selected = src.selected
+
+    if src.method is not NULL:
+        for i in range(src.nmethods):
+            dest.method[i].lnz = src.method[i].lnz
+            dest.method[i].fl = src.method[i].fl
+            dest.method[i].prune_dense = src.method[i].prune_dense
+            dest.method[i].prune_dense2 = src.method[i].prune_dense2
+            dest.method[i].nd_oksep = src.method[i].nd_oksep
+            dest.method[i].nd_small = src.method[i].nd_small
+            dest.method[i].aggressive = src.method[i].aggressive
+            dest.method[i].order_for_lu = src.method[i].order_for_lu
+            dest.method[i].nd_compress = src.method[i].nd_compress
+            dest.method[i].nd_camd = src.method[i].nd_camd
+            dest.method[i].nd_components = src.method[i].nd_components
+            dest.method[i].ordering = src.method[i].ordering
+
+    dest.postorder = src.postorder
+    dest.itype = src.itype
+
+    # Output Statistics
+    dest.status = src.status
+    dest.fl = src.fl
+    dest.lnz = src.lnz
+    dest.anz = src.anz
+    dest.modfl = src.modfl
+    dest.malloc_count = src.malloc_count
+    dest.memory_usage = src.memory_usage
+    dest.memory_inuse = src.memory_inuse
+    dest.nrealloc_col = src.nrealloc_col
+    dest.nrealloc_factor = src.nrealloc_factor
+    dest.ndbounds_hit = src.ndbounds_hit
+    dest.nsbounds_hit = src.nsbounds_hit
+    dest.rowfacfl = src.rowfacfl
+    dest.aatfl = src.aatfl
+    dest.called_nd = src.called_nd
+    dest.blas_ok = src.blas_ok
+
+    # Skip SPQR related fields and GPU related fields
+
+
 cdef void _cleanup_factor(CholeskyFactor cf):
     """Deallocate memory used by a CholeskyFactor."""
     if cf._cm is not NULL:
@@ -956,6 +1009,11 @@ cdef void _cleanup_factor(CholeskyFactor cf):
             if cf._factor is not NULL:
                 cholmod_l_free_factor(&cf._factor, cf._cm)
             cholmod_l_finish(cf._cm)
+
+
+# Define a special internal class for copying CholeskyFactor only
+cdef class _CopySentinel:
+    pass
 
 
 cdef class CholeskyFactor:
@@ -1089,6 +1147,12 @@ cdef class CholeskyFactor:
         object sym_kind=None,
         object supernodal_mode=None,
     ):
+        # Internal value to create an empty class during a copy
+        if A is _CopySentinel:
+            self._cm = NULL
+            self._factor = NULL
+            return
+
         A, use_int32, _ = validate_csc_input(A, require_square=True)
 
         if sym_kind is None:
@@ -1286,6 +1350,44 @@ cdef class CholeskyFactor:
     # -------------------------------------------------------------------------
     #         Public Methods
     # -------------------------------------------------------------------------
+    def copy(self):
+        """Return a copy of the CholeskyFactor object.
+
+        This method creates a deep copy of the CholeskyFactor object,
+        including the CHOLMOD common struct and the factor itself.
+
+        This method does not copy *all* of the underlying `cholmod_common`
+        struct, only the parts that are necessary for using the factor.
+
+        Returns
+        -------
+        CholeskyFactor
+            A deep copy of the CholeskyFactor object.
+        """
+        cdef CholeskyFactor cf = CholeskyFactor.__new__(CholeskyFactor, _CopySentinel)
+
+        cf._cm = &cf._Common
+
+        # Allocate and copy the CHOLMOD common struct
+        if self._use_int32:
+            cholmod_start(cf._cm)
+        else:
+            cholmod_l_start(cf._cm)
+
+        _copy_cholmod_common(self._cm, cf._cm)
+
+        # Copy the factor
+        if self._use_int32:
+            cf._factor = cholmod_copy_factor(self._factor, cf._cm)
+        else:
+            cf._factor = cholmod_l_copy_factor(self._factor, cf._cm)
+
+        cf._use_int32 = self._use_int32
+        cf._is_lower = self._is_lower
+        cf._stype = self._stype
+
+        return cf
+
     def get_factor(self, kind=None, lower=None):
         """Return a copy of the Cholesky factor in the specified format.
 

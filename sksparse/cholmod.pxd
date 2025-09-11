@@ -68,11 +68,18 @@ cdef extern from "cholmod.h":
     int CHOLMOD_Pt
 
     ctypedef struct cholmod_method_struct:
-        int ordering
-        size_t nd_small
-        int nd_components
+        double lnz
+        double fl
+        double prune_dense
+        double prune_dense2
         double nd_oksep
+        size_t nd_small
+        int aggressive
+        int order_for_lu
+        int nd_compress
         int nd_camd
+        int nd_components
+        int ordering
 
     ctypedef struct cholmod_common:
         int supernodal
@@ -84,9 +91,27 @@ cdef extern from "cholmod.h":
         int final_resymbol
         int quick_return_if_not_posdef
         int nmethods
+        int current
+        int selected
         cholmod_method_struct method[]
         int postorder
+        int itype
         int status
+        double fl
+        double lnz
+        double anz
+        double modfl
+        size_t malloc_count
+        size_t memory_usage
+        size_t memory_inuse
+        double nrealloc_col
+        double nrealloc_factor
+        double ndbounds_hit
+        double nsbounds_hit
+        double rowfacfl
+        double aatfl
+        int called_nd
+        int blas_ok
 
     ctypedef struct cholmod_factor:
         size_t n
@@ -312,6 +337,16 @@ cdef extern from "cholmod.h":
         cholmod_factor *L,
         cholmod_common *Common
     ) 
+
+    cholmod_factor *cholmod_copy_factor(
+        cholmod_factor *L,
+        cholmod_common *Common
+    )
+    cholmod_factor *cholmod_l_copy_factor(
+        cholmod_factor *L,
+        cholmod_common *Common
+    )
+
 
     int cholmod_etree(
         cholmod_sparse *A,
