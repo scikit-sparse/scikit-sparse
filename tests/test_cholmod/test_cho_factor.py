@@ -47,13 +47,8 @@ test_As = [
 ]
 
 
-@pytest.mark.parametrize("A", test_As)
-def test_refactor(A):
-    atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-3
-    f = cho_factor(A, lower=True)
-    L = f.get_factor()
-    assert_allclose((L @ L.T.conj()).toarray(), A.toarray(), atol=atol)
-    # Create a new matrix with the same sparsity pattern but different values
+def _create_randomized_matrix(A):
+    """Create a new matrix with the same sparsity pattern as A but different values."""
     Bl = sparse.tril(A, -1).copy()
     rng = np.random.default_rng(56)
     if np.issubdtype(A.dtype, np.complexfloating):
@@ -66,8 +61,26 @@ def test_refactor(A):
     # Ensure positive definiteness by adding to the diagonal
     B.setdiag(A.diagonal())
     B += sparse.diags_array(np.full(B.shape[0], B.shape[0], dtype=B.dtype))
-    B = B.tocsc()
+    return B.tocsc()
+
+
+@pytest.mark.parametrize("copy", [False, True])
+@pytest.mark.parametrize("A", test_As)
+def test_refactor(A, copy):
+    atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-3
+    f = cho_factor(A, lower=True)
+    L = f.get_factor()
+    assert_allclose((L @ L.T.conj()).toarray(), A.toarray(), atol=atol)
+    # Create a new matrix with the same sparsity pattern but different values
+    B = _create_randomized_matrix(A)
     # Factor the new matrix with the same sparsity pattern
-    f.factorize(B, lower=True)
-    Lb = f.get_factor()
+    if copy:
+        # Use a copy of the factorization object to ensure that we are taking
+        # the relevant parameters from the underlying cholmod_common object.
+        g = f.copy()
+        g.factorize(B, lower=True)
+        Lb = g.get_factor()
+    else:
+        f.factorize(B, lower=True)
+        Lb = f.get_factor()
     assert_allclose((Lb @ Lb.T.conj()).toarray(), B.toarray(), atol=atol)
