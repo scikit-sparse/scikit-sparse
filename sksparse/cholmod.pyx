@@ -1,5 +1,5 @@
 # Part of the scikit-sparse project.
-# Copyright (C) 2025 Bernard Roesler. All rights reserved.
+# Copyright (C) 2008-2025 The scikit-sparse developers. All rights reserved.
 # See pyproject.toml for full author list and LICENSE.txt for license details.
 # SPDX-License-Identifier: BSD-2-Clause
 #
@@ -347,14 +347,22 @@ cdef dict _np_dtypenum_from_cholmod = {
 
 
 cdef object _csc_from_cholmod_sparse(cholmod_sparse* A, cholmod_common* common):
-    """Build a scipy.sparse.csc_array that's a view onto A, with a 'base' with
-    appropriate destructor. 'A' must have been allocated by cholmod."""
+    """Create a csc_array that is a view onto a cholmod_sparse object.
 
-    # This is a little tricky: We build 3 arrays, views on each part of the
-    # cholmod_dense object. They all have the same _CholmodSparseDestructor
-    # object as base. So none of them will be deallocated until they have all
-    # become unused. Then those are built into a csc_array.
+    Parameters
+    ----------
+    A : cholmod_sparse*
+        A pointer to the CHOLMOD sparse matrix to convert to a csc_array.
+    common : cholmod_common*
+        A pointer to the CHOLMOD common structure used for memory management.
 
+    Returns
+    -------
+    res : csc_array
+        A scipy.sparse.csc_array that is a view onto the CHOLMOD sparse matrix.
+        The array has a base with a destructor that frees the CHOLMOD sparse
+        matrix when the array is no longer in use.
+    """
     cdef int np_itypenum = np.NPY_INT32 if A.itype == CHOLMOD_INT else np.NPY_INT64
     cdef int np_dtypenum = _np_dtypenum_from_cholmod.get(
         (A.xtype, A.dtype), np.NPY_OBJECT
