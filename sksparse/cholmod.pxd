@@ -1,5 +1,5 @@
 # Part of the scikit-sparse project.
-# Copyright (C) 2025 Bernard Roesler. All rights reserved.
+# Copyright (C) 2008-2025 The scikit-sparse developers. All rights reserved.
 # See pyproject.toml for full author list and LICENSE.txt for license details.
 # SPDX-License-Identifier: BSD-2-Clause
 #
@@ -8,7 +8,6 @@
 #  Created: 2025-08-11 12:59
 # =============================================================================
 # distutils: language = c
-# cython: language_level=3
 
 from libc.stdlib cimport malloc
 from libc.stdint cimport int32_t, int64_t
@@ -21,7 +20,7 @@ cdef extern from "cholmod.h":
     int CHOLMOD_PATTERN
     int CHOLMOD_REAL
     int CHOLMOD_COMPLEX
-    # int CHOLMOD_ZOMPLEX  # only used in old MATLAB interface
+    int CHOLMOD_ZOMPLEX  # only used in old MATLAB interface
 
     # itypes
     int CHOLMOD_INT
@@ -168,27 +167,9 @@ cdef extern from "cholmod.h":
     cholmod_factor* cholmod_analyze(cholmod_sparse *A, cholmod_common *Common)
     cholmod_factor* cholmod_l_analyze(cholmod_sparse *A, cholmod_common *Common)
 
-    cholmod_factor* cholmod_analyze_p(
-        cholmod_sparse *A,
-        int32_t *UserPerm,
-        int32_t *fset,
-        size_t fsize,
-        cholmod_common *Common
-    )
-    cholmod_factor* cholmod_l_analyze_p(
-        cholmod_sparse *A,
-        int64_t *UserPerm,
-        int64_t *fset,
-        size_t fsize,
-        cholmod_common *Common
-    )
-
-    int cholmod_factorize(cholmod_sparse *A, cholmod_factor *L, cholmod_common *Common)
-    int cholmod_l_factorize(cholmod_sparse *A, cholmod_factor *L, cholmod_common *Common)
-
     int cholmod_factorize_p(
         cholmod_sparse *A,
-        double beta [2],
+        double beta[2],
         int32_t *fset,
         size_t fsize,
         cholmod_factor *L,
@@ -229,6 +210,9 @@ cdef extern from "cholmod.h":
         cholmod_common *Common
     )
 
+    double cholmod_rcond(cholmod_factor *L, cholmod_common *Common)
+    double cholmod_l_rcond(cholmod_factor *L, cholmod_common *Common)
+
     int cholmod_updown(
         int update,
         cholmod_sparse *C,
@@ -268,6 +252,51 @@ cdef extern from "cholmod.h":
         cholmod_common *Common
     )
 
+    int cholmod_resymbol(
+        cholmod_sparse *A,
+        int *fset,
+        size_t fsize,
+        int pack,
+        cholmod_factor *L,
+        cholmod_common *Common
+    )
+    int cholmod_l_resymbol(
+        cholmod_sparse *A,
+        int *fset,
+        size_t fsize,
+        int pack,
+        cholmod_factor *L,
+        cholmod_common *Common
+    )
+
+    int cholmod_resymbol_noperm(
+        cholmod_sparse *A,
+        int *fset,
+        size_t fsize,
+        int pack,
+        cholmod_factor *L,
+        cholmod_common *Common
+    )
+    int cholmod_l_resymbol_noperm(
+        cholmod_sparse *A,
+        int *fset,
+        size_t fsize,
+        int pack,
+        cholmod_factor *L,
+        cholmod_common *Common
+    )
+
+    cholmod_sparse* cholmod_transpose(
+        cholmod_sparse *A,
+        int mode,
+        cholmod_common *Common
+    )
+    cholmod_sparse* cholmod_l_transpose(
+        cholmod_sparse *A,
+        int mode,
+        cholmod_common *Common
+    )
+
     cholmod_sparse *cholmod_submatrix(
         cholmod_sparse *A,
         int32_t *rset,
@@ -288,12 +317,6 @@ cdef extern from "cholmod.h":
         int sorted,
         cholmod_common *Common
     )
-
-    double cholmod_rcond(cholmod_factor *L, cholmod_common *Common)
-    double cholmod_l_rcond(cholmod_factor *L, cholmod_common *Common)
-
-    cholmod_sparse* cholmod_factor_to_sparse(cholmod_factor *L, cholmod_common *Common)
-    cholmod_sparse* cholmod_l_factor_to_sparse(cholmod_factor *L, cholmod_common *Common)
 
     cholmod_sparse *cholmod_allocate_sparse(
         size_t nrow,
@@ -316,8 +339,8 @@ cdef extern from "cholmod.h":
         cholmod_common *Common
     )
 
-    cholmod_factor* cholmod_allocate_factor(size_t n, cholmod_common *Common)
-    cholmod_factor* cholmod_l_allocate_factor(size_t n, cholmod_common *Common)
+    void *cholmod_malloc(size_t n, size_t size, cholmod_common *Common)
+    void *cholmod_l_malloc(size_t n, size_t size, cholmod_common *Common)
 
     int cholmod_change_factor(
         int to_xtype,
@@ -347,17 +370,8 @@ cdef extern from "cholmod.h":
         cholmod_common *Common
     )
 
-
-    int cholmod_etree(
-        cholmod_sparse *A,
-        int32_t *Parent,
-        cholmod_common *Common
-    )
-    int cholmod_l_etree(
-        cholmod_sparse *A,
-        int64_t *Parent,
-        cholmod_common *Common
-    )
+    int cholmod_etree(cholmod_sparse *A, int32_t *Parent, cholmod_common *Common)
+    int cholmod_l_etree(cholmod_sparse *A, int64_t *Parent, cholmod_common *Common)
 
     int32_t cholmod_postorder(
         int32_t *Parent,
@@ -413,40 +427,6 @@ cdef extern from "cholmod.h":
         size_t krow,
         int64_t *Parent,
         cholmod_sparse *R,
-        cholmod_common *Common
-    )
-
-    int cholmod_resymbol(
-        cholmod_sparse *A,
-        int *fset,
-        size_t fsize,
-        int pack,
-        cholmod_factor *L,
-        cholmod_common *Common
-    )
-    int cholmod_l_resymbol(
-        cholmod_sparse *A,
-        int *fset,
-        size_t fsize,
-        int pack,
-        cholmod_factor *L,
-        cholmod_common *Common
-    )
-
-    int cholmod_resymbol_noperm(
-        cholmod_sparse *A,
-        int *fset,
-        size_t fsize,
-        int pack,
-        cholmod_factor *L,
-        cholmod_common *Common
-    )
-    int cholmod_l_resymbol_noperm(
-        cholmod_sparse *A,
-        int *fset,
-        size_t fsize,
-        int pack,
-        cholmod_factor *L,
         cholmod_common *Common
     )
 
@@ -522,18 +502,8 @@ cdef extern from "cholmod.h":
         cholmod_common *Common
     )
 
-    void *cholmod_free(
-        size_t n,
-        size_t size,
-        void *p,
-        cholmod_common *Common
-    )
-    void *cholmod_l_free(
-        size_t n,
-        size_t size,
-        void *p,
-        cholmod_common *Common
-    )
+    void *cholmod_free(size_t n, size_t size, void *p, cholmod_common *Common)
+    void *cholmod_l_free(size_t n, size_t size, void *p, cholmod_common *Common)
 
     int cholmod_free_sparse(cholmod_sparse **A, cholmod_common *Common)
     int cholmod_l_free_sparse(cholmod_sparse **A, cholmod_common *Common)
@@ -543,15 +513,3 @@ cdef extern from "cholmod.h":
 
     int cholmod_free_factor(cholmod_factor **L, cholmod_common *Common)
     int cholmod_l_free_factor(cholmod_factor **L, cholmod_common *Common)
-
-    int cholmod_drop(double tol, cholmod_sparse *A, cholmod_common *Common)
-    int cholmod_l_drop(double tol, cholmod_sparse *A, cholmod_common *Common)
-
-    cholmod_sparse* cholmod_transpose(cholmod_sparse *A, int mode, cholmod_common *Common)
-    cholmod_sparse* cholmod_l_transpose(cholmod_sparse *A, int mode, cholmod_common *Common)
-
-    void *cholmod_malloc(size_t n, size_t size, cholmod_common *Common)
-    void *cholmod_l_malloc(size_t n, size_t size, cholmod_common *Common)
-
-    int cholmod_check_perm(int32_t *Perm, size_t len, size_t n, cholmod_common *Common)
-    int cholmod_l_check_perm(int64_t *Perm, size_t len, size_t n, cholmod_common *Common)

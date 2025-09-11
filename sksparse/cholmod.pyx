@@ -374,6 +374,7 @@ cdef object _csc_from_cholmod_sparse(cholmod_sparse* A, cholmod_common* common):
     # Take ownership of the data
     cdef _CholmodSparseDestructor base = _CholmodSparseDestructor()
     base.init(A, common)
+
     for array in (indptr, indices, data):
         np.set_array_base(array, base)
         assert np.PyArray_ISWRITEABLE(array)
@@ -947,8 +948,8 @@ cdef dict _npdtypeclass_from_cholmod = {
 # -----------------------------------------------------------------------------
 cdef void _copy_cholmod_common(cholmod_common* dest, cholmod_common* src):
     """Copy the contents of one cholmod_common struct to another."""
-    if dest is NULL or src is NULL:
-        raise ValueError("Input pointer is NULL.")
+    assert dest is not NULL
+    assert src is not NULL
 
     # Copy known input fields, ignore others
     dest.supernodal = src.supernodal
@@ -1142,6 +1143,7 @@ cdef class CholeskyFactor:
     def __cinit__(
         self,
         object A,
+        *,
         bint lower=False,
         object order=None,
         object sym_kind=None,
