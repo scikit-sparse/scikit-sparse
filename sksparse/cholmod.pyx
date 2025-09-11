@@ -795,7 +795,7 @@ cdef class _CholmodDenseDestructor:
 cdef np.ndarray _ndarray_from_cholmod_dense(
     cholmod_dense* X, bint use_int32, cholmod_common* common
 ):
-    """Build a numpy.ndarray that is a view onto a cholmod_dense object.
+    """Create a numpy.ndarray that is a view onto a cholmod_dense object.
 
     Parameters
     ----------
@@ -834,7 +834,7 @@ cdef np.ndarray _ndarray_from_cholmod_dense(
     return arr
 
 
-cdef np.ndarray _ndarray_from_cholmod_intarray(void* ptr, size_t N, bint use_int32):
+cdef np.ndarray _ndarray_copy_from_intptr(void* ptr, size_t N, bint use_int32):
     """Create a NumPy array from a pointer to an integer array.
 
     Parameters
@@ -859,7 +859,7 @@ cdef np.ndarray _ndarray_from_cholmod_intarray(void* ptr, size_t N, bint use_int
     return p.copy()  # return a copy in case ptr is freed
 
 
-cdef np.ndarray _ndarray_view_from_factor(
+cdef np.ndarray _ndarray_int_view_from_factor(
     void* ptr, size_t N, CholeskyFactor py_factor
 ):
     """Create a NumPy array from the an integer vector in a CHOLMOD factor.
@@ -924,7 +924,20 @@ cdef dict _ordering_methods_inv = {
 
 
 cdef void _set_ordering_method(object order, cholmod_common* cm):
-    """Set the ordering method in the CHOLMOD common struct."""
+    """Set the ordering method in the CHOLMOD common struct.
+
+    This function sets the values of ``cm->nmethods``, and possibly
+    ``cm->method[0].ordering`` and ``cm->postorder``.
+
+    Parameters
+    ----------
+    order : None or  str in {"default", "best", "natural", "metis", \
+            "nesdis", "amd", "colamd", "postordered"}
+        The desired ordering method.
+    cm : cholmod_common*
+        Pointer to a CHOLMOD common structure for configuration and status.
+        Contains the ordering method on output.
+    """
     if order == "default":
         cm.nmethods = 0
     elif order == "best":
@@ -941,7 +954,7 @@ cdef void _set_ordering_method(object order, cholmod_common* cm):
         )
 
 
-cdef dict _npdtypeclass_from_cholmod = {
+cdef dict _npdtype_class_from_xdtype = {
     (CHOLMOD_REAL, CHOLMOD_SINGLE): np.float32,
     (CHOLMOD_REAL, CHOLMOD_DOUBLE): np.float64,
     (CHOLMOD_COMPLEX, CHOLMOD_SINGLE): np.complex64,
@@ -1304,7 +1317,7 @@ cdef class CholeskyFactor:
         # "np.int32" etc. are dtype classes, not actual dtypes. numpy handles
         # both well, but be explicit and return a dtype object.
         return np.dtype(
-            _npdtypeclass_from_cholmod.get(
+            _npdtype_class_from_xdtype.get(
                 (self._factor.xtype, self._factor.dtype), None
             )
         )
@@ -1315,7 +1328,7 @@ cdef class CholeskyFactor:
 
     @property
     def colcount(self):
-        return _ndarray_view_from_factor(self._factor.ColCount, self._factor.n, self)
+        return _ndarray_int_view_from_factor(self._factor.ColCount, self._factor.n, self)
 
     @property
     def nnz(self):
@@ -1328,7 +1341,7 @@ cdef class CholeskyFactor:
 
     @property
     def perm(self):
-        return _ndarray_view_from_factor(self._factor.Perm, self._factor.n, self)
+        return _ndarray_int_view_from_factor(self._factor.Perm, self._factor.n, self)
 
     @property
     def factor(self):
@@ -2614,7 +2627,7 @@ def symbfact(A, *, kind=None, lower=False, return_factor=False):
     _handle_errors(cm.status)
 
     # Return the results
-    count = _ndarray_from_cholmod_intarray(ColCount, N, use_int32)
+    count = _ndarray_copy_from_intptr(ColCount, N, use_int32)
 
     # Compute height of the elimination tree
     cdef int32_t h_int32 = 0
@@ -2630,8 +2643,8 @@ def symbfact(A, *, kind=None, lower=False, return_factor=False):
             h_int64 = max(h_int64, (<int64_t*>Level)[i])
         h = h_int64 + 1
 
-    parent = _ndarray_from_cholmod_intarray(Parent, N, use_int32)
-    post = _ndarray_from_cholmod_intarray(Post, N, use_int32)
+    parent = _ndarray_copy_from_intptr(Parent, N, use_int32)
+    post = _ndarray_copy_from_intptr(Post, N, use_int32)
 
     # Construct symbolic L if requested
     cdef cholmod_sparse *Ls
@@ -2832,7 +2845,7 @@ def etree(A, *, kind=None, return_post=False):
     _handle_errors(cm.status)
 
     # Get the ndarray to return
-    parent = _ndarray_from_cholmod_intarray(Parent, N, use_int32)
+    parent = _ndarray_copy_from_intptr(Parent, N, use_int32)
 
     if return_post:
         if use_int32:
@@ -2844,7 +2857,7 @@ def etree(A, *, kind=None, return_post=False):
             if cholmod_l_postorder(<int64_t*>Parent, N, NULL, <int64_t*>Post, cm) != N:
                 raise CholmodError("Postordering failed.")
 
-        post = _ndarray_from_cholmod_intarray(Post, N, use_int32)
+        post = _ndarray_copy_from_intptr(Post, N, use_int32)
 
     # Free memory (arrays are copied to numpy)
     if use_int32:
@@ -3006,7 +3019,7 @@ def bisect(A, *, kind=None):
         raise CholmodError("Bisecting failed.")
 
     # Get the ndarray to return
-    s = _ndarray_from_cholmod_intarray(Partition, N, use_int32)
+    s = _ndarray_copy_from_intptr(Partition, N, use_int32)
 
     # Free memory (arrays are copied to numpy)
     if use_int32:
@@ -3136,8 +3149,8 @@ class SeparatorTree():
             raise CholmodError("Pruning the separator tree failed.")
 
         # Get the ndarrays to return
-        cp_out = _ndarray_from_cholmod_intarray(CParent, nc_new, use_int32)
-        cmember_out = _ndarray_from_cholmod_intarray(CMember, N, use_int32)
+        cp_out = _ndarray_copy_from_intptr(CParent, nc_new, use_int32)
+        cmember_out = _ndarray_copy_from_intptr(CMember, N, use_int32)
 
         # Free memory (arrays are copied to numpy)
         if use_int32:
@@ -3358,9 +3371,9 @@ def nesdis(
         raise CholmodError("Nested dissection failed.")
 
     # Get the ndarrays to return
-    p = _ndarray_from_cholmod_intarray(Perm, N, use_int32)
-    cp = _ndarray_from_cholmod_intarray(CParent, ncomp, use_int32)
-    cmember = _ndarray_from_cholmod_intarray(CMember, N, use_int32)
+    p = _ndarray_copy_from_intptr(Perm, N, use_int32)
+    cp = _ndarray_copy_from_intptr(CParent, ncomp, use_int32)
+    cmember = _ndarray_copy_from_intptr(CMember, N, use_int32)
 
     # Free memory (arrays are copied to numpy)
     if use_int32:
@@ -3511,7 +3524,7 @@ def metis(A, *, kind=None):
         raise CholmodError("metis failed.")
 
     # Get the ndarray to return
-    p = _ndarray_from_cholmod_intarray(Perm, N, use_int32)
+    p = _ndarray_copy_from_intptr(Perm, N, use_int32)
 
     # Free memory (arrays are copied to numpy)
     if use_int32:
