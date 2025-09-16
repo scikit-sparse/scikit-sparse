@@ -66,17 +66,22 @@ def test_view_vs_get(A_example, order):
     assert_allclose(pv, p, atol=1e-15)
 
 
-@pytest.mark.parametrize("dtype", DTYPES)
-def test_determinant(dtype):
-    A = sparse.csc_array(
+@pytest.fixture
+def A_small():
+    return sparse.csc_array(
         np.array(
             [[10,  0, 3,  0],
               [0,  5, 0, -2],
               [3,  0, 5,  0],
               [0, -2, 0,  2]]
         ),
-        dtype=dtype
+        dtype=np.float64,
     )
+
+
+@pytest.mark.parametrize("dtype", DTYPES)
+def test_determinant(A_small, dtype):
+    A = A_small.astype(dtype)
     rtol = 1e-7 if A.dtype in (np.float64, np.complex128) else 1e-6
 
     f = ldl_factor(A, lower=True)
@@ -91,6 +96,16 @@ def test_determinant(dtype):
 
     assert_allclose(f.det(), expect_det, rtol=rtol, strict=True)
     assert_allclose(f.slogdet(), (expect_sign, expect_logdet), rtol=rtol, strict=True)
+
+
+@pytest.mark.parametrize("dtype", DTYPES)
+def test_inv(A_small, dtype):
+    atol = 1e-12 if dtype in (np.float64, np.complex128) else 1e-3
+    A = A_small.astype(dtype)
+    f = ldl_factor(A)
+    Ainv = f.inv()
+    I = np.eye(A.shape[0], dtype=A.dtype)
+    assert_allclose((A @ Ainv).toarray(), I, atol=atol, strict=True)
 
 
 test_As = [
