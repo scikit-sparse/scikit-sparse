@@ -2081,6 +2081,49 @@ cdef class CholeskyFactor:
         """
         return np.exp(self.logdet())
 
+    def inv(self):
+        """Compute the inverse of the matrix from its Cholesky factorization.
+
+        .. warning:: For most purposes, it is better to use :meth:`.solve`
+            instead of computing the inverse explicitly. The
+            following two lines of code are mathematically equivalent::
+
+            x = f.solve(b)
+            x = f.inv() @ b  # DO NOT USE
+
+            but the first line is both faster and more numerically stable.
+
+        Returns
+        -------
+        Ainv : csc_array
+            The inverse of the matrix `A` that was factorized.
+
+        Notes
+        -----
+        This function computes the inverse of the matrix `A` from its Cholesky
+        factorization. If the factorization is in :math:`LL^T` form, the
+        inverse is computed as:
+
+        .. math::
+
+            A^{-1} = P^{\\top} L^{-\\top} L^{-1} P,
+
+        where `P` is the permutation matrix corresponding to the permutation
+        vector returned by :meth:`.get_perm`. If the factorization is in
+        :math:`LDL^{\\top}` form, the inverse is computed as:
+
+        .. math::
+
+            A^{-1} = P^{\\top} L^{-\\top} D^{-1} L^{-1} P.
+
+        .. versionadded:: 0.2
+
+        See Also
+        --------
+        :func:`numpy.linalg.inv`, :func:`scipy.linalg.inv`
+        """
+        return self.solve(eye_array(self.N, format='csc', dtype=self.dtype))
+
     # -------------------------------------------------------------------------
     #         Private API
     # -------------------------------------------------------------------------
