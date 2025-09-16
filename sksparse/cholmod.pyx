@@ -1616,9 +1616,27 @@ cdef class CholeskyFactor:
         return self  # for method chaining
 
     def solve(self, b):
-        """Solve the linear system ``A @ x = b`` for ``x``, using the
+        """Solve the linear system :math:`A x = b` for `x`, using the
         factorization.
 
+        Parameters
+        ----------
+        b : (N,) or (N, K) ndarray or sparse matrix
+            The right-hand side vector or matrix.
+
+        Returns
+        -------
+        x : (N,) or (N, K) ndarray or sparse matrix
+            The solution vector or matrix, returned in the same format as `b`.
+
+        Raises
+        ------
+        CholmodNotPositiveDefiniteError
+            If the matrix `A` is exactly singular, or singular to working
+            precision.
+
+        Notes
+        -----
         This function solves the linear system:
 
         .. math::
@@ -1649,24 +1667,6 @@ cdef class CholeskyFactor:
 
             P^{\\top} L D L^{\\top} P x = b.
 
-        Parameters
-        ----------
-        b : (N,) or (N, K) ndarray or sparse matrix
-            The right-hand side vector or matrix.
-
-        Returns
-        -------
-        x : (N,) or (N, K) ndarray or sparse matrix
-            The solution vector or matrix, returned in the same format as `b`.
-
-        Raises
-        ------
-        CholmodNotPositiveDefiniteError
-            If the matrix `A` is exactly singular, or singular to working
-            precision.
-
-        Notes
-        -----
         This function uses the CHOLMOD library to solve the linear system. It
         is intended to combine the MATLAB interfaces ``cholmod2.m``
         [#cholmod_c]_, and ``ldlsolve.m`` [#ldlsolve_c]_.
@@ -2095,8 +2095,8 @@ cdef class CholeskyFactor:
             instead of computing the inverse explicitly. The
             following two lines of code are mathematically equivalent::
 
-            x = f.solve(b)
-            x = f.inv() @ b  # DO NOT USE
+                x = f.solve(b)
+                x = f.inv() @ b  # DO NOT USE
 
             but the first line is both faster and more numerically stable.
 
