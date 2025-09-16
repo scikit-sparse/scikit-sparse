@@ -1477,7 +1477,7 @@ cdef class CholeskyFactor:
         """
         return self.perm.copy()
 
-    def factorize(self, object A, object ldl=None, object beta=None, bint lower=False):
+    def factorize(self, object A, object ldl=None, object beta=None, object lower=None):
         """Compute the Cholesky factorization of a sparse matrix.
 
         This method computes the :math:`P A P^{\\top} = R^{\\top} R` or
@@ -1494,7 +1494,7 @@ cdef class CholeskyFactor:
             numericaly different from the matrix used to initialize the
             :obj:`CholeskyFactor` object, but it must have the same sparsity
             pattern.
-        ldl : None or bool, optional
+        ldl : bool, optional
             If True, compute the LDL factorization instead of the
             Cholesky factorization. Default is None, which uses the same type of
             factorization as the previous call to ``factorize``, or ``LL`` if
@@ -1505,7 +1505,9 @@ cdef class CholeskyFactor:
             :math:`A` itself.
         lower : bool, optional
             If True, only use the lower triangular part of `A`. Otherwise, use
-            the upper triangular part. Default is False.
+            the upper triangular part. Default is None, which uses the same
+            triangular part used for the object initialization or the
+            previous call to ``factorize``.
 
         Notes
         -----
@@ -1559,7 +1561,12 @@ cdef class CholeskyFactor:
         if not isinstance(ldl, bool):
             raise ValueError("ldl must be a boolean value.")
 
-        self._is_lower = lower
+        if lower is None:
+            lower = self._is_lower  # use the existing triangle
+        elif isinstance(lower, bool):
+            self._is_lower = lower
+        else:
+            raise ValueError("lower must be a boolean value.")
 
         # See CHOLMOD/MATLAB/ldlchol.c and/or lchol.c for details
         self._cm.final_asis = False

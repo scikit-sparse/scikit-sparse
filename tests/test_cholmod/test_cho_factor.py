@@ -140,9 +140,9 @@ def test_refactor(A, copy):
         # Use a copy of the factorization object to ensure that we are taking
         # the relevant parameters from the underlying cholmod_common object.
         g = f.copy()
-        g.factorize(B, lower=True)
+        g.factorize(B)
         Lb = g.get_factor()
     else:
-        f.factorize(B, lower=True)
+        f.factorize(B)
         Lb = f.get_factor()
     assert_allclose((Lb @ Lb.T.conj()).toarray(), B.toarray(), atol=atol)
