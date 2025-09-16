@@ -66,6 +66,33 @@ def test_view_vs_get(A_example, order):
     assert_allclose(pv, p, atol=1e-15)
 
 
+@pytest.mark.parametrize("dtype", DTYPES)
+def test_determinant(dtype):
+    A = sparse.csc_array(
+        np.array(
+            [[10,  0, 3,  0],
+              [0,  5, 0, -2],
+              [3,  0, 5,  0],
+              [0, -2, 0,  2]]
+        ),
+        dtype=dtype
+    )
+    rtol = 1e-7 if A.dtype in (np.float64, np.complex128) else 1e-6
+
+    f = ldl_factor(A, lower=True)
+
+    if A.dtype in (np.complex64, np.complex128):
+        with pytest.warns(RuntimeWarning, match="(divide by zero|invalid value)"):
+            expect_det = np.linalg.det(A.toarray())
+            expect_sign, expect_logdet = np.linalg.slogdet(A.toarray())
+    else:
+        expect_det = np.linalg.det(A.toarray())
+        expect_sign, expect_logdet = np.linalg.slogdet(A.toarray())
+
+    assert_allclose(f.det(), expect_det, rtol=rtol, strict=True)
+    assert_allclose(f.slogdet(), (expect_sign, expect_logdet), rtol=rtol, strict=True)
+
+
 test_As = [
     A
     for dtype in DTYPES

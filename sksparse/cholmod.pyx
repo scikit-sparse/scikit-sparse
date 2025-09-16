@@ -1978,6 +1978,109 @@ cdef class CholeskyFactor:
 
         return self
 
+    def logdet(self):
+        """Compute the (natural) log-determinant of the matrix from its
+        Cholesky factorization.
+
+        Returns
+        -------
+        logdet : float
+            The natural logarithm of the determinant of the matrix `A` that was
+            factorized.
+
+        Notes
+        -----
+        This function computes the log-determinant of the matrix `A` from its
+        Cholesky factorization. If the factorization is in :math:`LL^T` form,
+        the determinant is computed as:
+
+        .. math::
+
+            \\log \\det(A) = 2 \\sum_i \\log L_{ii}.
+
+        If the factorization is in :math:`LDL^{\\top}` form, the determinant is
+        computed as:
+
+        .. math::
+
+            \\log \\det(A) = \\sum_i \\log D_{ii}.
+
+        .. versionadded:: 0.2
+
+        See Also
+        --------
+        :meth:`.slogdet`, :meth:`.det`, :func:`numpy.linalg.slogdet`,
+        :func:`numpy.linalg.det`, :func:`scipy.linalg.det`
+        """
+        if self.is_ll:
+            L = self.get_factor()
+            return 2 * np.sum(np.log(L.diagonal()))
+        else:
+            _, D = self.get_factor()
+            return np.sum(np.log(D.diagonal()))
+
+    def slogdet(self):
+        """Compute the sign and (natural) log-determinant of the matrix from
+        its Cholesky factorization.
+
+        Returns
+        -------
+        sign : int
+            The sign of the determinant of the matrix `A` that was
+            factorized. This is always 1 for a positive definite matrix.
+        logdet : float
+            The natural logarithm of the absolute value of the determinant of
+            the matrix `A` that was factorized.
+
+        Notes
+        -----
+        This function computes the sign and log-determinant of the matrix `A`
+        from its Cholesky factorization. If the factorization is in
+        :math:`LL^T` form, the determinant is computed as:
+
+        .. math::
+
+            \\log \\det(A) = 2 \\sum_i \\log L_{ii}.
+
+        If the factorization is in :math:`LDL^{\\top}` form, the determinant is
+        computed as:
+
+        .. math::
+
+            \\log \\det(A) = \\sum_i \\log D_{ii}.
+
+        .. versionadded:: 0.2
+
+        See Also
+        --------
+        :meth:`.logdet`, :meth:`.det`, :func:`numpy.linalg.slogdet`,
+        :func:`numpy.linalg.det`, :func:`scipy.linalg.det`
+        """
+        return (self.dtype.type(1.0), self.logdet())
+
+    def det(self):
+        """Compute the determinant of the matrix from its Cholesky
+        factorization.
+
+        .. warning::
+
+            This function may overflow or underflow for large matrices. Use
+            :meth:`.logdet` or :meth:`.slogdet` instead.
+
+        Returns
+        -------
+        det : float
+            The determinant of the matrix `A` that was factorized.
+
+        .. versionadded:: 0.2
+
+        See Also
+        --------
+        :meth:`.logdet`, :meth:`.slogdet`, :func:`numpy.linalg.det`,
+        :func:`numpy.linalg.slogdet`, :func:`scipy.linalg.det`
+        """
+        return np.exp(self.logdet())
+
     # -------------------------------------------------------------------------
     #         Private API
     # -------------------------------------------------------------------------
