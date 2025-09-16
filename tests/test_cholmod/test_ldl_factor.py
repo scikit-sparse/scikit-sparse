@@ -37,11 +37,13 @@ def A_example():
     return A
 
 
-def test_convert_factor(A_example):
-    A = A_example
+@pytest.mark.parametrize("dtype", DTYPES)
+def test_convert_factor(A_example, dtype):
+    atol = 1e-15 if dtype in (np.float64, np.complex128) else 1e-7
+    A = A_example.astype(dtype)
     f = ldl_factor(A)
     L = f.get_factor(kind="LL")
-    assert_allclose((L @ L.T.conj()).toarray(), A.toarray(), atol=1e-15)
+    assert_allclose((L @ L.T.conj()).toarray(), A.toarray(), atol=atol)
 
 
 @pytest.mark.parametrize("order", [None, "amd"])
