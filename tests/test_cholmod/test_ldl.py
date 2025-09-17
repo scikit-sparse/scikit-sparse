@@ -81,6 +81,12 @@ test_As = [
 ]
 
 
+@pytest.mark.parametrize("A", test_As[:1])
+def test_natural_ordering(A):
+    _L, _D, p = ldl(A, order="natural")
+    assert_array_equal(p, np.arange(A.shape[0]))
+
+
 @pytest.mark.parametrize("A", test_As)
 @pytest.mark.parametrize(
     "order",

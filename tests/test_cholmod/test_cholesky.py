@@ -79,6 +79,12 @@ test_As = [
 ]
 
 
+@pytest.mark.parametrize("A", test_As[:1])
+def test_natural_ordering(A):
+    _L, p = cholesky(A, order="natural", lower=True)
+    assert_array_equal(p, np.arange(A.shape[0]))
+
+
 @pytest.mark.parametrize("A", test_As)
 @pytest.mark.parametrize(
     "order",
