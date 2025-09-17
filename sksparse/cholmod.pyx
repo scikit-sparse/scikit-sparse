@@ -1410,6 +1410,8 @@ cdef class CholeskyFactor:
         else:
             cf._factor = cholmod_l_copy_factor(self._factor, cf._cm)
 
+        _handle_errors(cf._cm.status)
+
         cf._use_int32 = self._use_int32
         cf._is_lower = self._is_lower
         cf._stype = self._stype
@@ -2173,6 +2175,8 @@ cdef class CholeskyFactor:
         else:
             Xs = cholmod_l_spsolve(system, self._factor, Bs, self._cm)
 
+        _handle_errors(self._cm.status)
+
         return _csc_from_cholmod_sparse(Xs, self._cm)
 
     cdef np.ndarray _solve_dense(self, np.ndarray b):
@@ -2204,6 +2208,8 @@ cdef class CholeskyFactor:
             Xd = cholmod_solve(system, self._factor, Bd, self._cm)
         else:
             Xd = cholmod_l_solve(system, self._factor, Bd, self._cm)
+
+        _handle_errors(self._cm.status)
 
         return _ndarray_from_cholmod_dense(Xd, self._use_int32, self._cm)
 
