@@ -16,7 +16,7 @@ from numpy.testing import assert_allclose, assert_array_equal
 from scipy import linalg as la
 from scipy import sparse
 
-from sksparse.cholmod import CholmodError, ldl_factor
+from sksparse.cholmod import CholmodError, CholmodWarning, ldl_factor
 
 from ..helpers import generate_random_matrices
 
@@ -159,7 +159,7 @@ def test_nearly_singular(Arandom):
 
     expect_x = sparse.coo_array(np.arange(1, N + 1, dtype=A.dtype))
     b = A @ expect_x
-    with pytest.raises(CholmodError, match="nearly singular"):
+    with pytest.warns(CholmodWarning, match="nearly singular"):
         ldl_factor(A).solve(b)
 
 

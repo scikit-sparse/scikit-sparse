@@ -1818,10 +1818,10 @@ cdef class CholeskyFactor:
                 "Matrix is indefinite or singular to working precision."
             )
         elif rcond < eps:
-            # TODO warning instead of error
-            raise CholmodNotPositiveDefiniteError(
+            warnings.warn(
                 "Matrix is nearly singular."
-                f"  Results may be inaccurate (rcond={rcond:.2e})."
+                f"  Results may be inaccurate (rcond={rcond:.2e}).",
+                CholmodWarning,
             )
 
     def update(self, C):

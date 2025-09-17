@@ -22,6 +22,7 @@ from scipy.io import mmread
 from sksparse.cholmod import (
     CholmodError,
     CholmodNotPositiveDefiniteError,
+    CholmodWarning,
     cho_factor,
 )
 
@@ -182,7 +183,7 @@ def test_nearly_singular(Arandom):
 
     expect_x = sparse.coo_array(np.arange(1, N + 1, dtype=A.dtype))
     b = A @ expect_x
-    with pytest.raises(CholmodNotPositiveDefiniteError, match="nearly singular"):
+    with pytest.warns(CholmodWarning, match="nearly singular"):
         cho_factor(A).solve(b)
 
 
