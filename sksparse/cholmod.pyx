@@ -2223,6 +2223,8 @@ cdef class CholeskyFactor:
         else:
             rcond = cholmod_l_rcond(self._factor, self._cm)
 
+        _handle_errors(self._cm.status)
+
         if rcond == 0:
             raise CholmodNotPositiveDefiniteError(
                 "Matrix is indefinite or singular to working precision."
