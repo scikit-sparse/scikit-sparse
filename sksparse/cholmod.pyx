@@ -1056,9 +1056,6 @@ cdef class CholeskyFactor:
     The numeric factorization is not computed until :meth:`.factorize` is
     called.
 
-    The analysis follows that of the SuiteSparse ``analyze`` MATLAB function
-    [#analyze_c]_.
-
     Attributes
     ----------
     N : int
@@ -1091,8 +1088,7 @@ cdef class CholeskyFactor:
     sym_kind : str in {"sym", "row", "col"}, optional
         The type of factorization for which to analyze the matrix:
 
-        * ``sym``: Symmetric factorization. Only the lower triangular part of
-          ``A`` is used, and no check is made for symmetry.
+        * ``sym``: Symmetric factorization. No check is made for symmetry.
         * ``row``: Unsymmetric factorization of :math:`A A^{\\top}`.
         * ``col``: Unsymmetric factorization of :math:`A^{\\top} A`.
 
@@ -1151,6 +1147,11 @@ cdef class CholeskyFactor:
     * :func:`.ldl_factor` : Factorize a matrix using LDL decomposition.
 
     .. versionadded:: 0.5.0
+
+    Notes
+    -----
+    The symbolic analysis follows that of the SuiteSparse CHOLMOD ``analyze``
+    MATLAB function [#analyze_c]_.
 
     References
     ----------
@@ -1480,13 +1481,14 @@ cdef class CholeskyFactor:
     def factorize(self, object A, object ldl=None, float beta=0.0, object lower=None):
         """Compute the numerical Cholesky factorization of a sparse matrix.
 
-        This method computes the :math:`P A P^{\\top} = R^{\\top} R` or
-        :math:`P A P^{\\top} = L L^{\\top}` decomposition of a Hermitian
-        positive-definite matrix `A`, with fill-reducing permutation `P`.
+        This method computes the numerical values of :math:`P A P^{\\top}
+        = R^{\\top} R` or :math:`P A P^{\\top} = L L^{\\top}` decomposition of
+        a Hermitian positive-definite matrix `A`, with fill-reducing
+        permutation `P`.
 
         Parameters
         ----------
-        A : (N, N) {{array_like, sparse array}}
+        A : (N, N) {array_like, sparse array}
             An array convertible to a sparse matrix in Compressed Sparse Column
             (CSC) format. The matrix must be square and symmetric positive
             definite. Only the upper or lower triangular part of the matrix is
@@ -1495,10 +1497,10 @@ cdef class CholeskyFactor:
             :obj:`CholeskyFactor` object, but it must have the same sparsity
             pattern.
         ldl : bool, optional
-            If True, compute the LDL factorization instead of the
-            Cholesky factorization. Default is None, which uses the same type of
-            factorization as the previous call to ``factorize``, or ``LL`` if
-            this is the first call.
+            If True, compute the LDL factorization instead of the Cholesky
+            factorization. Default is None, which uses the same type of
+            factorization as the previous call to :meth:`.factorize`, or False
+            if this is the first call.
         beta : float, optional
             The scalar value to add to the diagonal of the matrix before
             factorization. Default is 0.
@@ -1506,7 +1508,7 @@ cdef class CholeskyFactor:
             If True, only use the lower triangular part of `A`. Otherwise, use
             the upper triangular part. Default is None, which uses the same
             triangular part used for the object initialization or the
-            previous call to ``factorize``.
+            previous call to :meth:`.factorize`.
 
         Notes
         -----
@@ -2336,6 +2338,9 @@ A : (N, N) {{array_like, sparse array}}
     is made for symmetry.
 beta : float, optional
     The scalar value to add to the diagonal of the matrix before factorization.
+lower : bool, optional
+    If True, return the lower triangular factor `L`, otherwise return the
+    upper triangular factor `R`.
 order : None or str in {{"default", "best", "natural", "metis", "nesdis", \
         "amd", "colamd", "postordered"}}, optional
     The permutation algorithm to use for the factorization. By default, the
@@ -2358,8 +2363,21 @@ order : None or str in {{"default", "best", "natural", "metis", "nesdis", \
         The ordering method ``best`` may be quite slow for large matrices,
         but if the factorization is reused many times, it can be worth it.
 
-lower : bool, optional
-    If True, return the lower triangular factor `L`.
+sym_kind : str in {{"sym", "row", "col"}}, optional
+    The type of factorization for which to analyze the matrix:
+
+    * ``sym``: Symmetric factorization. No check is made for symmetry.
+    * ``row``: Unsymmetric factorization of :math:`A A^{{\\top}}`.
+    * ``col``: Unsymmetric factorization of :math:`A^{{\\top}} A`.
+
+supernodal_mode : str in {{"auto", "simplicial", "supernodal"}}, optional
+    The type of factorization to use:
+
+    * ``auto``: Automatically select the factorization type.
+    * ``simplicial``: Use a simplicial factorization.
+    * ``supernodal``: Use a supernodal factorization.
+
+    Note that the ``simplicial`` mode may be slow for large matrices.
 
 Returns
 -------
@@ -2397,6 +2415,7 @@ p : ndarray of int, optional
     The permutation vector used in the factorization. Only returned if the
     ordering is not ``None``.
 """
+
 
 # -----------------------------------------------------------------------------
 #         Cholesky Docstring
