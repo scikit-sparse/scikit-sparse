@@ -1170,7 +1170,7 @@ cdef class CholeskyFactor:
         self,
         object A,
         *,
-        bint lower=False,
+        bint lower=True,
         object order=None,
         object sym_kind=None,
         object supernodal_mode=None,
