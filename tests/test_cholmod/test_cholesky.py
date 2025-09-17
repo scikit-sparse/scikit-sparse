@@ -114,11 +114,11 @@ def test_lower(A):
     assert_allclose(R.T.conj().toarray(), L.toarray(), atol=atol)
 
 
+@pytest.mark.parametrize("beta", [0.0, 1.0, 3.4])
 @pytest.mark.parametrize("A", test_As)
-def test_beta(A):
-    atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-3
+def test_beta(A, beta):
+    atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
     N = A.shape[0]
-    beta = 17.0  # arbitrary positive value
     L = cholesky(A, beta, lower=True)
     expect_LL = (A + beta * sparse.eye_array(N)).toarray()
     assert_allclose((L @ L.T.conj()).toarray(), expect_LL, atol=atol)

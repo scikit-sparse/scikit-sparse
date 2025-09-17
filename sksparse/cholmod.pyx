@@ -2284,7 +2284,6 @@ def cho_factor(
 def ldl_factor(
     A, beta=None, *, lower=True, order=None, sym_kind=None, supernodal_mode=None
 ):
-    sym_kind = "row" if beta is not None else "sym"
     return CholeskyFactor(
         A, lower=lower, order=order, sym_kind=sym_kind, supernodal_mode=supernodal_mode
     ).factorize(A, ldl=True, beta=beta, lower=lower)
