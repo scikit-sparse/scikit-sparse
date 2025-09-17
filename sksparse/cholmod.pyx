@@ -429,7 +429,6 @@ cdef object _csc_view_from_cholmod_factor(CholeskyFactor py_factor, object ldl=N
     if L is NULL:
         raise ValueError("The factor pointer is NULL.")
 
-    # TODO handle below to return a symbolic factor
     if L.xtype == CHOLMOD_PATTERN:
         raise ValueError("The factor has no numerical values.")
 
@@ -1723,8 +1722,6 @@ cdef class CholeskyFactor:
         # Convert to 1D array if input b is 1D
         if K == 0:
             X = X[:, 0]
-
-        # TODO stats data structure
 
         return X
 
@@ -3263,7 +3260,6 @@ class SeparatorTree():
         cdef void *CParent
         cdef void *CMember
 
-        # TODO could do checks of each value in a for-loop here
         if use_int32:
             CParent = cholmod_malloc(Nc, sizeof(int32_t), cm)
             CMember = cholmod_malloc(N, sizeof(int32_t), cm)
@@ -3635,7 +3631,7 @@ def metis(A, *, kind=None):
     # -------------------------------------------------------------------------
     cdef void *Perm
     cdef cholmod_sparse *C
-    cdef bint postorder = True  # TODO accept options inputs
+    cdef bint postorder = True
     cdef int64_t ok
 
     if transpose:
