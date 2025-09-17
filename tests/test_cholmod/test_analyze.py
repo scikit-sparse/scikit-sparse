@@ -15,7 +15,11 @@ import pytest
 from numpy.testing import assert_array_equal
 from scipy import sparse
 
-from sksparse.cholmod import CholeskyFactor, CholmodNotPositiveDefiniteError
+from sksparse.cholmod import (
+    CholeskyFactor,
+    CholmodError,
+    CholmodNotPositiveDefiniteError,
+)
 
 from ..helpers import generate_random_matrices, is_valid_permutation
 
@@ -105,6 +109,36 @@ def test_itype(A_example, itype):
     assert np.all(count <= N)
     assert_array_equal(count, expect_count, strict=True)
     assert f.nnz == 33  # == nnz(lchol(A)) in MATLAB (natural ordering)
+
+
+def test_solve_symbolic(A_example):
+    A = A_example
+    f = CholeskyFactor(A)
+    b = np.arange(A.shape[0], dtype=A.dtype)
+    with pytest.raises(CholmodError, match="is symbolic"):
+        f.solve(b)
+
+
+def test_update_symbolic(A_example):
+    A = A_example
+    f = CholeskyFactor(A)
+    with pytest.raises(CholmodError, match="is symbolic"):
+        f.update(A[:, :1])
+
+
+def test_resymbol_symbolic(A_example):
+    A = A_example
+    f = CholeskyFactor(A)
+    with pytest.raises(CholmodError, match="is symbolic"):
+        f.resymbol(A)
+
+
+@pytest.mark.parametrize("method", ["slogdet", "logdet", "det"])
+def test_det_symbolic(A_example, method):
+    A = A_example
+    f = CholeskyFactor(A)
+    with pytest.raises(CholmodError, match="is symbolic"):
+        f.__getattribute__(method)()
 
 
 ORDERS = [

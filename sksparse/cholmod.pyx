@@ -1272,6 +1272,11 @@ cdef class CholeskyFactor:
         """Deallocate memory used by the CholeskyFactor."""
         _cleanup_factor(self)
 
+    def _require_factorized(self):
+        """Raise an error if the factor is symbolic only."""
+        if self._factor.xtype == CHOLMOD_PATTERN:
+            raise CholmodError("Factor is symbolic. Call `factorize` before updating.")
+
     def __repr__(self):
         return (
             f"CholeskyFactor("
@@ -1686,6 +1691,8 @@ cdef class CholeskyFactor:
         .. [#ldlsolve_c] ``ldlsolve.c`` - CHOLMOD MATLAB interface
             https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/ldlsolve.c
         """
+        self._require_factorized()
+
         if not (isinstance(b, np.ndarray) or issparse(b)):
             raise ValueError("b must be an ndarray or sparse matrix.")
 
@@ -1826,6 +1833,8 @@ cdef class CholeskyFactor:
     def _update(self, C, updown="up"):
         assert updown in ("up", "down")
 
+        self._require_factorized()
+
         if not issparse(C) or C.ndim not in {1, 2}:
             raise ValueError(f"Update matrix C is type {type(C)}. "
                              "Expected a 1D or 2D sparse array.")
@@ -1920,6 +1929,8 @@ cdef class CholeskyFactor:
 
         .. versionadded:: 0.5.0
         """
+        self._require_factorized()
+
         if not (0 <= k < self.N):
             raise IndexError(
                 f"Row index k={k} is out of bounds for matrix of size {self.N}."
@@ -1981,6 +1992,8 @@ cdef class CholeskyFactor:
 
         .. versionadded:: 0.5.0
         """
+        self._require_factorized()
+
         if not (0 <= k < self.N):
             raise IndexError(
                 f"Row index k={k} is out of bounds for matrix of size {self.N}."
@@ -2041,6 +2054,8 @@ cdef class CholeskyFactor:
         .. [#resymbol_c] ``resymbol.c`` - CHOLMOD MATLAB resymbolization function
             https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/resymbol.c
         """
+        self._require_factorized()
+
         cdef bint A_use_int32
         A, A_use_int32, _ = validate_csc_input(A, require_square=True)
 
@@ -2121,6 +2136,7 @@ cdef class CholeskyFactor:
         :meth:`.slogdet`, :meth:`.det`, :func:`numpy.linalg.slogdet`,
         :func:`numpy.linalg.det`, :func:`scipy.linalg.det`
         """
+        self._require_factorized()
         if self.is_ll:
             L = self.get_factor()
             return 2 * np.sum(np.log(L.diagonal()))
