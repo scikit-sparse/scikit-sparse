@@ -118,10 +118,17 @@ def test_lower(A):
 
 
 @pytest.mark.parametrize("beta", [0.0, 1.0, 3.4])
+@pytest.mark.parametrize("order", [None, "amd"])
 @pytest.mark.parametrize("A", test_As)
-def test_beta(A, beta):
+def test_beta(A, beta, order):
     atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
     N = A.shape[0]
-    L, D = ldl(A, beta)
-    expect_LDL = (A + beta * sparse.eye_array(N)).toarray()
+
+    if order is None:
+        L, D = ldl(A, beta)
+        expect_LDL = (A + beta * sparse.eye_array(N)).toarray()
+    else:
+        L, D, p = ldl(A, beta, order=order)
+        expect_LDL = (A[p][:, p] + beta * sparse.eye_array(N)).toarray()
+
     assert_allclose((L @ D @ L.T.conj()).toarray(), expect_LDL, atol=atol)

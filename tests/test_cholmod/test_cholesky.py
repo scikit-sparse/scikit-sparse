@@ -115,10 +115,17 @@ def test_lower(A):
 
 
 @pytest.mark.parametrize("beta", [0.0, 1.0, 3.4])
+@pytest.mark.parametrize("order", [None, "amd"])
 @pytest.mark.parametrize("A", test_As)
-def test_beta(A, beta):
+def test_beta(A, beta, order):
     atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
     N = A.shape[0]
-    L = cholesky(A, beta, lower=True)
-    expect_LL = (A + beta * sparse.eye_array(N)).toarray()
+
+    if order is None:
+        L = cholesky(A, beta, lower=True)
+        expect_LL = (A + beta * sparse.eye_array(N)).toarray()
+    else:
+        L, p = cholesky(A, beta, lower=True, order=order)
+        expect_LL = (A[p][:, p] + beta * sparse.eye_array(N)).toarray()
+
     assert_allclose((L @ L.T.conj()).toarray(), expect_LL, atol=atol)

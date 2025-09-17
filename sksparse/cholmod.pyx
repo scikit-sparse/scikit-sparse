@@ -1477,8 +1477,8 @@ cdef class CholeskyFactor:
         """
         return self.perm.copy()
 
-    def factorize(self, object A, object ldl=None, object beta=None, object lower=None):
-        """Compute the Cholesky factorization of a sparse matrix.
+    def factorize(self, object A, object ldl=None, float beta=0.0, object lower=None):
+        """Compute the numerical Cholesky factorization of a sparse matrix.
 
         This method computes the :math:`P A P^{\\top} = R^{\\top} R` or
         :math:`P A P^{\\top} = L L^{\\top}` decomposition of a Hermitian
@@ -1501,8 +1501,7 @@ cdef class CholeskyFactor:
             this is the first call.
         beta : float, optional
             The scalar value to add to the diagonal of the matrix before
-            factorization. Default is None, which computes the factorization of
-            :math:`A` itself.
+            factorization. Default is 0.
         lower : bool, optional
             If True, only use the lower triangular part of `A`. Otherwise, use
             the upper triangular part. Default is None, which uses the same
@@ -1546,7 +1545,13 @@ cdef class CholeskyFactor:
 
         .. math::
 
-            L D L^{\\top} = P A A^{\\top} P^{\\top} + \\beta I.
+            P A P^{\\top} + \\beta I.
+
+        Note that if the :obj:`CholeskyFactor` was initialized with ``sym_kind``
+        equal to ``"row"`` or ``"col"``, the factorization is computed for
+        :math:`P A A^{\\top} P^{\\top}` or :math:`P A^{\\top} A P^{\\top}`,
+        respectively. Similarly, ``beta`` is added to the diagonal of these
+        matrices.
         """
         assert self._factor is not NULL, "The factor has not been initialized."
 
@@ -1593,14 +1598,11 @@ cdef class CholeskyFactor:
         # Set stype and beta
         cdef double betac[2]
 
-        if beta is None:
-            betac[0] = 0.0
-            betac[1] = 0.0
-        else:
-            if not np.isscalar(beta):
-                raise ValueError("beta must be a scalar value.")
-            betac[0] = beta
-            betac[1] = 0.0
+        if not np.isscalar(beta):
+            raise ValueError("beta must be a scalar value.")
+
+        betac[0] = beta
+        betac[1] = 0.0
 
         Ac.stype = self._stype  # set in __cinit__ with sym_kind
 
@@ -2274,7 +2276,7 @@ CholeskyFactor.downdate.__doc__ = _DOC_UPDATE_TEMPLATE.format(
 #         Convenience functions
 # -----------------------------------------------------------------------------
 def cho_factor(
-    A, beta=None, *, lower=False, order=None, sym_kind=None, supernodal_mode=None
+    A, beta=0.0, *, lower=False, order=None, sym_kind=None, supernodal_mode=None
 ):
     return CholeskyFactor(
         A, lower=lower, order=order, sym_kind=sym_kind, supernodal_mode=supernodal_mode
@@ -2282,7 +2284,7 @@ def cho_factor(
 
 
 def ldl_factor(
-    A, beta=None, *, lower=True, order=None, sym_kind=None, supernodal_mode=None
+    A, beta=0.0, *, lower=True, order=None, sym_kind=None, supernodal_mode=None
 ):
     return CholeskyFactor(
         A, lower=lower, order=order, sym_kind=sym_kind, supernodal_mode=supernodal_mode
@@ -2291,7 +2293,7 @@ def ldl_factor(
 
 # csc_arrays from the factorization, and optionally the permutation
 def cholesky(
-    A, beta=None, *, lower=False, order=None, sym_kind=None, supernodal_mode=None
+    A, beta=0.0, *, lower=False, order=None, sym_kind=None, supernodal_mode=None
 ):
     f = cho_factor(
         A,
@@ -2306,7 +2308,7 @@ def cholesky(
     return R if order is None else (R, p)
 
 
-def ldl(A, beta=None, *, lower=True, order=None, sym_kind=None, supernodal_mode=None):
+def ldl(A, beta=0.0, *, lower=True, order=None, sym_kind=None, supernodal_mode=None):
     f = ldl_factor(
         A,
         beta=beta,
@@ -2332,7 +2334,8 @@ A : (N, N) {{array_like, sparse array}}
     (CSC) format. The matrix must be square and symmetric positive definite.
     Only the upper or lower triangular part of the matrix is used, and no check
     is made for symmetry.
-{beta_param}
+beta : float, optional
+    The scalar value to add to the diagonal of the matrix before factorization.
 order : None or str in {{"default", "best", "natural", "metis", "nesdis", \
         "amd", "colamd", "postordered"}}, optional
     The permutation algorithm to use for the factorization. By default, the
@@ -2416,6 +2419,14 @@ returned instead, such that:
     L L^{\\top} = P A P^{\\top}.
 
 In this case, only the lower triangular part of `A` is used.
+
+If ``beta`` is a scalar value, compute the factorization of:
+
+.. math::
+
+    P A P^{\\top} + \\beta I,
+
+where `I` is the identity matrix.
 """
 
 
@@ -2431,7 +2442,6 @@ _cho_factor_returns = """CholeskyFactor
 
 cho_factor.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     intro=_cholesky_intro,
-    beta_param="",
     returns=_cho_factor_returns,
     see_also=_cholesky_see_also,
     doc_tag="#cho_factor_h",
@@ -2440,7 +2450,6 @@ cho_factor.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
 
 cholesky.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     intro=_cholesky_intro,
-    beta_param="",
     returns=_CHOLESKY_RETURNS.format(ldl_D_output=""),
     see_also=_cholesky_see_also,
     doc_tag="#cholesky_h",
@@ -2473,15 +2482,10 @@ If ``beta`` is a scalar value, compute the factorization of:
 
 .. math::
 
-    L D L^{\\top} = P A A^{\\top} P^{\\top} + \\beta I,
+    P A P^{\\top} + \\beta I,
 
 where `I` is the identity matrix.
 """
-
-_beta_param = """beta : float, optional
-    The scalar value to add to the diagonal of the symmetrized matrix
-    :math:`A A^{\\top}` before factorization. Default is None, which
-    computes the factorization of :math:`A` itself."""
 
 
 _ldl_D_output = """D : dia_array
@@ -2496,7 +2500,6 @@ _ldl_see_also = """
 
 ldl_factor.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     intro=_ldl_intro,
-    beta_param=_beta_param,
     returns=_cho_factor_returns,
     see_also=_ldl_see_also,
     doc_tag="#ldl_factor_h",
@@ -2505,7 +2508,6 @@ ldl_factor.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
 
 ldl.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     intro=_ldl_intro,
-    beta_param=_beta_param,
     returns=_CHOLESKY_RETURNS.format(ldl_D_output=_ldl_D_output),
     see_also=_ldl_see_also,
     doc_tag="#ldl_h",
