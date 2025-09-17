@@ -15,7 +15,7 @@ import pytest
 from numpy.testing import assert_allclose
 from scipy import sparse
 
-from sksparse.cholmod import cho_factor
+from sksparse.cholmod import CholmodInvalidInputError, cho_factor
 
 from ..helpers import generate_random_matrices
 
@@ -63,12 +63,7 @@ def test_view_vs_get(A_example, order):
 @pytest.fixture
 def A_small():
     return sparse.csc_array(
-        np.array(
-            [[10,  0, 3,  0],
-              [0,  5, 0, -2],
-              [3,  0, 5,  0],
-              [0, -2, 0,  2]]
-        ),
+        np.array([[10, 0, 3, 0], [0, 5, 0, -2], [3, 0, 5, 0], [0, -2, 0, 2]]),
         dtype=np.float64,
     )
 
@@ -100,6 +95,13 @@ def test_inv(A_small, dtype):
     Ainv = f.inv()
     I = np.eye(A.shape[0], dtype=A.dtype)
     assert_allclose((A @ Ainv).toarray(), I, atol=atol, strict=True)
+
+
+def test_bad_refactor_type(A_small):
+    A = A_small.astype(np.float64)
+    f = cho_factor(A)
+    with pytest.raises(CholmodInvalidInputError):
+        f.factorize(A.astype(np.complex128))
 
 
 test_As = [
