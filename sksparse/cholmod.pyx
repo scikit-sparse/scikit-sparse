@@ -1721,6 +1721,102 @@ cdef class CholeskyFactor:
 
         return X
 
+    cdef object _solve_sparse(self, object b):
+        """Solve the system A x = b with a sparse right-hand side."""
+        # Get the b vector or matrix into CHOLMOD format
+        cdef cholmod_sparse Bspmatrix
+        cdef cholmod_sparse* Bs = &Bspmatrix
+
+        # CHOLMOD expects at least a column vector for the RHS
+        if b.ndim == 1:
+            b = b.reshape((-1, 1)).tocsc()  # (N, 1)
+
+        # For LDL, permute the RHS
+        if not self.is_ll:
+            b = b[self.perm]
+
+        cdef int stype = 0
+        cdef bint b_use_int32
+
+        b, b_use_int32, _ = validate_csc_input(b)
+
+        # keep a reference to b so it is not garbage collected
+        cdef object _b_ref = _cholmod_sparse_from_csc(b, stype, b_use_int32, &Bspmatrix)
+
+        # Check the condition number before solving
+        self._check_rcond()
+
+        # Solve the system
+        cdef cholmod_sparse* Xs
+
+        cdef int system = CHOLMOD_A if self.is_ll else CHOLMOD_LDLt
+
+        if self._use_int32:
+            Xs = cholmod_spsolve(system, self._factor, Bs, self._cm)
+        else:
+            Xs = cholmod_l_spsolve(system, self._factor, Bs, self._cm)
+
+        _handle_errors(self._cm.status)
+
+        return _csc_from_cholmod_sparse(Xs, self._cm)
+
+    cdef np.ndarray _solve_dense(self, np.ndarray b):
+        """Solve the system A x = b with a dense right-hand side."""
+        # Get the b vector or matrix into CHOLMOD format
+        cdef cholmod_dense Bmatrix
+        cdef cholmod_dense* Bd = &Bmatrix
+
+        # CHOLMOD expects at least a column vector for the RHS
+        if b.ndim == 1:
+            b = b[:, np.newaxis]  # (N, 1)
+
+        # For LDL, permute the RHS
+        if not self.is_ll:
+            b = b[self.perm]
+
+        # keep a reference to b so it is not garbage collected
+        cdef object _b_ref = _cholmod_dense_from_ndarray(b, &Bmatrix)
+
+        # Check the condition number before solving
+        self._check_rcond()
+
+        # Solve the system
+        cdef cholmod_dense* Xd
+
+        cdef int system = CHOLMOD_A if self.is_ll else CHOLMOD_LDLt
+
+        if self._use_int32:
+            Xd = cholmod_solve(system, self._factor, Bd, self._cm)
+        else:
+            Xd = cholmod_l_solve(system, self._factor, Bd, self._cm)
+
+        _handle_errors(self._cm.status)
+
+        return _ndarray_from_cholmod_dense(Xd, self._use_int32, self._cm)
+
+    cdef void _check_rcond(self) except *:
+        """Check the condition number."""
+        cdef double rcond
+        cdef double eps = np.finfo(np.float64).eps
+
+        if self._use_int32:
+            rcond = cholmod_rcond(self._factor, self._cm)
+        else:
+            rcond = cholmod_l_rcond(self._factor, self._cm)
+
+        _handle_errors(self._cm.status)
+
+        if rcond == 0:
+            raise CholmodNotPositiveDefiniteError(
+                "Matrix is indefinite or singular to working precision."
+            )
+        elif rcond < eps:
+            # TODO warning instead of error
+            raise CholmodNotPositiveDefiniteError(
+                "Matrix is nearly singular."
+                f"  Results may be inaccurate (rcond={rcond:.2e})."
+            )
+
     def update(self, C):
         return self._update(C, updown="up")
 
@@ -2136,104 +2232,6 @@ cdef class CholeskyFactor:
         :func:`numpy.linalg.inv`, :func:`scipy.linalg.inv`
         """
         return self.solve(eye_array(self.N, format='csc', dtype=self.dtype))
-
-    # -------------------------------------------------------------------------
-    #         Private API
-    # -------------------------------------------------------------------------
-    cdef object _solve_sparse(self, object b):
-        """Solve the system A x = b with a sparse right-hand side."""
-        # Get the b vector or matrix into CHOLMOD format
-        cdef cholmod_sparse Bspmatrix
-        cdef cholmod_sparse* Bs = &Bspmatrix
-
-        # CHOLMOD expects at least a column vector for the RHS
-        if b.ndim == 1:
-            b = b.reshape((-1, 1)).tocsc()  # (N, 1)
-
-        # For LDL, permute the RHS
-        if not self.is_ll:
-            b = b[self.perm]
-
-        cdef int stype = 0
-        cdef bint b_use_int32
-
-        b, b_use_int32, _ = validate_csc_input(b)
-
-        # keep a reference to b so it is not garbage collected
-        cdef object _b_ref = _cholmod_sparse_from_csc(b, stype, b_use_int32, &Bspmatrix)
-
-        # Check the condition number before solving
-        self._check_rcond()
-
-        # Solve the system
-        cdef cholmod_sparse* Xs
-
-        cdef int system = CHOLMOD_A if self.is_ll else CHOLMOD_LDLt
-
-        if self._use_int32:
-            Xs = cholmod_spsolve(system, self._factor, Bs, self._cm)
-        else:
-            Xs = cholmod_l_spsolve(system, self._factor, Bs, self._cm)
-
-        _handle_errors(self._cm.status)
-
-        return _csc_from_cholmod_sparse(Xs, self._cm)
-
-    cdef np.ndarray _solve_dense(self, np.ndarray b):
-        """Solve the system A x = b with a dense right-hand side."""
-        # Get the b vector or matrix into CHOLMOD format
-        cdef cholmod_dense Bmatrix
-        cdef cholmod_dense* Bd = &Bmatrix
-
-        # CHOLMOD expects at least a column vector for the RHS
-        if b.ndim == 1:
-            b = b[:, np.newaxis]  # (N, 1)
-
-        # For LDL, permute the RHS
-        if not self.is_ll:
-            b = b[self.perm]
-
-        # keep a reference to b so it is not garbage collected
-        cdef object _b_ref = _cholmod_dense_from_ndarray(b, &Bmatrix)
-
-        # Check the condition number before solving
-        self._check_rcond()
-
-        # Solve the system
-        cdef cholmod_dense* Xd
-
-        cdef int system = CHOLMOD_A if self.is_ll else CHOLMOD_LDLt
-
-        if self._use_int32:
-            Xd = cholmod_solve(system, self._factor, Bd, self._cm)
-        else:
-            Xd = cholmod_l_solve(system, self._factor, Bd, self._cm)
-
-        _handle_errors(self._cm.status)
-
-        return _ndarray_from_cholmod_dense(Xd, self._use_int32, self._cm)
-
-    cdef void _check_rcond(self) except *:
-        """Check the condition number."""
-        cdef double rcond
-        cdef double eps = np.finfo(np.float64).eps
-
-        if self._use_int32:
-            rcond = cholmod_rcond(self._factor, self._cm)
-        else:
-            rcond = cholmod_l_rcond(self._factor, self._cm)
-
-        _handle_errors(self._cm.status)
-
-        if rcond == 0:
-            raise CholmodNotPositiveDefiniteError(
-                "Matrix is indefinite or singular to working precision."
-            )
-        elif rcond < eps:
-            raise CholmodNotPositiveDefiniteError(
-                "Matrix is nearly singular."
-                f"  Results may be inaccurate (rcond={rcond:.2e})."
-            )
 
 
 # -----------------------------------------------------------------------------
