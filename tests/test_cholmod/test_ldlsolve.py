@@ -99,21 +99,9 @@ def test_singleton_sparse(dtype):
     assert_allclose(x.toarray(), b.toarray())
 
 
-# Declare a single random matrix fixture for some tests
-@pytest.fixture(
-    params=list(
-        generate_random_matrices(
-            N_trials=1, N_max=200, d_scale=0.05, pos_def_only=True
-        ),
-    )
-)
-def Arandom(request):
-    return request.param
-
-
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
-def test_itype_1D(Arandom, itype):
-    A = Arandom
+def test_itype_1D(davis_example_chol, itype):
+    A = davis_example_chol
     A.indptr = A.indptr.astype(itype)
     A.indices = A.indices.astype(itype)
     N = A.shape[0]
@@ -125,8 +113,8 @@ def test_itype_1D(Arandom, itype):
 
 
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
-def test_itype_2D(Arandom, itype):
-    A = Arandom
+def test_itype_2D(davis_example_chol, itype):
+    A = davis_example_chol
     A.indptr = A.indptr.astype(itype)
     A.indices = A.indices.astype(itype)
     N = A.shape[0]
@@ -143,8 +131,8 @@ def test_itype_2D(Arandom, itype):
 
 # NOTE *exactly* singular matrices are not positive definite, so they fail in
 # the ldl() function.
-def test_nearly_singular(Arandom):
-    A = Arandom.todok()
+def test_nearly_singular(davis_example_chol):
+    A = davis_example_chol.todok()
     N = A.shape[0]
     lam0 = la.eigvalsh(A.toarray()).min()
 

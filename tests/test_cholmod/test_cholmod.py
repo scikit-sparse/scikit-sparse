@@ -106,21 +106,9 @@ def test_singleton_sparse(dtype):
     assert_allclose(x.toarray(), b.toarray())
 
 
-# Declare a single random matrix fixture for some tests
-@pytest.fixture(
-    params=list(
-        generate_random_matrices(
-            N_trials=1, N_max=200, d_scale=0.05, pos_def_only=True
-        ),
-    )
-)
-def Arandom(request):
-    return request.param
-
-
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
-def test_itype_1D(Arandom, itype):
-    A = Arandom
+def test_itype_1D(davis_example_chol, itype):
+    A = davis_example_chol
     A.indptr = A.indptr.astype(itype)
     A.indices = A.indices.astype(itype)
     N = A.shape[0]
@@ -132,8 +120,8 @@ def test_itype_1D(Arandom, itype):
 
 
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
-def test_itype_2D(Arandom, itype):
-    A = Arandom
+def test_itype_2D(davis_example_chol, itype):
+    A = davis_example_chol
     A.indptr = A.indptr.astype(itype)
     A.indices = A.indices.astype(itype)
     N = A.shape[0]
@@ -148,8 +136,8 @@ def test_itype_2D(Arandom, itype):
     assert x.indices.dtype == itype
 
 
-def test_exactly_singular(Arandom):
-    A = Arandom.todok()
+def test_exactly_singular(davis_example_chol):
+    A = davis_example_chol.todok()
     N = A.shape[0]
     lam0 = la.eigvalsh(A.toarray()).min()
 
@@ -167,8 +155,8 @@ def test_exactly_singular(Arandom):
         cho_factor(A).solve(b)
 
 
-def test_nearly_singular(Arandom):
-    A = Arandom.todok()
+def test_nearly_singular(davis_example_chol):
+    A = davis_example_chol.todok()
     N = A.shape[0]
     lam0 = la.eigvalsh(A.toarray()).min()
 
@@ -217,7 +205,7 @@ test_As = [
 )
 @pytest.mark.parametrize("K", [0, 1, 3], ids=lambda k: f"K={k}")
 @pytest.mark.parametrize("is_sparse", [False, True], ids=["dense", "sparse"])
-def test_ldlsolve(A, order, K, is_sparse):
+def test_solve(A, order, K, is_sparse):
     atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
 
     # Build RHS

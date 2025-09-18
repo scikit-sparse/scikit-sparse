@@ -49,12 +49,9 @@ def test_singleton_matrix(dtype):
     assert_array_equal(L.toarray(), expect_L.toarray(), strict=True)
 
 
-@pytest.mark.parametrize(
-    "A",
-    generate_random_matrices(N_trials=1, N_max=200, d_scale=0.05, pos_def_only=True),
-)
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
-def test_itype(A, itype):
+def test_itype(davis_example_chol, itype):
+    A = davis_example_chol
     A.indptr = A.indptr.astype(itype)
     A.indices = A.indices.astype(itype)
     R = cholesky(A)

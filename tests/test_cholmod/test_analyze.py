@@ -75,24 +75,9 @@ def test_singleton(dtype):
     assert_array_equal(count, expect_count, strict=True)
 
 
-# Declare a single matrix fixture for some tests
-# See: Davis, Timothy A. (2006). Direct Methods for Sparse Linear Systems,
-# pp 708 (Equation 2.1).
-@pytest.fixture
-def A_example():
-    N = 11
-    rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
-    cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
-    vals = np.ones(len(rows), dtype=np.float64)
-    L = sparse.coo_array((vals, (rows, cols)), shape=(N, N))
-    A = (L + L.T).tocsc()  # make it symmetric
-    A.setdiag(1)
-    return A
-
-
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
-def test_itype(A_example, itype):
-    A = A_example
+def test_itype(davis_example_chol, itype):
+    A = davis_example_chol
     A.indptr = A.indptr.astype(itype)
     A.indices = A.indices.astype(itype)
     N = A.shape[0]
@@ -111,31 +96,31 @@ def test_itype(A_example, itype):
     assert f.nnz == 33  # == nnz(lchol(A)) in MATLAB (natural ordering)
 
 
-def test_solve_symbolic(A_example):
-    A = A_example
+def test_solve_symbolic(davis_example_chol):
+    A = davis_example_chol
     f = CholeskyFactor(A)
     b = np.arange(A.shape[0], dtype=A.dtype)
     with pytest.raises(CholmodError, match="is symbolic"):
         f.solve(b)
 
 
-def test_update_symbolic(A_example):
-    A = A_example
+def test_update_symbolic(davis_example_chol):
+    A = davis_example_chol
     f = CholeskyFactor(A)
     with pytest.raises(CholmodError, match="is symbolic"):
         f.update(A[:, :1])
 
 
-def test_resymbol_symbolic(A_example):
-    A = A_example
+def test_resymbol_symbolic(davis_example_chol):
+    A = davis_example_chol
     f = CholeskyFactor(A)
     with pytest.raises(CholmodError, match="is symbolic"):
         f.resymbol(A)
 
 
 @pytest.mark.parametrize("method", ["slogdet", "logdet", "det"])
-def test_det_symbolic(A_example, method):
-    A = A_example
+def test_det_symbolic(davis_example_chol, method):
+    A = davis_example_chol
     f = CholeskyFactor(A)
     with pytest.raises(CholmodError, match="is symbolic"):
         f.__getattribute__(method)()
@@ -155,8 +140,8 @@ ORDERS = [
 
 
 @pytest.mark.parametrize("order", ORDERS)
-def test_ordering(A_example, order):
-    f = CholeskyFactor(A_example, order=order)
+def test_ordering(davis_example_chol, order):
+    f = CholeskyFactor(davis_example_chol, order=order)
     assert f.order in ORDERS
     if order is None:
         assert f.order == "natural"

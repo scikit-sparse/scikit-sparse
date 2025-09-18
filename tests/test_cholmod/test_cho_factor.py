@@ -22,33 +22,18 @@ from ..helpers import generate_random_matrices
 DTYPES = [np.float32, np.float64, np.complex64, np.complex128]
 
 
-# Declare a single matrix fixture for some tests
-# See: Davis, Timothy A. (2006). Direct Methods for Sparse Linear Systems,
-# pp 708 (Equation 2.1).
-@pytest.fixture
-def A_example():
-    N = 11
-    rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
-    cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
-    vals = np.ones(len(rows), dtype=np.float64)
-    L = sparse.coo_array((vals, (rows, cols)), shape=(N, N))
-    A = (L + L.T).tocsc()  # make it symmetric
-    A.setdiag(N)
-    return A
-
-
 @pytest.mark.parametrize("dtype", DTYPES)
-def test_convert_factor(A_example, dtype):
-    atol = 1e-15 if dtype in (np.float64, np.complex128) else 1e-7
-    A = A_example.astype(dtype)
+def test_convert_factor(davis_example_chol, dtype):
+    atol = 1e-15 if dtype in (np.float64, np.complex128) else 1e-6
+    A = davis_example_chol.astype(dtype)
     f = cho_factor(A, lower=True)
     L, D = f.get_factor(kind="LDL")
     assert_allclose((L @ D @ L.T.conj()).toarray(), A.toarray(), atol=atol)
 
 
 @pytest.mark.parametrize("order", [None, "amd"])
-def test_view_vs_get(A_example, order):
-    A = A_example
+def test_view_vs_get(davis_example_chol, order):
+    A = davis_example_chol
     f = cho_factor(A, lower=True, order=order)
     Lv = f.factor
     pv = f.perm

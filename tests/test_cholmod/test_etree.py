@@ -96,24 +96,9 @@ def test_singleton(dtype):
     assert_array_equal(post, np.array([0], dtype=itype), strict=True)
 
 
-# Declare a single matrix fixture for some tests
-# See: Davis, Timothy A. (2006). Direct Methods for Sparse Linear Systems,
-# pp 708 (Equation 2.1).
-@pytest.fixture
-def A_example():
-    N = 11
-    rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
-    cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
-    vals = np.ones(len(rows), dtype=np.float64)
-    L = sparse.coo_array((vals, (rows, cols)), shape=(N, N))
-    A = (L + L.T).tocsc()  # make it symmetric
-    A.setdiag(1)
-    return A
-
-
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
-def test_etree_known(A_example, itype):
-    A = A_example
+def test_etree_known(davis_example_chol, itype):
+    A = davis_example_chol
     A.indptr = A.indptr.astype(itype)
     A.indices = A.indices.astype(itype)
     print("\nA_example:")
@@ -126,9 +111,9 @@ def test_etree_known(A_example, itype):
     assert_array_equal(post, expect_post, strict=True)
 
 
-def test_symlo(A_example):
+def test_symlo(davis_example_chol):
     # kind="lo" is the same as kind="sym" with A.T (lower triangular)
-    A = A_example
+    A = davis_example_chol
     S_sym = etree(A, kind="sym", return_post=True)
     S_lo = etree(A.T.tocsc(), kind="lo", return_post=True)
     for x, y in zip(S_lo, S_sym):
@@ -138,8 +123,8 @@ def test_symlo(A_example):
             assert_array_equal(x, y, strict=True)
 
 
-def test_rowcol(A_example):
-    A = A_example
+def test_rowcol(davis_example_chol):
+    A = davis_example_chol
     S_col = etree(A, kind="col", return_post=True)
     # Check that the factorization is correct
     N = A.shape[0]
