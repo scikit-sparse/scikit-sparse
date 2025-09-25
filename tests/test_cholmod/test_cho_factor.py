@@ -10,6 +10,8 @@
 
 """Unit tests for the CholeskyFactor object."""
 
+import warnings
+
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
@@ -48,7 +50,12 @@ def test_view_vs_get(davis_example_chol, order):
 @pytest.fixture
 def A_small():
     return sparse.csc_array(
-        np.array([[10, 0, 3, 0], [0, 5, 0, -2], [3, 0, 5, 0], [0, -2, 0, 2]]),
+        np.array(
+            [[10,  0, 3,  0],
+              [0,  5, 0, -2],
+              [3,  0, 5,  0],
+              [0, -2, 0,  2]]
+        ),
         dtype=np.float64,
     )
 
@@ -60,13 +67,21 @@ def test_determinant(A_small, dtype):
 
     f = cho_factor(A, lower=True)
 
-    if A.dtype in (np.complex64, np.complex128):
-        with pytest.warns(RuntimeWarning, match="(divide by zero|invalid value)"):
-            expect_det = np.linalg.det(A.toarray())
-            expect_sign, expect_logdet = np.linalg.slogdet(A.toarray())
-    else:
+    # In some versions of numpy, a warning is raised by slogdet for
+    # these complex types: (np.complex64, np.complex128). Make sure that is the
+    # warning that is raised, and not some other warning.
+    with warnings.catch_warnings(record=True) as record:
+        warnings.simplefilter("always")
         expect_det = np.linalg.det(A.toarray())
         expect_sign, expect_logdet = np.linalg.slogdet(A.toarray())
+
+    if record:
+        assert record[0].category is RuntimeWarning
+        assert "divide by zero" in str(record[0].message) or "invalid value" in str(
+            record[0].message
+        )
+    else:
+        pass
 
     assert_allclose(f.det(), expect_det, rtol=rtol, strict=True)
     assert_allclose(f.slogdet(), (expect_sign, expect_logdet), rtol=rtol, strict=True)
