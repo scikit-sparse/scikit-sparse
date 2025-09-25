@@ -27,6 +27,6 @@ def davis_example_chol():
     rng = np.random.default_rng(565656)
     vals = rng.random(len(rows), dtype=np.float64)
     L = sparse.coo_array((vals, (rows, cols)), shape=(N, N))
-    A = (L + L.T).tocsc()  # make it symmetric
+    A = L + L.T   # make it symmetric
     A.setdiag(N)  # make it strongly positive definite
-    return A
+    return A.tocsc()

@@ -79,6 +79,11 @@ v0.5.0
     class for convenient access to :code:`cholmod_factor` attributes. See the
     full documentation for details.
 
+  - Fix a bug in the previous version where sparse inputs with inconsistent
+    ``has_sorted_indices`` or ``has_canonical_format`` flags would silently
+    lead to incorrect results. The input matrix is now modified into
+    a canonical CSC format, regardless of the input format.
+
 
 v0.4.4
 ------

@@ -267,7 +267,7 @@ cdef object _cholmod_sparse_from_csc(
     A.nrow, A.ncol = A_py.shape
     A.nzmax = A_py.nnz
     A.packed = True
-    A.sorted = True
+    A.sorted = True  # NOTE requires input indices to be sorted
     A.itype = CHOLMOD_INT if use_int32 else CHOLMOD_LONG
     A.stype = -1 if stype < 0 else (0 if stype == 0 else 1)
     A.dtype = _single_or_double(dtype)

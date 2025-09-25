@@ -49,6 +49,41 @@ def test_singleton_matrix(dtype):
     assert_array_equal(L.toarray(), expect_L.toarray(), strict=True)
 
 
+# See: Davis, Timothy A. (2006). Direct Methods for Sparse Linear Systems,
+# pp 708 (Equation 2.1).
+@pytest.fixture
+def noncanonical_A():
+    """Return a small non-canonical example matrix from Davis (2006)."""
+    N = 11
+    rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
+    cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
+    rng = np.random.default_rng(565656)
+    vals = rng.random(len(rows), dtype=np.float64)
+    L = sparse.coo_array((vals, (rows, cols)), shape=(N, N))
+    A = (L + L.T).tocsc()  # make it symmetric
+    # NOTE As of scipy v1.16.2, sparse.csc_array.setdiag() does not guarantee
+    # sorted indices. This line breaks A.has_canonical_format and
+    # A.has_sorted_indices! A.has_sorted_indices returns True, but A.indices is
+    # NOT sorted!
+    A.setdiag(N)  # make it strongly positive definite
+    return A
+
+
+def test_noncanonical_input(noncanonical_A):
+    A = noncanonical_A
+    expect_unsorted_cols = [0, 1, 2, 3, 4, 5, 6, 7, 9]
+
+    # Show that A is not in canonical format (unsorted indices)
+    for p in range(A.shape[1]):
+        col_idx = A.indices[A.indptr[p] : A.indptr[p + 1]]
+        if not np.all(np.diff(col_idx) > 0):
+            assert p in expect_unsorted_cols
+            print(f"Column {p} is not sorted: {col_idx}")
+
+    R = cholesky(A)
+    assert_allclose((R.T.conj() @ R).toarray(), A.toarray(), atol=1e-12)
+
+
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
 def test_itype(davis_example_chol, itype):
     A = davis_example_chol

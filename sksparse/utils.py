@@ -23,13 +23,15 @@ def validate_csc_input(A, require_square=False):
     ----------
     A : (M, N) array_like
         Input matrix to be validated and converted to CSC format, if possible.
+        If `A` is already a `csc_array`, and not in canonical format, it will
+        be converted to canonical format in-place (a copy is not made).
     require_square : bool, optional
         If True, the input matrix must be square (M == N). Default is False.
 
     Returns
     -------
     A : (M, N) csc_array
-        The input matrix converted to CSC format.
+        The input matrix converted to canonical CSC format.
     use_int32 : bool
         Indicates whether the index arrays use int32 (True) or int64 (False).
     out_itype : dtype
@@ -68,6 +70,20 @@ def validate_csc_input(A, require_square=False):
             A = csc_array(A)
     except ValueError:
         raise ValueError("Input must be convertible to CSC format.")
+
+    # A copy will reset the flags, and avoid modifying the input. Generally,
+    # users would not expect the input matrix to be modified.
+    # A = A.copy()
+
+    # NOTE as of scipy 1.16.2, A.has_sorted_indices and A.has_canonical_format
+    #   are not always set correctly!
+    # Manually set the flags to False to force fixing the format.
+    A.has_sorted_indices = False
+    A.has_canonical_format = False
+    A.sum_duplicates()  # sort indices and sum duplicates
+
+    assert A.has_sorted_indices
+    assert A.has_canonical_format
 
     # Choose index width: int32 or int64
     use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
