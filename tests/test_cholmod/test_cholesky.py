@@ -97,8 +97,12 @@ def test_itype(davis_example_chol, itype):
 @pytest.mark.parametrize("dtype", DTYPES)
 def test_not_positive_definite(dtype):
     # Create a simple non-positive definite matrix
-    A = sparse.csc_array([[1, 2], [2, 1]], dtype=dtype)
-    with pytest.raises(CholmodNotPositiveDefiniteError):
+    A = sparse.eye_array(10, dtype=dtype).todok()
+    A[5:, 5:] = 0  # make it not positive definite
+    A = A.tocsc()
+    with pytest.raises(
+        CholmodNotPositiveDefiniteError, match="not positive definite.*column 5"
+    ):
         cholesky(A)
 
 

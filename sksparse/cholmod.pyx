@@ -117,7 +117,7 @@ class CholmodSmallDiagonalWarning(CholmodWarning):
     pass
 
 
-cdef _handle_errors(int status) except * with gil:
+cdef _handle_errors(int status, object minor=None) except * with gil:
     """Handle CHOLMOD errors by raising Python exceptions or warnings.
 
     This function should be called with cholmod_common->status after any
@@ -133,6 +133,8 @@ cdef _handle_errors(int status) except * with gil:
     ----------
     status : int
         The CHOLMOD status code, from the cholmod_common.status field.
+    minor : int, optional
+        The column index that caused the error, if applicable.
 
     Returns
     -------
@@ -174,7 +176,7 @@ cdef _handle_errors(int status) except * with gil:
         ),
         CHOLMOD_NOT_POSDEF: (
             CholmodNotPositiveDefiniteError,
-            "Input matrix is not positive definite."
+            f"Input matrix is not positive definite. Failed at column {minor}."
         ),
         CHOLMOD_DSMALL: (
             CholmodSmallDiagonalWarning,
@@ -1260,7 +1262,7 @@ cdef class CholeskyFactor:
                     self._factor = cholmod_l_analyze(Ac, self._cm)
 
             # Check for errors
-            _handle_errors(self._cm.status)
+            _handle_errors(self._cm.status, self._factor.minor)
 
         except Exception as e:
             _cleanup_factor(self)
@@ -1609,7 +1611,7 @@ cdef class CholeskyFactor:
             cholmod_l_factorize_p(Ac, betac, NULL, 0, self._factor, self._cm)
 
         # Check for errors
-        _handle_errors(self._cm.status)
+        _handle_errors(self._cm.status, self._factor.minor)
 
         return self  # for method chaining
 
