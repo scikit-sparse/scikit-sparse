@@ -1273,7 +1273,7 @@ cdef class CholeskyFactor:
 
     def _require_factorized(self):
         """Raise an error if the factor is symbolic only."""
-        if self._factor.xtype == CHOLMOD_PATTERN:
+        if not self.is_numeric:
             raise CholmodError("Factor is symbolic. Call `factorize` before updating.")
 
     def __repr__(self):
@@ -1316,6 +1316,10 @@ cdef class CholeskyFactor:
     @property
     def is_super(self):
         return bool(self._factor.is_super)
+
+    @property
+    def is_numeric(self):
+        return self._factor.xtype != CHOLMOD_PATTERN
 
     @property
     def itype(self):
@@ -1566,10 +1570,10 @@ cdef class CholeskyFactor:
         A, _, _ = validate_csc_input(A, require_square=True)
 
         if ldl is None:
-            try:
+            if self.is_numeric:
                 ldl = not self.is_ll  # use the existing factor type
-            except ValueError:
-                ldl = False  # default to LL if no factor exists yet
+            else:
+                ldl = False           # default to LL for first factorization
 
         if not isinstance(ldl, bool):
             raise ValueError("ldl must be a boolean value.")
