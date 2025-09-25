@@ -20,7 +20,7 @@ from scipy.sparse import SparseEfficiencyWarning
 
 from sksparse.btf import maxtrans
 
-from .helpers import generate_random_matrices, is_valid_permutation
+from ..helpers import generate_random_matrices, is_valid_permutation
 
 
 def is_valid_match(p):

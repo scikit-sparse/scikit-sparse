@@ -20,7 +20,7 @@ from scipy.sparse import SparseEfficiencyWarning
 
 from sksparse.btf import btf, btf_q_permutation
 
-from .helpers import generate_random_matrices, is_valid_permutation
+from ..helpers import generate_random_matrices, is_valid_permutation
 
 
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
