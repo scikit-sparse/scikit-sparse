@@ -1488,7 +1488,7 @@ cdef class CholeskyFactor:
         """
         return self.perm.copy()
 
-    def factorize(self, object A, object ldl=None, float beta=0.0, object lower=None):
+    def factorize(self, object A, object ldl=None, double beta=0.0):
         """Compute the numerical Cholesky factorization of a sparse matrix.
 
         This method computes the numerical values of :math:`P A P^{\\top}
@@ -1514,11 +1514,6 @@ cdef class CholeskyFactor:
         beta : float, optional
             The scalar value to add to the diagonal of the matrix before
             factorization. Default is 0.
-        lower : bool, optional
-            If True, only use the lower triangular part of `A`. Otherwise, use
-            the upper triangular part. Default is None, which uses the same
-            triangular part used for the object initialization or the
-            previous call to :meth:`.factorize`.
 
         Notes
         -----
@@ -1530,8 +1525,8 @@ cdef class CholeskyFactor:
             R^{\\top} R = P A P^{\\top},
 
         where `R` is an upper triangular matrix. Only the upper triangular part
-        of `A` is used. If ``lower`` is True, the lower triangular factor `L`
-        is computed instead, such that:
+        of `A` is used. If ``self.is_lower`` is True, the lower triangular
+        factor `L` is computed instead, such that:
 
         .. math::
 
@@ -1578,13 +1573,6 @@ cdef class CholeskyFactor:
         if not isinstance(ldl, bool):
             raise ValueError("ldl must be a boolean value.")
 
-        if lower is None:
-            lower = self._is_lower  # use the existing triangle
-        elif isinstance(lower, bool):
-            self._is_lower = lower
-        else:
-            raise ValueError("lower must be a boolean value.")
-
         # See CHOLMOD/MATLAB/ldlchol.c and/or lchol.c for details
         self._cm.final_asis = False
         self._cm.final_super = False
@@ -1603,20 +1591,17 @@ cdef class CholeskyFactor:
         cdef cholmod_sparse Amatrix
         cdef cholmod_sparse *Ac = &Amatrix
 
-        stype = -1 if lower else 1  # use lower or upper triangular part
+        stype = self._stype  # set in __cinit__ with sym_kind
         # Keep a reference to the input matrix to keep it alive
         cdef object _ref = _cholmod_sparse_from_csc(A, stype, self._use_int32, Ac)
 
-        # Set stype and beta
-        cdef double betac[2]
-
+        # Set beta
         if not np.isscalar(beta):
             raise ValueError("beta must be a scalar value.")
 
+        cdef double betac[2]
         betac[0] = beta
         betac[1] = 0.0
-
-        Ac.stype = self._stype  # set in __cinit__ with sym_kind
 
         # Factorize the matrix
         if self._use_int32:
@@ -2305,7 +2290,7 @@ def cho_factor(
 ):
     return CholeskyFactor(
         A, lower=lower, order=order, sym_kind=sym_kind, supernodal_mode=supernodal_mode
-    ).factorize(A, ldl=False, beta=beta, lower=lower)
+    ).factorize(A, ldl=False, beta=beta)
 
 
 def ldl_factor(
@@ -2313,7 +2298,7 @@ def ldl_factor(
 ):
     return CholeskyFactor(
         A, lower=lower, order=order, sym_kind=sym_kind, supernodal_mode=supernodal_mode
-    ).factorize(A, ldl=True, beta=beta, lower=lower)
+    ).factorize(A, ldl=True, beta=beta)
 
 
 # csc_arrays from the factorization, and optionally the permutation
