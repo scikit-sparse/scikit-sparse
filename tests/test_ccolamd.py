@@ -253,7 +253,7 @@ def test_info_can_24():
     )
 
     # Load the can_24 matrix from a file
-    can_24_path = Path("tests") / "test_data" / "can_24"
+    can_24_path = Path("tests") / "data" / "can_24"
     with can_24_path.open() as fp:
         can_24 = np.genfromtxt(fp, dtype=int)
 
