@@ -231,7 +231,7 @@ cdef object _cholmod_sparse_from_csc(
     stype : int
         The assumed symmetry type of ``A_py``:
         * -1: lower triangular,
-        *  0: unsymmetric (not used here),
+        *  0: unsymmetric,
         *  1: upper triangular.
     use_int32 : bool
         Whether to use 32-bit or 64-bit integers for indices and indptr.
@@ -241,11 +241,10 @@ cdef object _cholmod_sparse_from_csc(
 
     Returns
     -------
-    res : tuple
-        A tuple containing a reference to ``A_py`` and the three arrays that
-        make it up: ``A.indptr``, ``A.indices``, and ``A.data``. There is no
-        use for the output of this function, except to keep the underlying data
-        from being garbage collected until the cholmod_sparse object is freed.
+    res : csc_array
+        A reference to ``A_py``. There is no use for the output of this
+        function, except to keep the underlying data from being garbage
+        collected until the cholmod_sparse object is freed.
 
     References
     ----------
