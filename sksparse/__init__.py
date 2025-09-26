@@ -12,14 +12,10 @@
 # 2022-       Aaron Johnson           <aaron9035@gmail.com>
 # 2025-       Bernard Roesler         <bernard.roesler@gmail.com>
 
-"""Sparse matrix tools.
-
-This is a home for sparse matrix code in Python that plays well with
-scipy.sparse, but that is somehow unsuitable for inclusion in scipy
-proper. Usually this will be because it is released under the GPL.
-
-So far we have a wrapper for the CHOLMOD library for sparse Cholesky
-decomposition. Further contributions are welcome!
+"""
+===================================
+Scikit Sparse API (:mod:`sksparse`)
+===================================
 """
 
 from importlib.metadata import version, PackageNotFoundError

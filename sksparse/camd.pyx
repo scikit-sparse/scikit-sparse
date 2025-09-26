@@ -9,38 +9,49 @@
 #     File: camd.pyx
 #  Created: 2025-08-01 13:04
 # =============================================================================
-# cython: language_level=3
 
-"""sksparse.camd: Python interface to the Approximate Minimum Degree (CAMD)
-ordering algorithm.
-
-This module provides a Cython interface to the CAMD algorithm from the
-SuiteSparse library by Timothy A. Davis. The algorithm computes a fill-reducing
-ordering of a sparse matrix, which is useful for improving the performance of
-Cholesky or LU factorization and subsequent linear algebra operations.
-
-Interfaces
-----------
-* `camd`: Main function to compute the CAMD ordering.
-* `CAMDInfo`: Dataclass to hold information statistics returned by the CAMD
-  algorithm.
-* `camd_default_control`: Get the default control parameters for CAMD.
-
-This wrapper handles both 32-bit and 64-bit integer indices, depending on the
-input matrix format.
+"""
+=============================================================================
+Constrained Approximate Minimum Degree (CAMD) Ordering (:mod:`sksparse.camd`)
+=============================================================================
 
 .. versionadded:: 0.5.0
 
+Python interface to the `Constrained Approximate Minimum Degree (CAMD)
+<https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CAMD>`_ ordering
+algorithm.
+
+
+Interface
+---------
+
+.. autosummary::
+   :toctree: generated/
+
+   CAMDInfo - Dataclass to hold information statistics returned by the CAMD algorithm.
+   camd - Main function to compute the CAMD ordering.
+   camd_default_control - Get the default control parameters for CAMD.
+
+
+Exceptions and Warnings
+-----------------------
+
+.. autosummary::
+   :toctree: generated/
+
+   CAMDError - Base class for CAMD-related errors.
+   CAMDInvalidMatrixError - Raised when the input matrix is invalid for CAMD.
+   CAMDMemoryError - Raised when CAMD runs out of memory.
+
+
 References
 ----------
-* SuiteSparse homepage:
-  https://people.engr.tamu.edu/davis/suitesparse.html
-* SuiteSparse CAMD:
-  https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CAMD
+* `SuiteSparse homepage <https://people.engr.tamu.edu/davis/suitesparse.html>`_
+* `SuiteSparse CAMD <https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CAMD>`_
 * AMD Algorithm Publication:
-  Amestoy, P. R., Davis, T. A., & Duff, I. S. (1996). An approximate
-    minimum degree ordering algorithm. SIAM Journal on Matrix Analysis and
-    Applications, 17(4), 886-905.
+  Amestoy, P. R., Davis, T. A., & Duff, I. S. (1996). An approximate minimum
+  degree ordering algorithm. *SIAM Journal on Matrix Analysis and Applications*,
+  17(4), 886-905.
 """
 
 cimport cython

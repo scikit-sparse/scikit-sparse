@@ -9,38 +9,54 @@
 #     File: amd.pyx
 #  Created: 2025-07-28 11:12
 # =============================================================================
-# cython: language_level=3
 
-"""sksparse.amd: Python interface to the Approximate Minimum Degree (AMD)
-ordering algorithm.
+"""
+===============================================================
+Approximate Minimum Degree (AMD) Ordering (:mod:`sksparse.amd`)
+===============================================================
 
-This module provides a Cython interface to the AMD algorithm from the
-SuiteSparse library by Timothy A. Davis. The algorithm computes a fill-reducing
-ordering of a sparse matrix, which is useful for improving the performance of
-Cholesky or LU factorization and subsequent linear algebra operations.
-
-Interfaces
-----------
-* `amd`: Main function to compute the AMD ordering.
-* `AMDInfo`: Dataclass to hold information statistics returned by the AMD
-  algorithm.
-* `amd_default_control`: Get the default control parameters for AMD.
-
-This wrapper handles both 32-bit and 64-bit integer indices, depending on the
-input matrix format.
+.. currentmodule:: sksparse.amd
 
 .. versionadded:: 0.5.0
 
+Python interface to the `Approximate Minimum Degree (AMD)
+<https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/AMD>`_ ordering
+algorithm.
+
+
+Interface
+---------
+
+.. autosummary::
+   :toctree: generated/
+
+   AMDInfo - Dataclass to hold information statistics returned by the AMD algorithm.
+   amd - Main function to compute the AMD ordering.
+   amd_default_control - Get the default control parameters for AMD.
+
+
+Exceptions and Warnings
+-----------------------
+
+.. autosummary::
+   :toctree: generated/
+
+   AMDError - Base class for AMD-related errors.
+   AMDInvalidMatrixError - Raised when the input matrix is invalid for AMD.
+   AMDMemoryError - Raised when AMD runs out of memory.
+
+
 References
 ----------
+
 * SuiteSparse homepage:
   https://people.engr.tamu.edu/davis/suitesparse.html
 * SuiteSparse AMD:
   https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/AMD
 * AMD Algorithm Publication:
-  Amestoy, P. R., Davis, T. A., & Duff, I. S. (1996). An approximate
-    minimum degree ordering algorithm. SIAM Journal on Matrix Analysis and
-    Applications, 17(4), 886-905.
+  Amestoy, P. R., Davis, T. A., & Duff, I. S. (1996). An approximate minimum
+  degree ordering algorithm. *SIAM Journal on Matrix Analysis and
+  Applications*, 17(4), 886-905.
 """
 
 cimport cython

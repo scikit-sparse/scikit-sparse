@@ -10,36 +10,56 @@
 #  Created: 2025-07-31 10:13
 # =============================================================================
 
-"""sksparse.ccolamd: Cython interface to CCOLAMD, a column approximate minimum
-degree ordering algorithm.
+"""
+==========================================================================================
+Constrained Column Approximate Minimum Degree (CCOLAMD) Ordering (:mod:`sksparse.ccolamd`)
+==========================================================================================
 
-This module provides a Cython interface to the CCOLAMD algorithm from the
-SuiteSparse library by Timothy A. Davis. The algorithm computes a column
-ordering for sparse matrices that is suitable for various numerical
-factorizations, such as LU and QR.
-
-Interfaces
-----------
-* `ccolamd`: Function to compute the column ordering of any shape sparse matrix.
-
-This wrapper handles both 32-bit and 64-bit integer indices, depending on the
-input matrix format.
+.. currentmodule:: sksparse.ccolamd
 
 .. versionadded:: 0.5.0
 
+Python interface to the `Constrained Column Approximate Minimum Degree
+(CCOLAMD)
+<https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CCOLAMD>`_
+ordering algorithm.
+
+
+Interface
+---------
+
+.. autosummary::
+   :toctree: generated/
+
+   ccolamd - Function to compute the column ordering of any shape sparse matrix.
+   csymamd - Function to compute the column ordering of a symmetric sparse matrix.
+   ccolamd_get_defaults - Function to get the default knobs for CCOLAMD.
+
+
+Exceptions and Warnings
+-----------------------
+
+.. autosummary::
+   :toctree: generated/
+
+   CCOLAMDError - Base class for CCOLAMD errors.
+   CCOLAMDValueError - Raised when CCOLAMD encounters a value error.
+   CCOLAMDMemoryError - Raised when CCOLAMD runs out of memory.
+   CCOLAMDInternalError - Raised when CCOLAMD encounters an internal error.
+   CCOLAMDStats - Dataclass containing statistics about the ordering.
+
+
 References
 ----------
-* SuiteSparse homepage:
-  https://people.engr.tamu.edu/davis/suitesparse.html
-* SuiteSparse CCOLAMD:
-  https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CCOLAMD
+* `SuiteSparse homepage <https://people.engr.tamu.edu/davis/suitesparse.html>`_
+* `SuiteSparse CCOLAMD <https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CCOLAMD>`_
 * CCOLAMD Algorithm Publications:
   - T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, An approximate column
-    minimum degree ordering algorithm, ACM Transactions on Mathematical
-    Software, vol. 30, no. 3., pp. 353-376, 2004.
+    minimum degree ordering algorithm, *ACM Transactions on Mathematical
+    Software*, vol. 30, no. 3., pp. 353-376, 2004.
   - T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, Algorithm 836: CCOLAMD,
-    an approximate column minimum degree ordering algorithm, ACM
-    Transactions on Mathematical Software, vol. 30, no. 3., pp. 377-380,
+    an approximate column minimum degree ordering algorithm, *ACM
+    Transactions on Mathematical Software*, vol. 30, no. 3., pp. 377-380,
     2004.
 """
 

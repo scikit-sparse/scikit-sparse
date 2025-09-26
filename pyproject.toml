@@ -119,7 +119,7 @@ ignore = [
 known-first-party = ["sksparse"]
 
 [tool.ruff.lint.per-file-ignores]
-"__init__.py" = ['I001', 'F403', 'F405']  # ignore import sorting, wildcard imports, and undefined names
+"__init__.py" = ['D', 'I001', 'F403', 'F405']  # ignore import sorting, wildcard imports, and undefined names
 "test_*.py" = ['D101', 'D102', 'D103', 'E501']  # ignore docstring checks in test files
 "setup.py" = ['D100', 'D101', 'D102', 'D103', 'D104']  # ignore docstrings
 

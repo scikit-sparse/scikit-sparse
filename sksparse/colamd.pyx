@@ -10,36 +10,55 @@
 #  Created: 2025-07-31 10:13
 # =============================================================================
 
-"""sksparse.colamd: Cython interface to COLAMD, a column approximate minimum
-degree ordering algorithm.
+"""
+============================================================================
+Column Approximate Minimum Degree (COLAMD) Ordering (:mod:`sksparse.colamd`)
+============================================================================
 
-This module provides a Cython interface to the COLAMD algorithm from the
-SuiteSparse library by Timothy A. Davis. The algorithm computes a column
-ordering for sparse matrices that is suitable for various numerical
-factorizations, such as LU and QR.
-
-Interfaces
-----------
-* `colamd`: Function to compute the column ordering of any shape sparse matrix.
-
-This wrapper handles both 32-bit and 64-bit integer indices, depending on the
-input matrix format.
+.. currentmodule:: sksparse.colamd
 
 .. versionadded:: 0.5.0
 
+Python interface to the `Column Approximate Minimum Degree (COLAMD)
+<https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/COLAMD>`_ ordering
+algorithm.
+
+
+Interface
+---------
+
+.. autosummary::
+   :toctree: generated/
+
+   colamd - Function to compute the column ordering of any shape sparse matrix.
+   symamd - Function to compute the column ordering of a symmetric sparse matrix.
+   colamd_get_defaults - Get the default knobs for COLAMD.
+
+
+Exceptions and Warnings
+-----------------------
+
+.. autosummary::
+   :toctree: generated/
+
+   COLAMDError - Base class for COLAMD errors.
+   COLAMDValueError - Raised when COLAMD encounters a value error.
+   COLAMDMemoryError - Raised when COLAMD runs out of memory.
+   COLAMDInternalError - Raised when COLAMD encounters an internal error.
+   COLAMDStats - Dataclass containing statistics about the ordering.
+
+
 References
 ----------
-* SuiteSparse homepage:
-  https://people.engr.tamu.edu/davis/suitesparse.html
-* SuiteSparse COLAMD:
-  https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/COLAMD
+* `SuiteSparse homepage <https://people.engr.tamu.edu/davis/suitesparse.html>`_
+* `SuiteSparse COLAMD <https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/COLAMD>`_
 * COLAMD Algorithm Publications:
   - T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, An approximate column
-    minimum degree ordering algorithm, ACM Transactions on Mathematical
-    Software, vol. 30, no. 3., pp. 353-376, 2004.
+    minimum degree ordering algorithm, *ACM Transactions on Mathematical
+    Software*, vol. 30, no. 3., pp. 353-376, 2004.
   - T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, Algorithm 836: COLAMD,
-    an approximate column minimum degree ordering algorithm, ACM
-    Transactions on Mathematical Software, vol. 30, no. 3., pp. 377-380,
+    an approximate column minimum degree ordering algorithm, *ACM
+    Transactions on Mathematical Software*, vol. 30, no. 3., pp. 377-380,
     2004.
 """
 

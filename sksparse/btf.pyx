@@ -8,29 +8,35 @@
 #  Created: 2025-08-04 20:22
 # =============================================================================
 
-"""sksparse.btf: Python interface to the Block Triangular Format (BTF) library.
+"""
+=================================================
+Block Triangular Form (BTF) (:mod:`sksparse.btf`)
+=================================================
 
-This module provides a Cython interface to the BTF module of the SuiteSparse
-library by Timothy A. Davis. The main algorithm computes a permutation of a
-sparse matrix into Block Triangular Form (BTF).
-
-Interfaces
-----------
-* `maxtrans`: Maximum transversal of a sparse matrix.
-* `strongcomp`: Strongly connected components of a directed graph.
-* `btf`: Permutation into Block Triangular Form (BTF).
-
-This wrapper handles both 32-bit and 64-bit integer types, depending on the
-input matrix format.
+.. currentmodule:: sksparse.btf
 
 .. versionadded:: 0.5.0
 
+Python interface to the `Block Triangular Format (BTF)
+<https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/BTF>`_ library.
+
+
+Interface
+---------
+
+.. autosummary::
+   :toctree: generated/
+
+   maxtrans - Maximum transversal of a sparse matrix.
+   strongcomp - Strongly connected components of a directed graph.
+   btf - Permutation into Block Triangular Form (BTF).
+   btf_q_permutation - Convert raw BTF column permutation to valid permutation.
+
+
 References
 ----------
-* SuiteSparse homepage:
-  https://people.engr.tamu.edu/davis/suitesparse.html
-* SuiteSparse BTF:
-  https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/BTF
+* `SuiteSparse homepage <https://people.engr.tamu.edu/davis/suitesparse.html>`_
+* `SuiteSparse BTF <https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/BTF>`_
 * Duff, Iain. "On Algorithms for Obtaining a Maximum Transversal", *ACM Trans.
   Mathematical Software*, vol 7, no. 1, pp. 315-330.
 * "Algorithm 575: Permutations for a Zero-Free Diagonal", *ACM Trans.
