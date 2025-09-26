@@ -63,6 +63,8 @@ _build
 dist
 doc/build
 doc/cdoc/build
+# auto-generated Sphinx files
+doc/**/generated
 # Eggs
 .eggs
 # Egg metadata

@@ -31,9 +31,11 @@ if not os.environ.get('READTHEDOCS'):
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
+    'sphinx.ext.autosummary',  # page-per-object
     'sphinx.ext.doctest',
     'sphinx.ext.intersphinx',
     'sphinx.ext.mathjax',
+    'sphinx.ext.napoleon',     # numpy style docstrings
     'sphinx.ext.viewcode',
 ]
 
@@ -43,13 +45,19 @@ intersphinx_mapping = {
     'scipy': ('https://docs.scipy.org/doc/scipy', None),
 }
 
+autodoc_default_options = {
+    'members': True,
+    'undoc-members': False,
+    'inherited-members': False,
+    'show-inheritance': True,
+}
+
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+# templates_path = ['_templates']
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
-# source_suffix = ['.rst', '.md']
-source_suffix = '.rst'
+source_suffix = {'.rst': 'restructuredtext'}
 
 # The encoding of source files.
 #source_encoding = 'utf-8-sig'
@@ -87,7 +95,7 @@ language = 'en'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['_build', '_cholmod_internal.rst']
+exclude_patterns = ['_build', '**/_drafts']
 
 # The reST default role (used for this markup: `text`) to use for all
 # documents.
@@ -121,15 +129,23 @@ todo_include_todos = False
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'alabaster'
+# html_theme = 'pydata_sphinx_theme'
+html_theme = 'furo'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
-html_theme_options = {
-    "github_user": "broesler",
-    "github_repo": "scikit-sparse",
-    "github_banner": True}
+# html_theme_options = {
+#     "icon_links": [
+#         {
+#             "name": "GitHub",
+#             "url": "https://github.com/broesler/scikit-sparse",
+#             "icon": "fab fa-github",
+#         }
+#     ],
+#     "show_prev_next": True,
+#     "navbar_end": ["theme-switcher", "navbar-icon-links"],
+# }
 
 # Add any paths that contain custom themes here, relative to this directory.
 #html_theme_path = []
@@ -191,7 +207,7 @@ html_theme_options = {
 #html_show_sphinx = True
 
 # If true, "(C) Copyright ..." is shown in the HTML footer. Default is True.
-#html_show_copyright = True
+html_show_copyright = True
 
 # If true, an OpenSearch description file will be output, and all pages will
 # contain a <link> tag referring to it.  The value of this option must be the
@@ -205,11 +221,11 @@ html_theme_options = {
 # Sphinx supports the following languages:
 #   'da', 'de', 'en', 'es', 'fi', 'fr', 'h', 'it', 'ja'
 #   'nl', 'no', 'pt', 'ro', 'r', 'sv', 'tr'
-#html_search_language = 'en'
+# html_search_language = 'en'
 
 # A dictionary with options for the search language support, empty by default.
 # Now only 'ja' uses this config value
-#html_search_options = {'type': 'default'}
+# html_search_options = {'type': 'default'}
 
 # The name of a javascript file (relative to the configuration directory) that
 # implements a search results scorer. If empty, the default will be used.
