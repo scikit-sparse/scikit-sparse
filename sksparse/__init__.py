@@ -16,6 +16,42 @@
 ===================================
 Scikit Sparse API (:mod:`sksparse`)
 ===================================
+
+.. currentmodule:: sksparse
+
+.. toctree::
+   :maxdepth: 1
+   :hidden:
+   :titlesonly:
+
+   sksparse.amd <amd>
+   sksparse.btf <btf>
+   sksparse.camd <camd>
+   sksparse.ccolamd <ccolamd>
+   sksparse.cholmod <cholmod>
+   sksparse.colamd <colamd>
+
+Provides sparse matrix algorithms not found in SciPy, for use with SciPy's
+sparse matrix classes in :mod:`scipy.sparse`.
+
+
+Submodules
+==========
+
+.. autosummary::
+
+   amd - Approximate Minimum Degree ordering
+   btf
+   camd
+   ccolamd
+   cholmod
+   colamd
+
+
+References
+----------
+* `SuiteSparse homepage <https://people.engr.tamu.edu/davis/suitesparse.html>`_
+* `SuiteSparse GitHub <https://github.com/DrTimothyAldenDavis/SuiteSparse>`_
 """
 
 from importlib.metadata import version, PackageNotFoundError
