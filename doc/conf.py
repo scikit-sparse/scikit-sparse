@@ -45,6 +45,8 @@ intersphinx_mapping = {
     'scipy': ('https://docs.scipy.org/doc/scipy', None),
 }
 
+nitpicky = True  # warn about all references where the target cannot be found
+
 napoleon_use_rtype = False  # don't show seprate section for return type
 
 # Add any paths that contain templates here, relative to this directory.
