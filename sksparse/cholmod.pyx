@@ -1233,12 +1233,7 @@ cdef class CholeskyFactor:
 
     See Also
     --------
-    * :func:`.cholesky` : Factorize a matrix using Cholesky decomposition.
-    * :func:`.ldl` : Factorize a matrix using LDL decomposition.
-    * :func:`.cho_factor` : Factorize a matrix using Cholesky decomposition.
-    * :func:`.ldl_factor` : Factorize a matrix using LDL decomposition.
-
-    .. versionadded:: 0.5.0
+    cholesky, ldl, cho_factor, ldl_factor
 
     Notes
     -----
@@ -2116,10 +2111,7 @@ cdef class CholeskyFactor:
 
         See Also
         --------
-        :func:`.cholesky`, :func:`.ldl`, :meth:`.update`, :meth:`.rowadd`,
-        :meth:`.rowdel`
-
-        .. versionadded:: 0.5.0
+        cholesky, ldl, update, rowadd, rowdel
 
         References
         ----------
@@ -2186,6 +2178,10 @@ cdef class CholeskyFactor:
             The natural logarithm of the determinant of the matrix `A` that was
             factorized.
 
+        See Also
+        --------
+        slogdet, det, numpy.linalg.slogdet, numpy.linalg.det, scipy.linalg.det
+
         Notes
         -----
         This function computes the log-determinant of the matrix `A` from its
@@ -2204,11 +2200,6 @@ cdef class CholeskyFactor:
             \\log \\det(A) = \\sum_i \\log D_{ii}.
 
         .. versionadded:: 0.2
-
-        See Also
-        --------
-        :meth:`.slogdet`, :meth:`.det`, :func:`numpy.linalg.slogdet`,
-        :func:`numpy.linalg.det`, :func:`scipy.linalg.det`
         """
         self._require_factorized()
         if self.is_ll:
@@ -2231,6 +2222,10 @@ cdef class CholeskyFactor:
             The natural logarithm of the absolute value of the determinant of
             the matrix `A` that was factorized.
 
+        See Also
+        --------
+        logdet, det, numpy.linalg.slogdet, numpy.linalg.det, scipy.linalg.det
+
         Notes
         -----
         This function computes the sign and log-determinant of the matrix `A`
@@ -2249,11 +2244,6 @@ cdef class CholeskyFactor:
             \\log \\det(A) = \\sum_i \\log D_{ii}.
 
         .. versionadded:: 0.2
-
-        See Also
-        --------
-        :meth:`.logdet`, :meth:`.det`, :func:`numpy.linalg.slogdet`,
-        :func:`numpy.linalg.det`, :func:`scipy.linalg.det`
         """
         return (self.dtype.type(1.0), self.logdet())
 
@@ -2275,8 +2265,7 @@ cdef class CholeskyFactor:
 
         See Also
         --------
-        :meth:`.logdet`, :meth:`.slogdet`, :func:`numpy.linalg.det`,
-        :func:`numpy.linalg.slogdet`, :func:`scipy.linalg.det`
+        logdet, slogdet, numpy.linalg.det, numpy.linalg.slogdet, scipy.linalg.det
         """
         return np.exp(self.logdet())
 
@@ -2297,6 +2286,10 @@ cdef class CholeskyFactor:
         Ainv : csc_array
             The inverse of the matrix `A` that was factorized.
 
+        See Also
+        --------
+        numpy.linalg.inv, scipy.linalg.inv
+
         Notes
         -----
         This function computes the inverse of the matrix `A` from its Cholesky
@@ -2316,10 +2309,6 @@ cdef class CholeskyFactor:
             A^{-1} = P^{\\top} L^{-\\top} D^{-1} L^{-1} P.
 
         .. versionadded:: 0.2
-
-        See Also
-        --------
-        :func:`numpy.linalg.inv`, :func:`scipy.linalg.inv`
         """
         return self.solve(eye_array(self.N, format='csc', dtype=self.dtype))
 
@@ -2545,9 +2534,7 @@ where `I` is the identity matrix.
 """
 
 
-_cholesky_see_also = """
-  * :func:`.ldl` : Factorize a matrix using LDL decomposition.
-  * :func:`.ldl_factor` : Factorize a matrix using LDL decomposition."""
+_cholesky_see_also = "ldl, ldl_factor"
 
 
 _cho_factor_returns = """CholeskyFactor
@@ -2608,9 +2595,7 @@ _ldl_D_output = """D : dia_array
     The data type will match that of ``A``."""
 
 
-_ldl_see_also = """
-    * :func:`.cholesky` : Factorize a matrix using Cholesky decomposition.
-    * :func:`.cho_factor` : Factorize a matrix using Cholesky decomposition."""
+_ldl_see_also = "cholesky, cho_factor"
 
 
 ldl_factor.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
@@ -3132,7 +3117,7 @@ def bisect(A, *, kind=None):
 
     See Also
     --------
-    :func:`.nesdis`, :func:`.metis`
+    nesdis, metis
 
     Notes
     -----
@@ -3451,7 +3436,7 @@ def nesdis(
 
     See Also
     --------
-    :func:`.bisect`, :func:`.metis`
+    bisect, metis
 
     Notes
     -----
@@ -3649,7 +3634,7 @@ def metis(A, *, kind=None):
 
     See Also
     --------
-    :func:`.bisect`, :func:`.nesdis`
+    bisect, nesdis
 
     Notes
     -----
