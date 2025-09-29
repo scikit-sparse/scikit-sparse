@@ -21,6 +21,3 @@
         {%- endfor %}
     {% endif %}
 {% endblock %}
-
-{% block attributes %}
-{% endblock %}

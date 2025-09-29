@@ -1169,6 +1169,25 @@ cdef class CholeskyFactor:
         was used, returns the integer value.
     perm : *(N,)* :obj:`numpy.ndarray` of int
         A read-only view of the permutation vector used for the factorization.
+    factor : :obj:`~scipy.sparse.csc_array`
+        A view of the the Cholesky factor in Compressed Sparse Column (CSC)
+        format. If ``self.is_ll``, the returned matrix is lower triangular.
+        Otherwise, the matrix view contains the lower triangular and the
+        diagonal factors combined.
+
+        .. note::
+
+            The view is always in lower triangular form, even if the factor was
+            created using ``lower=False``. To get the upper triangular factor,
+            use :obj:`get_factor` with ``lower=False``. To get the split `L`
+            and `D` factors, use :obj:`get_factor` with ``kind="LDL"``.
+
+        .. warning::
+
+            The returned matrix is a view on the internal data of the CHOLMOD
+            factor. It will be modified if the factor is modified (*e.g.*, by
+            calling :meth:`.factorize`). To get a copy, use
+            :meth:`.get_factor`.
 
     Parameters
     ----------
@@ -1446,29 +1465,6 @@ cdef class CholeskyFactor:
 
     @property
     def factor(self):
-        """Return a view of the Cholesky factor.
-
-        .. warning::
-
-            The returned matrix is a view on the internal data of the CHOLMOD
-            factor. It will be modified if the factor is modified (*e.g.*, by
-            calling :meth:`.factorize`). To get a copy, use
-            :meth:`.get_factor`.
-
-        Returns
-        -------
-        L : csc_array
-            The Cholesky factor in Compressed Sparse Column (CSC) format. If
-            ``self.is_ll``, the returned matrix is lower triangular. Otherwise,
-            the matrix view contains the lower triangular and the diagonal
-            factors combined.
-
-        .. note :: The view is always in lower triangular form, even if the
-            factor was created using ``lower=False``. To get the upper
-            triangular factor, use :obj:`get_factor` with ``lower=False``. To
-            get the split `L` and `D` factors, use :obj:`get_factor` with
-            ``kind="LDL"``.
-        """
         return _csc_view_from_cholmod_factor(self)
 
     # -------------------------------------------------------------------------

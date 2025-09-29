@@ -47,6 +47,7 @@ intersphinx_mapping = {
 
 nitpicky = True  # warn about all references where the target cannot be found
 
+napoleon_use_param = False  # ignore text after colon in param description
 napoleon_use_rtype = False  # don't show seprate section for return type
 
 # Add any paths that contain templates here, relative to this directory.
