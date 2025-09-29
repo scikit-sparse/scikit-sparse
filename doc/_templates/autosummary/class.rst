@@ -1,4 +1,4 @@
-{{ name }}
+{{ fullname }}
 {{ underline }}
 
 .. currentmodule:: {{ module }}
@@ -14,6 +14,7 @@
 
     .. autosummary::
         :toctree:
+        :nosignatures:
 
         {% for item in methods %}
         ~{{ name }}.{{ item }}
