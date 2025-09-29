@@ -268,10 +268,10 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
 
     Returns
     -------
-    p : ndarray
+    p : :obj:`~numpy.ndarray`
         The permutation vector such that the Cholesky factor of ``A[p][:, p]``
         has fewer nonzeros than the Cholesky factor of ``A``.
-    info : ndarray, optional
+    info : :obj:`~numpy.ndarray`, optional
         Additional information about the ordering process, returned if
         ``return_info`` is True. Contains various statistics and status codes.
 
@@ -399,6 +399,7 @@ def amd_default_control():
           columns with more than ``max(dense_thresh * sqrt(N), 16)`` entries
           are permuted to the end of the matrix.
         * 'aggressive': Whether to use aggressive absorption.
+
 
     .. versionadded:: 0.5.0
     """

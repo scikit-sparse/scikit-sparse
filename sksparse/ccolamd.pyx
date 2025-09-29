@@ -54,10 +54,12 @@ References
 * `SuiteSparse homepage <https://people.engr.tamu.edu/davis/suitesparse.html>`_
 * `SuiteSparse CCOLAMD <https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CCOLAMD>`_
 * CCOLAMD Algorithm Publications:
-  - T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, An approximate column
+
+  * T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, An approximate column
     minimum degree ordering algorithm, *ACM Transactions on Mathematical
     Software*, vol. 30, no. 3., pp. 353-376, 2004.
-  - T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, Algorithm 836: CCOLAMD,
+
+  * T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, Algorithm 836: CCOLAMD,
     an approximate column minimum degree ordering algorithm, *ACM
     Transactions on Mathematical Software*, vol. 30, no. 3., pp. 377-380,
     2004.
@@ -503,11 +505,12 @@ aggressive : bool, optional
 
 Returns
 -------
-q : (N,) ndarray
+q : (N,) :class:`~numpy.ndarray`
     The permutation vector.
-stats : CCOLAMDStats, optional
+stats : :class:`CCOLAMDStats`, optional
     If ``return_info`` is True, returns an object containing statistics
     about the ordering.
+
 
 .. versionadded:: 0.5.0
 
@@ -576,14 +579,16 @@ Adapted from the CCOLAMD documentation {csymamd_reftag}_:
     `A`.
 """
 
-csymamd_A_param = """A : (N, N) {array_like, sparse matrix}
+csymamd_A_param = """A : (N, N) array_like or sparse matrix
     The input matrix for which to compute the column ordering.
     Must be 2D, square, and convertible to CSC format.
 
     .. note::
+
         This routine only accesses the lower triangular part of ``A``,
         which is *assumed* to be symmetric. If it is not, the results may
         be incorrect or undefined.
+
 """
 
 csymamd.__doc__ = _CCOLAMD_DOC_TEMPLATE.format(
@@ -609,6 +614,7 @@ def ccolamd_get_defaults():
           are permuted to the end of the matrix.
         * 'dense_col_thresh': Like `dense_row_thresh`, but for columns.
         * 'aggressive': Default value for the aggressive knob.
+
 
     .. versionadded:: 0.5.0
     """

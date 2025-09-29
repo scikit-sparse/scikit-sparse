@@ -435,6 +435,7 @@ def camd_default_control():
           are permuted to the end of the matrix.
         * 'aggressive': Whether to use aggressive absorption.
 
+
     .. versionadded:: 0.5.0
     """
     cdef double[::1] ctrl_view = np.empty(CAMD_CONTROL, dtype=np.float64)

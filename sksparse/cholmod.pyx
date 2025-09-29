@@ -1156,23 +1156,23 @@ cdef class CholeskyFactor:
         Whether the factor is in ``LL.T`` form (True) or ``LDL.T`` form (False).
     is_super : bool
         Whether the factor is in supernodal (True) or simplicial (False) format.
-    itype : np.dtype in {np.int32, np.int64}
+    itype : :obj:`numpy.int32` or :obj:`numpy.int64`
         The integer type used for indices and indptr in the factor.
-    dtype : np.dtype
+    dtype : numpy.dtype
         The data type used for numerical values in the factor.
-    colcount : (N,) ndarray of int
+    colcount : *(N,)* :obj:`numpy.ndarray` of int
         The number of nonzeros in each column of the factor.
     nnz : int
         The number of nonzeros in the factor.
     order : str or int
         The ordering method used for the factorization. If an unknown ordering
         was used, returns the integer value.
-    perm : (N,) ndarray of int
+    perm : *(N,)* :obj:`numpy.ndarray` of int
         A read-only view of the permutation vector used for the factorization.
 
     Parameters
     ----------
-    A : (N, N) {array_like, sparse array}
+    A : (N, N) array_like or sparse array
         An array convertible to a sparse matrix in Compressed Sparse Column
         (CSC) format. The matrix must be square and symmetric positive
         definite. Only the upper or lower triangular part of the matrix is
@@ -1203,16 +1203,14 @@ cdef class CholeskyFactor:
         the natural ordering of the input matrix is used. The other options
         are:
 
-        * ``default``: Use the default method, which first tries AMD, then
-            METIS.
-        * ``best``: Automatically select the best ordering based on the
-            input.
+        * ``default``: Use the default method, which first tries AMD, then METIS.
+        * ``best``: Automatically select the best ordering based on the input.
         * ``metis``: Use the METIS library for graph partitioning.
         * ``nesdis``: Use the NESDIS library for nested dissection.
         * ``amd``: Use the Approximate Minimum Degree (AMD) algorithm.
         * ``colamd``: Use the Approximate Minimum Degree (AMD) algorithm
-            for the symmetric case, or the COLAMD algorithm for the
-            unsymmetric case (:math:`A A^{{\\top}}` or :math:`A^{{\\top}} A`).
+          for the symmetric case, or the COLAMD algorithm for the
+          unsymmetric case (:math:`A A^{{\\top}}` or :math:`A^{{\\top}} A`).
         * ``postordered``: Use natural ordering followed by postordering.
 
         By default, methods other than ``natural`` will also be
@@ -1239,6 +1237,12 @@ cdef class CholeskyFactor:
     -----
     The symbolic analysis follows that of the SuiteSparse CHOLMOD ``analyze``
     MATLAB function [#analyze_c]_.
+
+
+    .. versionadded:: 0.1.0
+    .. versionchanged:: 0.5.0
+        Renamed from ``Factor``. Major API updates to more closely resemble the
+        :func:`scipy.linalg.cholesky` dense interface.
 
     References
     ----------
@@ -2106,7 +2110,7 @@ cdef class CholeskyFactor:
 
         Returns
         -------
-        CholeskyFactor
+        :class:`.CholeskyFactor`
             The current object, for method chaining.
 
         See Also
@@ -2117,6 +2121,8 @@ cdef class CholeskyFactor:
         ----------
         .. [#resymbol_c] ``resymbol.c`` - CHOLMOD MATLAB resymbolization function
             https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/resymbol.c
+
+        .. versionadded:: 0.5.0
         """
         self._require_factorized()
 
@@ -2251,6 +2257,8 @@ cdef class CholeskyFactor:
         """Compute the determinant of the matrix from its Cholesky
         factorization.
 
+        .. versionadded:: 0.2
+
         .. warning::
 
             This function may overflow or underflow for large matrices. Use
@@ -2260,8 +2268,6 @@ cdef class CholeskyFactor:
         -------
         det : float
             The determinant of the matrix `A` that was factorized.
-
-        .. versionadded:: 0.2
 
         See Also
         --------
@@ -2483,7 +2489,8 @@ This function is an interface to the CHOLMOD library, which is part of
 the SuiteSparse collection by Timothy A. Davis. For more details, see the
 documentation in the header file [{doc_tag}]_.
 
-.. versionadded:: 0.5.0
+
+{version_notes}
 
 References
 ----------
@@ -2546,14 +2553,22 @@ cho_factor.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     intro=_cholesky_intro,
     returns=_cho_factor_returns,
     see_also=_cholesky_see_also,
+    version_notes=".. versionadded:: 0.5.0",
     doc_tag="#cho_factor_h",
 )
 
+
+_cholesky_version_notes=""".. versionadded:: 0.1.0
+.. versionchanged:: 0.5.0
+    The function now returns the matrix directly instead of a ``Factor``
+    object, and the permutation vector when an ordering method is specified.
+"""
 
 cholesky.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     intro=_cholesky_intro,
     returns=_CHOLESKY_RETURNS.format(ldl_D_output=""),
     see_also=_cholesky_see_also,
+    version_notes=_cholesky_version_notes,
     doc_tag="#cholesky_h",
 )
 
@@ -2602,6 +2617,7 @@ ldl_factor.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     intro=_ldl_intro,
     returns=_cho_factor_returns,
     see_also=_ldl_see_also,
+    version_notes=".. versionadded:: 0.5.0",
     doc_tag="#ldl_factor_h",
 )
 
@@ -2610,6 +2626,7 @@ ldl.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     intro=_ldl_intro,
     returns=_CHOLESKY_RETURNS.format(ldl_D_output=_ldl_D_output),
     see_also=_ldl_see_also,
+    version_notes=".. versionadded:: 0.5.0",
     doc_tag="#ldl_h",
 )
 
@@ -3244,16 +3261,18 @@ def bisect(A, *, kind=None):
 class SeparatorTree():
     """The separator tree of a sparse matrix graph.
 
+    .. versionadded:: 0.5.0
+
     This object is typically created by :func:`.nesdis`.
 
     Attributes
     ----------
-    cp : (C,) ndarray of int, optional
+    cp : *(C,)* numpy.ndarray of int, optional
         The separator tree, where ``C`` is the number of components found. The
         value ``cp[c]`` is the parent of the component ``c`` in the separator
         tree, or ``-1`` if ``c`` is the root of the tree. There is a maximum of
         ``N`` components, where ``N`` is the dimension of the input matrix.
-    cmember : (N,) ndarray of int, optional
+    cmember : *(N,)* numpy.ndarray of int, optional
         The component membership vector, where ``cmember[i]`` is the component
         to which node ``i`` belongs.
     """
@@ -3297,8 +3316,6 @@ class SeparatorTree():
         -----
         This function is based on the SuiteSparse CHOLMOD MATLAB interface
         [#septree_c]_.
-
-        .. versionadded:: 0.5.0
 
         References
         ----------

@@ -53,13 +53,16 @@ References
 * `SuiteSparse homepage <https://people.engr.tamu.edu/davis/suitesparse.html>`_
 * `SuiteSparse COLAMD <https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/COLAMD>`_
 * COLAMD Algorithm Publications:
-  - T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, An approximate column
+
+  * T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, An approximate column
     minimum degree ordering algorithm, *ACM Transactions on Mathematical
     Software*, vol. 30, no. 3., pp. 353-376, 2004.
-  - T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, Algorithm 836: COLAMD,
+
+  * T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, Algorithm 836: COLAMD,
     an approximate column minimum degree ordering algorithm, *ACM
     Transactions on Mathematical Software*, vol. 30, no. 3., pp. 377-380,
     2004.
+
 """
 
 cimport cython
@@ -433,11 +436,12 @@ aggressive : bool, optional
 
 Returns
 -------
-q : (N,) ndarray
+q : (N,) :class:`~numpy.ndarray`
     The permutation vector.
-stats : COLAMDStats, optional
+stats : :class:`COLAMDStats`, optional
     If ``return_info`` is True, returns an object containing statistics
     about the ordering.
+
 
 .. versionadded:: 0.5.0
 
@@ -469,7 +473,7 @@ Adapted from the COLAMD documentation {_colamd_reftag}_:
     row interchanges.
 """
 
-_colamd_A_param = """A : (M, N) {array_like, sparse matrix}
+_colamd_A_param = """A : (M, N) array_like or sparse matrix
     The input matrix for which to compute the column ordering.
     Must be 2D and convertible to CSC format. Need not be square."""
 
@@ -503,9 +507,11 @@ _symamd_A_param = """A : (N, N) {array_like, sparse matrix}
     Must be 2D, square, and convertible to CSC format.
 
     .. note::
+
         This routine only accesses the lower triangular part of ``A``,
         which is *assumed* to be symmetric. If it is not, the results may
         be incorrect or undefined.
+
 """
 
 symamd.__doc__ = _COLAMD_DOC_TEMPLATE.format(
@@ -528,6 +534,7 @@ def colamd_get_defaults():
           are permuted to the end of the matrix.
         * 'dense_col_thresh': Like `dense_row_thresh`, but for columns.
         * 'aggressive': Default value for the aggressive knob.
+
 
     .. versionadded:: 0.5.0
     """
