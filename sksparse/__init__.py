@@ -40,7 +40,7 @@ Submodules
 
 .. autosummary::
 
-   amd - Approximate Minimum Degree ordering
+   amd
    btf
    camd
    ccolamd

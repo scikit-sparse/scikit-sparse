@@ -44,7 +44,6 @@ Object Interface
 
 .. autosummary::
     :toctree: generated/
-    :recursive:
     
     cho_factor - Computes the Cholesky factorization of a sparse matrix.
     ldl_factor - Computes the LDL.T factorization of a sparse matrix.

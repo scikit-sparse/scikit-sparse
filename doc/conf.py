@@ -45,15 +45,10 @@ intersphinx_mapping = {
     'scipy': ('https://docs.scipy.org/doc/scipy', None),
 }
 
-autodoc_default_options = {
-    'members': True,
-    'undoc-members': False,
-    'inherited-members': False,
-    'show-inheritance': True,
-}
+napoleon_use_rtype = False  # don't show seprate section for return type
 
 # Add any paths that contain templates here, relative to this directory.
-# templates_path = ['_templates']
+templates_path = ['_templates']
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
