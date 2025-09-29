@@ -116,7 +116,7 @@ class AMDInfo:
         Number of rows and columns of the input matrix ``A``.
     nz : int
         Number of nonzeros in the input matrix ``A``.
-    symmetry : float in [0, 1]
+    symmetry : :class:`float` :math:`\in [0, 1]`
         Symmetry of pattern of ``A``. The symmetry is the number of "matched"
         off-diagonal entries divided by the total number of off-diagonal
         entries. An entry ``A[i, j]`` is matched if ``A[j, i]`` is also an
@@ -277,7 +277,7 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
 
     Raises
     ------
-    SparseEfficiencyWarning
+    ~scipy.sparse.SparseEfficiencyWarning
         If the input matrix is not in CSC format, a warning is raised and the
         matrix is converted to CSC format.
     ValueError
