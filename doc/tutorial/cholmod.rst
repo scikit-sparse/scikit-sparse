@@ -4,32 +4,26 @@ Cholesky Decomposition (:mod:`sksparse.cholmod`)
 
 .. currentmodule:: sksparse.cholmod
 
-.. versionadded:: 0.1.0
-
-.. versionchanged:: 0.5.0
-   Major API updates to more closely resemble the :func:`scipy.linalg.cholesky`
-   dense interface, and incorporate more functions from the CHOLMOD MATLAB
-   interface.
-
 
 The :mod:`sksparse.cholmod` module provides an interface to the SuiteSparse
-`CHOLMOD <https://github.com/DrTimothyAldenDavis/SuiteSparse/tree/dev/CHOLMOD>`_
-package, which computes basic linear algebra operations for sparse, symmetric,
-positive-definite matrices.
+`CHOLMOD <cholmod_github_>`_ package, which computes basic linear algebra
+operations for sparse, symmetric, positive-definite matrices.
 
 The main function of this module is to compute the `Cholesky factor
-<http://en.wikipedia.org/wiki/Cholesky_decomposition>`_ :math:`L` of a sparse,
+<cholesky_wiki_>`_ :math:`L` of a sparse,
 symmetric (Hermitian if complex), positive-definite matrix :math:`A` with
 a fill-reducing permutation :math:`P`, such that:
 
 .. math::
-    LL^{\\top} = PAP^{\\top}.
+
+    LL^{\top} = PAP^{\top}.
 
 For matrices that are symmetric but may be numerically close to semi-definite,
 the module can compute the LDL factorization:
 
 .. math::
-   LDL^{\\top} = PAP^{\\top}.
+
+   LDL^{\top} = PAP^{\top}.
 
 Either of these factors can then be used to solve linear systems of the form
 :math:`Ax = b`.
@@ -47,6 +41,12 @@ package including:
 * The ability to perform the fill-reduction analysis once, and then
   re-use it to efficiently decompose many matrices with the same pattern of
   non-zero entries.
+
+This wrapper handles both 32-bit and 64-bit integer types, depending on the
+input matrix format.
+
+.. _cholmod_github: https://github.com/DrTimothyAldenDavis/SuiteSparse/tree/dev/CHOLMOD
+.. _cholesky_wiki: http://en.wikipedia.org/wiki/Cholesky_decomposition
 
 
 Quickstart
@@ -81,8 +81,54 @@ system:
   x = f.solve(b)     # solve Ax = b
 
 
-This wrapper handles both 32-bit and 64-bit integer types, depending on the
-input matrix format.
+Examples
+--------
+
+.. _cholesky-example:
+
+Cholesky Example
+++++++++++++++++
+
+To see how to use the Cholesky factorization, we can load a sparse matrix
+from the `SuiteSparse Matrix Collection <SSMC_>`_ and compute its ordering.
+
+.. _SSMC: https://sparse.tamu.edu
+
+.. literalinclude:: examples/cholmod_example.py
+   :language: python
+
+This figure shows the effect of AMD ordering that reduces the fill-in of the
+Cholesky factorization of a sparse matrix.
+
+.. figure:: examples/cholesky_example.svg
+   :alt: Cholesky Example with AMD Ordering
+   :align: center
+   :width: 90%
+
+   The number of non-zeros in the Cholesky factorization of the original matrix
+   (left) and the permuted matrix (right) using AMD ordering.
+
+
+Nested Dissection Example
++++++++++++++++++++++++++
+
+To see the effects of nested dissection ordering, we can load a sparse matrix
+and compute its ordering.
+
+.. literalinclude:: examples/nesdis_example.py
+   :language: python
+
+This figure shows the effect of nested dissection ordering that reduces the
+fill-in of the LU factorization of a sparse matrix in a case where the AMD
+order *does not* help.
+
+.. figure:: examples/nesdis_example.svg
+   :alt: LU Example with Nesdis Ordering
+   :align: center
+   :width: 90%
+
+   The number of non-zeros in the LU factorization of the original matrix
+   and the permuted matrix using AMD and nested dissection ordering.
 
 
 Function Interface
@@ -93,12 +139,6 @@ manipulate the :class:`CholeskyFactor` object, the :mod:`.cholmod` module
 provides the :func:`cholesky` and :func:`ldl` functions that perform both the
 symbolic analysis and the numerical factorization in one step, and return the
 matrices directly.
-
-.. autosummary::
-   :toctree: generated/
-
-    cholesky - Computes the Cholesky factorization of a sparse matrix.
-    ldl - Computes the LDL.T factorization of a sparse matrix.
 
 
 Object Interface
@@ -124,27 +164,13 @@ in-place using the :meth:`.update`, :meth:`.rowadd`, :meth:`.rowdel`, and
 The :meth:`.factorize` method can be called again to factor a new matrix
 with the same sparsity pattern.
 
-.. autosummary::
-    :toctree: generated/
-    :recursive:
-    
-    cho_factor - Computes the Cholesky factorization of a sparse matrix.
-    ldl_factor - Computes the LDL.T factorization of a sparse matrix.
-    CholeskyFactor - Class representing a Cholesky factorization.
-
 
 Symbolic Analysis
 -----------------
 
 In addition to numerical factorization, :mod:`.cholmod` provides symbolic
-operations that can be used to analyze the structure of the Cholesky
-factor and to compute fill-reducing permutations.
-
-.. autosummary::
-    :toctree: generated/
-
-    symbfact - Computes the symbolic factorization of a sparse matrix.
-    etree - Computes the elimination tree of a sparse matrix.
+operations :func:`symbfact`, and :func:`etree` that can be used to analyze the
+structure of the Cholesky factor and to compute fill-reducing permutations.
 
 
 Graph Partitioning
@@ -156,16 +182,10 @@ node reordering, which can be used like the :mod:`~sksparse.amd` and
 fill-in during factorization.
 
 These functions provide a direct interface to the corresponding CHOLMOD
-functions that are used internally by :func:`cholesky` and :func:`ldl` when
-the ``order`` argument is specified.
-
-.. autosummary::
-    :toctree: generated/
-
-    bisect - Bisects a graph using nested dissection.
-    metis - Computes a fill-reducing ordering using METIS.
-    nesdis - Computes a fill-reducing ordering using NESDIS.
-    SeparatorTree - Class representing a separator tree.
+functions that are used internally by :func:`cholesky` and :func:`ldl` when the
+``order`` argument is specified. The functions :func:`bisect`, :func:`metis`,
+and :func:`nesdis` can be used to compute fill-reducing orderings, and the
+:class:`SeparatorTree` class represents the resulting separator tree.
 
 
 Exceptions and Warnings
@@ -179,72 +199,5 @@ a :class:`~scipy.sparse.csc_array` (note that the
 deprecated and is not recommended for use in new code).
 
 Errors detected by CHOLMOD or by our wrapper code are converted into exceptions
-of type :exc:`CholmodError` or an appropriate subclass.
-
-.. autosummary::
-    :toctree: generated/
-
-    CholmodWarning - Base class for CHOLMOD-related warnings.
-    CholmodSmallDiagonalWarning - Warning for small diagonal entries.
-
-    CholmodError - Base class for CHOLMOD-related errors.
-    CholmodNotPositiveDefiniteError - Raised when the input matrix is not positive definite.
-    CholmodNotInstalledError - Raised when the CHOLMOD library is not installed.
-    CholmodOutOfMemoryError - Raised when CHOLMOD runs out of memory.
-    CholmodOverflowError - Raised when CHOLMOD encounters an integer overflow.
-    CholmodInvalidInputError - Raised when CHOLMOD receives invalid input.
-    CholmodGpuProblemError - Raised when CHOLMOD encounters a problem with CUDA.
-
-
-.. _cholesky-example:
-
-Examples
---------
-
-Cholesky Example
-++++++++++++++++
-
-This figure shows the effect of AMD ordering that reduces the fill-in of the
-Cholesky factorization of a sparse matrix.
-
-.. figure:: ../examples/cholesky_example.svg
-   :alt: Cholesky Example with AMD Ordering
-   :align: center
-   :width: 90%
-
-   The number of non-zeros in the Cholesky factorization of the original matrix
-   (left) and the permuted matrix (right) using AMD ordering.
-
-The source code for this example is:
-
-.. literalinclude:: ../examples/cholmod_example.py
-   :language: python
-
-
-Nested Dissection Example
-+++++++++++++++++++++++++
-
-This figure shows the effect of nested dissection ordering that reduces the
-fill-in of the LU factorization of a sparse matrix in a case where the AMD
-order *does not* help.
-
-.. figure:: ../examples/nesdis_example.svg
-   :alt: LU Example with Nesdis Ordering
-   :align: center
-   :width: 90%
-
-   The number of non-zeros in the LU factorization of the original matrix
-   and the permuted matrix using AMD and nested dissection ordering.
-
-The source code for this example is:
-
-.. literalinclude:: ../examples/nesdis_example.py
-   :language: python
-
-
-References
-----------
-* SuiteSparse homepage:
-  https://people.engr.tamu.edu/davis/suitesparse.html
-* SuiteSparse CHOLMOD:
-  https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD
+of type :exc:`CholmodError` or an appropriate subclass. See the
+:ref:`cholmod-exceptions` for details.

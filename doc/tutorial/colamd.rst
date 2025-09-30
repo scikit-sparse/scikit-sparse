@@ -3,21 +3,18 @@
    See pyproject.toml for full author list and LICENSE.txt for license details.
    SPDX-License-Identifier: BSD-2-Clause
 
+============================================================================
 Column Approximate Minimum Degree (COLAMD) Ordering (:mod:`sksparse.colamd`)
 ============================================================================
 
-.. module:: sksparse.colamd
-   :synopsis: Column Approximate Minimum Degree (COLAMD) Ordering
+.. currentmodule:: sksparse.colamd
 
-.. versionadded:: 0.5.0
 
 The :mod:`sksparse.colamd` module provides efficient an implementation of the
-`Column Approximate Minimum Degree (COLAMD)
-<https://dl.acm.org/doi/abs/10.1145/1024074.1024079>`_
-ordering algorithm for sparse matrices.
+`Column Approximate Minimum Degree (COLAMD) <colamd_paper_>`_ ordering
+algorithm for sparse matrices.
 
-It exposes the main functions of the `COLAMD package
-<https://github.com/DrTimothyAldenDavis/SuiteSparse/tree/dev/COLAMD>`_, which
+It exposes the main functions of the `COLAMD package <colamd_github_>`_, which
 computes a column ordering :math:`Q` of a sparse matrix that minimizes the
 fill-in of the Cholesky decomposition of :math:`(AQ)^{\top}(AQ)`. The
 :func:`.colamd` function is appropriate for use with non-symmetric and
@@ -32,6 +29,9 @@ operations than `A`. This function assumes that its input is symmetric.
 The :func:`.colamd` and :func:`.symamd` functions accept both real and complex
 matrices, in any format supported by :mod:`scipy.sparse` (CSC format is most
 efficient).
+
+.. _colamd_paper: https://dl.acm.org/doi/abs/10.1145/1024074.1024079
+.. _colamd_github: https://github.com/DrTimothyAldenDavis/SuiteSparse/tree/dev/COLAMD
 
 
 Quickstart
@@ -68,59 +68,16 @@ should be less than or equal to the number of non-zeros in the LU
 factorization of the original matrix, but this is not guaranteed.
 
 
-Top-level Functions
--------------------
-
-The main functions this module provides are :func:`colamd` and :func:`symamd`.
-
-.. autofunction:: colamd
-
-.. autofunction:: symamd
-
-
-:class:`COLAMDStats` Objects
-----------------------------
-
-An :class:`COLAMDStats` object is a dataclass returned by the :func:`colamd`
-function when the ``return_info`` parameter is set to ``True``. It contains
-information about the ordering, including the return status.
-
-.. autoclass:: COLAMDStats
-
-Typically, the :class:`COLAMDStats` object is unnecessary, and you can
-just use the permutation vector returned by :func:`colamd`.
-
-
-.. Convenience Methods
-.. -------------------
-
-.. The COLAMD package also provides a convenience function to get the default
-.. control parameters from the COLAMD package:
-
-.. .. autofunction:: amd_default_control
-
-
-Error Handling
---------------
-
-Errors raised by the COLAMD package are converted into Python exceptions. The
-following exceptions are available:
-
-.. autoclass:: COLAMDError
-   :show-inheritance:
-
-.. autoclass:: COLAMDValueError
-   :show-inheritance:
-
-.. autoclass:: COLAMDMemoryError
-   :show-inheritance:
-
-.. autoclass:: COLAMDInternalError
-   :show-inheritance:
-
-
 Example
 -------
+
+To see the effects of COLAMD ordering, we can load a sparse matrix from the
+`SuiteSparse Matrix Collection <SSMC_>`_ and compute its ordering.
+
+.. _SSMC: https://sparse.tamu.edu
+
+.. literalinclude:: examples/colamd_example.py
+   :language: python
 
 This figure shows the effect of COLAMD ordering that reduces the fill-in of the
 Cholesky factorization of a sparse matrix.
@@ -133,7 +90,29 @@ Cholesky factorization of a sparse matrix.
    The number of non-zeros in the LU factorization of the original matrix
    (left) and the permuted matrix (right) using COLAMD ordering.
 
-The source code for this example is:
 
-.. literalinclude:: examples/colamd_example.py
-   :language: python
+:class:`COLAMDStats` Objects
+----------------------------
+
+An :class:`COLAMDStats` object is a dataclass returned by the :func:`colamd`
+function when the ``return_info`` parameter is set to ``True``. It contains
+information about the ordering, including the return status.
+
+Typically, the :class:`COLAMDStats` object is unnecessary, and you can
+just use the permutation vector returned by :func:`colamd`.
+
+
+Convenience Methods
+-------------------
+
+The COLAMD package also provides a convenience function,
+:func:`colamd_get_defaults` to get the default control parameters from the
+COLAMD package. Most users will not need to use this function, as the default
+control parameters are used automatically by :func:`colamd`.
+
+
+Error Handling
+--------------
+
+Errors raised by the COLAMD package are converted into Python exceptions. See
+the :ref:`colamd-exceptions` for details.

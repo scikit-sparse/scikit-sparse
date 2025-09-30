@@ -24,6 +24,8 @@ Python interface to the `Approximate Minimum Degree (AMD)
 algorithm.
 
 
+.. _amd-interface:
+
 Interface
 ---------
 
@@ -34,6 +36,8 @@ Interface
    amd - Main function to compute the AMD ordering.
    amd_default_control - Get the default control parameters for AMD.
 
+
+.. _amd-exceptions:
 
 Exceptions and Warnings
 -----------------------

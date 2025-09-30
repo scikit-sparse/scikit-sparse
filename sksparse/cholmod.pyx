@@ -76,6 +76,8 @@ Graph Partitioning
     SeparatorTree - Class representing a separator tree.
 
 
+.. _cholmod-exceptions:
+
 Exceptions and Warnings
 -----------------------
 

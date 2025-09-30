@@ -25,6 +25,8 @@ Python interface to the `Constrained Column Approximate Minimum Degree
 ordering algorithm.
 
 
+.. _ccolamd-interface:
+
 Interface
 ---------
 
@@ -35,6 +37,8 @@ Interface
    csymamd - Function to compute the column ordering of a symmetric sparse matrix.
    ccolamd_get_defaults - Function to get the default knobs for CCOLAMD.
 
+
+.. _ccolamd-exceptions:
 
 Exceptions and Warnings
 -----------------------

@@ -22,6 +22,8 @@ Python interface to the `Constrained Approximate Minimum Degree (CAMD)
 algorithm.
 
 
+.. _camd-interface:
+
 Interface
 ---------
 
@@ -32,6 +34,8 @@ Interface
    camd - Main function to compute the CAMD ordering.
    camd_default_control - Get the default control parameters for CAMD.
 
+
+.. _camd-exceptions:
 
 Exceptions and Warnings
 -----------------------

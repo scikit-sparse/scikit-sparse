@@ -24,6 +24,8 @@ Python interface to the `Column Approximate Minimum Degree (COLAMD)
 algorithm.
 
 
+.. _colamd-interface:
+
 Interface
 ---------
 
@@ -34,6 +36,8 @@ Interface
    symamd - Function to compute the column ordering of a symmetric sparse matrix.
    colamd_get_defaults - Get the default knobs for COLAMD.
 
+
+.. _colamd-exceptions:
 
 Exceptions and Warnings
 -----------------------

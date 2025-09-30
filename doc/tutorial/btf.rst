@@ -3,24 +3,25 @@
    See pyproject.toml for full author list and LICENSE.txt for license details.
    SPDX-License-Identifier: BSD-2-Clause
 
+=================================================
 Block Triangular Form (BTF) (:mod:`sksparse.btf`)
-===============================================================
+=================================================
 
-.. module:: sksparse.btf
-   :synopsis: Block Triangular Form (BTF) permutation
+.. currentmodule:: sksparse.btf
 
-.. versionadded:: 0.5.0
 
 The :mod:`sksparse.btf` module provides efficient implementations of the
 Block Triangular Form (BTF) ordering algorithm for sparse, square matrices.
 
 It exposes the main functions of the `BTF package
-<https://github.com/DrTimothyAldenDavis/SuiteSparse/tree/dev/BTF>`_, which
+<btf_github_>`_, which
 permutes a sparse matrix into upper block triangular form with a zero-free
 diagonal, or with a maximum number of nonzeros along the diagonal if
 a zero-free permutation does not exist. The BTF function accepts both real and
 complex matrices, in any format supported by :mod:`scipy.sparse` (CSC format is
 most efficient).
+
+.. _btf_github: https://github.com/DrTimothyAldenDavis/SuiteSparse/tree/dev/BTF
 
 
 Quickstart
@@ -51,34 +52,16 @@ use
    PAQ = A[p][:, q]              # permute the matrix
 
 
-Top-level Functions
--------------------
-
-The main function this module provides is :func:`btf`.
-
-.. autofunction:: btf
-
-Internally, the :func:`btf` function uses a combination of the following:
-
-.. autofunction:: maxtrans
-   
-.. autofunction:: strongcomp
-
-They are exposed for advanced use cases, but typically you will not need to
-call them directly.
-
-
-Convenience Methods
--------------------
-
-The BTF package also provides a convenience function to get the actual ``q``
-permutation vector:
-
-.. autofunction:: btf_q_permutation
-
-
 Example
 -------
+
+To see the effects of BTF ordering, we can load a sparse matrix from the
+`SuiteSparse Matrix Collection <SSMC_>`_ and compute its ordering.
+
+.. _SSMC: https://sparse.tamu.edu
+
+.. literalinclude:: examples/btf_example.py
+   :language: python
 
 This figure shows the effect of BTF ordering:
 
@@ -87,7 +70,9 @@ This figure shows the effect of BTF ordering:
    :align: center
    :width: 90%
 
-The source code for this example is:
 
-.. literalinclude:: examples/btf_example.py
-   :language: python
+Convenience Methods
+-------------------
+
+The BTF package also provides a convenience function,
+:func:`btf_q_permutation`, to get the actual ``q`` permutation vector.
