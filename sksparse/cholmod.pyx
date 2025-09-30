@@ -33,7 +33,8 @@ Function Interface
 ------------------
 
 .. autosummary::
-   :toctree: generated/
+    :toctree: generated/
+    :nosignatures:
 
     cholesky - Computes the Cholesky factorization of a sparse matrix.
     ldl - Computes the LDL.T factorization of a sparse matrix.
@@ -44,7 +45,8 @@ Object Interface
 
 .. autosummary::
     :toctree: generated/
-    
+    :nosignatures:
+
     cho_factor - Computes the Cholesky factorization of a sparse matrix.
     ldl_factor - Computes the LDL.T factorization of a sparse matrix.
     CholeskyFactor - Class representing a Cholesky factorization.
@@ -55,6 +57,7 @@ Symbolic Analysis
 
 .. autosummary::
     :toctree: generated/
+    :nosignatures:
 
     symbfact - Computes the symbolic factorization of a sparse matrix.
     etree - Computes the elimination tree of a sparse matrix.
@@ -65,6 +68,7 @@ Graph Partitioning
 
 .. autosummary::
     :toctree: generated/
+    :nosignatures:
 
     bisect - Bisects a graph using nested dissection.
     metis - Computes a fill-reducing ordering using METIS.
