@@ -1148,47 +1148,6 @@ cdef class CholeskyFactor:
     The numeric factorization is not computed until :meth:`.factorize` is
     called.
 
-    Attributes
-    ----------
-    N : int
-        The number of rows and columns in the factor.
-    is_ll : bool
-        Whether the factor is in ``LL.T`` form (True) or ``LDL.T`` form (False).
-    is_super : bool
-        Whether the factor is in supernodal (True) or simplicial (False) format.
-    itype : :obj:`numpy.int32` or :obj:`numpy.int64`
-        The integer type used for indices and indptr in the factor.
-    dtype : numpy.dtype
-        The data type used for numerical values in the factor.
-    colcount : *(N,)* :obj:`numpy.ndarray` of int
-        The number of nonzeros in each column of the factor.
-    nnz : int
-        The number of nonzeros in the factor.
-    order : str or int
-        The ordering method used for the factorization. If an unknown ordering
-        was used, returns the integer value.
-    perm : *(N,)* :obj:`numpy.ndarray` of int
-        A read-only view of the permutation vector used for the factorization.
-    factor : :obj:`~scipy.sparse.csc_array`
-        A view of the the Cholesky factor in Compressed Sparse Column (CSC)
-        format. If ``self.is_ll``, the returned matrix is lower triangular.
-        Otherwise, the matrix view contains the lower triangular and the
-        diagonal factors combined.
-
-        .. note::
-
-            The view is always in lower triangular form, even if the factor was
-            created using ``lower=False``. To get the upper triangular factor,
-            use :obj:`get_factor` with ``lower=False``. To get the split `L`
-            and `D` factors, use :obj:`get_factor` with ``kind="LDL"``.
-
-        .. warning::
-
-            The returned matrix is a view on the internal data of the CHOLMOD
-            factor. It will be modified if the factor is modified (*e.g.*, by
-            calling :meth:`.factorize`). To get a copy, use
-            :meth:`.get_factor`.
-
     Parameters
     ----------
     A : (N, N) array_like or sparse array
@@ -1240,6 +1199,47 @@ cdef class CholeskyFactor:
             The ordering method ``best`` may be quite slow for large
             matrices, but if the factorization is reused many times, it can
             be worth it.
+
+    Attributes
+    ----------
+    N : int
+        The number of rows and columns in the factor.
+    is_ll : bool
+        Whether the factor is in ``LL.T`` form (True) or ``LDL.T`` form (False).
+    is_super : bool
+        Whether the factor is in supernodal (True) or simplicial (False) format.
+    itype : :obj:`numpy.int32` or :obj:`numpy.int64`
+        The integer type used for indices and indptr in the factor.
+    dtype : numpy.dtype
+        The data type used for numerical values in the factor.
+    colcount : *(N,)* :obj:`numpy.ndarray` of int
+        The number of nonzeros in each column of the factor.
+    nnz : int
+        The number of nonzeros in the factor.
+    order : str or int
+        The ordering method used for the factorization. If an unknown ordering
+        was used, returns the integer value.
+    perm : *(N,)* :obj:`numpy.ndarray` of int
+        A read-only view of the permutation vector used for the factorization.
+    factor : :obj:`~scipy.sparse.csc_array`
+        A view of the the Cholesky factor in Compressed Sparse Column (CSC)
+        format. If ``self.is_ll``, the returned matrix is lower triangular.
+        Otherwise, the matrix view contains the lower triangular and the
+        diagonal factors combined.
+
+        .. note::
+
+            The view is always in lower triangular form, even if the factor was
+            created using ``lower=False``. To get the upper triangular factor,
+            use :obj:`get_factor` with ``lower=False``. To get the split `L`
+            and `D` factors, use :obj:`get_factor` with ``kind="LDL"``.
+
+        .. warning::
+
+            The returned matrix is a view on the internal data of the CHOLMOD
+            factor. It will be modified if the factor is modified (*e.g.*, by
+            calling :meth:`.factorize`). To get a copy, use
+            :meth:`.get_factor`.
 
     Raises
     ------
