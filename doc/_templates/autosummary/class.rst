@@ -1,4 +1,4 @@
-{{ fullname }}
+{{ name }}
 {{ underline }}
 
 .. currentmodule:: {{ module }}
@@ -9,15 +9,15 @@
    :no-special-members:
 
 {% block methods %}
-    {% if methods %}
-    .. rubric:: Methods
+{% if methods %}
+.. rubric:: Methods
 
-    .. autosummary::
-        :toctree:
-        :nosignatures:
+.. autosummary::
+    :toctree:
+    :nosignatures:
 
-        {% for item in methods %}
-        ~{{ name }}.{{ item }}
-        {%- endfor %}
-    {% endif %}
+    {% for item in methods %}
+    ~{{ name }}.{{ item }}
+    {%- endfor %}
+{% endif %}
 {% endblock %}
