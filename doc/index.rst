@@ -12,6 +12,8 @@ scikit-sparse - Sparse matrix extensions for SciPy
 
    Overview <overview>
 
+   User Guide <tutorial/index>
+
    API Reference <reference/index>
 
    Change Log <changes>
