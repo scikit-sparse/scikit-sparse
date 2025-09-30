@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 name = "scikit-sparse-dev"
 version = "0.5.0.dev0"
 description = "Scikit-sparse is a Python wrapper for the SuiteSparse sparse matrix library."
-readme = "README.md"
+readme = "README.rst"
 requires-python = ">=3.10"
 license = "BSD-2-Clause"
 license-files = ["LICENSE.txt"]
