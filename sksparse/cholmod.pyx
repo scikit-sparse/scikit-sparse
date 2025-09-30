@@ -82,16 +82,16 @@ Exceptions and Warnings
 .. autosummary::
     :toctree: generated/
 
-    CholmodWarning - Base class for CHOLMOD-related warnings.
-    CholmodSmallDiagonalWarning - Warning for small diagonal entries.
+    CholmodWarning
+    CholmodSmallDiagonalWarning
 
-    CholmodError - Base class for CHOLMOD-related errors.
-    CholmodNotPositiveDefiniteError - Raised when the input matrix is not positive definite.
-    CholmodNotInstalledError - Raised when the CHOLMOD library is not installed.
-    CholmodOutOfMemoryError - Raised when CHOLMOD runs out of memory.
-    CholmodOverflowError - Raised when CHOLMOD encounters an integer overflow.
-    CholmodInvalidInputError - Raised when CHOLMOD receives invalid input.
-    CholmodGpuProblemError - Raised when CHOLMOD encounters a problem with CUDA.
+    CholmodError
+    CholmodNotPositiveDefiniteError
+    CholmodNotInstalledError
+    CholmodOutOfMemoryError
+    CholmodOverflowError
+    CholmodInvalidInputError
+    CholmodGpuProblemError
 
 
 References
@@ -158,38 +158,47 @@ cdef int CHOLMOD_TRANS_CONJ = 2  # numeric (conjugate transpose)
 #         Error Handling
 # -----------------------------------------------------------------------------
 class CholmodError(Exception):
+    """Base class for CHOLMOD-related errors."""
     pass
 
 
 class CholmodNotPositiveDefiniteError(CholmodError):
+    """Raised when the input matrix is not positive definite."""
     pass
 
 
 class CholmodNotInstalledError(CholmodError):
+    """Raised when the CHOLMOD library is not installed."""
     pass
 
 
 class CholmodOutOfMemoryError(CholmodError):
+    """Raised when CHOLMOD runs out of memory."""
     pass
 
 
 class CholmodOverflowError(CholmodError):
+    """Raised when CHOLMOD encounters an integer overflow."""
     pass
 
 
 class CholmodInvalidInputError(CholmodError):
+    """Raised when CHOLMOD receives invalid input."""
     pass
 
 
 class CholmodGpuProblemError(CholmodError):
+    """Raised when CHOLMOD encounters a problem with CUDA."""
     pass
 
 
 class CholmodWarning(Warning):
+    """Base class for CHOLMOD-related warnings."""
     pass
 
 
 class CholmodSmallDiagonalWarning(CholmodWarning):
+    """Warning for small diagonal entries."""
     pass
 
 
