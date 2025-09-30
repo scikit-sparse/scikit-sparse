@@ -94,6 +94,19 @@ def maxtrans(A):
     ----------
     .. [#maxtrans_h] BTF maxtrans header file:
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/BTF/Include/btf.h
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from scipy.sparse import random_array
+    >>> from sksparse.btf import maxtrans
+    >>> # Create a non-symmetric matrix
+    >>> N = 11
+    >>> rng = np.random.default_rng(56)
+    >>> A = random_array((N, N - 3), density=0.5, format='csc', rng=rng)
+    >>> jmatch = maxtrans(A)
+    >>> jmatch
+    array([ 0,  2,  1,  3,  4,  5,  7, -1,  6, -1, -1], dtype=int32)
     """
     A, _, out_dtype = validate_csc_input(A)
 
@@ -194,6 +207,23 @@ def strongcomp(A, q=None):
     ----------
     .. [#strongcomp_h] BTF strongcomp header file:
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/BTF/Include/btf.h
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from scipy.sparse import random_array, block_diag
+    >>> from sksparse.btf import strongcomp
+    >>> # Create a matrix with at least 2 strongly connected components
+    >>> M, N = 4, 7
+    >>> rng = np.random.default_rng(56)
+    >>> A0 = random_array((M, M), density=0.5, rng=rng)
+    >>> A1 = random_array((N, N), density=0.5, rng=rng)
+    >>> A = block_diag((A0, A1), format='csc')
+    >>> # The first M rows/columns are ordered together, then the last N
+    >>> p, r = strongcomp(A)
+    array([ 0,  1,  3,  2, 10,  4,  5,  6,  7,  8,  9], dtype=int32)
+    >>> r
+    array([ 0,  3,  4,  5, 11], dtype=int32)
     """
     A, _, out_dtype = validate_csc_input(A, require_square=True)
 
@@ -320,6 +350,26 @@ def btf(A):
     ----------
     .. [#btf_h] BTF header file:
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/BTF/Include/btf.h
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from scipy.sparse import random_array, block_diag
+    >>> from sksparse.btf import btf
+    >>> # Create a matrix with at least 2 strongly connected components
+    >>> M, N = 4, 7
+    >>> rng = np.random.default_rng(56)
+    >>> A0 = random_array((M, M), density=0.5, rng=rng)
+    >>> A1 = random_array((N, N), density=0.5, rng=rng)
+    >>> A = block_diag((A0, A1), format='csc')
+    >>> # The first M rows/columns are ordered together, then the last N
+    >>> p, q, r = btf(A)
+    >>> p
+    array([ 0,  3,  1,  2, 10,  4,  5,  6,  7,  8,  9], dtype=int32)
+    >>> q
+    array([ 0,  1,  2, -5, 10,  6,  5,  7,  8,  4,  9], dtype=int32)
+    >>> r
+    array([ 0,  2,  3,  4,  5, 11,  9, 10,  0,  0,  0,  0], dtype=int32)
     """
     A, _, out_dtype = validate_csc_input(A, require_square=True)
 
@@ -431,6 +481,14 @@ def btf_q_permutation(q):
     This function is a Python equivalent of that macro.
 
     .. versionadded:: 0.5.0
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from sksparse.btf import btf_q_permutation
+    >>> q = np.array([0, 1, 2, -5, 10, 6, 5, 7, 8, 4, 9], dtype=np.int32)
+    >>> btf_q_permutation(q)
+    array([ 0,  1,  2,  3, 10,  6,  5,  7,  8,  4,  9], dtype=int32)
     """
     q = np.asarray(q)
 

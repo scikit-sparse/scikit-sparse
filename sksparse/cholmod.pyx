@@ -2507,6 +2507,10 @@ References
 ----------
 .. [{doc_tag}] ``cholmod.h`` - SuiteSparse CHOLMOD header file.
     https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/Include/cholmod.h
+
+Examples
+--------
+{example}
 """
 
 
@@ -2560,12 +2564,50 @@ _cho_factor_returns = """CholeskyFactor
     and manipulate the factorization.
 """
 
+_cholesky_example = """
+>>> import numpy as np
+>>> from scipy.sparse import coo_array
+>>> from sksparse.cholmod import cholesky, cho_factor
+>>> # Create a symmetric positive definite matrix from (Davis, Eqn 2.1)
+>>> N = 11
+>>> rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
+>>> cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
+>>> rng = np.random.default_rng(56)
+>>> vals = rng.random(len(rows), dtype=np.float64)
+>>> L = coo_array((vals, (rows, cols)), shape=(N, N))
+>>> A = L + L.T   # make it symmetric
+>>> A.setdiag(N)  # make it strongly positive definite
+>>> A = A.tocsc()
+>>> L, p = cholesky(A, order='amd', lower=True)
+>>> L
+<Compressed Sparse Column sparse array of dtype 'float64'
+        with 30 stored elements and shape (11, 11)>
+>>> p
+array([ 4,  8,  6,  0,  3,  5,  1,  2,  9, 10,  7])
+>>> f = cho_factor(A, order='amd', lower=True)
+>>> f
+CholeskyFactor(N=11, nnz=30, is_ll=True, is_super=False, itype=np.int64,
+    dtype=np.float64, order=natural)
+>>> np.allclose(L.toarray(), f.get_factor().toarray(), atol=1e-15)
+True
+>>> np.array_equal(p, f.get_perm())
+True
+>>> # Solve a linear system
+>>> expect_x = np.arange(N, dtype=np.float64)
+>>> b = A @ expect_x
+>>> x = f.solve(b)
+>>> np.allclose(x, expect_x)
+True
+"""
+
+
 cho_factor.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     intro=_cholesky_intro,
     returns=_cho_factor_returns,
     see_also=_cholesky_see_also,
     version_notes=".. versionadded:: 0.5.0",
     doc_tag="#cho_factor_h",
+    example=_cholesky_example,
 )
 
 
@@ -2581,6 +2623,7 @@ cholesky.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     see_also=_cholesky_see_also,
     version_notes=_cholesky_version_notes,
     doc_tag="#cholesky_h",
+    example=_cholesky_example,
 )
 
 # -----------------------------------------------------------------------------
@@ -2615,13 +2658,52 @@ If ``beta`` is a scalar value, compute the factorization of:
 where `I` is the identity matrix.
 """
 
-
 _ldl_D_output = """D : dia_array
     The diagonal matrix `D` of the factorization, in sparse DIA format.
     The data type will match that of ``A``."""
 
 
-_ldl_see_also = "cholesky, cho_factor"
+_ldl_example = """
+>>> import numpy as np
+>>> from scipy.sparse import coo_array
+>>> from sksparse.cholmod import ldl, ldl_factor
+>>> # Create a symmetric positive definite matrix from (Davis, Eqn 2.1)
+>>> N = 11
+>>> rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
+>>> cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
+>>> rng = np.random.default_rng(56)
+>>> vals = rng.random(len(rows), dtype=np.float64)
+>>> L = coo_array((vals, (rows, cols)), shape=(N, N))
+>>> A = L + L.T   # make it symmetric
+>>> A.setdiag(N)  # make it strongly positive definite
+>>> A = A.tocsc()
+>>> L, D, p = ldl(A, order='amd')
+>>> L
+<Compressed Sparse Column sparse array of dtype 'float64'
+        with 30 stored elements and shape (11, 11)>
+>>> D
+<DIAgonal sparse array of dtype 'float64'
+        with 11 stored elements (1 diagonals) and shape (11, 11)>
+>>> p
+array([ 4,  8,  6,  0,  3,  5,  1,  2,  9, 10,  7])
+>>> f = ldl_factor(A, order='amd')
+>>> f
+CholeskyFactor(N=11, nnz=30, is_ll=False, is_super=False, itype=np.int64,
+    dtype=np.float64, order=amd)
+>>> Lf, Df = f.get_factor()
+>>> np.allclose(L.toarray(), Lf.toarray(), atol=1e-15)
+True
+>>> np.allclose(D.toarray(), Df.toarray(), atol=1e-15)
+True
+>>> np.array_equal(p, f.get_perm())
+True
+>>> # Solve a linear system
+>>> expect_x = np.arange(N, dtype=np.float64)
+>>> b = A @ expect_x
+>>> x = f.solve(b)
+>>> np.allclose(x, expect_x)
+True
+"""
 
 
 ldl_factor.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
@@ -2630,6 +2712,7 @@ ldl_factor.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     see_also=_ldl_see_also,
     version_notes=".. versionadded:: 0.5.0",
     doc_tag="#ldl_factor_h",
+    example=_ldl_example,
 )
 
 
@@ -2639,6 +2722,7 @@ ldl.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     see_also=_ldl_see_also,
     version_notes=".. versionadded:: 0.5.0",
     doc_tag="#ldl_h",
+    example=_ldl_example,
 )
 
 
@@ -2702,6 +2786,34 @@ def symbfact(A, *, kind=None, bint lower=False, bint return_factor=False):
     ----------
     .. [#symbfact_c] ``symbfact2.c`` - CHOLMOD MATLAB symbolic factorization function
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/symbfact2.c
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from scipy.sparse import coo_array
+    >>> from sksparse.cholmod import cholesky, symbfact
+    >>> # Create a symmetric positive definite matrix from (Davis, Eqn 2.1)
+    >>> N = 11
+    >>> rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
+    >>> cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
+    >>> rng = np.random.default_rng(56)
+    >>> vals = rng.random(len(rows), dtype=np.float64)
+    >>> L = coo_array((vals, (rows, cols)), shape=(N, N))
+    >>> A = L + L.T   # make it symmetric
+    >>> A.setdiag(N)  # make it strongly positive definite
+    >>> A = A.tocsc()
+    >>> L = cholesky(A, lower=True)
+    >>> count, h, parent, post = symbfact(A)
+    >>> count
+    array([3, 3, 4, 3, 3, 4, 4, 3, 3, 2, 1])
+    >>> np.array_equal(count, np.count_nonzero(L.toarray(), axis=0))
+    True
+    >>> h
+    6
+    >>> parent
+    array([ 5,  2,  7,  5,  7,  6,  8,  9,  9, 10, -1])
+    >>> post
+    array([ 1,  2,  4,  7,  0,  3,  5,  6,  8,  9, 10])
     """
     cdef bint use_int32
     A, use_int32, out_itype = validate_csc_input(A)
@@ -2973,6 +3085,27 @@ def etree(A, *, kind=None, bint return_post=False):
     ----------
     .. [#etree_c] ``etree2.c`` - CHOLMOD MATLAB symbolic factorization function
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/etree2.c
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from scipy.sparse import coo_array
+    >>> from sksparse.cholmod import etree
+    >>> # Create a symmetric positive definite matrix from (Davis, Eqn 2.1)
+    >>> N = 11
+    >>> rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
+    >>> cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
+    >>> rng = np.random.default_rng(56)
+    >>> vals = rng.random(len(rows), dtype=np.float64)
+    >>> L = coo_array((vals, (rows, cols)), shape=(N, N))
+    >>> A = L + L.T   # make it symmetric
+    >>> A.setdiag(N)  # make it strongly positive definite
+    >>> A = A.tocsc()
+    >>> parent, post = etree(A, return_post=True)
+    >>> parent
+    array([ 5,  2,  7,  5,  7,  6,  8,  9,  9, 10, -1])
+    >>> post
+    array([ 1,  2,  4,  7,  0,  3,  5,  6,  8,  9, 10])
     """
     cdef bint use_int32
     A, use_int32, out_itype = validate_csc_input(A)
@@ -3158,6 +3291,25 @@ def bisect(A, *, kind=None):
     ----------
     .. [#bisect_c] ``bisect.c`` - CHOLMOD MATLAB bisect function
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/bisect.c
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from scipy.sparse import coo_array
+    >>> from sksparse.cholmod import bisect
+    >>> # Create a symmetric positive definite matrix from (Davis, Eqn 2.1)
+    >>> N = 11
+    >>> rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
+    >>> cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
+    >>> rng = np.random.default_rng(56)
+    >>> vals = rng.random(len(rows), dtype=np.float64)
+    >>> L = coo_array((vals, (rows, cols)), shape=(N, N))
+    >>> A = L + L.T   # make it symmetric
+    >>> A.setdiag(N)  # make it strongly positive definite
+    >>> A = A.tocsc()
+    >>> s = bisect(A)
+    >>> s
+    array([0, 1, 1, 0, 1, 0, 0, 1, 0, 2, 2])
     """
     cdef bint use_int32
     A, use_int32, out_itype = validate_csc_input(A)
@@ -3477,6 +3629,27 @@ def nesdis(
     ----------
     .. [#nesdis_c] ``nesdis.c`` - CHOLMOD MATLAB nesdis function
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/nesdis.c
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from scipy.sparse import coo_array
+    >>> from sksparse.cholmod import nesdis
+    >>> # Create a symmetric positive definite matrix from (Davis, Eqn 2.1)
+    >>> N = 11
+    >>> rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
+    >>> cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
+    >>> rng = np.random.default_rng(56)
+    >>> vals = rng.random(len(rows), dtype=np.float64)
+    >>> L = coo_array((vals, (rows, cols)), shape=(N, N))
+    >>> A = L + L.T   # make it symmetric
+    >>> A.setdiag(N)  # make it strongly positive definite
+    >>> A = A.tocsc()
+    >>> p, s = nesdis(A, return_separator=True)
+    >>> p
+    array([ 1,  4,  6,  8,  0,  3,  5,  2,  9, 10,  7])
+    >>> s
+    SeparatorTree(components=1, nodes=11)
     """
     cdef bint use_int32
     A, use_int32, out_itype = validate_csc_input(A)
@@ -3675,6 +3848,25 @@ def metis(A, *, kind=None):
     ----------
     .. [#metis_c] ``metis.c`` - CHOLMOD MATLAB metis function
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/metis.c
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from scipy.sparse import coo_array
+    >>> from sksparse.cholmod import metis
+    >>> # Create a symmetric positive definite matrix from (Davis, Eqn 2.1)
+    >>> N = 11
+    >>> rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
+    >>> cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
+    >>> rng = np.random.default_rng(56)
+    >>> vals = rng.random(len(rows), dtype=np.float64)
+    >>> L = coo_array((vals, (rows, cols)), shape=(N, N))
+    >>> A = L + L.T   # make it symmetric
+    >>> A.setdiag(N)  # make it strongly positive definite
+    >>> A = A.tocsc()
+    >>> p = metis(A)
+    >>> p
+    array([ 8,  3,  6,  0,  5,  2,  4,  7,  1,  9, 10])
     """
     cdef bint use_int32
     A, use_int32, out_itype = validate_csc_input(A)

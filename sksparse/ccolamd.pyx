@@ -522,6 +522,10 @@ References
 ----------
 .. {reftag} ``ccolamd.c`` - SuiteSparse AMD source file.
     https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CCOLAMD/Source/ccolamd.c
+
+Examples
+--------
+{example}
 """
 
 # Define the docstrings
@@ -555,11 +559,33 @@ ccolamd_opt_lu_param = """opt_lu : {'lu', 'cholesky'}, optional
     the ordering is optimized for Cholesky factorization of :math:`A^{\\top}
     A`. If None, uses the default value from CCOLAMD, which is 'cholesky'."""
 
+_ccolamd_example = """\
+>>> import numpy as np
+>>> from scipy.sparse import random_array
+>>> from sksparse.ccolamd import ccolamd
+>>> # Create a non-symmetric matrix
+>>> N = 11
+>>> rng = np.random.default_rng(56)
+>>> A = random_array((N, N - 3), density=0.5, format='csc', rng=rng)
+>>> A.setdiag(N)  # make the diagonal non-zero
+>>> # Constrain the first K nodes to be ordered first
+>>> K = 4
+>>> C = np.full(A.shape[1], K)
+>>> C[:K] = np.arange(K)  # constrained nodes
+>>> p, info = ccolamd(A, constraints=C, return_info=True)
+>>> p
+array([0, 1, 2, 3, 4, 7, 6, 5], dtype=int32)
+>>> info
+CCOLAMDStats(N_rows_ignored=0, N_cols_ignored=0, Ncmpa=0, status=0, info1=-1,
+    info2=-1, info3=0)
+"""
+
 ccolamd.__doc__ = _CCOLAMD_DOC_TEMPLATE.format(
     intro=ccolamd_intro,
     A_param=ccolamd_A_param,
     opt_lu_param=ccolamd_opt_lu_param,
     reftag=ccolamd_reftag,
+    example=_ccolamd_example,
 )
 
 
@@ -595,11 +621,34 @@ csymamd_A_param = """A : (N, N) array_like or sparse matrix
 
 """
 
+_csymamd_example = """\
+>>> import numpy as np
+>>> from scipy.sparse import random_array
+>>> from sksparse.ccolamd import csymamd
+>>> # Create a non-symmetric matrix
+>>> N = 11
+>>> rng = np.random.default_rng(56)
+>>> A = random_array((N, N - 3), density=0.5, format='csc', rng=rng)
+>>> A.setdiag(N)  # make the diagonal non-zero
+>>> A = (A.T @ A).tocsc()  # make A symmetric
+>>> # Constrain the first K nodes to be ordered first
+>>> K = 4
+>>> C = np.full(A.shape[1], K)
+>>> C[:K] = np.arange(K)   # constrained nodes
+>>> p, info = csymamd(A, constraints=C, return_info=True)
+>>> p
+array([0, 1, 2, 3, 7, 6, 5, 4], dtype=int32)
+>>> info
+CCOLAMDStats(N_rows_ignored=0, N_cols_ignored=0, Ncmpa=0, status=0, info1=-1,
+    info2=-1, info3=0)
+"""
+
 csymamd.__doc__ = _CCOLAMD_DOC_TEMPLATE.format(
     intro=csymamd_intro,
     A_param=csymamd_A_param,
     opt_lu_param='',
     reftag=csymamd_reftag,
+    example=_csymamd_example,
 )
 
 

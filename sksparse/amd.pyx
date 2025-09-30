@@ -308,6 +308,29 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
         https://people.engr.tamu.edu/davis/suitesparse.html
     .. [2] SuiteSparse GitHub repository.
         https://github.com/DrTimothyAldenDavis/SuiteSparse
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from scipy.sparse import coo_array
+    >>> from sksparse.amd import amd
+    >>> # Create a symmetric positive definite matrix from (Davis, Eqn 2.1)
+    >>> N = 11
+    >>> rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
+    >>> cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
+    >>> rng = np.random.default_rng(565656)
+    >>> vals = rng.random(len(rows), dtype=np.float64)
+    >>> L = coo_array((vals, (rows, cols)), shape=(N, N))
+    >>> A = L + L.T   # make it symmetric
+    >>> A.setdiag(N)  # make it strongly positive definite
+    >>> A = A.tocsc()
+    >>> p, info = amd(A, return_info=True)
+    >>> p
+    array([ 1,  4,  8,  6,  0,  3,  5,  2,  9, 10,  7])
+    >>> info
+    AMDInfo(status=0, N=11, nz=43, symmetry=1.0, nzdiag=11, nz_A_plus_AT=32,
+        Ndense=0, memory=1096.0, Ncmpa=0, Lnz=19, Ndiv=19, Nmultsubs_LDL=29,
+        Nmultsubs_LU=39, dmax=4)
     """
 
     A, _, out_itype = validate_csc_input(A, require_square=True)

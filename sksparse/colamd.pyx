@@ -453,6 +453,10 @@ References
 ----------
 .. {reftag} ``colamd.c`` - SuiteSparse AMD source file.
     https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/COLAMD/Source/colamd.c
+
+Examples
+--------
+{example}
 """
 
 # Define the docstrings
@@ -481,8 +485,28 @@ _colamd_A_param = """A : (M, N) array_like or sparse matrix
     The input matrix for which to compute the column ordering.
     Must be 2D and convertible to CSC format. Need not be square."""
 
+_colamd_example = """\
+>>> import numpy as np
+>>> from scipy.sparse import random_array
+>>> from sksparse.colamd import colamd
+>>> # Create a non-symmetric matrix
+>>> N = 11
+>>> rng = np.random.default_rng(56)
+>>> A = random_array((N, N - 3), density=0.5, format='csc', rng=rng)
+>>> A.setdiag(N)  # make the diagonal non-zero
+>>> p, info = colamd(A, return_info=True)
+>>> p
+array([0, 3, 5, 6, 7, 1, 2, 4], dtype=int32)
+>>> info
+COLAMDStats(N_rows_ignored=0, N_cols_ignored=0, Ncmpa=0, status=0, info1=-1,
+    info2=-1, info3=0)
+"""
+
 colamd.__doc__ = _COLAMD_DOC_TEMPLATE.format(
-    intro=_colamd_intro, A_param=_colamd_A_param, reftag=_colamd_reftag,
+    intro=_colamd_intro,
+    A_param=_colamd_A_param,
+    reftag=_colamd_reftag,
+    example=_colamd_example,
 )
 
 
@@ -518,8 +542,29 @@ _symamd_A_param = """A : (N, N) {array_like, sparse matrix}
 
 """
 
+_symamd_example = """\
+>>> import numpy as np
+>>> from scipy.sparse import random_array
+>>> from sksparse.colamd import symamd
+>>> # Create a non-symmetric matrix
+>>> N = 11
+>>> rng = np.random.default_rng(56)
+>>> A = random_array((N, N - 3), density=0.5, format='csc', rng=rng)
+>>> A.setdiag(N)           # make the diagonal non-zero
+>>> A = (A.T @ A).tocsc()  # make it symmetric
+>>> p, info = symamd(A, return_info=True)
+>>> p
+array([4, 6, 7, 0, 1, 2, 3, 5], dtype=int32)
+>>> info
+COLAMDStats(N_rows_ignored=0, N_cols_ignored=0, Ncmpa=0, status=0, info1=-1,
+    info2=-1, info3=0)
+"""
+
 symamd.__doc__ = _COLAMD_DOC_TEMPLATE.format(
-    intro=_symamd_intro, A_param=_symamd_A_param, reftag=_symamd_reftag,
+    intro=_symamd_intro,
+    A_param=_symamd_A_param,
+    reftag=_symamd_reftag,
+    example=_symamd_example,
 )
 
 
