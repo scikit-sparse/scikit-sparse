@@ -292,6 +292,10 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
     AMDMemoryError
         If the AMD algorithm runs out of memory during execution.
 
+    See Also
+    --------
+    ~sksparse.camd.camd, ~sksparse.colamd.colamd, ~sksparse.ccolamd.ccolamd
+
     Notes
     -----
     This function wraps the AMD (Approximate Minimum Degree) algorithm from

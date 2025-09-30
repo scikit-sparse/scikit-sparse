@@ -515,6 +515,10 @@ stats : :class:`CCOLAMDStats`, optional
     If ``return_info`` is True, returns an object containing statistics
     about the ordering.
 
+See Also
+--------
+{see_also}
+
 
 .. versionadded:: 0.5.0
 
@@ -584,6 +588,7 @@ ccolamd.__doc__ = _CCOLAMD_DOC_TEMPLATE.format(
     intro=ccolamd_intro,
     A_param=ccolamd_A_param,
     opt_lu_param=ccolamd_opt_lu_param,
+    see_also="csymamd, ~sksparse.colamd.colamd, ~sksparse.colamd.symamd",
     reftag=ccolamd_reftag,
     example=_ccolamd_example,
 )
@@ -647,6 +652,7 @@ csymamd.__doc__ = _CCOLAMD_DOC_TEMPLATE.format(
     intro=csymamd_intro,
     A_param=csymamd_A_param,
     opt_lu_param='',
+    see_also="ccolamd, ~sksparse.colamd.colamd, ~sksparse.colamd.symamd",
     reftag=csymamd_reftag,
     example=_csymamd_example,
 )

@@ -295,6 +295,10 @@ def camd(A, constraints=None, dense_thresh=None, aggressive=None, return_info=Fa
     CAMDMemoryError
         If the CAMD algorithm runs out of memory during execution.
 
+    See Also
+    --------
+    ~sksparse.amd.amd, ~sksparse.colamd.colamd, ~sksparse.ccolamd.ccolamd
+
     Notes
     -----
     This function wraps the CAMD (Approximate Minimum Degree) algorithm from

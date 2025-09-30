@@ -2555,10 +2555,6 @@ If ``beta`` is a scalar value, compute the factorization of:
 where `I` is the identity matrix.
 """
 
-
-_cholesky_see_also = "ldl, ldl_factor"
-
-
 _cho_factor_returns = """CholeskyFactor
     The factorization object. Use its methods to solve linear systems
     and manipulate the factorization.
@@ -2604,7 +2600,7 @@ True
 cho_factor.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     intro=_cholesky_intro,
     returns=_cho_factor_returns,
-    see_also=_cholesky_see_also,
+    see_also="cholesky, ldl, ldl_factor",
     version_notes=".. versionadded:: 0.5.0",
     doc_tag="#cho_factor_h",
     example=_cholesky_example,
@@ -2620,7 +2616,7 @@ _cholesky_version_notes=""".. versionadded:: 0.1.0
 cholesky.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     intro=_cholesky_intro,
     returns=_CHOLESKY_RETURNS.format(ldl_D_output=""),
-    see_also=_cholesky_see_also,
+    see_also="cho_factor, ldl, ldl_factor",
     version_notes=_cholesky_version_notes,
     doc_tag="#cholesky_h",
     example=_cholesky_example,
@@ -2709,7 +2705,7 @@ True
 ldl_factor.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     intro=_ldl_intro,
     returns=_cho_factor_returns,
-    see_also=_ldl_see_also,
+    see_also="ldl, cholesky, cho_factor",
     version_notes=".. versionadded:: 0.5.0",
     doc_tag="#ldl_factor_h",
     example=_ldl_example,
@@ -2719,7 +2715,7 @@ ldl_factor.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
 ldl.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     intro=_ldl_intro,
     returns=_CHOLESKY_RETURNS.format(ldl_D_output=_ldl_D_output),
-    see_also=_ldl_see_also,
+    see_also="ldl_factor, cholesky, cho_factor",
     version_notes=".. versionadded:: 0.5.0",
     doc_tag="#ldl_h",
     example=_ldl_example,
@@ -2779,6 +2775,11 @@ def symbfact(A, *, kind=None, bint lower=False, bint return_factor=False):
     L : (N, N) csc_array
         The symbolic factorization of the matrix. Only returned if
         ``return_factor`` is True.
+
+    See Also
+    --------
+    etree
+
 
     .. versionadded:: 0.5.0
 
@@ -3080,6 +3081,10 @@ def etree(A, *, kind=None, bint return_post=False):
         is the root of the tree.
 
     .. versionadded:: 0.5.0
+
+    See Also
+    --------
+    symbfact
 
     References
     ----------
