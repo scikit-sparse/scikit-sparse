@@ -194,6 +194,7 @@ def test_kind(A, kind):
 def test_rowcol_kind(A, kind):
     _test_kind(A, kind)
 
+
 # -----------------------------------------------------------------------------
 #         Test pruning of the separator tree
 # -----------------------------------------------------------------------------
@@ -213,6 +214,7 @@ def test_prune_septree(A):
     assert np.all(st_pruned.cmember >= 0)
     assert np.all(st_pruned.cmember < N)
     assert len(st_pruned.cp) == st_pruned.cmember.max() + 1
+
 
 # =============================================================================
 # =============================================================================

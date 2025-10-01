@@ -83,9 +83,6 @@ language_level = "3"
 [tool.ruff]
 line-length = 88
 target-version = "py310"
-extend-exclude = [
-    "doc",
-]
 
 [tool.ruff.lint]
 extend-select = [
