@@ -21,9 +21,16 @@
 
 .. end-badges
 
-=============
-scikit-sparse
-=============
+========================
+Scikit-Sparse (sksparse)
+========================
+
+**NOTE**:
+
+    This is the README for the development version of scikit-sparse.
+    For the stable version, see `the GitHub repository <upstream_repo_>`_, and
+    `the stable docs <upstream_docs_>`_.
+
 
 The ``scikit-sparse`` package is a companion to the `scipy.sparse
 <scipy_sparse_>`_ package for sparse matrix manipulation in Python. It provides
@@ -33,10 +40,12 @@ GPL licenses, such as `SuiteSparse <suitesparse_website_>`_.
 
 For more details on usage see `the docs <sksparse_docs_>`_.
 
+.. _upstream_repo: https://github.com/scikit-sparse/scikit-sparse
+.. _upstream_docs: https://scikit-sparse.readthedocs.io
 .. _scipy_sparse: https://docs.scipy.org/doc/scipy/reference/sparse.html
 .. _suitesparse_website: https://people.engr.tamu.edu/davis/suitesparse.html
 .. _sksparse_docs: https://scikit-sparse-dev.readthedocs.org
-
+   
 .. start-installation
 
 Requirements
@@ -90,11 +99,11 @@ Installing Scikit-Sparse
 
 Once you have SuiteSparse installed, you can install ``scikit-sparse`` with::
 
-    $ conda install -c conda-forge scikit-sparse
+    $ conda install -c conda-forge scikit-sparse-dev
 
 or if you prefer to use pip, you can install it with::
 
-    $ pip install scikit-sparse
+    $ pip install scikit-sparse-dev
 
 Check if the installation was successful by running the following command::
 
