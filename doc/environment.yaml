@@ -1,0 +1,11 @@
+# This file is used by ReadTheDocs to set up the conda environment
+name: rtd313
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.13
+  - pip
+  - pip:
+    - ../.[docs]
+  - suitesparse

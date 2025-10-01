@@ -2,21 +2,16 @@
 # The version of the configuration file.
 version: 2
 
-# Configuration for the build environment
 build:
   os: ubuntu-24.04
   tools:
     # Use a recent Python version
-    python: "3.13"
-  # Set the directory where Sphinx source files are located
-  jobs:
-    pre_build:
-      # Install the dependencies from pyproject.toml
-      - pip install .[docs]
+    python: "mambaforge-22.9"
 
-# Configuration for the documentation format
+conda:
+  environment: doc/environment.yaml
+
 sphinx:
-  configuration: docs/conf.py
+  configuration: doc/conf.py
 
-# Configuration for the actual documentation build
 formats: all
