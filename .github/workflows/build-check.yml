@@ -84,12 +84,16 @@ jobs:
         run: |
           micromamba create -n test-sdist python=${{ matrix.python-version }} -y
           micromamba activate test-sdist
-          micromamba install -c conda-forge suitesparse -y
+          micromamba install -c conda-forge suitesparse pytest -y
           pip install dist/scikit_sparse*.tar.gz
+          SRC_DIR=$(pwd)
           cd ..  # cd out of repo to avoid import issues
           pip show scikit-sparse
           pip show scikit-sparse-dev
           python -c "import sksparse; print(f'sdist loaded from: {sksparse.__file__}')"
+          # Run tests on the installed package
+          cp -R ${SRC_DIR}/tests ./tests
+          pytest tests
 
       - name: Upload built artifacts
         uses: actions/upload-artifact@v4
