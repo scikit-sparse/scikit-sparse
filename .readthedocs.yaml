@@ -1,0 +1,22 @@
+# .readthedocs.yaml
+# The version of the configuration file.
+version: 2
+
+# Configuration for the build environment
+build:
+  os: ubuntu-24.04
+  tools:
+    # Use a recent Python version
+    python: "3.13"
+  # Set the directory where Sphinx source files are located
+  jobs:
+    pre_build:
+      # Install the dependencies from pyproject.toml
+      - pip install .[docs]
+
+# Configuration for the documentation format
+sphinx:
+  configuration: docs/conf.py
+
+# Configuration for the actual documentation build
+formats: all

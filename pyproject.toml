@@ -50,13 +50,17 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+docs = [
+    "sphinx",
+    "furo",
+]
 dev = [
     "build",
     "pre-commit",
     "pytest",
     "ruff",
-    "sphinx",
-    "furo",
+    # setuptools gets all docs dependencies too
+    "docs",
 ]
 
 [project.urls]
