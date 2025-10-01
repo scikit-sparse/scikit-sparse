@@ -1,6 +1,7 @@
 # MANIFEST.in
 # Files to be included in the source distribution (not in the wheel)
 include LICENSE.txt
-include README.md
-include sksparse/cholmod_backward_compatible.h
+include README.rst
 recursive-include sksparse *.pyx *.pxd *.c
+recursive-exclude tests *
+recursive-exclude *.egg-info *
