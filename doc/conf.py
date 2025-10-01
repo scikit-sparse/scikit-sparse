@@ -37,6 +37,7 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.napoleon',     # numpy style docstrings
     'sphinx.ext.viewcode',
+    'sphinx_copybutton',  # add "copy" button to code blocks
 ]
 
 intersphinx_mapping = {

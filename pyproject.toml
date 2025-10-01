@@ -53,6 +53,7 @@ dependencies = [
 docs = [
     "sphinx",
     "furo",
+    "sphinx-copybutton",
 ]
 dev = [
     "build",
