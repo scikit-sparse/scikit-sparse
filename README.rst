@@ -1,15 +1,15 @@
 .. start-badges
 
-.. image:: https://img.shields.io/github/v/release/scikit-sparse/scikit-sparse
-   :target: https://github.com/scikit-sparse/scikit-sparse/releases/latest
+.. image:: https://img.shields.io/github/v/release/broesler/scikit-sparse
+   :target: https://github.com/broesler/scikit-sparse/releases/latest
 
 .. image:: https://img.shields.io/pypi/v/scikit-sparse
-   :target: https://pypi.org/project/scikit-sparse/
+   :target: https://pypi.org/project/scikit-sparse-dev/
 
 .. image:: https://img.shields.io/conda/vn/conda-forge/scikit-sparse.svg
-   :target: https://anaconda.org/conda-forge/scikit-sparse
+   :target: https://anaconda.org/conda-forge/scikit-sparse-dev
 
-.. image:: https://img.shields.io/github/workflow/status/scikit-sparse/scikit-sparse/CI%20targets?label=CI%20Tests
+.. image:: https://img.shields.io/github/workflow/status/broesler/scikit-sparse/CI%20targets?label=CI%20Tests
    :target: https://github.com/broesler/scikit-sparse/actions/workflows/ci-dev.yml
 
 .. image:: https://readthedocs.org/projects/scikit-sparse-dev/badge/?version=latest
@@ -31,7 +31,7 @@ For more details on usage see `the docs <sksparse_docs_>`_.
 
 .. _scipy_sparse: https://docs.scipy.org/doc/scipy/reference/sparse.html
 .. _suitesparse_website: https://people.engr.tamu.edu/davis/suitesparse.html
-.. _sksparse_docs: https://scikit-sparse.readthedocs.org
+.. _sksparse_docs: https://scikit-sparse-dev.readthedocs.org
 
 .. start-installation
 
@@ -102,11 +102,11 @@ Check if the installation was successful by running the following command::
 See `Troubleshooting <docs_trouble_>`_ for more information on determining
 which SuiteSparse library is being used.
 
-.. _docs_trouble: https://scikit-sparse.readthedocs.io/en/latest/overview.html#troubleshooting
+.. _docs_trouble: https://scikit-sparse-dev.readthedocs.io/en/latest/overview.html#troubleshooting
 
 
 ----
 
 Copyright © 2009–2025, the `scikit-sparse developers <docs_dev_>`_.
 
-.. _docs_dev: https://scikit-sparse.readthedocs.io/en/latest/overview.html#developers
+.. _docs_dev: https://scikit-sparse-dev.readthedocs.io/en/latest/overview.html#developers

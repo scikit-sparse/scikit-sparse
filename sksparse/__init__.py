@@ -57,7 +57,7 @@ References
 from importlib.metadata import version, PackageNotFoundError
 
 try:
-    __version__ = version("scikit-sparse")
+    __version__ = version("scikit-sparse-dev")
 except PackageNotFoundError:
     # package is not installed, so we set a default version
     __version__ = "0.0.0.dev0"

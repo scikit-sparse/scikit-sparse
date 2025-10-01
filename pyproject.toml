@@ -64,8 +64,8 @@ dev = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/scikit-sparse/scikit-sparse"
-"Bug Tracker" = "https://github.com/scikit-sparse/scikit-sparse/issues"
+"Homepage" = "https://github.com/broesler/scikit-sparse"
+"Bug Tracker" = "https://github.com/broesler/scikit-sparse/issues"
 
 # This data is excluded from the wheel package, but not necessarily from the
 # sdist (for sdist, see: MANIFEST.in)
