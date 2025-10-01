@@ -3,7 +3,8 @@ name: Build Check
 on:
   workflow_dispatch:
   push:
-    branches: [build-check]
+    branches: 
+      - "build-check"
 
 jobs:
   build-check:
@@ -60,23 +61,35 @@ jobs:
             exit 1
           fi
 
+      - name: Setup Micromamba
+        uses: mamba-org/setup-micromamba@v2
+        with:
+          micromamba-version: "latest"
+          init-shell: bash
+
       - name: Create new conda env and install wheel
         shell: bash -l {0}  # use bash as a login shell for conda activation
         run: |
-          conda create -n test-wheel python=${{ matrix.python-version }} -y
-          conda activate test-wheel
-          conda install -c conda-forge suitesparse -y
+          micromamba create -n test-wheel python=${{ matrix.python-version }} -y
+          micromamba activate test-wheel
+          micromamba install -c conda-forge suitesparse -y
           pip install dist/*.whl
-          python -c "import sksparse; print(sksparse.__version__)"
+          cd ..  # cd out of repo to avoid import issues
+          pip show scikit-sparse
+          pip show scikit-sparse-dev
+          python -c "import sksparse; print(f'Wheel loaded from: {sksparse.__file__}')"
 
       - name: Create new conda env and install sdist
         shell: bash -l {0}  # use bash as a login shell for conda activation
         run: |
-          conda create -n test-sdist python=${{ matrix.python-version }} -y
-          conda activate test-sdist
-          conda install -c conda-forge suitesparse -y
+          micromamba create -n test-sdist python=${{ matrix.python-version }} -y
+          micromamba activate test-sdist
+          micromamba install -c conda-forge suitesparse -y
           pip install dist/scikit_sparse*.tar.gz
-          python -c "import sksparse; print(sksparse.__version__)"
+          cd ..  # cd out of repo to avoid import issues
+          pip show scikit-sparse
+          pip show scikit-sparse-dev
+          python -c "import sksparse; print(f'sdist loaded from: {sksparse.__file__}')"
 
       - name: Upload built artifacts
         uses: actions/upload-artifact@v4
