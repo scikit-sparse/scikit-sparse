@@ -12,8 +12,13 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys
+import inspect
 import os
+import re
+import sys
+from importlib import import_module
+from pathlib import Path
+from urllib.parse import quote
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -37,6 +42,7 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.napoleon',     # numpy style docstrings
     'sphinx.ext.viewcode',
+    'sphinx.ext.linkcode',
     'sphinx_copybutton',  # add "copy" button to code blocks
 ]
 
@@ -123,6 +129,109 @@ pygments_style = 'sphinx'
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
 
+GITHUB_URL = "https://github.com/broesler/scikit-sparse"
+GITHUB_BRANCH = "release/v0.5.0.dev0"
+
+PROJECT_ROOT = Path(__file__).parent.parent
+
+
+def get_cython_lineno(src_path: Path, obj_name: str) -> int | None:
+    """Get the line number of a Cython object in its .pyx source file.
+
+    Parameters
+    ----------
+    src_path
+        Path to the .pyx source file.
+    obj_name
+        Name of the object to find.
+
+    Returns
+    -------
+    int or None
+        Line number of the object in the source file, or None if not found.
+    """
+    pat = re.compile(
+        rf"^\s*(cdef|cpdef|def|class)\s+.*?\b{re.escape(obj_name)}\b\s*(\(|:|=)",
+    )
+
+    try:
+        with src_path.open() as fp:
+            for i, line in enumerate(fp, start=1):
+                if pat.search(line):
+                    return i
+    except FileNotFoundError:
+        pass
+
+    if obj_name == "CholeskyFactor.factorize":
+        breakpoint()
+    return None
+
+
+# linkcode setup
+def linkcode_resolve(domain, info):
+    """Determine the URL corresponding to Python object."""
+    if domain != "py":
+        return None
+
+    if not info["module"]:
+        return None
+
+    modname = info["module"]
+    fullname = info["fullname"]
+
+    if not modname or not fullname:
+        return None
+
+    # --- Get Python object ---
+    try:
+        module = import_module(modname)
+        obj = module
+        for part in fullname.split("."):
+            obj = getattr(obj, part)
+    except Exception:
+        obj = None  # Cython object, or cannot be found
+
+    # --- Get source file and line number ---
+    filename = None
+    lineno = None
+
+    if obj is not None:
+        try:
+            filename = inspect.getsourcefile(obj)
+        except TypeError:
+            pass
+
+    if filename is not None and filename != "<string>":
+        # ---------- Pure Python Objects ----------
+        # Get the line number
+        try:
+            _, lineno = inspect.getsourcelines(obj)
+        except Exception:
+            pass
+
+        src_path = Path(filename)
+    else:
+        # ---------- Cython Objects ----------
+        potential_pyx_path = Path(*modname.split("."))
+        src_path = PROJECT_ROOT / potential_pyx_path.with_suffix(".pyx")
+        obj_simple_name = fullname.split(".")[-1]
+        lineno = get_cython_lineno(src_path, obj_simple_name)
+
+    # Construct the path relative to the Git repo root
+    try:
+        rel_path = src_path.relative_to(PROJECT_ROOT)
+    except ValueError:
+        return None  # file not in the scikit-sparse repo
+
+    github_path = quote(rel_path.as_posix())
+
+    url = f"{GITHUB_URL}/blob/{GITHUB_BRANCH}/{github_path}"
+
+    if lineno:
+        url += f"#L{lineno}"
+
+    return url
+
 
 # -- Options for HTML output ----------------------------------------------
 
@@ -134,14 +243,14 @@ html_theme = 'furo'
 # further.  For a list of options available for each theme, see the
 # documentation.
 html_theme_options = {
-    "source_repository": "https://github.com/broesler/scikit-sparse/",
-    "source_branch": "release/v0.5.0.dev0",
+    "source_repository": GITHUB_URL,
+    "source_branch": GITHUB_BRANCH,
     "source_directory": "doc/",
     "top_of_page_buttons": ["view"],
     "footer_icons": [
         {
             "name": "GitHub",
-            "url": "https://github.com/broesler/scikit-sparse",
+            "url": GITHUB_URL,
             "html": """
                 <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 16 16">
                     <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path>
