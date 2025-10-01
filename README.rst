@@ -2,15 +2,19 @@
 
 .. image:: https://img.shields.io/github/v/release/broesler/scikit-sparse
    :target: https://github.com/broesler/scikit-sparse/releases/latest
+   :alt: Latest GitHub release
 
-.. image:: https://img.shields.io/pypi/v/scikit-sparse
+.. image:: https://img.shields.io/pypi/v/scikit-sparse-dev
    :target: https://pypi.org/project/scikit-sparse-dev/
+   :alt: Latest PyPI release
 
-.. image:: https://img.shields.io/conda/vn/conda-forge/scikit-sparse.svg
+.. image:: https://img.shields.io/conda/vn/conda-forge/scikit-sparse-dev
    :target: https://anaconda.org/conda-forge/scikit-sparse-dev
+   :alt: Latest conda-forge release
 
-.. image:: https://img.shields.io/github/workflow/status/broesler/scikit-sparse/CI%20targets?label=CI%20Tests
+.. image:: https://github.com/broesler/scikit-sparse/actions/workflows/ci-dev.yml/badge.svg?branch=dev
    :target: https://github.com/broesler/scikit-sparse/actions/workflows/ci-dev.yml
+   :alt: CI Status
 
 .. image:: https://readthedocs.org/projects/scikit-sparse-dev/badge/?version=latest
    :target: https://scikit-sparse-dev.readthedocs.io/en/latest/
