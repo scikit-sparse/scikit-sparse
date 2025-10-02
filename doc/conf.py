@@ -132,7 +132,7 @@ pygments_style = "sphinx"
 todo_include_todos = False
 
 GITHUB_URL = "https://github.com/broesler/scikit-sparse"
-GITHUB_BRANCH = "release/v0.5.0.dev0"
+GITHUB_BRANCH = "dev"
 
 PROJECT_ROOT = Path(__file__).parent.parent
 

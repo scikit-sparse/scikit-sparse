@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scikit-sparse-dev"
-version = "0.5.0.dev0"
+version = "0.5.0.dev1"
 description = "Scikit-sparse is a Python wrapper for the SuiteSparse sparse matrix library."
 readme = "README.rst"
 requires-python = ">=3.10"
@@ -50,18 +50,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-docs = [
-    "sphinx",
-    "furo",
-    "sphinx-copybutton",
-]
 dev = [
     "build",
     "pre-commit",
     "pytest",
     "ruff",
-    # setuptools gets all docs dependencies too
-    "docs",
+    "sphinx",
+    "furo",
+    "sphinx-copybutton",
 ]
 
 [project.urls]
