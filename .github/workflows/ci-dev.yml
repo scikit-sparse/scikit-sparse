@@ -5,7 +5,10 @@ on:
   pull_request:
   push:
     branches:
-      - "**"
+      - "dev"
+  release:
+    types:
+      - "published"
 
 jobs:
   tests:
