@@ -111,12 +111,21 @@ setup(
     # You may specify the directory where CHOLMOD is installed using the
     # library_dirs and include_dirs keywords in the lines below.
     ext_modules=cythonize(
-        Extension(
-            "sksparse.cholmod",
-            ["sksparse/cholmod.pyx"],
-            include_dirs=INCLUDE_DIRS,
-            library_dirs=LIBRARY_DIRS,
-            libraries=["cholmod"],
-        )
+        [
+            Extension(
+                "sksparse.cholmod",
+                ["sksparse/cholmod.pyx"],
+                include_dirs=INCLUDE_DIRS,
+                library_dirs=LIBRARY_DIRS,
+                libraries=["cholmod"],
+            ),
+            Extension(
+                "sksparse.umfpack",
+                ["sksparse/umfpack.pyx"],
+                include_dirs=INCLUDE_DIRS,
+                library_dirs=LIBRARY_DIRS,
+                libraries=["umfpack"],
+            )
+        ],
     ),
 )
