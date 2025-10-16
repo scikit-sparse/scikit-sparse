@@ -247,6 +247,97 @@ cdef bint _is_real_dtype(np.dtype dtype):
 
 
 # -----------------------------------------------------------------------------
+#         Control Class
+# -----------------------------------------------------------------------------
+cdef dict _CONTROL_INDEX = {
+    "print_level": UMFPACK_PRL,
+    "dense_row": UMFPACK_DENSE_ROW,
+    "dense_col": UMFPACK_DENSE_COL,
+    "blas3_block_size": UMFPACK_BLOCK_SIZE,
+    "strategy": UMFPACK_STRATEGY,
+    "ordering_method": UMFPACK_ORDERING,
+    "fixQ": UMFPACK_FIXQ,
+    "amd_dense": UMFPACK_AMD_DENSE,
+    "aggressive": UMFPACK_AGGRESSIVE,
+    "singletons": UMFPACK_SINGLETONS,
+    "pivot_tol": UMFPACK_PIVOT_TOLERANCE,
+    "alloc_init": UMFPACK_ALLOC_INIT,
+    "sym_pivot_tol": UMFPACK_SYM_PIVOT_TOLERANCE,
+    "row_scale": UMFPACK_SCALE,
+    "front_alloc_init": UMFPACK_FRONT_ALLOC_INIT,
+    "droptol": UMFPACK_DROPTOL,
+    "ir_steps": UMFPACK_IRSTEP,
+    "compiles_with_blas": UMFPACK_COMPILED_WITH_BLAS,
+    "sym_thresh": UMFPACK_STRATEGY_THRESH_SYM,
+    "nnzdiag_thresh": UMFPACK_STRATEGY_THRESH_NNZDIAG,
+}
+
+
+cdef class UMFControl:
+    """The class used to manage UMFPACK control parameters."""
+
+    cdef double _arr[UMFPACK_CONTROL]
+
+    def __cinit__(self, **kwargs):
+        # NOTE the 4 functions ([dz][il]_defaults) all set the same default
+        # values, so just pick one of them.
+        umfpack_di_defaults(self._arr)
+
+        # Update with user-provided values
+        for key, value in kwargs.items():
+            if key not in _CONTROL_INDEX:
+                raise KeyError(f"Invalid control parameter: {key}")
+            self._arr[_CONTROL_INDEX[key]] = value
+
+    def __getattr__(self, name):
+        if name not in _CONTROL_INDEX:
+            raise AttributeError(f"'UMFControl' object has no attribute '{name}'")
+        else:
+            return self._arr[_CONTROL_INDEX[name]]
+
+    def __setattr__(self, name, value):
+        if name not in _CONTROL_INDEX:
+            raise AttributeError(f"'UMFControl' object has no attribute '{name}'")
+        else:
+            # TODO validate values here (see umfpack.h for allowed values)
+            self._arr[_CONTROL_INDEX[name]] = value
+
+    def __repr__(self):
+        params = ",\n    ".join(
+            f"{key}={self._arr[idx]}" for key, idx in _CONTROL_INDEX.items()
+        )
+        return f"UMFControl(\n    {params}\n)"
+
+    def __str__(self):
+        return self.__repr__()
+
+    def report(self, print_level=2):
+        """Print a report of the control structure to stdout.
+
+        Parameters
+        ----------
+        print_level : int, optional
+            The verbosity level. Default value is 2.
+
+            Accepted values are:
+
+            * None: use current print level
+            * <= 1: no printing
+            * 2: print all control parameters
+
+        """
+        pl = print_level if print_level is not None else self.print_level
+        self.print_level = pl
+
+        # NOTE the 4 functions ([dz][il]_report_control) all print the same.
+        umfpack_di_report_control(self._arr)
+
+        # restore old print level
+        if print_level is None:
+            self.print_level = pl
+
+
+# -----------------------------------------------------------------------------
 #         UMFPACK Class Interface
 # -----------------------------------------------------------------------------
 cdef class UMFFactor:
@@ -262,13 +353,12 @@ cdef class UMFFactor:
     """
 
     cdef void *_symbolic
-    cdef double _control[UMFPACK_CONTROL]
+    cdef UMFControl _control
     cdef double _info[UMFPACK_INFO]
     cdef bint _use_int32
     cdef bint _is_real
 
-    # TODO set up control array
-    def __cinit__(self, object A):
+    def __cinit__(self, object A, object control=None):
         A, use_int32, _ = validate_csc_input(A)
 
         self._use_int32 = use_int32
@@ -286,9 +376,12 @@ cdef class UMFFactor:
 
         cdef int status
 
+        # Set the control array
+        self._control = UMFControl() if control is None else control
+
+        # Compute the symbolic factorization
         if self._is_real:
             if self._use_int32:
-                umfpack_di_defaults(self._control)
                 status = umfpack_di_symbolic(
                     M,
                     N,
@@ -296,11 +389,10 @@ cdef class UMFFactor:
                     <const int32_t*>indices.data,
                     <const double*>real_data.data,
                     &self._symbolic,
-                    self._control,
+                    self._control._arr,
                     self._info
                 )
             else:
-                umfpack_dl_defaults(self._control)
                 status = umfpack_dl_symbolic(
                     M,
                     N,
@@ -308,12 +400,11 @@ cdef class UMFFactor:
                     <const int64_t*>indices.data,
                     <const double*>real_data.data,
                     &self._symbolic,
-                    self._control,
+                    self._control._arr,
                     self._info
                 )
         else:
             if self._use_int32:
-                umfpack_zi_defaults(self._control)
                 status = umfpack_zi_symbolic(
                     M,
                     N,
@@ -322,11 +413,10 @@ cdef class UMFFactor:
                     <const double*>real_data.data,
                     <const double*>imag_data.data,
                     &self._symbolic,
-                    self._control,
+                    self._control._arr,
                     self._info
                 )
             else:
-                umfpack_zl_defaults(self._control)
                 status = umfpack_zl_symbolic(
                     M,
                     N,
@@ -335,7 +425,7 @@ cdef class UMFFactor:
                     <const double*>real_data.data,
                     <const double*>imag_data.data,
                     &self._symbolic,
-                    self._control,
+                    self._control._arr,
                     self._info
                 )
 
@@ -357,41 +447,26 @@ cdef class UMFFactor:
     # TODO __repr__ and __str__
 
     # -------------------------------------------------------------------------
-    #         Public API
+    #         Properties
     # -------------------------------------------------------------------------
-    # TODO make a python dataclass for control parameters
-    def report_control(self, print_level=2):
-        """Print a report of the control structure to stdout.
+    @property
+    def control(self):
+        """The control parameters used for the factorization.
 
-        Parameters
-        ----------
-        print_level : int, optional
-            The verbosity level. Default value is 2.
-
-            Accepted values are:
-
-            * None: use current print level
-            * <= 1: no printing
-            * 2: print all of control parameters
-
+        See :class:`UMFControl` for details.
         """
-        pl = print_level if print_level is not None else self._control[UMFPACK_PRL]
-        self._control[UMFPACK_PRL] = pl
+        return self._control
 
-        if self._is_real:
-            if self._use_int32:
-                umfpack_di_report_control(self._control)
-            else:
-                umfpack_dl_report_control(self._control)
-        else:
-            if self._use_int32:
-                umfpack_zi_report_control(self._control)
-            else:
-                umfpack_zl_report_control(self._control)
+    @control.setter
+    def control(self, UMFControl control):
+        self._control = control
 
-        # restore old print level
-        if print_level is None:
-            self._control[UMFPACK_PRL] = pl
+    # -------------------------------------------------------------------------
+    #         Public Methods
+    # -------------------------------------------------------------------------
+    def report_control(self, print_level=2):
+        self._control.report(print_level=print_level)
+
 
     def report_symbolic(self, print_level=4):
         """Print a report of the symbolic factorization to stdout.
@@ -410,23 +485,27 @@ cdef class UMFFactor:
             * 5: as 3, but print all of the input
 
         """
-        pl = print_level if print_level is not None else self._control[UMFPACK_PRL]
-        self._control[UMFPACK_PRL] = pl
+        pl = print_level if print_level is not None else self._control.print_level
+        self._control.print_level = pl
 
         if self._is_real:
             if self._use_int32:
-                umfpack_di_report_symbolic(self._symbolic, self._control)
+                umfpack_di_report_symbolic(self._symbolic, self._control._arr)
             else:
-                umfpack_dl_report_symbolic(self._symbolic, self._control)
+                umfpack_dl_report_symbolic(self._symbolic, self._control._arr)
         else:
             if self._use_int32:
-                umfpack_zi_report_symbolic(self._symbolic, self._control)
+                umfpack_zi_report_symbolic(self._symbolic, self._control._arr)
             else:
-                umfpack_zl_report_symbolic(self._symbolic, self._control)
+                umfpack_zl_report_symbolic(self._symbolic, self._control._arr)
 
         # restore old print level
         if print_level is None:
-            self._control[UMFPACK_PRL] = pl
+            self._control.print_level = pl
+
+
+# Set docstrings
+UMFFactor.report_control.__doc__ = UMFControl.report.__doc__
 
 # =============================================================================
 # =============================================================================

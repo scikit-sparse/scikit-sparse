@@ -25,3 +25,4 @@ def test_symbolic():
     f = UMFFactor(A)
     f.report_control()
     f.report_symbolic()
+    print(f.control)
