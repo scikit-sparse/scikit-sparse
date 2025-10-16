@@ -240,6 +240,22 @@ cdef extern from "umfpack.h":
     # -------------------------------------------------------------------------
     #         Functions
     # -------------------------------------------------------------------------
+    void umfpack_di_defaults(
+        double Control[UMFPACK_CONTROL]
+    )
+
+    void umfpack_dl_defaults(
+        double Control[UMFPACK_CONTROL]
+    )
+
+    void umfpack_zi_defaults(
+        double Control[UMFPACK_CONTROL]
+    )
+
+    void umfpack_zl_defaults(
+        double Control[UMFPACK_CONTROL]
+    )
+
     int umfpack_di_symbolic(
         int32_t n_row,
         int32_t n_col,
@@ -286,3 +302,58 @@ cdef extern from "umfpack.h":
         double Info[UMFPACK_INFO]
     )
 
+    void umfpack_di_free_symbolic(
+        void **Symbolic
+    )
+
+    void umfpack_dl_free_symbolic(
+        void **Symbolic
+    )
+
+    void umfpack_zi_free_symbolic(
+        void **Symbolic
+    )
+
+    void umfpack_zl_free_symbolic(
+        void **Symbolic
+    )
+
+
+    # -------------------------------------------------------------------------
+    #         Debugging
+    # -------------------------------------------------------------------------
+    void umfpack_di_report_control(
+        const double Control[UMFPACK_CONTROL]
+    )
+
+    void umfpack_dl_report_control(
+        const double Control[UMFPACK_CONTROL]
+    )
+
+    void umfpack_zi_report_control(
+        const double Control[UMFPACK_CONTROL]
+    )
+
+    void umfpack_zl_report_control(
+        const double Control[UMFPACK_CONTROL]
+    )
+
+    int umfpack_di_report_symbolic(
+        void *Symbolic,
+        const double Control[UMFPACK_CONTROL]
+    )
+
+    int umfpack_dl_report_symbolic(
+        void *Symbolic,
+        const double Control[UMFPACK_CONTROL]
+    )
+
+    int umfpack_zi_report_symbolic(
+        void *Symbolic,
+        const double Control[UMFPACK_CONTROL]
+    )
+
+    int umfpack_zl_report_symbolic(
+        void *Symbolic,
+        const double Control[UMFPACK_CONTROL]
+    )

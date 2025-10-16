@@ -12,9 +12,16 @@
 
 import pytest
 
-from sksparse.umfpack import dummy_func
+import numpy as np
+from scipy import sparse
+
+from sksparse.umfpack import UMFFactor
 
 
-def test_compile():
-    """Test that the umfpack module compiles correctly."""
-    assert dummy_func()
+def test_symbolic():
+    N = 10
+    A = sparse.random_array((N, N), density=0.5, format="csc", dtype=float)
+    A.setdiag(1.0)
+    f = UMFFactor(A)
+    f.report_control()
+    f.report_symbolic()
