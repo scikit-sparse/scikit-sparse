@@ -27,9 +27,216 @@ for sparse, possibly non-symmetric, indefinite matrices.
 import numpy as np
 cimport numpy as np
 
+import warnings
+
 from .utils import validate_csc_input
 
 
+# -----------------------------------------------------------------------------
+#         Warnings and Errors
+# -----------------------------------------------------------------------------
+class UMFPACKWarning(Warning):
+    """A warning occurred in a UMFPACK routine."""
+    pass
+
+
+class UMFPACKSingularMatrixWarning(UMFPACKWarning):
+    """A singular matrix was encountered in a UMFPACK routine."""
+    pass
+
+
+class UMFPACKDeterminantUnderflowWarning(UMFPACKWarning):
+    """A determinant underflow was encountered in a UMFPACK routine."""
+    pass
+
+
+class UMFPACKDeterminantOverflowWarning(UMFPACKWarning):
+    """A determinant overflow was encountered in a UMFPACK routine."""
+    pass
+
+
+class UMFPACKError(Exception):
+    """An error occurred in a UMFPACK routine."""
+    pass
+
+
+class UMFPACKOutOfMemoryError(UMFPACKError):
+    """UMFPACK ran out of memory."""
+    pass
+
+
+class UMFPACKInvalidNumericObjectError(UMFPACKError):
+    """An invalid Numeric object was passed to a UMFPACK routine."""
+    pass
+
+
+class UMFPACKInvalidSymbolicObjectError(UMFPACKError):
+    """An invalid Symbolic object was passed to a UMFPACK routine."""
+    pass
+
+
+class UMFPACKArgumentMissingError(UMFPACKError):
+    """A required argument was missing in a UMFPACK routine."""
+    pass
+
+
+class UMFPACKNNonpositiveError(UMFPACKError):
+    """A non-positive value for n was passed to a UMFPACK routine."""
+    pass
+
+
+class UMFPACKInvalidMatrixError(UMFPACKError):
+    """An invalid matrix was passed to a UMFPACK routine."""
+    pass
+
+
+class UMFPACKDifferentPatternError(UMFPACKError):
+    """A matrix with a different nonzero pattern was passed to a UMFPACK routine."""
+    pass
+
+
+class UMFPACKInvalidSystemError(UMFPACKError):
+    """An invalid system type was passed to a UMFPACK routine."""
+    pass
+
+
+class UMFPACKInvalidPermutationError(UMFPACKError):
+    """An invalid permutation was passed to a UMFPACK routine."""
+    pass
+
+
+class UMFPACKInternalError(UMFPACKError):
+    """An internal error occurred in a UMFPACK routine."""
+    pass
+
+
+class UMFPACKFileIOError(UMFPACKError):
+    """A file I/O error occurred in a UMFPACK routine."""
+    pass
+
+
+class UMFPACKOrderingFailedError(UMFPACKError):
+    """The ordering algorithm failed in a UMFPACK routine."""
+    pass
+
+
+class UMFPACKInvalidBlobError(UMFPACKError):
+    """An invalid blob was passed to a UMFPACK routine."""
+    pass
+
+
+cdef _handle_errors(int status) except * with gil:
+    """Handle UMFPACK errors by raising Python exceptions or warnings.
+
+    This function should be called with the return ``status`` after any UMFPACK
+    C function that may fail.
+
+    Parameters
+    ----------
+    status : int
+        The UMFPACK exit status code.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    :exc:`UMFPACKWarning`
+        Raises a warning for non-critical issues.
+    :exc:`UMFPACKError` or subclass
+        Raises an appropriate Python exception based on the UMFPACK status code.
+    """
+    if status == UMFPACK_OK:
+        return
+
+    status_msg = f"(code {status:d})"
+
+    # Known Errors
+    cdef dict error_map = {
+        UMFPACK_WARNING_singular_matrix: (
+            UMFPACKSingularMatrixWarning,
+            "Matrix is singular."
+        ),
+        UMFPACK_WARNING_determinant_underflow: (
+            UMFPACKDeterminantUnderflowWarning,
+            "Determinant underflow."
+        ),
+        UMFPACK_WARNING_determinant_overflow: (
+            UMFPACKDeterminantOverflowWarning,
+            "Determinant overflow."
+        ),
+        UMFPACK_ERROR_out_of_memory: (
+            UMFPACKOutOfMemoryError,
+            "Out of memory."
+        ),
+        UMFPACK_ERROR_invalid_Numeric_object: (
+            UMFPACKInvalidNumericObjectError,
+            "Invalid Numeric object."
+        ),
+        UMFPACK_ERROR_invalid_Symbolic_object: (
+            UMFPACKInvalidSymbolicObjectError,
+            "Invalid Symbolic object."
+        ),
+        UMFPACK_ERROR_argument_missing: (
+            UMFPACKArgumentMissingError,
+            "A required argument is missing."
+        ),
+        UMFPACK_ERROR_n_nonpositive: (
+            UMFPACKNNonpositiveError,
+            "Input N is non-positive."
+        ),
+        UMFPACK_ERROR_invalid_matrix: (
+            UMFPACKInvalidMatrixError,
+            "Invalid matrix."
+        ),
+        UMFPACK_ERROR_different_pattern: (
+            UMFPACKDifferentPatternError,
+            ("Matrix has different nonzero pattern than the matrix that was used"
+             "for the symbolic analysis.")
+        ),
+        UMFPACK_ERROR_invalid_system: (
+            UMFPACKInvalidSystemError,
+            "Invalid system type argument, or the matrix is not square."
+        ),
+        UMFPACK_ERROR_invalid_permutation: (
+            UMFPACKInvalidPermutationError,
+            "Invalid permutation."
+        ),
+        UMFPACK_ERROR_internal_error: (
+            UMFPACKInternalError,
+            "An internal error occurred."
+        ),
+        UMFPACK_ERROR_file_IO: (
+            UMFPACKFileIOError,
+            "A file I/O error occurred."
+        ),
+        UMFPACK_ERROR_ordering_failed: (
+            UMFPACKOrderingFailedError,
+            "The ordering algorithm failed."
+        ),
+        UMFPACK_ERROR_invalid_blob: (
+            UMFPACKInvalidBlobError,
+            "Invalid blob."
+        ),
+    }
+
+    # Fallback to generic error for unknown codes
+    exc_class, msg = error_map.get(
+        status,
+        (UMFPACKError, "An unknown UMFPACK error occurred.")
+    )
+    full_msg = msg + " " + status_msg
+
+    if issubclass(exc_class, Warning):
+        warnings.warn(full_msg, exc_class)
+    else:
+        raise exc_class(full_msg)
+
+
+# -----------------------------------------------------------------------------
+#         Helpers
+# -----------------------------------------------------------------------------
 cdef bint _is_real_dtype(np.dtype dtype):
     if np.issubdtype(dtype, np.float64):
         return True
@@ -39,6 +246,9 @@ cdef bint _is_real_dtype(np.dtype dtype):
         raise TypeError(f"dtype must be float64 or complex128. Got {dtype=}")
 
 
+# -----------------------------------------------------------------------------
+#         UMFPACK Class Interface
+# -----------------------------------------------------------------------------
 cdef class UMFFactor:
     """The main object used for creating and using an LU factorization.
 
@@ -129,9 +339,7 @@ cdef class UMFFactor:
                     self._info
                 )
 
-        # TODO _handle_errors(status)
-        if status != UMFPACK_OK:
-            raise RuntimeError(f"UMFPACK symbolic factorization failed with code {status}.")
+        _handle_errors(status)
 
     def __dealloc__(self):
         if self._symbolic is not NULL:
