@@ -273,8 +273,116 @@ cdef dict _CONTROL_INDEX = {
 }
 
 
+cdef dict _CONTROL_STRATEGY_INDEX = {
+    'auto': UMFPACK_STRATEGY_AUTO,
+    'unsymmetric': UMFPACK_STRATEGY_UNSYMMETRIC,
+    'obsolete': UMFPACK_STRATEGY_OBSOLETE,
+    'symmetric': UMFPACK_STRATEGY_SYMMETRIC,
+}
+
+
+cdef dict _CONTROL_SCALE_INDEX = {
+    None: UMFPACK_SCALE_NONE,
+    'none': UMFPACK_SCALE_NONE,
+    'sum': UMFPACK_SCALE_SUM,
+    'max': UMFPACK_SCALE_MAX,
+}
+
+
+cdef dict _CONTROL_ORDERING_INDEX = {
+    'cholmod': UMFPACK_ORDERING_CHOLMOD,
+    'amd': UMFPACK_ORDERING_AMD,
+    'given': UMFPACK_ORDERING_GIVEN,
+    'none': UMFPACK_ORDERING_NONE,
+    None: UMFPACK_ORDERING_NONE,
+    'metis': UMFPACK_ORDERING_METIS,
+    'best': UMFPACK_ORDERING_BEST,
+    'user': UMFPACK_ORDERING_USER,
+    'metis_guard': UMFPACK_ORDERING_METIS_GUARD,
+}
+
+
 cdef class UMFControl:
-    """The class used to manage UMFPACK control parameters."""
+    """The class used to manage UMFPACK control parameters.
+
+    Attributes
+    ----------
+    print_level : int
+        The verbosity level. Values vary depending on the
+        function called, but typically "0" means no printing, and higher values
+        mean more verbose printing. Default value is 1. 
+    dense_row, dense_col : int
+        A row or column is considered to be dense if it has more than ``max(16,
+        dense_[row|col] * 16 * sqrt(n_[row|col])`` entries. Default 0.2.
+    blas3_block_size : int
+        The block size to use in Level-3 BLAS operations. Default value is 32.
+    strategy : str
+        The strategy to use in the factorization. Default value is ``'auto'``.
+        Possible values are:
+        * ``'auto'``: choose the strategy automatically
+        * ``'unsymmetric'``: order the columns of :math:`A` with COLAMD
+        * ``'symmetric'``: Order the matrix :math:`A + A^{\\top}` with AMD
+
+    ordering_method : str
+        The ordering method to use. Default value is ``'amd'``. Possible values
+        are:
+        * ``'cholmod'``: use AMD/COLAMD, then METIS
+        * ``'amd'``: just use AMD or COLAMD
+        * ``'given'``: use the user-provided ordering
+        * ``'none'``: no ordering
+        * ``'metis'``: use METIS on :math:`A + A^{\\top}` or :math:`A^{\\top} A`
+        * ``'best'``: try AMD/COLAMD, METIS and NESDIS
+        * ``'user'``: use the user-provided function to compute the ordering
+        * ``'metis_guard'``: use METIS for symmetric strategy, try METIS for
+          unsymmetric and fall back to COLAMD if :math:`A` has many dense rows.
+
+    fixQ : int
+        Default 0. Possible values:
+        * -1: possibly modify :math:`Q` during numeric factorization.
+        * 0: automatic. Modify :math:`Q` only if strategy is unsymmetric.
+        * 1: do not modify :math:`Q` during numeric factorization.
+
+    amd_dense : int
+        Rows/columns in :math:`A + A^{\top}` with more than ``max(16,
+        amd_dense * sqrt(n))`` entries (where ``n = n_row
+        = n_col``) are ignored in the AMD pre-ordering. Default 10.
+    aggressive : bool
+        If True, use aggressive absorption in AMD. Default True.
+    singletons : bool
+        If True, remove singletons prior to factorization. Default True.
+    pivot_tol : float
+        The relative pivot tolerance for partial pivoting with row
+        interchanges. The absolute value of the entry must be >= ``pivot_tol
+        *`` largest absolute value in that column. ``pivot_tol=1.0`` gives true
+        partial pivoting. If ``pivot_tol <= 0.0``, then any non-zero entry is
+        acceptable as a pivot. Default value is 0.1.
+    sym_pivot_tol : float
+        The relative pivot tolerance for symmetric strategy. Default 0.001.
+    row_scale : str or None
+        The row scaling to use. Default value is ``'sum'``. Possible values are:
+        * None or ``'none'``: no row scaling
+        * ``'sum'``: divide each row by ``sum(abs(A[i,:]))``
+        * ``'max'``: divide each row by ``max(abs(A[i,:]))``
+
+    alloc_init : float
+        Estimated space for the memory to allocate for numeric factorization.
+        Default 0.7.
+    front_alloc_init : float
+        Estimated space for the memory to allocate for frontal matrices.
+        Default 0.5.
+    droptol : float
+        Drop tolerance for small entries in :math:`L` and :math:`U`. Default
+        value is 0.0 (no dropping).
+    ir_steps : int
+        Number of iterative refinement steps to perform. Default value is 2.
+    compiles_with_blas : bool
+        True if UMFPACK was compiled with BLAS support. Read-only.
+    sym_thresh : float
+        Threshold for choosing symmetric strategy. Default 0.3.
+    nnzdiag_thresh : float
+        Threshold for choosing unsymmetric strategy based on the number of
+        diagonal entries. Default 0.9.
+    """
 
     cdef double _arr[UMFPACK_CONTROL]
 
@@ -285,56 +393,94 @@ cdef class UMFControl:
 
         # Update with user-provided values
         for key, value in kwargs.items():
-            if key not in _CONTROL_INDEX:
-                raise KeyError(f"Invalid control parameter: {key}")
-            self._arr[_CONTROL_INDEX[key]] = value
+            try:
+                setattr(self, key, value)
+            except KeyError:
+                raise KeyError(
+                    f"Invalid control parameter: {key}. "
+                    f"Expected one of {list(_CONTROL_INDEX.keys())}"
+                )
 
     def __getattr__(self, name):
-        if name not in _CONTROL_INDEX:
-            raise AttributeError(f"'UMFControl' object has no attribute '{name}'")
-        else:
+        try:
             return self._arr[_CONTROL_INDEX[name]]
+        except KeyError:
+            raise AttributeError(f"UMFControl object has no attribute '{name}'")
 
     def __setattr__(self, name, value):
-        if name not in _CONTROL_INDEX:
-            raise AttributeError(f"'UMFControl' object has no attribute '{name}'")
-        else:
-            # TODO validate values here (see umfpack.h for allowed values)
-            self._arr[_CONTROL_INDEX[name]] = value
+        try:
+            idx = _CONTROL_INDEX[name]
+        except KeyError:
+            raise AttributeError(f"UMFControl object has no attribute '{name}'")
+
+        # Validate values
+        if idx == UMFPACK_STRATEGY:
+            try:
+                value = _CONTROL_STRATEGY_INDEX[value]
+            except KeyError:
+                raise ValueError(
+                    f"Invalid value for strategy: {value}. "
+                    f"Expected one of {list(_CONTROL_STRATEGY_INDEX.keys())}"
+                )
+
+            if value == UMFPACK_STRATEGY_OBSOLETE:
+                raise ValueError("'obsolete' value is, well, obsolete.")
+
+        elif idx == UMFPACK_ORDERING:
+            try:
+                value = _CONTROL_ORDERING_INDEX[value]
+            except KeyError:
+                raise ValueError(
+                    f"Invalid value for ordering_method: {value}. "
+                    f"Expected one of {list(_CONTROL_ORDERING_INDEX.keys())}"
+                )
+
+        elif idx == UMFPACK_SCALE:
+            try:
+                value = _CONTROL_SCALE_INDEX[value]
+            except KeyError:
+                raise ValueError(
+                    f"Invalid value for row_scale: {value}. "
+                    f"Expected one of {list(_CONTROL_SCALE_INDEX.keys())}"
+                )
+
+        elif idx == UMFPACK_COMPILED_WITH_BLAS:
+            raise AttributeError(f"'{name}' is read-only")
+
+        # Set the value
+        self._arr[idx] = value
 
     def __repr__(self):
         params = ",\n    ".join(
             f"{key}={self._arr[idx]}" for key, idx in _CONTROL_INDEX.items()
         )
-        return f"UMFControl(\n    {params}\n)"
+        return f"{self.__class__.__name__}(\n    {params}\n)"
 
     def __str__(self):
         return self.__repr__()
 
-    def report(self, print_level=2):
+    def report(self):
         """Print a report of the control structure to stdout.
 
-        Parameters
-        ----------
-        print_level : int, optional
-            The verbosity level. Default value is 2.
+        This method provides more internal details from UMFPACK itself than the
+        string representation.
 
-            Accepted values are:
+        .. note::
 
-            * None: use current print level
-            * <= 1: no printing
-            * 2: print all control parameters
-
+            This method temporarily sets the print level to 2 (print all
+            information) and restores the previous value afterwards, so the
+            report will *always* show "print level: 2". Use
+            ``UMFControl.print_level`` or ``print(UMFControl)`` to see the
+            actual print level.
         """
-        pl = print_level if print_level is not None else self.print_level
-        self.print_level = pl
+        cdef int old_pl = self.print_level
+        self.print_level = 2  # print all info
 
         # NOTE the 4 functions ([dz][il]_report_control) all print the same.
         umfpack_di_report_control(self._arr)
 
         # restore old print level
-        if print_level is None:
-            self.print_level = pl
+        self.print_level = old_pl
 
 
 # -----------------------------------------------------------------------------
@@ -464,11 +610,10 @@ cdef class UMFFactor:
     # -------------------------------------------------------------------------
     #         Public Methods
     # -------------------------------------------------------------------------
-    def report_control(self, print_level=2):
-        self._control.report(print_level=print_level)
+    def report_control(self):
+        self._control.report()
 
-
-    def report_symbolic(self, print_level=4):
+    def report_symbolic(self, object print_level=4):
         """Print a report of the symbolic factorization to stdout.
 
         Parameters
@@ -485,7 +630,8 @@ cdef class UMFFactor:
             * 5: as 3, but print all of the input
 
         """
-        pl = print_level if print_level is not None else self._control.print_level
+        cdef int pl = print_level if print_level is not None else self._control.print_level
+        cdef int old_pl = self._control.print_level
         self._control.print_level = pl
 
         if self._is_real:
@@ -500,8 +646,7 @@ cdef class UMFFactor:
                 umfpack_zl_report_symbolic(self._symbolic, self._control._arr)
 
         # restore old print level
-        if print_level is None:
-            self._control.print_level = pl
+        self._control.print_level = old_pl
 
 
 # Set docstrings
