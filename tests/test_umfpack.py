@@ -28,6 +28,8 @@ def test_symbolic(itype, dtype):
     A.indptr = A.indptr.astype(itype)
     A.indices = A.indices.astype(itype)
     f = UMFFactor(A)
+    print()
+    print(f)
     print('---------- report_control():')
     f.report_control()
     print('---------- report_symbolic():')
@@ -37,6 +39,7 @@ def test_symbolic(itype, dtype):
     f.factorize(A)
     print('---------- report_numeric():')
     f.report_numeric()
+    print(f)
     # Solve a system
     expect_x = np.arange(1, N + 1, dtype=dtype)
     b = A @ expect_x
