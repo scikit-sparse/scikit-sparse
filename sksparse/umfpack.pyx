@@ -310,7 +310,7 @@ cdef class UMFControl:
     print_level : int
         The verbosity level. Values vary depending on the
         function called, but typically "0" means no printing, and higher values
-        mean more verbose printing. Default value is 1. 
+        mean more verbose printing. Default value is 1.
     dense_row, dense_col : int
         A row or column is considered to be dense if it has more than ``max(16,
         dense_[row|col] * 16 * sqrt(n_[row|col])`` entries. Default 0.2.
@@ -531,9 +531,9 @@ cdef class UMFFactor:
                 status = umfpack_di_symbolic(
                     M,
                     N,
-                    <const int32_t*>indptr.data,
-                    <const int32_t*>indices.data,
-                    <const double*>real_data.data,
+                    <int32_t*>indptr.data,
+                    <int32_t*>indices.data,
+                    <double*>real_data.data,
                     &self._symbolic,
                     self._control._arr,
                     self._info
@@ -542,9 +542,9 @@ cdef class UMFFactor:
                 status = umfpack_dl_symbolic(
                     M,
                     N,
-                    <const int64_t*>indptr.data,
-                    <const int64_t*>indices.data,
-                    <const double*>real_data.data,
+                    <int64_t*>indptr.data,
+                    <int64_t*>indices.data,
+                    <double*>real_data.data,
                     &self._symbolic,
                     self._control._arr,
                     self._info
@@ -554,10 +554,10 @@ cdef class UMFFactor:
                 status = umfpack_zi_symbolic(
                     M,
                     N,
-                    <const int32_t*>indptr.data,
-                    <const int32_t*>indices.data,
-                    <const double*>real_data.data,
-                    <const double*>imag_data.data,
+                    <int32_t*>indptr.data,
+                    <int32_t*>indices.data,
+                    <double*>real_data.data,
+                    <double*>imag_data.data,
                     &self._symbolic,
                     self._control._arr,
                     self._info
@@ -566,10 +566,10 @@ cdef class UMFFactor:
                 status = umfpack_zl_symbolic(
                     M,
                     N,
-                    <const int64_t*>indptr.data,
-                    <const int64_t*>indices.data,
-                    <const double*>real_data.data,
-                    <const double*>imag_data.data,
+                    <int64_t*>indptr.data,
+                    <int64_t*>indices.data,
+                    <double*>real_data.data,
+                    <double*>imag_data.data,
                     &self._symbolic,
                     self._control._arr,
                     self._info
