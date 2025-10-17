@@ -27,7 +27,7 @@ for sparse, possibly non-symmetric, indefinite matrices.
 import numpy as np
 cimport numpy as np
 
-from scipy.sparse import issparse
+from scipy.sparse import issparse, csr_array, csc_array
 import warnings
 
 from .utils import validate_csc_input
@@ -252,8 +252,8 @@ cdef bint _is_real_dtype(np.dtype dtype):
 # -----------------------------------------------------------------------------
 cdef dict _INFO_INDEX = {
     "status": UMFPACK_STATUS,
-    "nrow": UMFPACK_NROW,
-    "ncol": UMFPACK_NCOL,
+    "n_row": UMFPACK_NROW,
+    "n_col": UMFPACK_NCOL,
     "nz": UMFPACK_NZ,
     "size_of_unit": UMFPACK_SIZE_OF_UNIT,
     "size_of_int": UMFPACK_SIZE_OF_INT,
@@ -634,11 +634,33 @@ cdef class UMFFactor:
     cdef bint _use_int32
     cdef bint _is_real
     # TODO store A matrix in the factor object for use in numeric and solve??
+    # cached "output" arrays, only extracted from _numeric upon request
+    cdef np.ndarray _Lp
+    cdef np.ndarray _Lj
+    cdef np.ndarray _Lx
+    cdef np.ndarray _Up
+    cdef np.ndarray _Ui
+    cdef np.ndarray _Ux
+    cdef np.ndarray _P
+    cdef np.ndarray _Q
+    cdef np.ndarray _Rs
+    # TODO Dx for diagonal of U?
 
     def __cinit__(self, object A, object control=None):
         A, use_int32, _ = validate_csc_input(A)
 
         self._use_int32 = use_int32
+
+        # Initialize cached output arrays
+        self._Lp = None
+        self._Lj = None
+        self._Lx = None
+        self._Up = None
+        self._Ui = None
+        self._Ux = None
+        self._P = None
+        self._Q = None
+        self._Rs = None
 
         # Compute the symbolic analysis
         cdef int M = A.shape[0]
@@ -712,6 +734,7 @@ cdef class UMFFactor:
         _handle_errors(status)
 
     def __dealloc__(self):
+        """Free UMFPACK symbolic and numeric objects."""
         if self._symbolic is not NULL:
             if self._is_real:
                 if self._use_int32:
@@ -741,9 +764,9 @@ cdef class UMFFactor:
         dtype = 'float64' if self._is_real else 'complex128'
         itype = 'int32' if self._use_int32 else 'int64'
         factor_type = 'numeric' if self.is_numeric else 'symbolic'
-        min_MN = min(self.nrow, self.ncol)
-        L_shape = (self.nrow, min_MN)
-        U_shape = (min_MN, self.ncol)
+        min_MN = min(self.n_row, self.n_col)
+        L_shape = (self.n_row, min_MN)
+        U_shape = (min_MN, self.n_col)
         return (
             f"<{cls_name} {factor_type} factor of dtype '{dtype}' "
             f"with '{itype}' indices:\n"
@@ -778,14 +801,14 @@ cdef class UMFFactor:
         return int(self.lnz + self.unz)
 
     @property
-    def nrow(self):
+    def n_row(self):
         """Number of rows of the input matrix."""
-        return int(self._info.nrow if self._info.nrow >= 0 else 0)
+        return int(self._info.n_row if self._info.n_row >= 0 else 0)
 
     @property
-    def ncol(self):
+    def n_col(self):
         """Number of columns of the input matrix."""
-        return int(self._info.ncol if self._info.ncol >= 0 else 0)
+        return int(self._info.n_col if self._info.n_col >= 0 else 0)
 
     @property
     def nz_udiag(self):
@@ -801,6 +824,45 @@ cdef class UMFFactor:
     def itype(self):
         """The integer type used for indices in the matrix."""
         return np.int32 if self._use_int32 else np.int64
+
+    @property
+    def L(self):
+        """The L factor in CSR format."""
+        if self._Lp is None or self._Lj is None or self._Lx is None:
+            self._get_numeric()
+
+        L_shape = (self.n_row, min(self.n_row, self.n_col))
+        return csr_array((self._Lx, self._Lj, self._Lp), shape=L_shape)
+
+    @property
+    def U(self):
+        """The U factor in CSC format."""
+        if self._Up is None or self._Ui is None or self._Ux is None:
+            self._get_numeric()
+
+        U_shape = (min(self.n_row, self.n_col), self.n_col)
+        return csc_array((self._Ux, self._Ui, self._Up), shape=U_shape)
+
+    @property
+    def perm_r(self):
+        """The row permutation vector."""
+        if self._P is None:
+            self._get_numeric()
+        return self._P
+
+    @property
+    def perm_c(self):
+        """The column permutation vector."""
+        if self._Q is None:
+            self._get_numeric()
+        return self._Q
+
+    @property
+    def R(self):
+        """The row scaling factors."""
+        if self._Rs is None:
+            self._get_numeric()
+        return self._Rs
 
     @property
     def info(self):
@@ -872,6 +934,17 @@ cdef class UMFFactor:
                 f"Expected {'float64' if self._is_real else 'complex128'}, "
                 f"got {'float64' if _is_real_dtype(A.data.dtype) else 'complex128'}."
             )
+
+        # Clear cached output arrays
+        self._Lp = None
+        self._Lj = None
+        self._Lx = None
+        self._Up = None
+        self._Ui = None
+        self._Ux = None
+        self._P = None
+        self._Q = None
+        self._Rs = None
 
         cdef np.ndarray indptr = A.indptr
         cdef np.ndarray indices = A.indices
@@ -1187,6 +1260,112 @@ cdef class UMFFactor:
 
         # restore old print level
         self._control.print_level = old_pl
+
+    # -------------------------------------------------------------------------
+    #         Private Methods
+    # -------------------------------------------------------------------------
+    cdef void _get_numeric(self):
+        """Extract the numeric factorization data from UMFPACK."""
+        assert self._numeric is not NULL, (
+            "Numeric factorization not present. "
+            "Cannot extract L and U factors."
+        )
+
+        cdef size_t lnz = self._info.lnz
+        cdef size_t unz = self._info.unz
+        cdef size_t n_row = self._info.n_row
+        cdef size_t n_col = self._info.n_col
+
+        cdef np.dtype dtype = np.dtype(np.float64 if self._is_real else np.complex128)
+        cdef np.dtype itype = np.dtype(np.int32 if self._use_int32 else np.int64)
+
+        # Create output arrays
+        self._Lp = np.empty(n_row + 1, dtype=itype)
+        self._Lj = np.empty(lnz, dtype=itype)
+        self._Lx = np.empty(lnz, dtype=dtype)
+
+        self._Up = np.empty(n_col + 1, dtype=itype)
+        self._Ui = np.empty(unz, dtype=itype)
+        self._Ux = np.empty(unz, dtype=dtype)
+
+        self._P = np.empty(n_row, dtype=itype)
+        self._Q = np.empty(n_col, dtype=itype)
+        self._Rs = np.empty(n_row, dtype=np.float64)  # always real
+
+        cdef int status
+        cdef int do_recip
+
+        # Extract the numeric factorization
+        if self._is_real:
+            if self._use_int32:
+                status = umfpack_di_get_numeric(
+                    <int32_t*>self._Lp.data,
+                    <int32_t*>self._Lj.data,
+                    <double*>self._Lx.data,
+                    <int32_t*>self._Up.data,
+                    <int32_t*>self._Ui.data,
+                    <double*>self._Ux.data,
+                    <int32_t*>self._P.data,
+                    <int32_t*>self._Q.data,
+                    NULL,  # Dx
+                    <int32_t*>do_recip,
+                    <double*>self._Rs.data,
+                    self._numeric
+                )
+            else:
+                status = umfpack_dl_get_numeric(
+                    <int64_t*>self._Lp.data,
+                    <int64_t*>self._Lj.data,
+                    <double*>self._Lx.data,
+                    <int64_t*>self._Up.data,
+                    <int64_t*>self._Ui.data,
+                    <double*>self._Ux.data,
+                    <int64_t*>self._P.data,
+                    <int64_t*>self._Q.data,
+                    NULL,  # Dx
+                    <int64_t*>do_recip,
+                    <double*>self._Rs.data,
+                    self._numeric
+                )
+        else:
+            if self._use_int32:
+                status = umfpack_zi_get_numeric(
+                    <int32_t*>self._Lp.data,
+                    <int32_t*>self._Lj.data,
+                    <double*>self._Lx.data,
+                    NULL,  # Lz
+                    <int32_t*>self._Up.data,
+                    <int32_t*>self._Ui.data,
+                    <double*>self._Ux.data,
+                    NULL,  # Uz
+                    <int32_t*>self._P.data,
+                    <int32_t*>self._Q.data,
+                    NULL,  # Dx
+                    NULL,  # Dz
+                    <int32_t*>do_recip,
+                    <double*>self._Rs.data,
+                    self._numeric
+                )
+            else:
+                status = umfpack_zl_get_numeric(
+                    <int64_t*>self._Lp.data,
+                    <int64_t*>self._Lj.data,
+                    <double*>self._Lx.data,
+                    NULL,  # Lz
+                    <int64_t*>self._Up.data,
+                    <int64_t*>self._Ui.data,
+                    <double*>self._Ux.data,
+                    NULL,  # Uz
+                    <int64_t*>self._P.data,
+                    <int64_t*>self._Q.data,
+                    NULL,  # Dx
+                    NULL,  # Dz
+                    <int64_t*>do_recip,
+                    <double*>self._Rs.data,
+                    self._numeric
+                )
+
+        _handle_errors(status)
 
 
 # Set docstrings

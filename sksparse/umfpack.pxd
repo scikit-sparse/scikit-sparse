@@ -387,6 +387,73 @@ cdef extern from "umfpack.h":
         double Info[UMFPACK_INFO]
     )
 
+
+    int umfpack_di_get_numeric(
+        int32_t Lp[],
+        int32_t Lj[],
+        double Lx[],
+        int32_t Up[],
+        int32_t Ui[],
+        double Ux[],
+        int32_t P[],
+        int32_t Q[],
+        double Dx[],
+        int32_t *do_recip,
+        double Rs[],
+        void *Numeric
+    )
+
+    int umfpack_dl_get_numeric(
+        int64_t Lp[],
+        int64_t Lj[],
+        double Lx[],
+        int64_t Up[],
+        int64_t Ui[],
+        double Ux[],
+        int64_t P[],
+        int64_t Q[],
+        double Dx[],
+        int64_t *do_recip,
+        double Rs[],
+        void *Numeric
+    )
+
+    int umfpack_zi_get_numeric(
+        int32_t Lp[],
+        int32_t Lj[],
+        double Lx[],
+        double Lz[],
+        int32_t Up[],
+        int32_t Ui[],
+        double Ux[],
+        double Uz[],
+        int32_t P[],
+        int32_t Q[],
+        double Dx[],
+        double Dz[],
+        int32_t *do_recip,
+        double Rs[],
+        void *Numeric
+    )
+
+    int umfpack_zl_get_numeric(
+        int64_t Lp[],
+        int64_t Lj[],
+        double Lx[],
+        double Lz[],
+        int64_t Up[],
+        int64_t Ui[],
+        double Ux[],
+        double Uz[],
+        int64_t P[],
+        int64_t Q[],
+        double Dx[],
+        double Dz[],
+        int64_t *do_recip,
+        double Rs[],
+        void *Numeric
+    )
+
     void umfpack_di_free_symbolic(
         void **Symbolic
     )
