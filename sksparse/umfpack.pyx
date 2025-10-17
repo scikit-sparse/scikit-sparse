@@ -607,7 +607,8 @@ cdef class UMFControl:
 # -----------------------------------------------------------------------------
 #         UMFPACK Class Interface
 # -----------------------------------------------------------------------------
-cdef dict _SOLVE_SYSTEM_INDEX = {
+# TODO include all solver options?
+cdef dict _TRANS_INDEX = {
     'N': UMFPACK_A,    # Ax = b
     'T': UMFPACK_Aat,  # A^T x = b
     'H': UMFPACK_At,   # A^H x = b
@@ -912,11 +913,11 @@ cdef class UMFFactor:
 
         cdef int sys
         try:
-            sys = _SOLVE_SYSTEM_INDEX[trans]
+            sys = _TRANS_INDEX[trans]
         except KeyError:
             raise ValueError(
                 f"Invalid value for trans: {trans}. "
-                f"Expected one of {list(_SOLVE_SYSTEM_INDEX.keys())}"
+                f"Expected one of {list(_TRANS_INDEX.keys())}"
             )
 
         if not (isinstance(b, np.ndarray) or issparse(b)):
