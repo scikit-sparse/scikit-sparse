@@ -42,3 +42,7 @@ def test_symbolic(itype, dtype):
     b = A @ expect_x
     x = f.solve(A, b)
     assert_allclose(x, expect_x, atol=1e-12, strict=True)
+    print('---------- print(f.info):')
+    print(f.info)
+    print('---------- report_info():')
+    f.report_info()
