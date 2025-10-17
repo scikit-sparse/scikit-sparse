@@ -248,6 +248,126 @@ cdef bint _is_real_dtype(np.dtype dtype):
 
 
 # -----------------------------------------------------------------------------
+#         Info Class
+# -----------------------------------------------------------------------------
+cdef dict _INFO_INDEX = {
+    "status": UMFPACK_STATUS,
+    "nrow": UMFPACK_NROW,
+    "ncol": UMFPACK_NCOL,
+    "nz": UMFPACK_NZ,
+    "size_of_unit": UMFPACK_SIZE_OF_UNIT,
+    "size_of_int": UMFPACK_SIZE_OF_INT,
+    "size_of_long": UMFPACK_SIZE_OF_LONG,
+    "size_of_pointer": UMFPACK_SIZE_OF_POINTER,
+    "size_of_entry": UMFPACK_SIZE_OF_ENTRY,
+    "ndense_row": UMFPACK_NDENSE_ROW,
+    "nempty_row": UMFPACK_NEMPTY_ROW,
+    "ndense_col": UMFPACK_NDENSE_COL,
+    "nempty_col": UMFPACK_NEMPTY_COL,
+    "symbolic_defrag": UMFPACK_SYMBOLIC_DEFRAG,
+    "symbolic_peak_memory": UMFPACK_SYMBOLIC_PEAK_MEMORY,
+    "symbolic_size": UMFPACK_SYMBOLIC_SIZE,
+    "symbolic_time": UMFPACK_SYMBOLIC_TIME,
+    "symbolic_walltime": UMFPACK_SYMBOLIC_WALLTIME,
+    "strategy_used": UMFPACK_STRATEGY_USED,
+    "ordering_used": UMFPACK_ORDERING_USED,
+    "qfixed": UMFPACK_QFIXED,
+    "diag_preferred": UMFPACK_DIAG_PREFERRED,
+    "pattern_symmetry": UMFPACK_PATTERN_SYMMETRY,
+    "nz_a_plus_at": UMFPACK_NZ_A_PLUS_AT,
+    "nzdiag": UMFPACK_NZDIAG,
+    "symmetric_lunz": UMFPACK_SYMMETRIC_LUNZ,
+    "symmetric_flops": UMFPACK_SYMMETRIC_FLOPS,
+    "symmetric_ndense": UMFPACK_SYMMETRIC_NDENSE,
+    "symmetric_dmax": UMFPACK_SYMMETRIC_DMAX,
+    "col_singletons": UMFPACK_COL_SINGLETONS,
+    "row_singletons": UMFPACK_ROW_SINGLETONS,
+    "n2": UMFPACK_N2,
+    "s_symmetric": UMFPACK_S_SYMMETRIC,
+    "numeric_size_estimate": UMFPACK_NUMERIC_SIZE_ESTIMATE,
+    "peak_memory_estimate": UMFPACK_PEAK_MEMORY_ESTIMATE,
+    "flops_estimate": UMFPACK_FLOPS_ESTIMATE,
+    "lnz_estimate": UMFPACK_LNZ_ESTIMATE,
+    "unz_estimate": UMFPACK_UNZ_ESTIMATE,
+    "variable_init_estimate": UMFPACK_VARIABLE_INIT_ESTIMATE,
+    "variable_peak_estimate": UMFPACK_VARIABLE_PEAK_ESTIMATE,
+    "variable_final_estimate": UMFPACK_VARIABLE_FINAL_ESTIMATE,
+    "max_front_size_estimate": UMFPACK_MAX_FRONT_SIZE_ESTIMATE,
+    "max_front_nrows_estimate": UMFPACK_MAX_FRONT_NROWS_ESTIMATE,
+    "max_front_ncols_estimate": UMFPACK_MAX_FRONT_NCOLS_ESTIMATE,
+    "numeric_size": UMFPACK_NUMERIC_SIZE,
+    "peak_memory": UMFPACK_PEAK_MEMORY,
+    "flops": UMFPACK_FLOPS,
+    "lnz": UMFPACK_LNZ,
+    "unz": UMFPACK_UNZ,
+    "variable_init": UMFPACK_VARIABLE_INIT,
+    "variable_peak": UMFPACK_VARIABLE_PEAK,
+    "variable_final": UMFPACK_VARIABLE_FINAL,
+    "max_front_size": UMFPACK_MAX_FRONT_SIZE,
+    "max_front_nrows": UMFPACK_MAX_FRONT_NROWS,
+    "max_front_ncols": UMFPACK_MAX_FRONT_NCOLS,
+    "numeric_defrag": UMFPACK_NUMERIC_DEFRAG,
+    "numeric_realloc": UMFPACK_NUMERIC_REALLOC,
+    "numeric_costly_realloc": UMFPACK_NUMERIC_COSTLY_REALLOC,
+    "compressed_pattern": UMFPACK_COMPRESSED_PATTERN,
+    "lu_entries": UMFPACK_LU_ENTRIES,
+    "numeric_time": UMFPACK_NUMERIC_TIME,
+    "udiag_nz": UMFPACK_UDIAG_NZ,
+    "rcond": UMFPACK_RCOND,
+    "was_scaled": UMFPACK_WAS_SCALED,
+    "rsmin": UMFPACK_RSMIN,
+    "rsmax": UMFPACK_RSMAX,
+    "umin": UMFPACK_UMIN,
+    "umax": UMFPACK_UMAX,
+    "alloc_init_used": UMFPACK_ALLOC_INIT_USED,
+    "forced_updates": UMFPACK_FORCED_UPDATES,
+    "numeric_walltime": UMFPACK_NUMERIC_WALLTIME,
+    "noff_diag": UMFPACK_NOFF_DIAG,
+    "all_lnz": UMFPACK_ALL_LNZ,
+    "all_unz": UMFPACK_ALL_UNZ,
+    "nzdropped": UMFPACK_NZDROPPED,
+    "ir_taken": UMFPACK_IR_TAKEN,
+    "ir_attempted": UMFPACK_IR_ATTEMPTED,
+    "omega1": UMFPACK_OMEGA1,
+    "omega2": UMFPACK_OMEGA2,
+    "solve_flops": UMFPACK_SOLVE_FLOPS,
+    "solve_time": UMFPACK_SOLVE_TIME,
+    "solve_walltime": UMFPACK_SOLVE_WALLTIME,
+}
+
+
+cdef class UMFInfo:
+    """A data class to store UMFPACK info."""
+
+    # TODO rename to "data" (no underscore) for consistency with ndarray
+    cdef double _arr[UMFPACK_INFO]
+
+    def __cinit__(self):
+        pass
+
+    def __getattr__(self, name):
+        try:
+            return self._arr[_INFO_INDEX[name]]
+        except KeyError:
+            raise AttributeError(
+                f"{self.__class__.__name__} object has no attribute '{name}'"
+            )
+
+    def __setattr__(self, name, value):
+        # Info values are read-only
+        raise AttributeError(f"cannot assign to '{name}'.")
+
+    def __repr__(self):
+        params = ",\n    ".join(
+            f"{key}={self._arr[idx]}" for key, idx in _INFO_INDEX.items()
+        )
+        return f"{self.__class__.__name__}(\n    {params}\n)"
+
+    def __str__(self):
+        return self.__repr__()
+
+
+# -----------------------------------------------------------------------------
 #         Control Class
 # -----------------------------------------------------------------------------
 cdef dict _CONTROL_INDEX = {
@@ -509,7 +629,7 @@ cdef class UMFFactor:
     cdef void *_symbolic
     cdef void *_numeric
     cdef UMFControl _control
-    cdef double _info[UMFPACK_INFO]  # TODO expose as object
+    cdef UMFInfo _info
     cdef bint _use_int32
     cdef bint _is_real
     # TODO store A matrix in the factor object for use in numeric and solve??
@@ -534,8 +654,9 @@ cdef class UMFFactor:
 
         cdef int status
 
-        # Set the control array
+        # Initialize the control and info arrays
         self._control = UMFControl() if control is None else control
+        self._info = UMFInfo()
 
         # Compute the symbolic factorization
         if self._is_real:
@@ -548,7 +669,7 @@ cdef class UMFFactor:
                     <double*>data.data,
                     &self._symbolic,
                     self._control._arr,
-                    self._info
+                    self._info._arr
                 )
             else:
                 status = umfpack_dl_symbolic(
@@ -559,7 +680,7 @@ cdef class UMFFactor:
                     <double*>data.data,
                     &self._symbolic,
                     self._control._arr,
-                    self._info
+                    self._info._arr
                 )
         else:
             if self._use_int32:
@@ -572,7 +693,7 @@ cdef class UMFFactor:
                     NULL,
                     &self._symbolic,
                     self._control._arr,
-                    self._info
+                    self._info._arr
                 )
             else:
                 status = umfpack_zl_symbolic(
@@ -584,7 +705,7 @@ cdef class UMFFactor:
                     NULL,
                     &self._symbolic,
                     self._control._arr,
-                    self._info
+                    self._info._arr
                 )
 
         _handle_errors(status)
@@ -611,6 +732,14 @@ cdef class UMFFactor:
     # -------------------------------------------------------------------------
     #         Properties
     # -------------------------------------------------------------------------
+    @property
+    def info(self):
+        """The info parameters from the last UMFPACK call.
+
+        See :class:`UMFInfo` for details.
+        """
+        return self._info
+
     @property
     def control(self):
         """The control parameters used for the factorization.
@@ -690,7 +819,7 @@ cdef class UMFFactor:
                     self._symbolic,
                     &self._numeric,
                     self._control._arr,
-                    self._info
+                    self._info._arr
                 )
             else:
                 status = umfpack_dl_numeric(
@@ -700,7 +829,7 @@ cdef class UMFFactor:
                     self._symbolic,
                     &self._numeric,
                     self._control._arr,
-                    self._info
+                    self._info._arr
                 )
         else:
             if self._use_int32:
@@ -712,7 +841,7 @@ cdef class UMFFactor:
                     self._symbolic,
                     &self._numeric,
                     self._control._arr,
-                    self._info
+                    self._info._arr
                 )
             else:
                 status = umfpack_zl_numeric(
@@ -723,7 +852,7 @@ cdef class UMFFactor:
                     self._symbolic,
                     &self._numeric,
                     self._control._arr,
-                    self._info
+                    self._info._arr
                 )
 
         _handle_errors(status)
@@ -850,7 +979,7 @@ cdef class UMFFactor:
                     B,
                     self._numeric,
                     self._control._arr,
-                    self._info
+                    self._info._arr
                 )
             else:
                 status = umfpack_dl_solve(
@@ -862,7 +991,7 @@ cdef class UMFFactor:
                     B,
                     self._numeric,
                     self._control._arr,
-                    self._info
+                    self._info._arr
                 )
         else:
             if self._use_int32:
@@ -878,7 +1007,7 @@ cdef class UMFFactor:
                     NULL,
                     self._numeric,
                     self._control._arr,
-                    self._info
+                    self._info._arr
                 )
             else:
                 status = umfpack_zl_solve(
@@ -893,7 +1022,7 @@ cdef class UMFFactor:
                     NULL,
                     self._numeric,
                     self._control._arr,
-                    self._info
+                    self._info._arr
                 )
 
         _handle_errors(status)
@@ -905,6 +1034,39 @@ cdef class UMFFactor:
     # -------------------------------------------------------------------------
     #         Reporting
     # -------------------------------------------------------------------------
+    def report_info(self, object print_level=2):
+        """Print a report of the UMFInfo structure.
+
+        This method provides more internal details from UMFPACK itself than the
+        string representation.
+
+        Parameters
+        ----------
+        print_level : int, optional
+            The verbosity level. Default value is 2.
+
+            Accepted values are:
+
+            * None: use current print level
+            * <= 0: no output
+            * 1: error messages only
+            * >= 2: error messages and print all of UMFInfo
+
+        """
+        cdef int pl
+        if print_level is None:
+            pl = self._control.print_level
+        else:
+            pl = print_level
+
+        cdef int old_pl = self._control.print_level
+        self._control.print_level = pl
+
+        umfpack_di_report_info(self._control._arr, self._info._arr)
+
+        # restore old print level
+        self._control.print_level = old_pl
+
     def report_control(self):
         self._control.report()
 

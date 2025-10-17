@@ -422,6 +422,11 @@ cdef extern from "umfpack.h":
     # -------------------------------------------------------------------------
     #         Debugging
     # -------------------------------------------------------------------------
+    void umfpack_di_report_info(
+        const double Control[UMFPACK_CONTROL],
+        const double Info[UMFPACK_INFO]
+    )
+
     void umfpack_di_report_control(
         const double Control[UMFPACK_CONTROL]
     )
