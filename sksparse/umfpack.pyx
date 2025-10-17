@@ -716,16 +716,24 @@ cdef class UMFFactor:
             if self._is_real:
                 if self._use_int32:
                     umfpack_di_free_symbolic(&self._symbolic)
-                    umfpack_di_free_numeric(&self._numeric)
                 else:
                     umfpack_dl_free_symbolic(&self._symbolic)
-                    umfpack_dl_free_numeric(&self._numeric)
             else:
                 if self._use_int32:
                     umfpack_zi_free_symbolic(&self._symbolic)
-                    umfpack_zi_free_numeric(&self._numeric)
                 else:
                     umfpack_zl_free_symbolic(&self._symbolic)
+
+        if self._numeric is not NULL:
+            if self._is_real:
+                if self._use_int32:
+                    umfpack_di_free_numeric(&self._numeric)
+                else:
+                    umfpack_dl_free_numeric(&self._numeric)
+            else:
+                if self._use_int32:
+                    umfpack_zi_free_numeric(&self._numeric)
+                else:
                     umfpack_zl_free_numeric(&self._numeric)
 
     # TODO __repr__ and __str__
