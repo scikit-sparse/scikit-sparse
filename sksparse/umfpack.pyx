@@ -1293,7 +1293,7 @@ cdef class UMFFactor:
         self._Rs = np.empty(n_row, dtype=np.float64)  # always real
 
         cdef int status
-        cdef int do_recip
+        cdef bint do_recip
 
         # Extract the numeric factorization
         if self._is_real:
@@ -1366,6 +1366,15 @@ cdef class UMFFactor:
                 )
 
         _handle_errors(status)
+
+        # From umfpack.h:
+        #   If do_recip is TRUE (one), then the scale factors Rs [i] are to be used
+        #   by multiplying row i by Rs [i].  Otherwise, the entries in row i are to
+        #   be divided by Rs [i].
+        #
+        # Always return R s.t. (R[:, np.newaxis] * A) scales the rows.
+        if not do_recip:
+            np.reciprocal(self._Rs, out=self._Rs)
 
 
 # Set docstrings
