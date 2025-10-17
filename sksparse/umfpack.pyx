@@ -336,18 +336,18 @@ cdef dict _INFO_INDEX = {
 }
 
 
+# TODO descriptions of each attribute
 cdef class UMFInfo:
     """A data class to store UMFPACK info."""
 
-    # TODO rename to "data" (no underscore) for consistency with ndarray
-    cdef double _arr[UMFPACK_INFO]
+    cdef double data[UMFPACK_INFO]
 
     def __cinit__(self):
         pass
 
     def __getattr__(self, name):
         try:
-            return self._arr[_INFO_INDEX[name]]
+            return self.data[_INFO_INDEX[name]]
         except KeyError:
             raise AttributeError(
                 f"{self.__class__.__name__} object has no attribute '{name}'"
@@ -359,7 +359,7 @@ cdef class UMFInfo:
 
     def __repr__(self):
         params = ",\n    ".join(
-            f"{key}={self._arr[idx]}" for key, idx in _INFO_INDEX.items()
+            f"{key}={self.data[idx]}" for key, idx in _INFO_INDEX.items()
         )
         return f"{self.__class__.__name__}(\n    {params}\n)"
 
@@ -505,12 +505,12 @@ cdef class UMFControl:
         diagonal entries. Default 0.9.
     """
 
-    cdef double _arr[UMFPACK_CONTROL]
+    cdef double data[UMFPACK_CONTROL]
 
     def __cinit__(self, **kwargs):
         # NOTE the 4 functions ([dz][il]_defaults) all set the same default
         # values, so just pick one of them.
-        umfpack_di_defaults(self._arr)
+        umfpack_di_defaults(self.data)
 
         # Update with user-provided values
         for key, value in kwargs.items():
@@ -524,7 +524,7 @@ cdef class UMFControl:
 
     def __getattr__(self, name):
         try:
-            return self._arr[_CONTROL_INDEX[name]]
+            return self.data[_CONTROL_INDEX[name]]
         except KeyError:
             raise AttributeError(f"UMFControl object has no attribute '{name}'")
 
@@ -569,11 +569,11 @@ cdef class UMFControl:
             raise AttributeError(f"'{name}' is read-only")
 
         # Set the value
-        self._arr[idx] = value
+        self.data[idx] = value
 
     def __repr__(self):
         params = ",\n    ".join(
-            f"{key}={self._arr[idx]}" for key, idx in _CONTROL_INDEX.items()
+            f"{key}={self.data[idx]}" for key, idx in _CONTROL_INDEX.items()
         )
         return f"{self.__class__.__name__}(\n    {params}\n)"
 
@@ -598,7 +598,7 @@ cdef class UMFControl:
         self.print_level = 2  # print all info
 
         # NOTE the 4 functions ([dz][il]_report_control) all print the same.
-        umfpack_di_report_control(self._arr)
+        umfpack_di_report_control(self.data)
 
         # restore old print level
         self.print_level = old_pl
@@ -691,8 +691,8 @@ cdef class UMFFactor:
                     <int32_t*>indices.data,
                     <double*>data.data,
                     &self._symbolic,
-                    self._control._arr,
-                    self._info._arr
+                    self._control.data,
+                    self._info.data
                 )
             else:
                 status = umfpack_dl_symbolic(
@@ -702,8 +702,8 @@ cdef class UMFFactor:
                     <int64_t*>indices.data,
                     <double*>data.data,
                     &self._symbolic,
-                    self._control._arr,
-                    self._info._arr
+                    self._control.data,
+                    self._info.data
                 )
         else:
             if self._use_int32:
@@ -715,8 +715,8 @@ cdef class UMFFactor:
                     <double*>data.data,
                     NULL,
                     &self._symbolic,
-                    self._control._arr,
-                    self._info._arr
+                    self._control.data,
+                    self._info.data
                 )
             else:
                 status = umfpack_zl_symbolic(
@@ -727,8 +727,8 @@ cdef class UMFFactor:
                     <double*>data.data,
                     NULL,
                     &self._symbolic,
-                    self._control._arr,
-                    self._info._arr
+                    self._control.data,
+                    self._info.data
                 )
 
         _handle_errors(status)
@@ -961,8 +961,8 @@ cdef class UMFFactor:
                     <double*>data.data,
                     self._symbolic,
                     &self._numeric,
-                    self._control._arr,
-                    self._info._arr
+                    self._control.data,
+                    self._info.data
                 )
             else:
                 status = umfpack_dl_numeric(
@@ -971,8 +971,8 @@ cdef class UMFFactor:
                     <double*>data.data,
                     self._symbolic,
                     &self._numeric,
-                    self._control._arr,
-                    self._info._arr
+                    self._control.data,
+                    self._info.data
                 )
         else:
             if self._use_int32:
@@ -983,8 +983,8 @@ cdef class UMFFactor:
                     NULL,
                     self._symbolic,
                     &self._numeric,
-                    self._control._arr,
-                    self._info._arr
+                    self._control.data,
+                    self._info.data
                 )
             else:
                 status = umfpack_zl_numeric(
@@ -994,8 +994,8 @@ cdef class UMFFactor:
                     NULL,
                     self._symbolic,
                     &self._numeric,
-                    self._control._arr,
-                    self._info._arr
+                    self._control.data,
+                    self._info.data
                 )
 
         _handle_errors(status)
@@ -1003,6 +1003,7 @@ cdef class UMFFactor:
         return self
 
     # TODO allow x as input?
+    # TODO A is *only* needed if info.ir_steps > 0 and sys == UMFPACK_A*.
     def solve(self, object A, object b, object trans='N'):
         """Solve a linear system using the LU factorization.
 
@@ -1121,8 +1122,8 @@ cdef class UMFFactor:
                     X,
                     B,
                     self._numeric,
-                    self._control._arr,
-                    self._info._arr
+                    self._control.data,
+                    self._info.data
                 )
             else:
                 status = umfpack_dl_solve(
@@ -1133,8 +1134,8 @@ cdef class UMFFactor:
                     X,
                     B,
                     self._numeric,
-                    self._control._arr,
-                    self._info._arr
+                    self._control.data,
+                    self._info.data
                 )
         else:
             if self._use_int32:
@@ -1149,8 +1150,8 @@ cdef class UMFFactor:
                     B,
                     NULL,
                     self._numeric,
-                    self._control._arr,
-                    self._info._arr
+                    self._control.data,
+                    self._info.data
                 )
             else:
                 status = umfpack_zl_solve(
@@ -1164,8 +1165,8 @@ cdef class UMFFactor:
                     B,
                     NULL,
                     self._numeric,
-                    self._control._arr,
-                    self._info._arr
+                    self._control.data,
+                    self._info.data
                 )
 
         _handle_errors(status)
@@ -1205,7 +1206,7 @@ cdef class UMFFactor:
         cdef int old_pl = self._control.print_level
         self._control.print_level = pl
 
-        umfpack_di_report_info(self._control._arr, self._info._arr)
+        umfpack_di_report_info(self._control.data, self._info.data)
 
         # restore old print level
         self._control.print_level = old_pl
@@ -1225,14 +1226,14 @@ cdef class UMFFactor:
 
         if self._is_real:
             if self._use_int32:
-                umfpack_di_report_symbolic(self._symbolic, self._control._arr)
+                umfpack_di_report_symbolic(self._symbolic, self._control.data)
             else:
-                umfpack_dl_report_symbolic(self._symbolic, self._control._arr)
+                umfpack_dl_report_symbolic(self._symbolic, self._control.data)
         else:
             if self._use_int32:
-                umfpack_zi_report_symbolic(self._symbolic, self._control._arr)
+                umfpack_zi_report_symbolic(self._symbolic, self._control.data)
             else:
-                umfpack_zl_report_symbolic(self._symbolic, self._control._arr)
+                umfpack_zl_report_symbolic(self._symbolic, self._control.data)
 
         # restore old print level
         self._control.print_level = old_pl
@@ -1249,14 +1250,14 @@ cdef class UMFFactor:
 
         if self._is_real:
             if self._use_int32:
-                umfpack_di_report_numeric(self._numeric, self._control._arr)
+                umfpack_di_report_numeric(self._numeric, self._control.data)
             else:
-                umfpack_dl_report_numeric(self._numeric, self._control._arr)
+                umfpack_dl_report_numeric(self._numeric, self._control.data)
         else:
             if self._use_int32:
-                umfpack_zi_report_numeric(self._numeric, self._control._arr)
+                umfpack_zi_report_numeric(self._numeric, self._control.data)
             else:
-                umfpack_zl_report_numeric(self._numeric, self._control._arr)
+                umfpack_zl_report_numeric(self._numeric, self._control.data)
 
         # restore old print level
         self._control.print_level = old_pl
