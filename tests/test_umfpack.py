@@ -19,11 +19,14 @@ from numpy.testing import assert_allclose
 from sksparse.umfpack import UMFFactor
 
 
+@pytest.mark.parametrize("itype", [np.int32, np.int64])
 @pytest.mark.parametrize("dtype", [np.float64, np.complex128])
-def test_symbolic(dtype):
+def test_symbolic(itype, dtype):
     N = 10
     A = sparse.random_array((N, N), density=0.5, format="csc", dtype=dtype)
     A.setdiag(1.0)
+    A.indptr = A.indptr.astype(itype)
+    A.indices = A.indices.astype(itype)
     f = UMFFactor(A)
     print('---------- report_control():')
     f.report_control()
