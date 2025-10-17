@@ -1003,6 +1003,7 @@ cdef class UMFFactor:
         return self
 
     # TODO allow x as input?
+    # TODO see umfpack_wsolve. Provide workspace for multiple solves?
     # TODO A is *only* needed if info.ir_steps > 0 and sys == UMFPACK_A*.
     def solve(self, object A, object b, object trans='N'):
         """Solve a linear system using the LU factorization.
@@ -1077,10 +1078,6 @@ cdef class UMFFactor:
                 "Right-hand side b must have the same number of rows as A."
             )
 
-        # Preparse to solve the system
-        if self._numeric is NULL:
-            self.factorize(A)
-
         if issparse(b):
             b = b.toarray()
         else:
@@ -1090,6 +1087,13 @@ cdef class UMFFactor:
             raise ValueError(
                 f"LHS and RHS dtypes do not match. {A.dtype=} and {b.dtype=}"
             )
+
+        # Prepare to solve the system
+        if self._numeric is NULL:
+            self.factorize(A)
+
+        # Check the condition number
+        self._check_rcond()
 
         # Allocate the output array
         # TODO handle K = 0 -> 1 etc.
@@ -1170,8 +1174,6 @@ cdef class UMFFactor:
                 )
 
         _handle_errors(status)
-
-        # TODO check condition number
 
         return x
 
@@ -1265,7 +1267,23 @@ cdef class UMFFactor:
     # -------------------------------------------------------------------------
     #         Private Methods
     # -------------------------------------------------------------------------
-    cdef void _get_numeric(self):
+    cdef void _check_rcond(self) except *:
+        """Check the condition number."""
+        cdef double rcond = self._info.rcond
+        cdef double eps = np.finfo(np.float64).eps
+
+        if rcond == 0:
+            raise UMFPACKError(
+                "Matrix is indefinite or singular to working precision."
+            )
+        elif rcond < eps:
+            warnings.warn(
+                "Matrix is nearly singular."
+                f"  Results may be inaccurate (rcond={rcond:.2e}).",
+                UMFPACKSingularMatrixWarning
+            )
+
+    cdef void _get_numeric(self) except *:
         """Extract the numeric factorization data from UMFPACK."""
         if self._numeric is NULL:
             raise UMFPACKError(
