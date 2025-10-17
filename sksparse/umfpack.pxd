@@ -290,6 +290,48 @@ cdef extern from "umfpack.h":
         double Info[UMFPACK_INFO]
     )
 
+    int umfpack_di_numeric(
+        const int32_t Ap[],
+        const int32_t Ai[],
+        const double Ax[],
+        void *Symbolic,
+        void **Numeric,
+        const double Control[UMFPACK_CONTROL],
+        double Info[UMFPACK_INFO]
+    )
+
+    int umfpack_dl_numeric(
+        const int64_t Ap[],
+        const int64_t Ai[],
+        const double Ax[],
+        void *Symbolic,
+        void **Numeric,
+        const double Control[UMFPACK_CONTROL],
+        double Info[UMFPACK_INFO]
+    )
+
+    int umfpack_zi_numeric(
+        const int32_t Ap[],
+        const int32_t Ai[],
+        const double Ax[],
+        const double Az[],
+        void *Symbolic,
+        void **Numeric,
+        const double Control[UMFPACK_CONTROL],
+        double Info[UMFPACK_INFO]
+    )
+
+    int umfpack_zl_numeric(
+        const int64_t Ap[],
+        const int64_t Ai[],
+        const double Ax[],
+        const double Az[],
+        void *Symbolic,
+        void **Numeric,
+        const double Control[UMFPACK_CONTROL],
+        double Info[UMFPACK_INFO]
+    )
+
     void umfpack_di_free_symbolic(
         void **Symbolic
     )
@@ -306,6 +348,21 @@ cdef extern from "umfpack.h":
         void **Symbolic
     )
 
+    void umfpack_di_free_numeric(
+        void **Numeric
+    )
+
+    void umfpack_dl_free_numeric(
+        void **Numeric
+    )
+
+    void umfpack_zi_free_numeric(
+        void **Numeric
+    )
+
+    void umfpack_zl_free_numeric(
+        void **Numeric
+    )
 
     # -------------------------------------------------------------------------
     #         Debugging
@@ -333,3 +390,24 @@ cdef extern from "umfpack.h":
         void *Symbolic,
         const double Control[UMFPACK_CONTROL]
     )
+
+    int umfpack_di_report_numeric(
+        void *Numeric,
+        const double Control[UMFPACK_CONTROL]
+    )
+
+    int umfpack_dl_report_numeric(
+        void *Numeric,
+        const double Control[UMFPACK_CONTROL]
+    )
+
+    int umfpack_zi_report_numeric(
+        void *Numeric,
+        const double Control[UMFPACK_CONTROL]
+    )
+
+    int umfpack_zl_report_numeric(
+        void *Numeric,
+        const double Control[UMFPACK_CONTROL]
+    )
+

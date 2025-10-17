@@ -499,6 +499,7 @@ cdef class UMFFactor:
     """
 
     cdef void *_symbolic
+    cdef void *_numeric
     cdef UMFControl _control
     cdef double _info[UMFPACK_INFO]
     cdef bint _use_int32
@@ -582,13 +583,17 @@ cdef class UMFFactor:
             if self._is_real:
                 if self._use_int32:
                     umfpack_di_free_symbolic(&self._symbolic)
+                    umfpack_di_free_numeric(&self._numeric)
                 else:
                     umfpack_dl_free_symbolic(&self._symbolic)
+                    umfpack_dl_free_numeric(&self._numeric)
             else:
                 if self._use_int32:
                     umfpack_zi_free_symbolic(&self._symbolic)
+                    umfpack_zi_free_numeric(&self._numeric)
                 else:
                     umfpack_zl_free_symbolic(&self._symbolic)
+                    umfpack_zl_free_numeric(&self._numeric)
 
     # TODO __repr__ and __str__
 
@@ -610,6 +615,111 @@ cdef class UMFFactor:
     # -------------------------------------------------------------------------
     #         Public Methods
     # -------------------------------------------------------------------------
+    def factorize(self, object A):
+        """Compute the numeric factorization of a sparse matrix.
+
+        This method computes the numeric factorization of a sparse matrix
+        :math:`A` given the symbolic analysis performed in the constructor. The
+        matrix :math:`A` must have the same shape and nonzero pattern as the
+        one used to create this :class:`UMFFactor` object, but need not have
+        the same values.
+
+        Parameters
+        ----------
+        A : *(M, N)* ndarray or sparse array
+            The input matrix. Must have the same shape and nonzero pattern as
+            the matrix used to create this :class:`UMFFactor` object.
+
+        Returns
+        -------
+        :class:`UMFFactor`
+            The current object, for method chaining.
+
+        Raises
+        ------
+        :exc:`UMFPACKError` or subclass
+            If an error occurs during the numeric factorization.
+        """
+        assert self._symbolic is not NULL, (
+            "Symbolic factorization not present. "
+            "Cannot perform numeric factorization."
+        )
+
+        A, use_int32, _ = validate_csc_input(A)
+
+        if use_int32 != self._use_int32:
+            raise ValueError(
+                "The integer size of the input matrix does not match "
+                "the one used for symbolic factorization. "
+                f"Expected '{'int32' if self._use_int32 else 'int64'}', "
+                f"got '{'int32' if use_int32 else 'int64'}'."
+            )
+
+        if _is_real_dtype(A.data.dtype) != self._is_real:
+            raise ValueError(
+                "The data type of the input matrix does not match "
+                "the one used for symbolic factorization. "
+                f"Expected {'float64' if self._is_real else 'complex128'}, "
+                f"got {'float64' if _is_real_dtype(A.data.dtype) else 'complex128'}."
+            )
+
+        cdef np.ndarray indptr = A.indptr
+        cdef np.ndarray indices = A.indices
+        cdef np.ndarray real_data = A.data.real
+        cdef np.ndarray imag_data = A.data.imag
+
+        cdef int status
+
+        # Compute the symbolic factorization
+        if self._is_real:
+            if self._use_int32:
+                status = umfpack_di_numeric(
+                    <int32_t*>indptr.data,
+                    <int32_t*>indices.data,
+                    <double*>real_data.data,
+                    self._symbolic,
+                    &self._numeric,
+                    self._control._arr,
+                    self._info
+                )
+            else:
+                status = umfpack_dl_numeric(
+                    <int64_t*>indptr.data,
+                    <int64_t*>indices.data,
+                    <double*>real_data.data,
+                    self._symbolic,
+                    &self._numeric,
+                    self._control._arr,
+                    self._info
+                )
+        else:
+            if self._use_int32:
+                status = umfpack_zi_numeric(
+                    <int32_t*>indptr.data,
+                    <int32_t*>indices.data,
+                    <double*>real_data.data,
+                    <double*>imag_data.data,
+                    self._symbolic,
+                    &self._numeric,
+                    self._control._arr,
+                    self._info
+                )
+            else:
+                status = umfpack_zl_numeric(
+                    <int64_t*>indptr.data,
+                    <int64_t*>indices.data,
+                    <double*>real_data.data,
+                    <double*>imag_data.data,
+                    self._symbolic,
+                    &self._numeric,
+                    self._control._arr,
+                    self._info
+                )
+
+        _handle_errors(status)
+
+        return self
+
     def report_control(self):
         self._control.report()
 
@@ -644,6 +754,30 @@ cdef class UMFFactor:
                 umfpack_zi_report_symbolic(self._symbolic, self._control._arr)
             else:
                 umfpack_zl_report_symbolic(self._symbolic, self._control._arr)
+
+        # restore old print level
+        self._control.print_level = old_pl
+
+    def report_numeric(self, object print_level=4):
+        cdef int pl
+        if print_level is None:
+            pl = self._control.print_level
+        else:
+            pl = print_level
+
+        cdef int old_pl = self._control.print_level
+        self._control.print_level = pl
+
+        if self._is_real:
+            if self._use_int32:
+                umfpack_di_report_numeric(self._numeric, self._control._arr)
+            else:
+                umfpack_dl_report_numeric(self._numeric, self._control._arr)
+        else:
+            if self._use_int32:
+                umfpack_zi_report_numeric(self._numeric, self._control._arr)
+            else:
+                umfpack_zl_report_numeric(self._numeric, self._control._arr)
 
         # restore old print level
         self._control.print_level = old_pl
