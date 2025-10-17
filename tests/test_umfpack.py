@@ -14,6 +14,7 @@ import pytest
 
 import numpy as np
 from scipy import sparse
+from numpy.testing import assert_allclose
 
 from sksparse.umfpack import UMFFactor
 
@@ -33,3 +34,8 @@ def test_symbolic(dtype):
     f.factorize(A)
     print('---------- report_numeric():')
     f.report_numeric()
+    # Solve a system
+    expect_x = np.arange(1, N + 1, dtype=dtype)
+    b = A @ expect_x
+    x = f.solve(A, b)
+    assert_allclose(x, expect_x, atol=1e-12, strict=True)
