@@ -516,8 +516,10 @@ cdef class UMFFactor:
 
         cdef np.ndarray indptr = A.indptr
         cdef np.ndarray indices = A.indices
-        cdef np.ndarray real_data = A.data.real
-        cdef np.ndarray imag_data = A.data.imag
+        cdef np.ndarray data = A.data
+        
+        # NOTE numpy stores complex arrays as *packed* form, aka [r, i, r, i]
+        # (length 2*nnz), so we can just pass the "Ax" input and skip Az.
 
         self._is_real = _is_real_dtype(A.data.dtype)
 
@@ -534,7 +536,7 @@ cdef class UMFFactor:
                     N,
                     <int32_t*>indptr.data,
                     <int32_t*>indices.data,
-                    <double*>real_data.data,
+                    <double*>data.data,
                     &self._symbolic,
                     self._control._arr,
                     self._info
@@ -545,7 +547,7 @@ cdef class UMFFactor:
                     N,
                     <int64_t*>indptr.data,
                     <int64_t*>indices.data,
-                    <double*>real_data.data,
+                    <double*>data.data,
                     &self._symbolic,
                     self._control._arr,
                     self._info
@@ -557,8 +559,8 @@ cdef class UMFFactor:
                     N,
                     <int32_t*>indptr.data,
                     <int32_t*>indices.data,
-                    <double*>real_data.data,
-                    <double*>imag_data.data,
+                    <double*>data.data,
+                    NULL,
                     &self._symbolic,
                     self._control._arr,
                     self._info
@@ -569,8 +571,8 @@ cdef class UMFFactor:
                     N,
                     <int64_t*>indptr.data,
                     <int64_t*>indices.data,
-                    <double*>real_data.data,
-                    <double*>imag_data.data,
+                    <double*>data.data,
+                    NULL,
                     &self._symbolic,
                     self._control._arr,
                     self._info
@@ -665,8 +667,7 @@ cdef class UMFFactor:
 
         cdef np.ndarray indptr = A.indptr
         cdef np.ndarray indices = A.indices
-        cdef np.ndarray real_data = A.data.real
-        cdef np.ndarray imag_data = A.data.imag
+        cdef np.ndarray data = A.data
 
         cdef int status
 
@@ -676,7 +677,7 @@ cdef class UMFFactor:
                 status = umfpack_di_numeric(
                     <int32_t*>indptr.data,
                     <int32_t*>indices.data,
-                    <double*>real_data.data,
+                    <double*>data.data,
                     self._symbolic,
                     &self._numeric,
                     self._control._arr,
@@ -686,7 +687,7 @@ cdef class UMFFactor:
                 status = umfpack_dl_numeric(
                     <int64_t*>indptr.data,
                     <int64_t*>indices.data,
-                    <double*>real_data.data,
+                    <double*>data.data,
                     self._symbolic,
                     &self._numeric,
                     self._control._arr,
@@ -697,8 +698,8 @@ cdef class UMFFactor:
                 status = umfpack_zi_numeric(
                     <int32_t*>indptr.data,
                     <int32_t*>indices.data,
-                    <double*>real_data.data,
-                    <double*>imag_data.data,
+                    <double*>data.data,
+                    NULL,
                     self._symbolic,
                     &self._numeric,
                     self._control._arr,
@@ -708,8 +709,8 @@ cdef class UMFFactor:
                 status = umfpack_zl_numeric(
                     <int64_t*>indptr.data,
                     <int64_t*>indices.data,
-                    <double*>real_data.data,
-                    <double*>imag_data.data,
+                    <double*>data.data,
+                    NULL,
                     self._symbolic,
                     &self._numeric,
                     self._control._arr,
