@@ -1267,10 +1267,11 @@ cdef class UMFFactor:
     # -------------------------------------------------------------------------
     cdef void _get_numeric(self):
         """Extract the numeric factorization data from UMFPACK."""
-        assert self._numeric is not NULL, (
-            "Numeric factorization not present. "
-            "Cannot extract L and U factors."
-        )
+        if self._numeric is NULL:
+            raise UMFPACKError(
+                "Numeric factorization not present. "
+                "Run `UMFFactor.factorize(A)` first."
+            )
 
         cdef size_t lnz = self._info.lnz
         cdef size_t unz = self._info.unz
