@@ -312,7 +312,7 @@ cdef dict _INFO_INDEX = {
     "compressed_pattern": UMFPACK_COMPRESSED_PATTERN,
     "lu_entries": UMFPACK_LU_ENTRIES,
     "numeric_time": UMFPACK_NUMERIC_TIME,
-    "udiag_nz": UMFPACK_UDIAG_NZ,
+    "nz_udiag": UMFPACK_UDIAG_NZ,
     "rcond": UMFPACK_RCOND,
     "was_scaled": UMFPACK_WAS_SCALED,
     "rsmin": UMFPACK_RSMIN,
@@ -736,11 +736,72 @@ cdef class UMFFactor:
                 else:
                     umfpack_zl_free_numeric(&self._numeric)
 
-    # TODO __repr__ and __str__
+    def __repr__(self):
+        cls_name = self.__class__.__name__
+        dtype = 'float64' if self._is_real else 'complex128'
+        itype = 'int32' if self._use_int32 else 'int64'
+        factor_type = 'numeric' if self.is_numeric else 'symbolic'
+        min_MN = min(self.nrow, self.ncol)
+        L_shape = (self.nrow, min_MN)
+        U_shape = (min_MN, self.ncol)
+        return (
+            f"<{cls_name} {factor_type} factor of dtype '{dtype}' "
+            f"with '{itype}' indices:\n"
+            f"    L: {L_shape} with {self.lnz} stored elements\n"
+            f"    U: {U_shape} with {self.unz} stored elements>"
+        )
+
+    def __str__(self):
+        return self.__repr__()
 
     # -------------------------------------------------------------------------
     #         Properties
     # -------------------------------------------------------------------------
+    @property
+    def is_numeric(self):
+        """Whether the numeric factorization is present."""
+        return self._symbolic is not NULL and self._numeric is not NULL
+
+    @property
+    def lnz(self):
+        """Number of entries in the L factor."""
+        return int(self._info.lnz if self._info.lnz >= 0 else 0)
+
+    @property
+    def unz(self):
+        """Number of entries in the U factor."""
+        return int(self._info.unz if self._info.unz >= 0 else 0)
+
+    @property
+    def nnz(self):
+        """Total number of entries in the LU factors."""
+        return int(self.lnz + self.unz)
+
+    @property
+    def nrow(self):
+        """Number of rows of the input matrix."""
+        return int(self._info.nrow if self._info.nrow >= 0 else 0)
+
+    @property
+    def ncol(self):
+        """Number of columns of the input matrix."""
+        return int(self._info.ncol if self._info.ncol >= 0 else 0)
+
+    @property
+    def nz_udiag(self):
+        """Number of nonzeros on the U diagonal."""
+        return int(self._info.nz_udiag if self._info.nz_udiag >= 0 else 0)
+
+    @property
+    def dtype(self):
+        """The data type of the matrix used for factorization."""
+        return np.float64 if self._is_real else np.complex128
+
+    @property
+    def itype(self):
+        """The integer type used for indices in the matrix."""
+        return np.int32 if self._use_int32 else np.int64
+
     @property
     def info(self):
         """The info parameters from the last UMFPACK call.
