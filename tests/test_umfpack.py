@@ -18,9 +18,10 @@ from scipy import sparse
 from sksparse.umfpack import UMFFactor
 
 
-def test_symbolic():
+@pytest.mark.parametrize("dtype", [np.float64, np.complex128])
+def test_symbolic(dtype):
     N = 10
-    A = sparse.random_array((N, N), density=0.5, format="csc", dtype=float)
+    A = sparse.random_array((N, N), density=0.5, format="csc", dtype=dtype)
     A.setdiag(1.0)
     f = UMFFactor(A)
     print('---------- report_control():')
