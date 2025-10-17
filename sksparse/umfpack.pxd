@@ -332,6 +332,61 @@ cdef extern from "umfpack.h":
         double Info[UMFPACK_INFO]
     )
 
+
+    int umfpack_di_solve(
+        int sys,
+        const int32_t Ap[],
+        const int32_t Ai[],
+        const double Ax[],
+        double X[],
+        const double B[],
+        void *Numeric,
+        const double Control[UMFPACK_CONTROL],
+        double Info[UMFPACK_INFO]
+    )
+
+    int umfpack_dl_solve(
+        int sys,
+        const int64_t Ap[],
+        const int64_t Ai[],
+        const double Ax[],
+        double X[],
+        const double B[],
+        void *Numeric,
+        const double Control[UMFPACK_CONTROL],
+        double Info[UMFPACK_INFO]
+    )
+
+    int umfpack_zi_solve(
+        int sys,
+        const int32_t Ap[],
+        const int32_t Ai[],
+        const double Ax[],
+        const double Az[],
+        double Xx[],
+        double Xz[],
+        const double Bx[],
+        const double Bz[],
+        void *Numeric,
+        const double Control[UMFPACK_CONTROL],
+        double Info[UMFPACK_INFO]
+    )
+
+    int umfpack_zl_solve(
+        int sys,
+        const int64_t Ap[],
+        const int64_t Ai[],
+        const double Ax[],
+        const double Az[],
+        double Xx[],
+        double Xz[],
+        const double Bx[],
+        const double Bz[],
+        void *Numeric,
+        const double Control[UMFPACK_CONTROL],
+        double Info[UMFPACK_INFO]
+    )
+
     void umfpack_di_free_symbolic(
         void **Symbolic
     )

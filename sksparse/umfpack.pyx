@@ -27,6 +27,7 @@ for sparse, possibly non-symmetric, indefinite matrices.
 import numpy as np
 cimport numpy as np
 
+from scipy.sparse import issparse
 import warnings
 
 from .utils import validate_csc_input
@@ -486,6 +487,13 @@ cdef class UMFControl:
 # -----------------------------------------------------------------------------
 #         UMFPACK Class Interface
 # -----------------------------------------------------------------------------
+cdef dict _SOLVE_SYSTEM_INDEX = {
+    'N': UMFPACK_A,    # Ax = b
+    'T': UMFPACK_Aat,  # A^T x = b
+    'H': UMFPACK_At,   # A^H x = b
+}
+
+
 cdef class UMFFactor:
     """The main object used for creating and using an LU factorization.
 
@@ -501,9 +509,10 @@ cdef class UMFFactor:
     cdef void *_symbolic
     cdef void *_numeric
     cdef UMFControl _control
-    cdef double _info[UMFPACK_INFO]
+    cdef double _info[UMFPACK_INFO]  # TODO expose as object
     cdef bint _use_int32
     cdef bint _is_real
+    # TODO store A matrix in the factor object for use in numeric and solve??
 
     def __cinit__(self, object A, object control=None):
         A, use_int32, _ = validate_csc_input(A)
@@ -517,7 +526,7 @@ cdef class UMFFactor:
         cdef np.ndarray indptr = A.indptr
         cdef np.ndarray indices = A.indices
         cdef np.ndarray data = A.data
-        
+
         # NOTE numpy stores complex arrays as *packed* form, aka [r, i, r, i]
         # (length 2*nnz), so we can just pass the "Ax" input and skip Az.
 
@@ -721,6 +730,181 @@ cdef class UMFFactor:
 
         return self
 
+    # TODO allow x as input?
+    def solve(self, object A, object b, object trans='N'):
+        """Solve a linear system using the LU factorization.
+
+        This method solves one of the following linear systems:
+
+        * :math:`A x = b` (if ``trans='N'``)
+        * :math:`A^{\\top} x = b` (if ``trans='T'`` and :math:`A` is real)
+        * :math:`A^{H} x = b` (if ``trans='H'`` and :math:`A` is complex)
+
+        The matrix :math:`A` must have the same shape and nonzero pattern as
+        the one used to create this :class:`UMFFactor` object, but need not
+        have the same values. No check is performed to ensure that the
+        input matrix is compatible with the existing factorization.
+
+        Parameters
+        ----------
+        A : *(N, N)* :obj:`ndarray` or sparse array
+            The input matrix. Must have the same shape and nonzero pattern as
+            the matrix used to create this :class:`UMFFactor` object.
+        b : *(N,)* :obj:`ndarray` or sparse array
+            The right-hand side vector.
+        trans : str, optional
+            The type of system to solve. Possible values are:
+
+            * ``'N'``: solve :math:`A x = b` (default)
+            * ``'T'``: solve :math:`A^{\\top} x = b`
+            * ``'H'``: solve :math:`A^{H} x = b`
+
+            .. note::
+
+                If :math:`A` is real, then ``'T'`` and ``'H'`` are equivalent.
+        """
+        A, use_int32, _ = validate_csc_input(A, require_square=True)
+
+        if use_int32 != self._use_int32:
+            raise ValueError(
+                "The integer size of the input matrix does not match "
+                "the one used for symbolic factorization. "
+                f"Expected '{'int32' if self._use_int32 else 'int64'}', "
+                f"got '{'int32' if use_int32 else 'int64'}'."
+            )
+
+        if _is_real_dtype(A.data.dtype) != self._is_real:
+            raise ValueError(
+                "The data type of the input matrix does not match "
+                "the one used for symbolic factorization. "
+                f"Expected {'float64' if self._is_real else 'complex128'}, "
+                f"got {'float64' if _is_real_dtype(A.data.dtype) else 'complex128'}."
+            )
+
+        cdef int sys
+        try:
+            sys = _SOLVE_SYSTEM_INDEX[trans]
+        except KeyError:
+            raise ValueError(
+                f"Invalid value for trans: {trans}. "
+                f"Expected one of {list(_SOLVE_SYSTEM_INDEX.keys())}"
+            )
+
+        if not (isinstance(b, np.ndarray) or issparse(b)):
+            raise ValueError("b must be an ndarray or sparse matrix.")
+
+        if b.ndim not in (1, 2):
+            raise ValueError("b must be a 1D or 2D array.")
+
+        cdef size_t N = A.shape[0]
+        cdef size_t K = b.shape[1] if b.ndim == 2 else 0
+
+        if b.shape[0] != N:
+            raise ValueError(
+                "Right-hand side b must have the same number of rows as A."
+            )
+
+        # Preparse to solve the system
+        if self._numeric is NULL:
+            self.factorize(A)
+
+        if issparse(b):
+            b = b.toarray()
+        else:
+            b = np.asarray(b)
+
+        if b.dtype != A.dtype:
+            raise ValueError(
+                f"LHS and RHS dtypes do not match. {A.dtype=} and {b.dtype=}"
+            )
+
+        # Allocate the output array
+        # TODO handle K = 0 -> 1 etc.
+        cdef object x_shape
+
+        if K > 0:
+            x_shape = (N, K)
+        else:
+            x_shape = (N,)
+
+        cdef np.ndarray x = np.empty(x_shape, dtype=b.dtype)
+
+        # Pointers to the underlying arrays
+        cdef np.ndarray indptr = A.indptr
+        cdef np.ndarray indices = A.indices
+        cdef np.ndarray data = A.data
+        cdef double *Ax = <double*>data.data
+        cdef double *X = <double*>x.data
+        cdef np.ndarray b_arr = b
+        cdef double *B = <double*>b_arr.data
+
+        # Solve the system
+        if self._is_real:
+            if self._use_int32:
+                status = umfpack_di_solve(
+                    sys,
+                    <int32_t*>indptr.data,
+                    <int32_t*>indices.data,
+                    Ax,
+                    X,
+                    B,
+                    self._numeric,
+                    self._control._arr,
+                    self._info
+                )
+            else:
+                status = umfpack_dl_solve(
+                    sys,
+                    <int64_t*>indptr.data,
+                    <int64_t*>indices.data,
+                    Ax,
+                    X,
+                    B,
+                    self._numeric,
+                    self._control._arr,
+                    self._info
+                )
+        else:
+            if self._use_int32:
+                status = umfpack_zi_solve(
+                    sys,
+                    <int32_t*>indptr.data,
+                    <int32_t*>indices.data,
+                    Ax,
+                    NULL,
+                    X,
+                    NULL,
+                    B,
+                    NULL,
+                    self._numeric,
+                    self._control._arr,
+                    self._info
+                )
+            else:
+                status = umfpack_zl_solve(
+                    sys,
+                    <int64_t*>indptr.data,
+                    <int64_t*>indices.data,
+                    Ax,
+                    NULL,
+                    X,
+                    NULL,
+                    B,
+                    NULL,
+                    self._numeric,
+                    self._control._arr,
+                    self._info
+                )
+
+        _handle_errors(status)
+
+        # TODO check condition number
+
+        return x
+
+    # -------------------------------------------------------------------------
+    #         Reporting
+    # -------------------------------------------------------------------------
     def report_control(self):
         self._control.report()
 
