@@ -724,23 +724,12 @@ cdef class UMFFactor:
         self._control.report()
 
     def report_symbolic(self, object print_level=4):
-        """Print a report of the symbolic factorization to stdout.
+        cdef int pl
+        if print_level is None:
+            pl = self._control.print_level
+        else:
+            pl = print_level
 
-        Parameters
-        ----------
-        print_level : int, optional
-            The verbosity level. Default value is 4.
-
-            Accepted values are:
-
-            * None: use current print level
-            * <= 2: no printing
-            * 3: fully check input, and print a short summary of its status
-            * 4: as 3, but print first few entries of the input
-            * 5: as 3, but print all of the input
-
-        """
-        cdef int pl = print_level if print_level is not None else self._control.print_level
         cdef int old_pl = self._control.print_level
         self._control.print_level = pl
 
@@ -784,7 +773,29 @@ cdef class UMFFactor:
 
 
 # Set docstrings
-UMFFactor.report_control.__doc__ = UMFControl.report.__doc__
+_REPORT_DOC = """Print a report of the {kind} factorization.
+
+This method provides more internal details from UMFPACK itself than the
+string representation.
+
+Parameters
+----------
+print_level : int, optional
+    The verbosity level. Default value is 4.
+
+    Accepted values are:
+
+    * None: use current print level
+    * <= 2: no printing
+    * 3: fully check input, and print a short summary of its status
+    * 4: as 3, but print first few entries of the input
+    * 5: as 3, but print all of the input
+
+"""
+
+UMFFactor.report_symbolic.__doc__ = _REPORT_DOC.format(kind="symbolic")
+UMFFactor.report_numeric.__doc__ = _REPORT_DOC.format(kind="numeric")
+
 
 # =============================================================================
 # =============================================================================
