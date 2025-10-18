@@ -1071,7 +1071,7 @@ cdef class UMFFactor:
             raise ValueError("b must be a 1D or 2D array.")
 
         cdef size_t N = A.shape[0]
-        cdef size_t K = b.shape[1] if b.ndim == 2 else 0
+        cdef bint return_1D = b.ndim == 1
 
         if b.shape[0] != N:
             raise ValueError(
@@ -1082,6 +1082,9 @@ cdef class UMFFactor:
             b = b.toarray()
         else:
             b = np.asarray(b)
+
+        if b.ndim == 1:
+            b = b.reshape((N, 1))
 
         if b.dtype != A.dtype:
             raise ValueError(
@@ -1095,87 +1098,148 @@ cdef class UMFFactor:
         # Check the condition number
         self._check_rcond()
 
+        # Ensure columns are contiguous for multiple RHS
+        b = np.asfortranarray(b)
+
         # Allocate the output array
-        # TODO handle K = 0 -> 1 etc.
-        cdef object x_shape
+        cdef np.ndarray x = np.empty_like(b, order='F')
 
-        if K > 0:
-            x_shape = (N, K)
+        if self._is_real:
+            self._solve_real(sys, A, b, x)
         else:
-            x_shape = (N,)
+            self._solve_complex(sys, A, b, x)
 
-        cdef np.ndarray x = np.empty(x_shape, dtype=b.dtype)
+        if return_1D:
+            return x[:, 0]
+        else:
+            return x
 
+    cdef void _solve_real(
+        self,
+        int sys,
+        object A,
+        np.ndarray[np.float64_t, ndim=2, mode='fortran'] b,
+        np.ndarray[np.float64_t, ndim=2, mode='fortran'] x
+    ):
+        """Solve multiple RHS systems when `b` is real."""
+        # Define memoryviews for proper column slicing
+        cdef np.float64_t[::1, :] b_view = b
+        cdef np.float64_t[::1, :] x_view = x
+
+        cdef size_t k
+        cdef size_t K = b.shape[1]
+        for k in range(K):
+            self._solve_single_rhs_real(sys, A, b_view[:, k], x_view[:, k])
+
+    cdef void _solve_complex(
+        self,
+        int sys,
+        object A,
+        np.ndarray[np.complex128_t, ndim=2, mode='fortran'] b,
+        np.ndarray[np.complex128_t, ndim=2, mode='fortran'] x
+    ):
+        """Solve multiple RHS systems when `b` is complex."""
+        # Define memoryviews for proper column slicing
+        cdef np.complex128_t[::1, :] b_view = b
+        cdef np.complex128_t[::1, :] x_view = x
+
+        cdef size_t k
+        cdef size_t K = b.shape[1]
+        for k in range(K):
+            self._solve_single_rhs_complex(sys, A, b_view[:, k], x_view[:, k])
+
+    cdef void _solve_single_rhs_real(
+        self,
+        int sys,
+        object A,
+        np.float64_t[:] b,
+        np.float64_t[:] x
+    ):
+        """Solve a single RHS system when RHS is real."""
         # Pointers to the underlying arrays
         cdef np.ndarray indptr = A.indptr
         cdef np.ndarray indices = A.indices
         cdef np.ndarray data = A.data
-        cdef double *Ax = <double*>data.data
-        cdef double *X = <double*>x.data
-        cdef np.ndarray b_arr = b
-        cdef double *B = <double*>b_arr.data
+
+        cdef double *b_ptr = &b[0]
+        cdef double *x_ptr = &x[0]
 
         # Solve the system
-        if self._is_real:
-            if self._use_int32:
-                status = umfpack_di_solve(
-                    sys,
-                    <int32_t*>indptr.data,
-                    <int32_t*>indices.data,
-                    Ax,
-                    X,
-                    B,
-                    self._numeric,
-                    self._control.data,
-                    self._info.data
-                )
-            else:
-                status = umfpack_dl_solve(
-                    sys,
-                    <int64_t*>indptr.data,
-                    <int64_t*>indices.data,
-                    Ax,
-                    X,
-                    B,
-                    self._numeric,
-                    self._control.data,
-                    self._info.data
-                )
+        if self._use_int32:
+            status = umfpack_di_solve(
+                sys,
+                <int32_t*>indptr.data,
+                <int32_t*>indices.data,
+                <double*>data.data,
+                x_ptr,
+                b_ptr,
+                self._numeric,
+                self._control.data,
+                self._info.data
+            )
         else:
-            if self._use_int32:
-                status = umfpack_zi_solve(
-                    sys,
-                    <int32_t*>indptr.data,
-                    <int32_t*>indices.data,
-                    Ax,
-                    NULL,
-                    X,
-                    NULL,
-                    B,
-                    NULL,
-                    self._numeric,
-                    self._control.data,
-                    self._info.data
-                )
-            else:
-                status = umfpack_zl_solve(
-                    sys,
-                    <int64_t*>indptr.data,
-                    <int64_t*>indices.data,
-                    Ax,
-                    NULL,
-                    X,
-                    NULL,
-                    B,
-                    NULL,
-                    self._numeric,
-                    self._control.data,
-                    self._info.data
-                )
+            status = umfpack_dl_solve(
+                sys,
+                <int64_t*>indptr.data,
+                <int64_t*>indices.data,
+                <double*>data.data,
+                x_ptr,
+                b_ptr,
+                self._numeric,
+                self._control.data,
+                self._info.data
+            )
 
         _handle_errors(status)
 
-        return x
+    cdef void _solve_single_rhs_complex(
+        self,
+        int sys,
+        object A,
+        np.complex128_t[:] b,
+        np.complex128_t[:] x
+    ):
+        """Solve a single RHS system when RHS is complex."""
+        # Pointers to the underlying arrays
+        cdef np.ndarray indptr = A.indptr
+        cdef np.ndarray indices = A.indices
+        cdef np.ndarray data = A.data
+
+        cdef double *b_ptr = <double*>&b[0]
+        cdef double *x_ptr = <double*>&x[0]
+
+        if self._use_int32:
+            status = umfpack_zi_solve(
+                sys,
+                <int32_t*>indptr.data,
+                <int32_t*>indices.data,
+                <double*>data.data,
+                NULL,
+                x_ptr,
+                NULL,
+                b_ptr,
+                NULL,
+                self._numeric,
+                self._control.data,
+                self._info.data
+            )
+        else:
+            status = umfpack_zl_solve(
+                sys,
+                <int64_t*>indptr.data,
+                <int64_t*>indices.data,
+                <double*>data.data,
+                NULL,
+                x_ptr,
+                NULL,
+                b_ptr,
+                NULL,
+                self._numeric,
+                self._control.data,
+                self._info.data
+            )
+
+        _handle_errors(status)
 
     # -------------------------------------------------------------------------
     #         Reporting
