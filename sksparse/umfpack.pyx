@@ -662,75 +662,118 @@ cdef class UMFFactor:
         self._Q = None
         self._Rs = None
 
-        # Compute the symbolic analysis
-        cdef int M = A.shape[0]
-        cdef int N = A.shape[1]
-
-        cdef np.ndarray indptr = A.indptr
-        cdef np.ndarray indices = A.indices
-        cdef np.ndarray data = A.data
-
-        # NOTE numpy stores complex arrays as *packed* form, aka [r, i, r, i]
-        # (length 2*nnz), so we can just pass the "Ax" input and skip Az.
-
-        self._is_real = _is_real_dtype(A.data.dtype)
-
-        cdef int status
-
         # Initialize the control and info arrays
         self._control = UMFControl() if control is None else control
         self._info = UMFInfo()
 
-        # Compute the symbolic factorization
+        cdef Py_ssize_t M = A.shape[0]
+        cdef Py_ssize_t N = A.shape[0]
+
+        # Compute the symbolic analysis
         if self._is_real:
             if self._use_int32:
-                status = umfpack_di_symbolic(
-                    M,
-                    N,
-                    <int32_t*>indptr.data,
-                    <int32_t*>indices.data,
-                    <double*>data.data,
-                    &self._symbolic,
-                    self._control.data,
-                    self._info.data
-                )
+                self._init_symbolic_di(M, N, A.indptr, A.indices, A.data)
             else:
-                status = umfpack_dl_symbolic(
-                    M,
-                    N,
-                    <int64_t*>indptr.data,
-                    <int64_t*>indices.data,
-                    <double*>data.data,
-                    &self._symbolic,
-                    self._control.data,
-                    self._info.data
-                )
+                self._init_symbolic_dl(M, N, A.indptr, A.indices, A.data)
         else:
             if self._use_int32:
-                status = umfpack_zi_symbolic(
-                    M,
-                    N,
-                    <int32_t*>indptr.data,
-                    <int32_t*>indices.data,
-                    <double*>data.data,
-                    NULL,
-                    &self._symbolic,
-                    self._control.data,
-                    self._info.data
-                )
+                self._init_symbolic_zi(M, N, A.indptr, A.indices, A.data)
             else:
-                status = umfpack_zl_symbolic(
-                    M,
-                    N,
-                    <int64_t*>indptr.data,
-                    <int64_t*>indices.data,
-                    <double*>data.data,
-                    NULL,
-                    &self._symbolic,
-                    self._control.data,
-                    self._info.data
-                )
+                self._init_symbolic_zl(M, N, A.indptr, A.indices, A.data)
 
+    cdef void _init_symbolic_di(
+        self,
+        int32_t M,
+        int32_t N,
+        const int32_t[::1] indptr,
+        const int32_t[::1] indices,
+        const double[::1] data
+    ) except *:
+        """Compute the symbolic factorization of a double, int matrix."""
+        cdef int status
+        # Compute the symbolic factorization
+        status = umfpack_di_symbolic(
+            M,
+            N,
+            &indptr[0],
+            &indices[0],
+            &data[0],
+            &self._symbolic,
+            self._control.data,
+            self._info.data
+        )
+        _handle_errors(status)
+
+    cdef void _init_symbolic_dl(
+        self,
+        int64_t M,
+        int64_t N,
+        const int64_t[::1] indptr,
+        const int64_t[::1] indices,
+        const double[::1] data
+    ) except *:
+        """Compute the symbolic factorization of a double, long matrix."""
+        cdef int status
+        status = umfpack_dl_symbolic(
+            M,
+            N,
+            &indptr[0],
+            &indices[0],
+            &data[0],
+            &self._symbolic,
+            self._control.data,
+            self._info.data
+        )
+        _handle_errors(status)
+
+    cdef void _init_symbolic_zi(
+        self,
+        int32_t M,
+        int32_t N,
+        const int32_t[::1] indptr,
+        const int32_t[::1] indices,
+        const double complex[::1] data
+    ) except *:
+        """Compute the symbolic factorization of a complex, int matrix."""
+        cdef int status
+        # NOTE numpy stores complex arrays as *packed* form, aka [r, i, r, i]
+        # (length 2*nnz), so we can just pass the "Ax" input and skip Az.
+        status = umfpack_zi_symbolic(
+            M,
+            N,
+            &indptr[0],
+            &indices[0],
+            <double*>&data[0],
+            NULL,
+            &self._symbolic,
+            self._control.data,
+            self._info.data
+        )
+        _handle_errors(status)
+
+    cdef void _init_symbolic_zl(
+        self,
+        int64_t M,
+        int64_t N,
+        const int64_t[::1] indptr,
+        const int64_t[::1] indices,
+        const double complex[::1] data
+    ) except *:
+        """Compute the symbolic factorization of a complex, long matrix."""
+        cdef int status
+        # NOTE numpy stores complex arrays as *packed* form, aka [r, i, r, i]
+        # (length 2*nnz), so we can just pass the "Ax" input and skip Az.
+        status = umfpack_zl_symbolic(
+            M,
+            N,
+            &indptr[0],
+            &indices[0],
+            <double*>&data[0],
+            NULL,
+            &self._symbolic,
+            self._control.data,
+            self._info.data
+        )
         _handle_errors(status)
 
     def __dealloc__(self):
