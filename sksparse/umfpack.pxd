@@ -454,6 +454,46 @@ cdef extern from "umfpack.h":
         void *Numeric
     )
 
+    int umfpack_di_copy_symbolic(
+        void **Symbolic,
+        void *Original
+    )
+
+    int umfpack_dl_copy_symbolic(
+        void **Symbolic,
+        void *Original
+    )
+
+    int umfpack_zi_copy_symbolic(
+        void **Symbolic,
+        void *Original
+    )
+
+    int umfpack_zl_copy_symbolic(
+        void **Symbolic,
+        void *Original
+    )
+
+    int umfpack_di_copy_numeric(
+        void **Numeric,
+        void *Original
+    )
+
+    int umfpack_dl_copy_numeric(
+        void **Numeric,
+        void *Original
+    )
+
+    int umfpack_zi_copy_numeric(
+        void **Numeric,
+        void *Original
+    )
+
+    int umfpack_zl_copy_numeric(
+        void **Numeric,
+        void *Original
+    )
+
     void umfpack_di_free_symbolic(
         void **Symbolic
     )

@@ -891,6 +891,56 @@ cdef class UMFFactor:
     # -------------------------------------------------------------------------
     #         Public Methods
     # -------------------------------------------------------------------------
+    def copy(self):
+        """Return a deep copy of the current UMFFactor object."""
+        cdef UMFFactor umf = UMFFactor.__new__(UMFFactor)
+
+        umf._use_int32 = self._use_int32
+        umf._is_real = self._is_real
+
+        cdef int status
+
+        if self._is_real:
+            if self._use_int32:
+                status = umfpack_di_copy_symbolic(&umf._symbolic, self._symbolic)
+            else:
+                status = umfpack_dl_copy_symbolic(&umf._symbolic, self._symbolic)
+        else:
+            if self._use_int32:
+                status = umfpack_zi_copy_symbolic(&umf._symbolic, self._symbolic)
+            else:
+                status = umfpack_zl_copy_symbolic(&umf._symbolic, self._symbolic)
+
+        _handle_errors(status)
+
+        if self._is_real:
+            if self._use_int32:
+                status = umfpack_di_copy_numeric(&umf._numeric, self._numeric)
+            else:
+                status = umfpack_dl_copy_numeric(&umf._numeric, self._numeric)
+        else:
+            if self._use_int32:
+                status = umfpack_zi_copy_numeric(&umf._numeric, self._numeric)
+            else:
+                status = umfpack_zl_copy_numeric(&umf._numeric, self._numeric)
+
+        _handle_errors(status)
+
+        umf._control = self._control
+        umf._info = self._info
+
+        umf._Lp = None if self._Lp is None else self._Lp.copy()
+        umf._Lj = None if self._Lj is None else self._Lj.copy()
+        umf._Lx = None if self._Lx is None else self._Lx.copy()
+        umf._Up = None if self._Up is None else self._Up.copy()
+        umf._Ui = None if self._Ui is None else self._Ui.copy()
+        umf._Ux = None if self._Ux is None else self._Ux.copy()
+        umf._P = None if self._P is None else self._P.copy()
+        umf._Q = None if self._Q is None else self._Q.copy()
+        umf._Rs = None if self._Rs is None else self._Rs.copy()
+
+        return umf
+
     def factorize(self, object A):
         """Compute the numeric factorization of a sparse matrix.
 
@@ -1094,6 +1144,8 @@ cdef class UMFFactor:
                 "Right-hand side b must have the same number of rows as A."
             )
 
+        cdef bint return_sparse = issparse(b)
+
         if issparse(b):
             b = b.toarray()
         else:
@@ -1117,10 +1169,13 @@ cdef class UMFFactor:
 
         self._solve(sys, b, A.indptr, A.indices, A.data, x)
 
+        if return_sparse:
+            x = csc_array(x)
+
         if return_1D:
-            return x[:, 0]
-        else:
-            return x
+            x = x[:, 0]
+
+        return x
 
     @cython.boundscheck(False)  # for-loop guaranteed in-bounds
     @cython.wraparound(False)
