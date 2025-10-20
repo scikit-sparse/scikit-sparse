@@ -684,6 +684,8 @@ cdef class UMFFactor:
         self._is_real = value_t is double
 
         # Compute the symbolic factorization
+        # NOTE numpy complex arrays store real and imag parts interleaved,
+        # so we can just pass the pointer to the data as double*
         if self._is_real:
             if self._use_int32:
                 status = umfpack_di_symbolic(
@@ -1110,7 +1112,7 @@ cdef class UMFFactor:
         # Allocate the output array
         x = np.empty_like(b, order='F')
 
-        self._solve(sys, A, b, x)
+        self._solve(sys, b, A.indptr, A.indices, A.data, x)
 
         if return_1D:
             return x[:, 0]
@@ -1120,88 +1122,86 @@ cdef class UMFFactor:
     def _solve(
         self,
         int sys,
-        object A,
         value_t[::1, :] b,
+        index_t[::1] indptr,
+        index_t[::1] indices,
+        value_t[::1] data,
         value_t[::1, :] x
     ):
         """Solve multiple RHS systems."""
-        cdef Py_ssize_t k
-        cdef Py_ssize_t K = b.shape[1]
+        cdef:
+            Py_ssize_t k
+            Py_ssize_t K = b.shape[1]
+            double* data_ptr
+            double* x_ptr
+            double* b_ptr
+
         for k in range(K):
-            self._solve_single_rhs(sys, A, <double*>&b[0, k], <double*>&x[0, k])
+            # NOTE numpy complex arrays store real and imag parts interleaved,
+            # so we can just pass the pointer to the data as double*
+            data_ptr = <double*>&data[0]
+            x_ptr = <double*>&x[0, k]
+            b_ptr = <double*>&b[0, k]
 
-    cdef void _solve_single_rhs(
-        self,
-        int sys,
-        object A,
-        double* b_ptr,
-        double* x_ptr
-    ):
-        """Solve a single RHS system."""
-        # Pointers to the underlying arrays
-        cdef np.ndarray indptr = A.indptr
-        cdef np.ndarray indices = A.indices
-        cdef np.ndarray data = A.data
-
-        # Solve the system
-        if self._is_real:
-            if self._use_int32:
-                status = umfpack_di_solve(
-                    sys,
-                    <int32_t*>indptr.data,
-                    <int32_t*>indices.data,
-                    <double*>data.data,
-                    x_ptr,
-                    b_ptr,
-                    self._numeric,
-                    self._control.data,
-                    self._info.data
-                )
+            # Solve the system
+            if self._is_real:
+                if self._use_int32:
+                    status = umfpack_di_solve(
+                        sys,
+                        <int32_t*>&indptr[0],
+                        <int32_t*>&indices[0],
+                        data_ptr,
+                        x_ptr,
+                        b_ptr,
+                        self._numeric,
+                        self._control.data,
+                        self._info.data
+                    )
+                else:
+                    status = umfpack_dl_solve(
+                        sys,
+                        <int64_t*>&indptr[0],
+                        <int64_t*>&indices[0],
+                        data_ptr,
+                        x_ptr,
+                        b_ptr,
+                        self._numeric,
+                        self._control.data,
+                        self._info.data
+                    )
             else:
-                status = umfpack_dl_solve(
-                    sys,
-                    <int64_t*>indptr.data,
-                    <int64_t*>indices.data,
-                    <double*>data.data,
-                    x_ptr,
-                    b_ptr,
-                    self._numeric,
-                    self._control.data,
-                    self._info.data
-                )
-        else:
-            if self._use_int32:
-                status = umfpack_zi_solve(
-                    sys,
-                    <int32_t*>indptr.data,
-                    <int32_t*>indices.data,
-                    <double*>data.data,
-                    NULL,
-                    x_ptr,
-                    NULL,
-                    b_ptr,
-                    NULL,
-                    self._numeric,
-                    self._control.data,
-                    self._info.data
-                )
-            else:
-                status = umfpack_zl_solve(
-                    sys,
-                    <int64_t*>indptr.data,
-                    <int64_t*>indices.data,
-                    <double*>data.data,
-                    NULL,
-                    x_ptr,
-                    NULL,
-                    b_ptr,
-                    NULL,
-                    self._numeric,
-                    self._control.data,
-                    self._info.data
-                )
+                if self._use_int32:
+                    status = umfpack_zi_solve(
+                        sys,
+                        <int32_t*>&indptr[0],
+                        <int32_t*>&indices[0],
+                        data_ptr,
+                        NULL,
+                        x_ptr,
+                        NULL,
+                        b_ptr,
+                        NULL,
+                        self._numeric,
+                        self._control.data,
+                        self._info.data
+                    )
+                else:
+                    status = umfpack_zl_solve(
+                        sys,
+                        <int64_t*>&indptr[0],
+                        <int64_t*>&indices[0],
+                        data_ptr,
+                        NULL,
+                        x_ptr,
+                        NULL,
+                        b_ptr,
+                        NULL,
+                        self._numeric,
+                        self._control.data,
+                        self._info.data
+                    )
 
-        _handle_errors(status)
+            _handle_errors(status)
 
     # -------------------------------------------------------------------------
     #         Reporting
