@@ -1145,7 +1145,7 @@ cdef class UMFFactor:
         b = np.asfortranarray(b)
 
         # Allocate the output array
-        cdef np.ndarray x = np.empty_like(b, order='F')
+        x = np.empty_like(b, order='F')
 
         if self._is_real:
             self._solve_real(sys, A, b, x)
@@ -1161,42 +1161,34 @@ cdef class UMFFactor:
         self,
         int sys,
         object A,
-        np.ndarray[np.float64_t, ndim=2, mode='fortran'] b,
-        np.ndarray[np.float64_t, ndim=2, mode='fortran'] x
+        double[::1, :] b,
+        double[::1, :] x
     ):
         """Solve multiple RHS systems when `b` is real."""
-        # Define memoryviews for proper column slicing
-        cdef np.float64_t[::1, :] b_view = b
-        cdef np.float64_t[::1, :] x_view = x
-
-        cdef size_t k
-        cdef size_t K = b.shape[1]
+        cdef Py_ssize_t k
+        cdef Py_ssize_t K = b.shape[1]
         for k in range(K):
-            self._solve_single_rhs_real(sys, A, b_view[:, k], x_view[:, k])
+            self._solve_single_rhs_real(sys, A, b[:, k], x[:, k])
 
     cdef void _solve_complex(
         self,
         int sys,
         object A,
-        np.ndarray[np.complex128_t, ndim=2, mode='fortran'] b,
-        np.ndarray[np.complex128_t, ndim=2, mode='fortran'] x
+        double complex[::1, :] b,
+        double complex[::1, :] x
     ):
         """Solve multiple RHS systems when `b` is complex."""
-        # Define memoryviews for proper column slicing
-        cdef np.complex128_t[::1, :] b_view = b
-        cdef np.complex128_t[::1, :] x_view = x
-
-        cdef size_t k
-        cdef size_t K = b.shape[1]
+        cdef Py_ssize_t k
+        cdef Py_ssize_t K = b.shape[1]
         for k in range(K):
-            self._solve_single_rhs_complex(sys, A, b_view[:, k], x_view[:, k])
+            self._solve_single_rhs_complex(sys, A, b[:, k], x[:, k])
 
     cdef void _solve_single_rhs_real(
         self,
         int sys,
         object A,
-        np.float64_t[:] b,
-        np.float64_t[:] x
+        double[::1] b,
+        double[::1] x
     ):
         """Solve a single RHS system when RHS is real."""
         # Pointers to the underlying arrays
@@ -1239,8 +1231,8 @@ cdef class UMFFactor:
         self,
         int sys,
         object A,
-        np.complex128_t[:] b,
-        np.complex128_t[:] x
+        double complex[::1] b,
+        double complex[::1] x
     ):
         """Solve a single RHS system when RHS is complex."""
         # Pointers to the underlying arrays
@@ -1248,6 +1240,7 @@ cdef class UMFFactor:
         cdef np.ndarray indices = A.indices
         cdef np.ndarray data = A.data
 
+        # Cast to double* for real and imaginary parts in packed form
         cdef double *b_ptr = <double*>&b[0]
         cdef double *x_ptr = <double*>&x[0]
 
