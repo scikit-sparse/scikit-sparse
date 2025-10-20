@@ -95,7 +95,7 @@ class UMFPACKArgumentMissingError(UMFPACKError):
     pass
 
 
-class UMFPACKNNonpositiveError(UMFPACKError):
+class UMFPACKNonpositiveError(UMFPACKError):
     """A non-positive value for n was passed to a UMFPACK routine."""
     pass
 
@@ -171,7 +171,7 @@ cdef dict _ERROR_INDEX = {
         "A required argument is missing."
     ),
     UMFPACK_ERROR_n_nonpositive: (
-        UMFPACKNNonpositiveError,
+        UMFPACKNonpositiveError,
         "Input N is non-positive."
     ),
     UMFPACK_ERROR_invalid_matrix: (
