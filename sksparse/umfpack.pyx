@@ -640,24 +640,25 @@ cdef class UMFFactor:
     The numeric factorization is not computed until :meth:`.numeric` is called.
     """
 
-    cdef void *_symbolic
-    cdef void *_numeric
-    cdef UMFControl _control
-    cdef UMFInfo _info
-    cdef bint _use_int32
-    cdef bint _is_real
-    # TODO store A matrix in the factor object for use in numeric and solve??
-    # cached "output" arrays, only extracted from _numeric upon request
-    cdef np.ndarray _Lp
-    cdef np.ndarray _Lj
-    cdef np.ndarray _Lx
-    cdef np.ndarray _Up
-    cdef np.ndarray _Ui
-    cdef np.ndarray _Ux
-    cdef np.ndarray _P
-    cdef np.ndarray _Q
-    cdef np.ndarray _Rs
-    # TODO Dx for diagonal of U?
+    cdef:
+        void *_symbolic
+        void *_numeric
+        UMFControl _control
+        UMFInfo _info
+        bint _use_int32
+        bint _is_real
+        # TODO store A matrix in the factor object for use in numeric and solve??
+        # cached "output" arrays, only extracted from _numeric upon request
+        np.ndarray _Lp
+        np.ndarray _Lj
+        np.ndarray _Lx
+        np.ndarray _Up
+        np.ndarray _Ui
+        np.ndarray _Ux
+        np.ndarray _P
+        np.ndarray _Q
+        np.ndarray _Rs
+        # TODO Dx for diagonal of U?
 
     def __init__(self, object A, object control=None):
         A, _, _ = validate_csc_input(A)
@@ -1317,13 +1318,14 @@ cdef class UMFFactor:
                 "Run `UMFFactor.factorize(A)` first."
             )
 
-        cdef size_t lnz = self._info.lnz
-        cdef size_t unz = self._info.unz
-        cdef size_t n_row = self._info.n_row
-        cdef size_t n_col = self._info.n_col
+        cdef:
+            size_t lnz = self._info.lnz
+            size_t unz = self._info.unz
+            size_t n_row = self._info.n_row
+            size_t n_col = self._info.n_col
 
-        cdef np.dtype dtype = np.dtype(np.float64 if self._is_real else np.complex128)
-        cdef np.dtype itype = np.dtype(np.int32 if self._use_int32 else np.int64)
+        dtype = np.dtype(np.double if self._is_real else np.cdouble)
+        itype = np.dtype(np.int32 if self._use_int32 else np.int64)
 
         # Create output arrays
         self._Lp = np.empty(n_row + 1, dtype=itype)
@@ -1338,6 +1340,23 @@ cdef class UMFFactor:
         self._Q = np.empty(n_col, dtype=itype)
         self._Rs = np.empty(n_row, dtype=np.float64)  # always real
 
+        self._dispatch_get_numeric(
+            self._Lp, self._Lj, self._Lx,
+            self._Up, self._Ui, self._Ux,
+            self._P,
+            self._Q,
+            self._Rs
+        )
+
+    def _dispatch_get_numeric(
+        self,
+        index_t[::1] Lp, index_t[::1] Lj, value_t[::1] Lx,
+        index_t[::1] Up, index_t[::1] Ui, value_t[::1] Ux,
+        index_t[::1] P,
+        index_t[::1] Q,
+        double[::1] Rs,
+    ):
+        """Call the appropriate UMFPACK get_numeric function."""
         cdef int status
         cdef bint do_recip
 
@@ -1345,69 +1364,69 @@ cdef class UMFFactor:
         if self._is_real:
             if self._use_int32:
                 status = umfpack_di_get_numeric(
-                    <int32_t*>self._Lp.data,
-                    <int32_t*>self._Lj.data,
-                    <double*>self._Lx.data,
-                    <int32_t*>self._Up.data,
-                    <int32_t*>self._Ui.data,
-                    <double*>self._Ux.data,
-                    <int32_t*>self._P.data,
-                    <int32_t*>self._Q.data,
+                    <int32_t*>&Lp[0],
+                    <int32_t*>&Lj[0],
+                    <double*>&Lx[0],
+                    <int32_t*>&Up[0],
+                    <int32_t*>&Ui[0],
+                    <double*>&Ux[0],
+                    <int32_t*>&P[0],
+                    <int32_t*>&Q[0],
                     NULL,  # Dx
                     <int32_t*>do_recip,
-                    <double*>self._Rs.data,
+                    <double*>&Rs[0],
                     self._numeric
                 )
             else:
                 status = umfpack_dl_get_numeric(
-                    <int64_t*>self._Lp.data,
-                    <int64_t*>self._Lj.data,
-                    <double*>self._Lx.data,
-                    <int64_t*>self._Up.data,
-                    <int64_t*>self._Ui.data,
-                    <double*>self._Ux.data,
-                    <int64_t*>self._P.data,
-                    <int64_t*>self._Q.data,
+                    <int64_t*>&Lp[0],
+                    <int64_t*>&Lj[0],
+                    <double*>&Lx[0],
+                    <int64_t*>&Up[0],
+                    <int64_t*>&Ui[0],
+                    <double*>&Ux[0],
+                    <int64_t*>&P[0],
+                    <int64_t*>&Q[0],
                     NULL,  # Dx
                     <int64_t*>do_recip,
-                    <double*>self._Rs.data,
+                    <double*>&Rs[0],
                     self._numeric
                 )
         else:
             if self._use_int32:
                 status = umfpack_zi_get_numeric(
-                    <int32_t*>self._Lp.data,
-                    <int32_t*>self._Lj.data,
-                    <double*>self._Lx.data,
+                    <int32_t*>&Lp[0],
+                    <int32_t*>&Lj[0],
+                    <double*>&Lx[0],
                     NULL,  # Lz
-                    <int32_t*>self._Up.data,
-                    <int32_t*>self._Ui.data,
-                    <double*>self._Ux.data,
+                    <int32_t*>&Up[0],
+                    <int32_t*>&Ui[0],
+                    <double*>&Ux[0],
                     NULL,  # Uz
-                    <int32_t*>self._P.data,
-                    <int32_t*>self._Q.data,
+                    <int32_t*>&P[0],
+                    <int32_t*>&Q[0],
                     NULL,  # Dx
                     NULL,  # Dz
                     <int32_t*>do_recip,
-                    <double*>self._Rs.data,
+                    <double*>&Rs[0],
                     self._numeric
                 )
             else:
                 status = umfpack_zl_get_numeric(
-                    <int64_t*>self._Lp.data,
-                    <int64_t*>self._Lj.data,
-                    <double*>self._Lx.data,
+                    <int64_t*>&Lp[0],
+                    <int64_t*>&Lj[0],
+                    <double*>&Lx[0],
                     NULL,  # Lz
-                    <int64_t*>self._Up.data,
-                    <int64_t*>self._Ui.data,
-                    <double*>self._Ux.data,
+                    <int64_t*>&Up[0],
+                    <int64_t*>&Ui[0],
+                    <double*>&Ux[0],
                     NULL,  # Uz
-                    <int64_t*>self._P.data,
-                    <int64_t*>self._Q.data,
+                    <int64_t*>&P[0],
+                    <int64_t*>&Q[0],
                     NULL,  # Dx
                     NULL,  # Dz
                     <int64_t*>do_recip,
-                    <double*>self._Rs.data,
+                    <double*>&Rs[0],
                     self._numeric
                 )
 
