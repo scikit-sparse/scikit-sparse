@@ -24,6 +24,7 @@ package, which computes the LU factorization and solves systems of equations
 for sparse, possibly non-symmetric, indefinite matrices.
 """
 
+cimport cython
 cimport numpy as cnp
 
 import numpy as np
@@ -670,6 +671,8 @@ cdef class UMFFactor:
         # Compute the symbolic analysis
         self._init_symbolic(A.shape[0], A.shape[1], A.indptr, A.indices, A.data)
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def _init_symbolic(
         self,
         int M,
@@ -955,10 +958,13 @@ cdef class UMFFactor:
 
         return self
 
-    def _factorize(self,
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def _factorize(
+        self,
         index_t[::1] indptr,
         index_t[::1] indices,
-        value_t[::1] data
+        value_t[::1] data,
     ):
         """Compute the numeric factorization given the CSC arrays."""
         cdef int status
@@ -1120,6 +1126,8 @@ cdef class UMFFactor:
         else:
             return x
 
+    @cython.boundscheck(False)  # for-loop guaranteed in-bounds
+    @cython.wraparound(False)
     def _solve(
         self,
         int sys,
@@ -1348,6 +1356,8 @@ cdef class UMFFactor:
             self._Rs
         )
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def _dispatch_get_numeric(
         self,
         index_t[::1] Lp, index_t[::1] Lj, value_t[::1] Lx,
