@@ -24,9 +24,9 @@ package, which computes the LU factorization and solves systems of equations
 for sparse, possibly non-symmetric, indefinite matrices.
 """
 
-import numpy as np
-cimport numpy as np
+cimport numpy as cnp
 
+import numpy as np
 from scipy.sparse import issparse, csr_array, csc_array
 import warnings
 
@@ -251,7 +251,7 @@ cdef _handle_errors(int status) except * with gil:
 # -----------------------------------------------------------------------------
 #         Helpers
 # -----------------------------------------------------------------------------
-cdef bint _is_real_dtype(np.dtype dtype):
+cdef bint _is_real_dtype(cnp.dtype dtype):
     if np.issubdtype(dtype, np.float64):
         return True
     elif np.issubdtype(dtype, np.complex128):
@@ -649,15 +649,15 @@ cdef class UMFFactor:
         bint _is_real
         # TODO store A matrix in the factor object for use in numeric and solve??
         # cached "output" arrays, only extracted from _numeric upon request
-        np.ndarray _Lp
-        np.ndarray _Lj
-        np.ndarray _Lx
-        np.ndarray _Up
-        np.ndarray _Ui
-        np.ndarray _Ux
-        np.ndarray _P
-        np.ndarray _Q
-        np.ndarray _Rs
+        cnp.ndarray _Lp
+        cnp.ndarray _Lj
+        cnp.ndarray _Lx
+        cnp.ndarray _Up
+        cnp.ndarray _Ui
+        cnp.ndarray _Ux
+        cnp.ndarray _P
+        cnp.ndarray _Q
+        cnp.ndarray _Rs
         # TODO Dx for diagonal of U?
 
     def __init__(self, object A, object control=None):
