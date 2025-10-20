@@ -355,9 +355,6 @@ cdef class UMFInfo:
 
     cdef double data[UMFPACK_INFO]
 
-    def __cinit__(self):
-        pass
-
     def __getattr__(self, name):
         try:
             return self.data[_INFO_INDEX[name]]
@@ -934,12 +931,12 @@ cdef class UMFFactor:
                 f"got '{'int32' if use_int32 else 'int64'}'."
             )
 
-        if _is_real_dtype(A.data.dtype) != self._is_real:
+        if _is_real_dtype(A.dtype) != self._is_real:
             raise ValueError(
                 "The data type of the input matrix does not match "
                 "the one used for symbolic factorization. "
                 f"Expected {'float64' if self._is_real else 'complex128'}, "
-                f"got {'float64' if _is_real_dtype(A.data.dtype) else 'complex128'}."
+                f"got {A.dtype}."
             )
 
         # Clear cached output arrays
@@ -1061,12 +1058,12 @@ cdef class UMFFactor:
                 f"got '{'int32' if use_int32 else 'int64'}'."
             )
 
-        if _is_real_dtype(A.data.dtype) != self._is_real:
+        if _is_real_dtype(A.dtype) != self._is_real:
             raise ValueError(
                 "The data type of the input matrix does not match "
                 "the one used for symbolic factorization. "
                 f"Expected {'float64' if self._is_real else 'complex128'}, "
-                f"got {'float64' if _is_real_dtype(A.data.dtype) else 'complex128'}."
+                f"got {A.dtype}."
             )
 
         cdef int sys
@@ -1081,10 +1078,15 @@ cdef class UMFFactor:
         if not (isinstance(b, np.ndarray) or issparse(b)):
             raise ValueError("b must be an ndarray or sparse matrix.")
 
+        if b.dtype != A.dtype:
+            raise ValueError(
+                f"LHS and RHS dtypes do not match. {A.dtype=} and {b.dtype=}"
+            )
+
         if b.ndim not in (1, 2):
             raise ValueError("b must be a 1D or 2D array.")
 
-        cdef size_t N = A.shape[0]
+        cdef Py_ssize_t N = A.shape[0]
         cdef bint return_1D = b.ndim == 1
 
         if b.shape[0] != N:
@@ -1099,11 +1101,6 @@ cdef class UMFFactor:
 
         if b.ndim == 1:
             b = b.reshape((N, 1))
-
-        if b.dtype != A.dtype:
-            raise ValueError(
-                f"LHS and RHS dtypes do not match. {A.dtype=} and {b.dtype=}"
-            )
 
         # Prepare to solve the system
         if self._numeric is NULL:
