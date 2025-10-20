@@ -948,19 +948,25 @@ cdef class UMFFactor:
         self._Q = None
         self._Rs = None
 
-        cdef np.ndarray indptr = A.indptr
-        cdef np.ndarray indices = A.indices
-        cdef np.ndarray data = A.data
+        self._factorize(A.indptr, A.indices, A.data)
 
+        return self
+
+    def _factorize(self,
+        index_t[::1] indptr,
+        index_t[::1] indices,
+        value_t[::1] data
+    ):
+        """Compute the numeric factorization given the CSC arrays."""
         cdef int status
 
         # Compute the symbolic factorization
         if self._is_real:
             if self._use_int32:
                 status = umfpack_di_numeric(
-                    <int32_t*>indptr.data,
-                    <int32_t*>indices.data,
-                    <double*>data.data,
+                    <int32_t*>&indptr[0],
+                    <int32_t*>&indices[0],
+                    <double*>&data[0],
                     self._symbolic,
                     &self._numeric,
                     self._control.data,
@@ -968,9 +974,9 @@ cdef class UMFFactor:
                 )
             else:
                 status = umfpack_dl_numeric(
-                    <int64_t*>indptr.data,
-                    <int64_t*>indices.data,
-                    <double*>data.data,
+                    <int64_t*>&indptr[0],
+                    <int64_t*>&indices[0],
+                    <double*>&data[0],
                     self._symbolic,
                     &self._numeric,
                     self._control.data,
@@ -979,9 +985,9 @@ cdef class UMFFactor:
         else:
             if self._use_int32:
                 status = umfpack_zi_numeric(
-                    <int32_t*>indptr.data,
-                    <int32_t*>indices.data,
-                    <double*>data.data,
+                    <int32_t*>&indptr[0],
+                    <int32_t*>&indices[0],
+                    <double*>&data[0],
                     NULL,
                     self._symbolic,
                     &self._numeric,
@@ -990,9 +996,9 @@ cdef class UMFFactor:
                 )
             else:
                 status = umfpack_zl_numeric(
-                    <int64_t*>indptr.data,
-                    <int64_t*>indices.data,
-                    <double*>data.data,
+                    <int64_t*>&indptr[0],
+                    <int64_t*>&indices[0],
+                    <double*>&data[0],
                     NULL,
                     self._symbolic,
                     &self._numeric,
@@ -1001,8 +1007,6 @@ cdef class UMFFactor:
                 )
 
         _handle_errors(status)
-
-        return self
 
     # TODO allow x as input?
     # TODO see umfpack_wsolve. Provide workspace for multiple solves?
