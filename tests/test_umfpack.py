@@ -13,8 +13,15 @@
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose, assert_array_equal
+from scipy import linalg as la
 from scipy import sparse
-from sksparse.umfpack import UMFFactor, UMFPACKError, UMFPACKNonpositiveError
+from sksparse.umfpack import (
+    UMFFactor,
+    UMFPACKError,
+    UMFPACKNonpositiveError,
+    UMFPACKWarning,
+    UMFPACKSingularMatrixWarning,
+)
 
 from .helpers import generate_random_matrices
 
@@ -143,6 +150,141 @@ def test_refactor(A, copy):
         f.factorize(B)
         assert_LU_equals_A(f, B, atol=atol)
 
+
+# -----------------------------------------------------------------------------
+#         Solve
+# -----------------------------------------------------------------------------
+class TestBadBShape:
+    @pytest.fixture(scope="class")
+    def N(self):
+        return 5
+
+    @pytest.fixture(scope="class")
+    def A(self, N):
+        return sparse.eye_array(N).tocsc()
+
+    @pytest.fixture(scope="class")
+    def f(self, A):
+        return UMFFactor(A).factorize(A)
+
+    def test_b_0D_dense(self, f, A):
+        b = np.empty([])
+        with pytest.raises(ValueError, match="must be a 1D or 2D array"):
+            f.solve(A, b)
+
+    def test_b_3D_dense(self, f, A):
+        b = np.empty((2, 3, 4))
+        with pytest.raises(ValueError, match="must be a 1D or 2D array"):
+            f.solve(A, b)
+
+    def test_b_3D_sparse(self, f, A):
+        b = sparse.coo_array((2, 3, 4))
+        with pytest.raises(ValueError, match="must be a 1D or 2D array"):
+            f.solve(A, b)
+
+    def test_b_KD_dense(self, f, A, N):
+        b = np.empty((N - 1, N))
+        with pytest.raises(ValueError, match="same number of rows as A"):
+            f.solve(A, b)
+
+    def test_b_KD_sparse(self, f, A, N):
+        b = sparse.csc_array((N - 1, N))
+        with pytest.raises(ValueError, match="same number of rows as A"):
+            f.solve(A, b)
+
+
+@pytest.mark.parametrize("dtype", DTYPES)
+def test_singleton_dense(dtype):
+    singleton_A = sparse.csc_array([[1]], dtype=dtype)
+    b = np.array([1], dtype=dtype)
+    x = UMFFactor(singleton_A).factorize(singleton_A).solve(singleton_A, b)
+    assert_allclose(x, b)
+
+
+@pytest.mark.parametrize("dtype", DTYPES)
+def test_singleton_sparse(dtype):
+    singleton_A = sparse.csc_array([[1]], dtype=dtype)
+    b = sparse.coo_array([1], dtype=dtype)
+    x = UMFFactor(singleton_A).factorize(singleton_A).solve(singleton_A, b)
+    assert_allclose(x.toarray(), b.toarray())
+
+
+def test_exactly_singular(davis_example_qr):
+    A = davis_example_qr.todok()
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+
+    N = A.shape[0]
+    lam0 = la.eigvalsh(A.toarray()).min()
+
+    # Make A exactly singular
+    A[:, -1] = 0.0
+    A[-1, :] = 0.0
+    A = A.tocsc()
+
+    lam1 = la.eigvalsh(A.toarray()).min()
+    print(f"\nMin eigenvalue: {lam0:.2e} -> {lam1:.2e}\n")
+
+    expect_x = sparse.coo_array(np.arange(1, N + 1, dtype=A.dtype))
+    b = A @ expect_x
+    with pytest.raises(UMFPACKError, match="indefinite or singular"):
+        # FIXME shouldn't warn *and* raise
+        with pytest.warns(UMFPACKSingularMatrixWarning, match="is singular"):
+            UMFFactor(A).factorize(A).solve(A, b)
+
+
+# FIXME doesn't warn?
+@pytest.mark.xfail(reason="FIXME")
+def test_nearly_singular(davis_example_qr):
+    A = davis_example_qr.todok()
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+
+    N = A.shape[0]
+    lam0 = la.eigvalsh(A.toarray()).min()
+
+    # Make A nearly singular
+    A[:, -1] = 0.0
+    A[-1, :] = 0.0
+    A[-1, -1] = 0.5 * np.finfo(A.dtype).eps
+    A = A.tocsc()
+
+    lam1 = la.eigvalsh(A.toarray()).min()
+    print(f"\nMin eigenvalue: {lam0:.2e} -> {lam1:.2e}\n")
+
+    expect_x = sparse.coo_array(np.arange(1, N + 1, dtype=A.dtype))
+    b = A @ expect_x
+    with pytest.warns(UMFPACKWarning, match="nearly singular"):
+        UMFFactor(A).factorize(A).solve(A, b)
+
+
+@pytest.mark.parametrize("A", test_As)
+@pytest.mark.parametrize("K", [0, 1, 3], ids=lambda k: f"K={k}")
+@pytest.mark.parametrize("is_sparse", [False, True], ids=["dense", "sparse"])
+def test_solve(A, K, is_sparse):
+    atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
+
+    # Build RHS
+    N = A.shape[0]
+    s = np.arange(1, N + 1, dtype=A.dtype)
+
+    if K == 0:
+        data = s  # (N,)
+    else:
+        data = np.array([i * s for i in range(1, K + 1)], dtype=A.dtype).T  # (N, K)
+
+    if is_sparse:
+        expect_x = sparse.coo_array(data, dtype=A.dtype)
+    else:
+        expect_x = np.asarray(data, dtype=A.dtype)
+
+    # Solve the system
+    b = A @ expect_x
+    x = UMFFactor(A).factorize(A).solve(A, b)
+
+    # Compare
+    if is_sparse:
+        assert_allclose(x.toarray(), expect_x.toarray(), atol=atol)
+    else:
+        assert_allclose(x, expect_x, atol=atol)
 
 
 # @pytest.mark.parametrize("itype", ITYPES)
