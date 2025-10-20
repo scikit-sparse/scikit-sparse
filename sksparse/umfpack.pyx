@@ -140,7 +140,77 @@ class UMFPACKInvalidBlobError(UMFPACKError):
     pass
 
 
-cdef _handle_errors(int status) except * with gil:
+# Known Errors
+cdef dict _ERROR_INDEX = {
+    UMFPACK_WARNING_singular_matrix: (
+        UMFPACKSingularMatrixWarning,
+        "Matrix is singular."
+    ),
+    UMFPACK_WARNING_determinant_underflow: (
+        UMFPACKDeterminantUnderflowWarning,
+        "Determinant underflow."
+    ),
+    UMFPACK_WARNING_determinant_overflow: (
+        UMFPACKDeterminantOverflowWarning,
+        "Determinant overflow."
+    ),
+    UMFPACK_ERROR_out_of_memory: (
+        UMFPACKOutOfMemoryError,
+        "Out of memory."
+    ),
+    UMFPACK_ERROR_invalid_Numeric_object: (
+        UMFPACKInvalidNumericObjectError,
+        "Invalid Numeric object."
+    ),
+    UMFPACK_ERROR_invalid_Symbolic_object: (
+        UMFPACKInvalidSymbolicObjectError,
+        "Invalid Symbolic object."
+    ),
+    UMFPACK_ERROR_argument_missing: (
+        UMFPACKArgumentMissingError,
+        "A required argument is missing."
+    ),
+    UMFPACK_ERROR_n_nonpositive: (
+        UMFPACKNNonpositiveError,
+        "Input N is non-positive."
+    ),
+    UMFPACK_ERROR_invalid_matrix: (
+        UMFPACKInvalidMatrixError,
+        "Invalid matrix."
+    ),
+    UMFPACK_ERROR_different_pattern: (
+        UMFPACKDifferentPatternError,
+        ("Matrix has different nonzero pattern than the matrix that was used"
+            "for the symbolic analysis.")
+    ),
+    UMFPACK_ERROR_invalid_system: (
+        UMFPACKInvalidSystemError,
+        "Invalid system type argument, or the matrix is not square."
+    ),
+    UMFPACK_ERROR_invalid_permutation: (
+        UMFPACKInvalidPermutationError,
+        "Invalid permutation."
+    ),
+    UMFPACK_ERROR_internal_error: (
+        UMFPACKInternalError,
+        "An internal error occurred."
+    ),
+    UMFPACK_ERROR_file_IO: (
+        UMFPACKFileIOError,
+        "A file I/O error occurred."
+    ),
+    UMFPACK_ERROR_ordering_failed: (
+        UMFPACKOrderingFailedError,
+        "The ordering algorithm failed."
+    ),
+    UMFPACK_ERROR_invalid_blob: (
+        UMFPACKInvalidBlobError,
+        "Invalid blob."
+    ),
+}
+
+
+cdef object _handle_errors(int status) with gil:
     """Handle UMFPACK errors by raising Python exceptions or warnings.
 
     This function should be called with the return ``status`` after any UMFPACK
@@ -165,83 +235,12 @@ cdef _handle_errors(int status) except * with gil:
     if status == UMFPACK_OK:
         return
 
-    status_msg = f"(code {status:d})"
-
-    # Known Errors
-    cdef dict error_map = {
-        UMFPACK_WARNING_singular_matrix: (
-            UMFPACKSingularMatrixWarning,
-            "Matrix is singular."
-        ),
-        UMFPACK_WARNING_determinant_underflow: (
-            UMFPACKDeterminantUnderflowWarning,
-            "Determinant underflow."
-        ),
-        UMFPACK_WARNING_determinant_overflow: (
-            UMFPACKDeterminantOverflowWarning,
-            "Determinant overflow."
-        ),
-        UMFPACK_ERROR_out_of_memory: (
-            UMFPACKOutOfMemoryError,
-            "Out of memory."
-        ),
-        UMFPACK_ERROR_invalid_Numeric_object: (
-            UMFPACKInvalidNumericObjectError,
-            "Invalid Numeric object."
-        ),
-        UMFPACK_ERROR_invalid_Symbolic_object: (
-            UMFPACKInvalidSymbolicObjectError,
-            "Invalid Symbolic object."
-        ),
-        UMFPACK_ERROR_argument_missing: (
-            UMFPACKArgumentMissingError,
-            "A required argument is missing."
-        ),
-        UMFPACK_ERROR_n_nonpositive: (
-            UMFPACKNNonpositiveError,
-            "Input N is non-positive."
-        ),
-        UMFPACK_ERROR_invalid_matrix: (
-            UMFPACKInvalidMatrixError,
-            "Invalid matrix."
-        ),
-        UMFPACK_ERROR_different_pattern: (
-            UMFPACKDifferentPatternError,
-            ("Matrix has different nonzero pattern than the matrix that was used"
-             "for the symbolic analysis.")
-        ),
-        UMFPACK_ERROR_invalid_system: (
-            UMFPACKInvalidSystemError,
-            "Invalid system type argument, or the matrix is not square."
-        ),
-        UMFPACK_ERROR_invalid_permutation: (
-            UMFPACKInvalidPermutationError,
-            "Invalid permutation."
-        ),
-        UMFPACK_ERROR_internal_error: (
-            UMFPACKInternalError,
-            "An internal error occurred."
-        ),
-        UMFPACK_ERROR_file_IO: (
-            UMFPACKFileIOError,
-            "A file I/O error occurred."
-        ),
-        UMFPACK_ERROR_ordering_failed: (
-            UMFPACKOrderingFailedError,
-            "The ordering algorithm failed."
-        ),
-        UMFPACK_ERROR_invalid_blob: (
-            UMFPACKInvalidBlobError,
-            "Invalid blob."
-        ),
-    }
-
     # Fallback to generic error for unknown codes
-    exc_class, msg = error_map.get(
+    exc_class, msg = _ERROR_INDEX.get(
         status,
         (UMFPACKError, "An unknown UMFPACK error occurred.")
     )
-    full_msg = msg + " " + status_msg
+    full_msg = f"{msg} (code {status:d})"
 
     if issubclass(exc_class, Warning):
         warnings.warn(full_msg, exc_class)
