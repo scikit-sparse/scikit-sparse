@@ -210,7 +210,7 @@ cdef dict _ERROR_INDEX = {
 }
 
 
-cdef object _handle_errors(int status) with gil:
+cdef int _handle_errors(int status) except -1 with gil:
     """Handle UMFPACK errors by raising Python exceptions or warnings.
 
     This function should be called with the return ``status`` after any UMFPACK
@@ -233,7 +233,7 @@ cdef object _handle_errors(int status) with gil:
         Raises an appropriate Python exception based on the UMFPACK status code.
     """
     if status == UMFPACK_OK:
-        return
+        return 0
 
     # Fallback to generic error for unknown codes
     exc_class, msg = _ERROR_INDEX.get(
