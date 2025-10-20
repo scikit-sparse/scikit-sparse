@@ -121,8 +121,9 @@ test_As = [
 ]
 
 
+@pytest.mark.parametrize("copy", [True, False])
 @pytest.mark.parametrize("A", test_As)
-def test_refactor(A):
+def test_refactor(A, copy):
     atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-6
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
     f = UMFFactor(A)
@@ -133,8 +134,15 @@ def test_refactor(A):
     rng = np.random.default_rng(56)
     B.data = rng.random(len(B.data)).astype(dtype=B.dtype)
     # Factor the new matrix with the same sparsity pattern
-    f.factorize(B)
-    assert_LU_equals_A(f, B, atol=atol)
+    if copy:
+        g = f.copy()
+        assert g is not f
+        g.factorize(B)
+        assert_LU_equals_A(g, B, atol=atol)
+    else:
+        f.factorize(B)
+        assert_LU_equals_A(f, B, atol=atol)
+
 
 
 # @pytest.mark.parametrize("itype", ITYPES)
