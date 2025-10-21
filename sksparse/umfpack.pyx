@@ -1212,7 +1212,7 @@ cdef class UMFFactor:
     # TODO allow x as input?
     # TODO see umfpack_wsolve. Provide workspace for multiple solves?
     # TODO A is *only* needed if info.ir_steps > 0 and sys == UMFPACK_A*.
-    def solve(self, object A, object b, object trans='N'):
+    def solve(self, object A, object b, *, object trans='N'):
         """Solve a linear system using the LU factorization.
 
         This method solves one of the following linear systems:
@@ -1300,6 +1300,7 @@ cdef class UMFFactor:
         if b.ndim == 1:
             b = b.reshape((N, 1))
 
+        # TODO warn here?
         # Prepare to solve the system
         if self._numeric is NULL:
             self.factorize(A)
@@ -1672,6 +1673,77 @@ print_level : int, optional
 
 UMFFactor.report_symbolic.__doc__ = _REPORT_DOC.format(kind="symbolic")
 UMFFactor.report_numeric.__doc__ = _REPORT_DOC.format(kind="numeric")
+
+
+# -----------------------------------------------------------------------------
+#         Convenience Functions
+# -----------------------------------------------------------------------------
+def umf_factor(object A, *, object control=None, **kwargs):
+    """Compute the LU factorization of a sparse matrix using UMFPACK.
+
+    This is a convenience function that creates a :class:`UMFFactor` object,
+    computes the numeric factorization, and returns the resulting object.
+
+    Parameters
+    ----------
+    A : *(M, N)* :obj:`ndarray` or sparse array
+        The input matrix to factorize.
+    control : :class:`UMFControl`, optional
+        The control parameters to use for the factorization. If not provided,
+        default parameters are used.
+    **kwargs : keyword arguments, optional
+        Additional keyword arguments to pass to :class:`UMFControl` if
+        `control` is not provided.
+
+    Returns
+    -------
+    :class:`UMFFactor`
+        The LU factorization of the input matrix.
+    """
+    if control is None:
+        control = UMFControl(**kwargs)
+    return UMFFactor(A, control).factorize(A)
+
+
+def umf_solve(object A, object b, *, object trans='N', object control=None, **kwargs):
+    """Solve a linear system using UMFPACK.
+
+    This is a convenience function that creates a :class:`UMFFactor` object,
+    computes the numeric factorization, and solves the linear system.
+
+    Parameters
+    ----------
+    A : *(N, N)* :obj:`ndarray` or sparse array
+        The input matrix.
+    b : *(N,)* :obj:`ndarray` or sparse array
+        The right-hand side vector.
+    trans : str, optional
+        The type of system to solve. Possible values are:
+
+        * ``'N'``: solve :math:`A x = b` (default)
+        * ``'T'``: solve :math:`A^{\\top} x = b`
+        * ``'H'``: solve :math:`A^{H} x = b`
+
+        .. note::
+
+            If :math:`A` is real, then ``'T'`` and ``'H'`` are equivalent.
+
+    control : :class:`UMFControl`, optional
+        The control parameters to use for the factorization. If not provided,
+        default parameters are used.
+    **kwargs : keyword arguments, optional
+        Additional keyword arguments to pass to :class:`UMFControl` if
+        `control` is not provided.
+
+    Returns
+    -------
+    x : *(N,)* :obj:`ndarray` or sparse array
+        The solution vector of the same type as the input right-hand side `b`.
+    """
+    if control is None:
+        control = UMFControl(**kwargs)
+    umf = UMFFactor(A, control).factorize(A)
+    return umf.solve(A, b, trans=trans)
 
 
 # =============================================================================
