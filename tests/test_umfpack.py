@@ -305,13 +305,13 @@ CONTROL_DEFAULTS = {
     'alloc_init': 0.7,
     'front_alloc_init': 0.5,
     'ir_steps': 2,
-    'row_scale': 1,  # UMFPACK_SCALE_SUM
-    'strategy': 0,  # UMFPACK_STRATEGY_AUTO
+    'row_scale': 'sum',  # UMFPACK_SCALE_SUM
+    'strategy': 'auto',  # UMFPACK_STRATEGY_AUTO
     'amd_dense': 10.0,  # AMD_DEFAULT_DENSE
     'fixQ': 0,
-    'aggressive': 1,
-    'droptol': 0,
-    'ordering_method': 1,  # UMFPACK_ORDERING_AMD
+    'aggressive': True,
+    'droptol': 0.0,
+    'ordering_method': 'amd',  # UMFPACK_ORDERING_AMD
     'singletons': True,
     'sym_thresh': 0.3,
     'nnzdiag_thresh': 0.9,
@@ -322,7 +322,7 @@ def test_default_controls():
     c = UMFControl()
     for key, expect_value in CONTROL_DEFAULTS.items():
         actual_value = getattr(c, key)
-        assert actual_value == expect_value
+        assert actual_value == expect_value, f"Control '{key}': expected {expect_value}, got {actual_value}"
 
 
 # TODO test IRSTEP == 0 and don't pass in A to solve()
@@ -338,68 +338,51 @@ def test_ir_steps(davis_example_qr):
     expect_x = np.arange(1, A.shape[0] + 1, dtype=A.dtype)
     b = A @ expect_x
     f.solve(A, b)
-    print(f"{f.info.ir_attempted=}, {f.info.ir_attempted=}")  # FIXME?
+    print(f"{f.info.ir_attempted=}, {f.info.ir_attempted=}")
     assert f.info.ir_attempted == N_steps
 
 
-# NOTE the integer values are from umfpack.h and subject to change
-SCALES = [None, "none", "sum", "max"]
-SCALE_MAP = {
-    None: 0,
-    "none": 0,  # UMFPACK_SCALE_NONE
-    "sum": 1,   # UMFPACK_SCALE_SUM
-    "max": 2    # UMFPACK_SCALE_MAX
-}
 
-
-@pytest.mark.parametrize("scale", SCALE_MAP)
+@pytest.mark.parametrize("scale", ["none", "sum", "max"])
 def test_row_scale(davis_example_qr, scale):
-    expect_scale = SCALE_MAP[scale]
     A = davis_example_qr
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
     f = UMFFactor(A)
     # Row scaling can be done *after* symbolic, but *before* numeric
     f.control.row_scale = scale
     f.factorize(A)
-    assert f.control.row_scale == expect_scale  # TODO
+    assert f.control.row_scale == scale
     expect_x = np.arange(1, A.shape[0] + 1, dtype=A.dtype)
     b = A @ expect_x
     f.solve(A, b)
     assert_LU_equals_A(f, A)
-    assert f.info.was_scaled == expect_scale
+    assert f.info.was_scaled == scale
+    if scale in [None, "none"]:
+        assert_allclose(f.R, 1.0)
+        assert_allclose(f.L.diagonal(), 1.0)
 
 
-# NOTE the integer values are from umfpack.h and subject to change
-ORDERINGS = [None, "none", "cholmod", "amd", "metis", "best"]
-ORDERING_MAP = {
-    "cholmod": 0,  # UMFPACK_ORDERING_CHOLMOD
-    "amd": 1,      # UMFPACK_ORDERING_AMD
-    "metis": 3,    # UMFPACK_ORDERING_METIS
-    "best": 4,     # UMFPACK_ORDERING_BEST
-    "none": 5,     # UMFPACK_ORDERING_NONE
-    None: 5,
-}
+ORDERINGS = ["none", "cholmod", "amd", "metis", "best"]
 
 
 @pytest.mark.parametrize("ordering", ORDERINGS)
 def test_ordering(davis_example_qr, ordering):
-    expect_ordering = ORDERING_MAP[ordering]
     A = davis_example_qr
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
     # Ordering must be done *before* symbolic factorization
     c = UMFControl(ordering_method=ordering)
     f = UMFFactor(A, control=c)
-    assert f.control.ordering_method == expect_ordering  # TODO
+    assert f.control.ordering_method == ordering
     f.factorize(A)
     expect_x = np.arange(1, A.shape[0] + 1, dtype=A.dtype)
     b = A @ expect_x
     f.solve(A, b)
     assert_LU_equals_A(f, A)
     if ordering in [None, "none", "amd", "metis"]:
-        assert f.info.ordering_used == expect_ordering
+        assert f.info.ordering_used == ordering
     else:  # ["cholmod", "best"]
         # May choose AMD or METIS
-        assert f.info.ordering_used in [1, 3]
+        assert f.info.ordering_used in ['amd', 'metis']
 
 
 
