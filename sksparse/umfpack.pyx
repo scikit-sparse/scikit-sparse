@@ -1412,6 +1412,61 @@ cdef class UMFFactor:
 
             _handle_errors(status)
 
+    def slogdet(self):
+        """Return the determinant of the matrix as (sign, logabsdet).
+
+        See Also
+        --------
+        :func:`numpy.linalg.slogdet`
+        """
+        if not self.is_numeric:
+            raise ValueError(
+                "Numeric factorization not present. "
+                "Cannot compute determinant."
+            )
+
+        Mx = np.empty(1, dtype=np.float64 if self._is_real else np.complex128)
+        Ex = np.empty(1, dtype=np.float64)
+
+        self._slogdet(Mx, Ex)
+
+        # Compute the result
+        m = Mx[0]
+        e = Ex[0]
+        sign = np.sign(m)
+        # log(|det(A)|) = log(|m| * 10**e) = log(|m|) + e * log(10)
+        logabsdet = np.log(abs(m)) + e * np.log(10.0)
+
+        return (sign, logabsdet)
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def _slogdet(self, value_t[::1] Mx, double[::1] Ex):
+        cdef int status
+        cdef double* mx_ptr = <double*>&Mx[0]
+        cdef double* ex_ptr = &Ex[0]
+
+        if self._is_real:
+            if self._use_int32:
+                status = umfpack_di_get_determinant(
+                    mx_ptr, ex_ptr, self._numeric, self._info.data
+                )
+            else:
+                status = umfpack_dl_get_determinant(
+                    mx_ptr, ex_ptr, self._numeric, self._info.data
+                )
+        else:
+            if self._use_int32:
+                status = umfpack_zi_get_determinant(
+                    mx_ptr, NULL, ex_ptr, self._numeric, self._info.data
+                )
+            else:
+                status = umfpack_zl_get_determinant(
+                    mx_ptr, NULL, ex_ptr, self._numeric, self._info.data
+                )
+
+        _handle_errors(status)
+
     # -------------------------------------------------------------------------
     #         Reporting
     # -------------------------------------------------------------------------

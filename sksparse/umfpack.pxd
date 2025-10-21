@@ -453,6 +453,36 @@ cdef extern from "umfpack.h":
         void *Numeric
     )
 
+    int umfpack_di_get_determinant(
+        double *Mx,
+        double *Ex,
+        void *Numeric,
+        double Info[UMFPACK_INFO]
+    )
+
+    int umfpack_dl_get_determinant(
+        double *Mx,
+        double *Ex,
+        void *Numeric,
+        double Info[UMFPACK_INFO]
+    )
+
+    int umfpack_zi_get_determinant(
+        double *Mx,
+        double *Mz,
+        double *Ex,
+        void *Numeric,
+        double Info[UMFPACK_INFO]
+    )
+
+    int umfpack_zl_get_determinant(
+        double *Mx,
+        double *Mz,
+        double *Ex,
+        void *Numeric,
+        double Info[UMFPACK_INFO]
+    )
+
     int umfpack_di_copy_symbolic(
         void **Symbolic,
         void *Original
