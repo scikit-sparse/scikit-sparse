@@ -749,6 +749,9 @@ cdef class UMFInfo:
         Time spent in `solve`, in seconds.
     solve_walltime : float
         Wall-clock time spent in `solve`, in seconds.
+
+
+    .. versionadded:: 0.5.0
     """
 
     cdef double data[UMFPACK_INFO]
@@ -872,6 +875,9 @@ cdef class UMFControl:
     nnzdiag_thresh : float
         Threshold for choosing unsymmetric strategy based on the number of
         diagonal entries. Default 0.9.
+
+
+    .. versionadded:: 0.5.0
     """
 
     cdef double data[UMFPACK_CONTROL]
@@ -2122,6 +2128,8 @@ def umf_factor(object A, *, object control=None, **kwargs):
     See Also
     --------
     UMFFactor, UMFControl, umf_solve
+
+    .. versionadded:: 0.5.0
     """
     if control is None:
         control = UMFControl(**kwargs)
@@ -2178,6 +2186,9 @@ def umf_solve(object A, object b, *, object trans='N', object control=None, **kw
     See Also
     --------
     UMFFactor, UMFControl, umf_factor
+
+
+    .. versionadded:: 0.5.0
     """
     if control is None:
         control = UMFControl(**kwargs)
