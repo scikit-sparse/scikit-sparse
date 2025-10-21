@@ -521,9 +521,179 @@ cdef dict _INFO_DISPATCH = {
 # -----------------------------------------------------------------------------
 #         Info and Control Classes
 # -----------------------------------------------------------------------------
-# TODO descriptions of each attribute
 cdef class UMFInfo:
-    """A data class to store UMFPACK info."""
+    """A data class to store UMFPACK info.
+
+    Attributes
+    ----------
+    status : int
+        Return status of the last UMFPACK call.
+    n_row : int
+        Number of rows in the input matrix.
+    n_col : int
+        Number of columns in the input matrix.
+    nz : int
+        Number of nonzeros in the input matrix.
+    size_of_unit : int
+        Size of a unit in bytes.
+    size_of_int : int
+        Size of an `int32_t` in bytes.
+    size_of_long : int
+        Size of an `int64_t` in bytes.
+    size_of_pointer : int
+        Size of a `void *` pointer in bytes.
+    size_of_entry : int
+        Size of an entry in bytes, real or complex.
+    ndense_row : int
+        Number of dense rows in the input matrix.
+    nempty_row : int
+        Number of empty rows in the input matrix.
+    ndense_col : int
+        Number of dense columns in the input matrix.
+    nempty_col : int
+        Number of empty columns in the input matrix.
+    symbolic_defrag : int
+        Number of memory compactions performed.
+    symbolic_peak_memory : int
+        Peak memory usage during symbolic factorization.
+    symbolic_size : int
+        Size of symbolic factorization, in Units.
+    symbolic_time : float
+        Time spent in symbolic factorization, in seconds.
+    symbolic_walltime : float
+        Wall-clock time spent in symbolic factorization, in seconds.
+    strategy_used : str in ['auto', 'unsymmetric', 'symmetric']
+        Strategy used in the factorization.
+    ordering_used : str in ['cholmod', 'amd', 'given', 'none', 'metis',\
+                             'best', 'user', 'metis_guard']
+        Ordering method used in the factorization.
+    qfixed : bool
+        Whether the column permutation Q was fixed.
+    diag_preferred : bool
+        Whether diagonal pivoting was preferred.
+    pattern_symmetry : float
+        Symmetry of the nonzero pattern of the input matrix, excluding dense
+        rows and columns (aka :math:`S`).
+    nz_a_plus_at : int
+        Number of nonzeros in :math:`S + S^{\\top}`, excluding the diagonal.
+    nzdiag : int
+        Number of nonzeros on the diagonal of :math:`S`.
+    symmetric_lunz : int
+        Number of non-zeros in :math:`L + U`, if AMD ordering was used.
+    symmetric_flops : int
+        Number of floating-point operations for the factorization, if AMD
+        ordering was used.
+    symmetric_ndense : int
+        Number of dense rows and columns in :math:`S + S^{\\top}`.
+    symmetric_dmax : int
+        Maximum number of entries in any column of :math:`L`, for AMD.
+    col_singletons : int
+        Number of column singletons.
+    row_singletons : int
+        Number of row singletons.
+    n2 : int
+        Size of :math:`S`.
+    s_symmetric : int
+        1 if :math:`S` is square and symmetrically permuted.
+    numeric_size_estimate : int
+        Estimated size of numeric factorization, in Units.
+    peak_memory_estimate : int
+        Estimated peak memory usage during numeric factorization.
+    flops_estimate : int
+        Estimated number of floating-point operations for the factorization.
+    lnz_estimate : int
+        Estimated number of nonzeros in :math:`L`.
+    unz_estimate : int
+        Estimated number of nonzeros in :math:`U`.
+    variable_init_estimate : int
+        Initial size of memory usage in numeric factorization.
+    variable_peak_estimate : int
+        Peak size of memory usage in numeric factorization.
+    variable_final_estimate : int
+        Final size of memory usage in numeric factorization.
+    max_front_size_estimate : int
+        Maximum frontal matrix size, estimated.
+    max_front_nrows_estimate : int
+        Maximum number of rows in any frontal matrix, estimated.
+    max_front_ncols_estimate : int
+        Maximum number of columns in any frontal matrix, estimated.
+    numeric_size : int
+        Size of numeric factorization, in Units.
+    peak_memory : int
+        Peak memory usage during symbolic and numeric factorization.
+    flops : int
+        Number of floating-point operations for the factorization.
+    lnz : int
+        Number of nonzeros in :math:`L`.
+    unz : int
+        Number of nonzeros in :math:`U`.
+    variable_init : int
+        Initial size of memory usage in numeric factorization.
+    variable_peak : int
+        Peak size of memory usage in numeric factorization.
+    variable_final : int
+        Final size of memory usage in numeric factorization.
+    max_front_size : int
+        Maximum frontal matrix size.
+    max_front_nrows : int
+        Maximum number of rows in any frontal matrix.
+    max_front_ncols : int
+        Maximum number of columns in any frontal matrix.
+    numeric_defrag : int
+        Number of memory compactions performed.
+    numeric_realloc : int
+        Number of memory reallocations performed.
+    numeric_costly_realloc : int
+        Number of costly memory reallocations performed.
+    compressed_pattern : int
+        Number of integers in LU pattern.
+    lu_entries : int
+        Number of real entries in :math:`L` and :math:`U`.
+    numeric_time : float
+        Time spent in numeric factorization, in seconds.
+    nz_udiag : int
+        Number of nonzeros on the diagonal of :math:`U`.
+    rcond : float
+        Estimate of the reciprocal of the condition number of :math:`A`.
+    was_scaled : str in ['none', 'sum', 'max']
+        Scaling method used.
+    rsmin : float
+        `min(max(row))` or `min(sum(row))`, depending on the scaling method.
+    rsmax : float
+        `max(max(row))` or `max(sum(row))`, depending on the scaling method.
+    umin : float
+        Minimum absolute value of a diagonal entry of :math:`U`.
+    umax : float
+        Maximum absolute value of a diagonal entry of :math:`U`.
+    alloc_init_used : float
+        Initial memory allocation used, as a fraction of total numeric memory.
+    forced_updates : int
+        Number of forced updates during numeric factorization. 
+    numeric_walltime : float
+        Wall-clock time spent in numeric factorization, in seconds.
+    noff_diag : int
+        Number of off-diagonal pivots.
+    all_lnz : int
+        Total number of entries in :math:`L`, if no dropped entries.
+    all_unz : int
+        Total number of entries in :math:`U`, if no dropped entries.
+    nzdropped : int
+        Number of dropped entries in :math:`L` and :math:`U`.
+    ir_taken : int
+        Number of iterative refinement steps taken.
+    ir_attempted : int
+        Number of iterative refinement steps attempted.
+    omega1 : int
+        Factor for sparse backdward error estimate.
+    omega2 : int
+        Factor for sparse backdward error estimate.
+    solve_flops : int
+        Number of floating-point operations for `solve`.
+    solve_time : float
+        Time spent in `solve`, in seconds.
+    solve_walltime : float
+        Wall-clock time spent in `solve`, in seconds.
+    """
 
     cdef double data[UMFPACK_INFO]
 
@@ -579,6 +749,7 @@ cdef class UMFControl:
     strategy : str
         The strategy to use in the factorization. Default value is ``'auto'``.
         Possible values are:
+
         * ``'auto'``: choose the strategy automatically
         * ``'unsymmetric'``: order the columns of :math:`A` with COLAMD
         * ``'symmetric'``: Order the matrix :math:`A + A^{\\top}` with AMD
@@ -586,6 +757,7 @@ cdef class UMFControl:
     ordering_method : str
         The ordering method to use. Default value is ``'amd'``. Possible values
         are:
+
         * ``'cholmod'``: use AMD/COLAMD, then METIS
         * ``'amd'``: just use AMD or COLAMD
         * ``'given'``: use the user-provided ordering
@@ -598,6 +770,7 @@ cdef class UMFControl:
 
     fixQ : int
         Default 0. Possible values:
+
         * -1: possibly modify :math:`Q` during numeric factorization.
         * 0: automatic. Modify :math:`Q` only if strategy is unsymmetric.
         * 1: do not modify :math:`Q` during numeric factorization.
@@ -620,6 +793,7 @@ cdef class UMFControl:
         The relative pivot tolerance for symmetric strategy. Default 0.001.
     row_scale : str or None
         The row scaling to use. Default value is ``'sum'``. Possible values are:
+
         * None or ``'none'``: no row scaling
         * ``'sum'``: divide each row by ``sum(abs(A[i,:]))``
         * ``'max'``: divide each row by ``max(abs(A[i,:]))``
