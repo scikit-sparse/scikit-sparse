@@ -75,6 +75,8 @@ if user_include_dir:
 if user_library_dir:
     LIBRARY_DIRS.append(user_library_dir)
 
+extension_names = ['cholmod', 'umfpack']
+
 setup(
     install_requires=["numpy>=1.13.3", "scipy>=0.19"],
     python_requires=">=3.6",
@@ -113,19 +115,13 @@ setup(
     ext_modules=cythonize(
         [
             Extension(
-                "sksparse.cholmod",
-                ["sksparse/cholmod.pyx"],
+                f"sksparse.{name}",
+                [f"sksparse/{name}.pyx"],
                 include_dirs=INCLUDE_DIRS,
                 library_dirs=LIBRARY_DIRS,
-                libraries=["cholmod"],
-            ),
-            Extension(
-                "sksparse.umfpack",
-                ["sksparse/umfpack.pyx"],
-                include_dirs=INCLUDE_DIRS,
-                library_dirs=LIBRARY_DIRS,
-                libraries=["umfpack"],
+                libraries=[name],
             )
+            for name in extension_names
         ],
     ),
 )
