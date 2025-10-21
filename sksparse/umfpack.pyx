@@ -261,7 +261,7 @@ cdef bint _is_real_dtype(cnp.dtype dtype):
 
 
 # -----------------------------------------------------------------------------
-#         Info Class
+#         Parameter Mappings
 # -----------------------------------------------------------------------------
 cdef dict _INFO_INDEX = {
     "status": UMFPACK_STATUS,
@@ -349,37 +349,82 @@ cdef dict _INFO_INDEX = {
 }
 
 
-# TODO descriptions of each attribute
-cdef class UMFInfo:
-    """A data class to store UMFPACK info."""
+cdef list _INFO_INT_NAMES = [
+    'status',
+    'n_row',
+    'n_col',
+    'nz',
+    'size_of_unit',
+    'size_of_int',
+    'size_of_long',
+    'size_of_pointer',
+    'size_of_entry',
+    'ndense_row',
+    'nempty_row',
+    'ndense_col',
+    'nempty_col',
+    'symbolic_defrag',
+    'symbolic_peak_memory',
+    'symbolic_size',
+    'strategy_used',
+    'ordering_used',
+    'qfixed',
+    'diag_preferred',
+    'nz_a_plus_at',
+    'nzdiag',
+    'symmetric_lunz',
+    'symmetric_flops',
+    'symmetric_ndense',
+    'symmetric_dmax',
+    'col_singletons',
+    'row_singletons',
+    'n2',
+    's_symmetric',
+    'numeric_size_estimate',
+    'peak_memory_estimate',
+    'flops_estimate',
+    'lnz_estimate',
+    'unz_estimate',
+    'variable_init_estimate',
+    'variable_peak_estimate',
+    'variable_final_estimate',
+    'max_front_size_estimate',
+    'max_front_nrows_estimate',
+    'max_front_ncols_estimate',
+    'numeric_size',
+    'peak_memory',
+    'flops',
+    'lnz',
+    'unz',
+    'variable_init',
+    'variable_peak',
+    'variable_final',
+    'max_front_size',
+    'max_front_nrows',
+    'max_front_ncols',
+    'numeric_defrag',
+    'numeric_realloc',
+    'numeric_costly_realloc',
+    'compressed_pattern',
+    'lu_entries',
+    'nz_udiag',
+    'forced_updates',
+    'noff_diag',
+    'all_lnz',
+    'all_unz',
+    'nzdropped',
+    'ir_taken',
+    'ir_attempted',
+    'solve_flops',
+]
 
-    cdef double data[UMFPACK_INFO]
-
-    def __getattr__(self, name):
-        try:
-            return self.data[_INFO_INDEX[name]]
-        except KeyError:
-            raise AttributeError(
-                f"{self.__class__.__name__} object has no attribute '{name}'"
-            )
-
-    def __setattr__(self, name, value):
-        # Info values are read-only
-        raise AttributeError(f"cannot assign to '{name}'.")
-
-    def __repr__(self):
-        params = ",\n    ".join(
-            f"{key}={self.data[idx]}" for key, idx in _INFO_INDEX.items()
-        )
-        return f"{self.__class__.__name__}(\n    {params}\n)"
-
-    def __str__(self):
-        return self.__repr__()
+cdef list _INFO_BOOL_NAMES = [
+    "qfixed",
+    "diag_preferred",
+    "aggressive",
+]
 
 
-# -----------------------------------------------------------------------------
-#         Control Class
-# -----------------------------------------------------------------------------
 cdef dict _CONTROL_INDEX = {
     "print_level": UMFPACK_PRL,
     "dense_row": UMFPACK_DENSE_ROW,
@@ -398,39 +443,123 @@ cdef dict _CONTROL_INDEX = {
     "front_alloc_init": UMFPACK_FRONT_ALLOC_INIT,
     "droptol": UMFPACK_DROPTOL,
     "ir_steps": UMFPACK_IRSTEP,
-    "compiles_with_blas": UMFPACK_COMPILED_WITH_BLAS,
+    "compiled_with_blas": UMFPACK_COMPILED_WITH_BLAS,
     "sym_thresh": UMFPACK_STRATEGY_THRESH_SYM,
     "nnzdiag_thresh": UMFPACK_STRATEGY_THRESH_NNZDIAG,
 }
 
 
+cdef list _CONTROL_INT_NAMES = [
+    "print_level",
+    "blas3_block_size",
+    "fixQ",
+    "amd_dense",
+    "ir_steps",
+]
+
+
+cdef list _CONTROL_BOOL_NAMES = [
+    "aggressive",
+    "singletons",
+    "compiled_with_blas",
+]
+
+
 cdef dict _CONTROL_STRATEGY_INDEX = {
-    'auto': UMFPACK_STRATEGY_AUTO,
-    'unsymmetric': UMFPACK_STRATEGY_UNSYMMETRIC,
-    'obsolete': UMFPACK_STRATEGY_OBSOLETE,
-    'symmetric': UMFPACK_STRATEGY_SYMMETRIC,
+    "auto": UMFPACK_STRATEGY_AUTO,
+    "unsymmetric": UMFPACK_STRATEGY_UNSYMMETRIC,
+    "obsolete": UMFPACK_STRATEGY_OBSOLETE,
+    "symmetric": UMFPACK_STRATEGY_SYMMETRIC,
+}
+
+cdef dict _CONTROL_STRATEGY_INVERSE_INDEX = {
+    v: k for k, v in _CONTROL_STRATEGY_INDEX.items()
 }
 
 
 cdef dict _CONTROL_SCALE_INDEX = {
-    None: UMFPACK_SCALE_NONE,
-    'none': UMFPACK_SCALE_NONE,
-    'sum': UMFPACK_SCALE_SUM,
-    'max': UMFPACK_SCALE_MAX,
+    "none": UMFPACK_SCALE_NONE,
+    "sum": UMFPACK_SCALE_SUM,
+    "max": UMFPACK_SCALE_MAX,
+}
+
+cdef dict _CONTROL_SCALE_INVERSE_INDEX = {
+    v: k for k, v in _CONTROL_SCALE_INDEX.items()
 }
 
 
 cdef dict _CONTROL_ORDERING_INDEX = {
-    'cholmod': UMFPACK_ORDERING_CHOLMOD,
-    'amd': UMFPACK_ORDERING_AMD,
-    'given': UMFPACK_ORDERING_GIVEN,
-    'none': UMFPACK_ORDERING_NONE,
-    None: UMFPACK_ORDERING_NONE,
-    'metis': UMFPACK_ORDERING_METIS,
-    'best': UMFPACK_ORDERING_BEST,
-    'user': UMFPACK_ORDERING_USER,
-    'metis_guard': UMFPACK_ORDERING_METIS_GUARD,
+    "cholmod": UMFPACK_ORDERING_CHOLMOD,
+    "amd": UMFPACK_ORDERING_AMD,
+    "given": UMFPACK_ORDERING_GIVEN,
+    "none": UMFPACK_ORDERING_NONE,
+    "metis": UMFPACK_ORDERING_METIS,
+    "best": UMFPACK_ORDERING_BEST,
+    "user": UMFPACK_ORDERING_USER,
+    "metis_guard": UMFPACK_ORDERING_METIS_GUARD,
 }
+
+cdef dict _CONTROL_ORDERING_INVERSE_INDEX = {
+    v: k for k, v in _CONTROL_ORDERING_INDEX.items()
+}
+
+
+cdef dict _CONTROL_DISPATCH = {
+    "strategy": _CONTROL_STRATEGY_INVERSE_INDEX,
+    "row_scale": _CONTROL_SCALE_INVERSE_INDEX,
+    "ordering_method": _CONTROL_ORDERING_INVERSE_INDEX,
+}
+
+
+cdef dict _INFO_DISPATCH = {
+    "strategy_used": _CONTROL_STRATEGY_INVERSE_INDEX,
+    "was_scaled": _CONTROL_SCALE_INVERSE_INDEX,
+    "ordering_used": _CONTROL_ORDERING_INVERSE_INDEX,
+}
+
+
+# -----------------------------------------------------------------------------
+#         Info and Control Classes
+# -----------------------------------------------------------------------------
+# TODO descriptions of each attribute
+cdef class UMFInfo:
+    """A data class to store UMFPACK info."""
+
+    cdef double data[UMFPACK_INFO]
+
+    def __getattr__(self, name):
+        try:
+            value = self.data[_INFO_INDEX[name]]
+        except KeyError:
+            raise AttributeError(
+                f"{self.__class__.__name__} object has no attribute '{name}'"
+            )
+
+        mapper = _INFO_DISPATCH.get(name, None)
+        if mapper is not None:
+            value = mapper[value]
+        elif name in _INFO_INT_NAMES:
+            value = int(value)
+        elif name in _INFO_BOOL_NAMES:
+            value = bool(value)
+
+        return value
+
+    def __setattr__(self, name, value):
+        # Info values are read-only
+        raise AttributeError(f"cannot assign to '{name}'.")
+
+    def __iter__(self):
+        cdef int idx
+        for key, idx in _INFO_INDEX.items():
+            yield (key, getattr(self, key))
+
+    def __repr__(self):
+        params = ",\n    ".join(f"{k}={repr(v)}" for k, v in self)
+        return f"{self.__class__.__name__}(\n    {params}\n)"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 cdef class UMFControl:
@@ -534,15 +663,28 @@ cdef class UMFControl:
 
     def __getattr__(self, name):
         try:
-            return self.data[_CONTROL_INDEX[name]]
+            value = self.data[_CONTROL_INDEX[name]]
         except KeyError:
             raise AttributeError(f"UMFControl object has no attribute '{name}'")
+
+        # Convert types where appropriate
+        mapper = _CONTROL_DISPATCH.get(name, None)
+        if mapper is not None:
+            value = mapper[value]
+        elif name in _CONTROL_INT_NAMES:
+            value = int(value)
+        elif name in _CONTROL_BOOL_NAMES:
+            value = bool(value)
+
+        return value
 
     def __setattr__(self, name, value):
         try:
             idx = _CONTROL_INDEX[name]
         except KeyError:
-            raise AttributeError(f"UMFControl object has no attribute '{name}'")
+            raise AttributeError(
+                f"{self.__class__.__name__} object has no attribute '{name}'"
+            )
 
         # Validate values
         if idx == UMFPACK_STRATEGY:
@@ -581,10 +723,13 @@ cdef class UMFControl:
         # Set the value
         self.data[idx] = value
 
+    def __iter__(self):
+        cdef int idx
+        for key, idx in _CONTROL_INDEX.items():
+            yield (key, getattr(self, key))
+
     def __repr__(self):
-        params = ",\n    ".join(
-            f"{key}={self.data[idx]}" for key, idx in _CONTROL_INDEX.items()
-        )
+        params = ",\n    ".join(f"{k}={repr(v)}" for k, v in self)
         return f"{self.__class__.__name__}(\n    {params}\n)"
 
     def __str__(self):
@@ -657,6 +802,7 @@ cdef class UMFFactor:
         cnp.ndarray _Rs
         # TODO Dx for diagonal of U?
 
+    # TODO allow control kwargs in UMFFactor initialization? or just umf_factor?
     def __init__(self, object A, object control=None):
         A, _, _ = validate_csc_input(A)
 
