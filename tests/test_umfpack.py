@@ -16,11 +16,12 @@ from numpy.testing import assert_allclose, assert_array_equal
 from scipy import linalg as la
 from scipy import sparse
 from sksparse.umfpack import (
+    UMFControl,
     UMFFactor,
     UMFPACKError,
     UMFPACKNonpositiveError,
-    UMFPACKWarning,
     UMFPACKSingularMatrixWarning,
+    UMFPACKWarning,
 )
 
 from .helpers import generate_random_matrices
@@ -37,6 +38,9 @@ def assert_LU_equals_A(f, A, atol=1e-15):
     assert_allclose(LU, PRAQ, atol=atol, strict=True)
 
 
+# -----------------------------------------------------------------------------
+#         Simple Tests
+# -----------------------------------------------------------------------------
 def test_empty_input():
     empty_A = sparse.csc_array((0, 0))
     with pytest.raises(UMFPACKNonpositiveError, match="non-positive"):
@@ -128,7 +132,7 @@ test_As = [
 ]
 
 
-@pytest.mark.parametrize("copy", [True, False])
+@pytest.mark.parametrize("copy", [False, True])
 @pytest.mark.parametrize("A", test_As)
 def test_refactor(A, copy):
     atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-6
@@ -287,61 +291,117 @@ def test_solve(A, K, is_sparse):
         assert_allclose(x, expect_x, atol=atol)
 
 
-# @pytest.mark.parametrize("itype", ITYPES)
-# @pytest.mark.parametrize("dtype", DTYPES)
-# def test_demo(itype, dtype):
-#     rng = np.random.default_rng(56)
-#     # Random matrix
-#     # N = 10
-#     # A = sparse.random_array((N, N), density=0.5, format="csc", rng=56, dtype=dtype)
-#     # A.setdiag(1.0)
+# -----------------------------------------------------------------------------
+#         Test Info and Control
+# -----------------------------------------------------------------------------
+# Copied from umfpack.h, subject to change
+CONTROL_DEFAULTS = {
+    'print_level': 1,
+    'dense_row': 0.2,
+    'dense_col': 0.2,
+    'pivot_tol': 0.1,
+    'sym_pivot_tol': 0.001,
+    'blas3_block_size': 32,
+    'alloc_init': 0.7,
+    'front_alloc_init': 0.5,
+    'ir_steps': 2,
+    'row_scale': 1,  # UMFPACK_SCALE_SUM
+    'strategy': 0,  # UMFPACK_STRATEGY_AUTO
+    'amd_dense': 10.0,  # AMD_DEFAULT_DENSE
+    'fixQ': 0,
+    'aggressive': 1,
+    'droptol': 0,
+    'ordering_method': 1,  # UMFPACK_ORDERING_AMD
+    'singletons': True,
+    'sym_thresh': 0.3,
+    'nnzdiag_thresh': 0.9,
+}
 
-#     # Laplaceian grid
-#     A = -LaplacianNd((3, 3), dtype=dtype).tosparse().tocsc()
-#     A[-1, -1] += 1.0  # make non-singular
-#     N = A.shape[0]
 
-#     A.indptr = A.indptr.astype(itype)
-#     A.indices = A.indices.astype(itype)
-#     f = UMFFactor(A)
-#     print()
-#     print(f)
-#     print('---------- report_control():')
-#     f.report_control()
-#     print('---------- report_symbolic():')
-#     f.report_symbolic()
-#     print('---------- print(f.control):')
-#     print(f.control)
-#     f.factorize(A)
-#     print('---------- report_numeric():')
-#     f.report_numeric()
-#     print(f)
-#     # Solve a system
-#     expect_x = np.arange(1, N + 1, dtype=dtype)
-#     # Ensure non-zero complex parts
-#     if np.issubdtype(dtype, np.complexfloating):
-#         expect_x += 1j * 0.1 * rng.random(N)
-#     expect_x = np.r_[expect_x, 2 * expect_x].reshape((-1, 2))  # multiple RHS
-#     print(f"{expect_x=}")
-#     b = A @ expect_x
-#     x = f.solve(A, b)
-#     assert_allclose(x, expect_x, atol=1e-12, strict=True)
-#     print('---------- print(f.info):')
-#     print(f.info)
-#     print('---------- report_info():')
-#     f.report_info()
-#     # Print the factors
-#     print('---------- factors:')
-#     print(repr(f.L))
-#     print(repr(f.U))
-#     print(repr(f.perm_r))
-#     print(repr(f.perm_c))
-#     print(repr(f.R))
-#     L, U, p, q, r = f.L, f.U, f.perm_r, f.perm_c, f.R
-#     # Check that L U = P R A Q
-#     LU = (L @ U).toarray()
-#     PRAQ = (r[:, np.newaxis] * A).tocsc()[p][:, q].toarray()
-#     assert_allclose(LU, PRAQ, atol=1e-12, strict=True)
+def test_default_controls():
+    c = UMFControl()
+    for key, expect_value in CONTROL_DEFAULTS.items():
+        actual_value = getattr(c, key)
+        assert actual_value == expect_value
+
+
+# TODO test IRSTEP == 0 and don't pass in A to solve()
+def test_ir_steps(davis_example_qr):
+    A = davis_example_qr
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+    N_steps = 0
+    c = UMFControl(ir_steps=N_steps)  # arbitrary > default
+    c.report()
+    f = UMFFactor(A, control=c)
+    assert f.control.ir_steps == N_steps
+    f.factorize(A)
+    expect_x = np.arange(1, A.shape[0] + 1, dtype=A.dtype)
+    b = A @ expect_x
+    f.solve(A, b)
+    print(f"{f.info.ir_attempted=}, {f.info.ir_attempted=}")  # FIXME?
+    assert f.info.ir_attempted == N_steps
+
+
+# NOTE the integer values are from umfpack.h and subject to change
+SCALES = [None, "none", "sum", "max"]
+SCALE_MAP = {
+    None: 0,
+    "none": 0,  # UMFPACK_SCALE_NONE
+    "sum": 1,   # UMFPACK_SCALE_SUM
+    "max": 2    # UMFPACK_SCALE_MAX
+}
+
+
+@pytest.mark.parametrize("scale", SCALE_MAP)
+def test_row_scale(davis_example_qr, scale):
+    expect_scale = SCALE_MAP[scale]
+    A = davis_example_qr
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+    f = UMFFactor(A)
+    # Row scaling can be done *after* symbolic, but *before* numeric
+    f.control.row_scale = scale
+    f.factorize(A)
+    assert f.control.row_scale == expect_scale  # TODO
+    expect_x = np.arange(1, A.shape[0] + 1, dtype=A.dtype)
+    b = A @ expect_x
+    f.solve(A, b)
+    assert_LU_equals_A(f, A)
+    assert f.info.was_scaled == expect_scale
+
+
+# NOTE the integer values are from umfpack.h and subject to change
+ORDERINGS = [None, "none", "cholmod", "amd", "metis", "best"]
+ORDERING_MAP = {
+    "cholmod": 0,  # UMFPACK_ORDERING_CHOLMOD
+    "amd": 1,      # UMFPACK_ORDERING_AMD
+    "metis": 3,    # UMFPACK_ORDERING_METIS
+    "best": 4,     # UMFPACK_ORDERING_BEST
+    "none": 5,     # UMFPACK_ORDERING_NONE
+    None: 5,
+}
+
+
+@pytest.mark.parametrize("ordering", ORDERINGS)
+def test_ordering(davis_example_qr, ordering):
+    expect_ordering = ORDERING_MAP[ordering]
+    A = davis_example_qr
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+    # Ordering must be done *before* symbolic factorization
+    c = UMFControl(ordering_method=ordering)
+    f = UMFFactor(A, control=c)
+    assert f.control.ordering_method == expect_ordering  # TODO
+    f.factorize(A)
+    expect_x = np.arange(1, A.shape[0] + 1, dtype=A.dtype)
+    b = A @ expect_x
+    f.solve(A, b)
+    assert_LU_equals_A(f, A)
+    if ordering in [None, "none", "amd", "metis"]:
+        assert f.info.ordering_used == expect_ordering
+    else:  # ["cholmod", "best"]
+        # May choose AMD or METIS
+        assert f.info.ordering_used in [1, 3]
+
+
 
 # =============================================================================
 # =============================================================================
