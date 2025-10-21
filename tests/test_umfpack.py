@@ -22,6 +22,8 @@ from sksparse.umfpack import (
     UMFPACKNonpositiveError,
     UMFPACKSingularMatrixWarning,
     UMFPACKWarning,
+    umf_factor,
+    umf_solve,
 )
 
 from .helpers import generate_random_matrices
@@ -102,8 +104,7 @@ def test_davis_example_qr(davis_example_qr, itype, dtype):
     A.indices = A.indices.astype(itype)
     A.data = A.data.astype(dtype)
 
-    f = UMFFactor(A)
-    f.factorize(A)
+    f = umf_factor(A)
     assert f.is_numeric
 
     # Get the factors
@@ -137,8 +138,7 @@ test_As = [
 def test_refactor(A, copy):
     atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-6
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
-    f = UMFFactor(A)
-    f.factorize(A)
+    f = umf_factor(A)
     assert_LU_equals_A(f, A, atol=atol)
     # Create a new matrix with the same sparsity pattern but different values
     B = A.copy()
@@ -169,7 +169,7 @@ class TestBadBShape:
 
     @pytest.fixture(scope="class")
     def f(self, A):
-        return UMFFactor(A).factorize(A)
+        return umf_factor(A)
 
     def test_b_0D_dense(self, f, A):
         b = np.empty([])
@@ -233,7 +233,7 @@ def test_exactly_singular(davis_example_qr):
     with pytest.raises(UMFPACKError, match="indefinite or singular"):
         # FIXME shouldn't warn *and* raise
         with pytest.warns(UMFPACKSingularMatrixWarning, match="is singular"):
-            UMFFactor(A).factorize(A).solve(A, b)
+            umf_solve(A, b)
 
 
 # FIXME doesn't warn?
@@ -257,7 +257,7 @@ def test_nearly_singular(davis_example_qr):
     expect_x = sparse.coo_array(np.arange(1, N + 1, dtype=A.dtype))
     b = A @ expect_x
     with pytest.warns(UMFPACKWarning, match="nearly singular"):
-        UMFFactor(A).factorize(A).solve(A, b)
+        umf_solve(A, b)
 
 
 @pytest.mark.parametrize("A", test_As)
@@ -282,7 +282,7 @@ def test_solve(A, K, is_sparse):
 
     # Solve the system
     b = A @ expect_x
-    x = UMFFactor(A).factorize(A).solve(A, b)
+    x = umf_solve(A, b)
 
     # Compare
     if is_sparse:
@@ -332,12 +332,12 @@ def test_ir_steps(davis_example_qr):
     N_steps = 0
     c = UMFControl(ir_steps=N_steps)  # arbitrary > default
     c.report()
-    f = UMFFactor(A, control=c)
+    f = umf_factor(A, control=c)
     assert f.control.ir_steps == N_steps
-    f.factorize(A)
     expect_x = np.arange(1, A.shape[0] + 1, dtype=A.dtype)
     b = A @ expect_x
-    f.solve(A, b)
+    x = f.solve(A, b)
+    assert_allclose(x, expect_x, atol=1e-15, strict=True)
     print(f"{f.info.ir_attempted=}, {f.info.ir_attempted=}")
     assert f.info.ir_attempted == N_steps
 
@@ -350,13 +350,10 @@ def test_row_scale(davis_example_qr, scale):
     f = UMFFactor(A)
     # Row scaling can be done *after* symbolic, but *before* numeric
     f.control.row_scale = scale
-    f.factorize(A)
     assert f.control.row_scale == scale
-    expect_x = np.arange(1, A.shape[0] + 1, dtype=A.dtype)
-    b = A @ expect_x
-    f.solve(A, b)
-    assert_LU_equals_A(f, A)
+    f.factorize(A)
     assert f.info.was_scaled == scale
+    assert_LU_equals_A(f, A)
     if scale in [None, "none"]:
         assert_allclose(f.R, 1.0)
         assert_allclose(f.L.diagonal(), 1.0)
@@ -370,14 +367,12 @@ def test_ordering(davis_example_qr, ordering):
     A = davis_example_qr
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
     # Ordering must be done *before* symbolic factorization
-    c = UMFControl(ordering_method=ordering)
-    f = UMFFactor(A, control=c)
-    assert f.control.ordering_method == ordering
-    f.factorize(A)
+    f = umf_factor(A, ordering_method=ordering)
     expect_x = np.arange(1, A.shape[0] + 1, dtype=A.dtype)
     b = A @ expect_x
-    f.solve(A, b)
+    x = f.solve(A, b)
     assert_LU_equals_A(f, A)
+    assert_allclose(x, expect_x, atol=1e-15, strict=True)
     if ordering in [None, "none", "amd", "metis"]:
         assert f.info.ordering_used == ordering
     else:  # ["cholmod", "best"]
