@@ -22,6 +22,62 @@ An interface to the SuiteSparse `UMFPACK
 <https://github.com/DrTimothyAldenDavis/SuiteSparse/tree/dev/UMFPACK>`_
 package, which computes the LU factorization and solves systems of equations
 for sparse, possibly non-symmetric, indefinite matrices.
+
+
+Function Interface
+------------------
+
+.. autosummary::
+    :toctree: generated/
+    :nosignatures:
+
+    umf_solve - Solve a linear system using the UMFPACK factorization.
+
+
+Object Interface
+----------------
+
+.. autosummary::
+    :toctree: generated/
+    :nosignatures:
+    
+    umf_factor - Compute the LU factorization of a sparse matrix.
+    UMFFactor - An object-oriented interface to UMFPACK.
+
+
+.. umfpack-exceptions:
+
+Warnings and Exceptions
+-----------------------
+
+.. autosummary::
+    :toctree: generated/
+
+    UMFPACKWarning
+    UMFPACKSingularMatrixWarning
+    UMFPACKDeterminantUnderflowWarning
+    UMFPACKDeterminantOverflowWarning
+
+    UMFPACKError
+    UMFPACKOutOfMemoryError
+    UMFPACKInvalidNumericObjectError
+    UMFPACKInvalidSymbolicObjectError
+    UMFPACKArgumentMissingError
+    UMFPACKNonpositiveError
+    UMFPACKInvalidMatrixError
+    UMFPACKDifferentPatternError
+    UMFPACKInvalidSystemError
+    UMFPACKInvalidPermutationError
+    UMFPACKInternalError
+    UMFPACKFileIOError
+    UMFPACKOrderingFailedError
+    UMFPACKInvalidBlobError
+
+
+References
+----------
+* `SuiteSparse homepage <https://people.engr.tamu.edu/davis/suitesparse.html>`_
+* `SuiteSparse UMFPACK <https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/UMFPACK>`_
 """
 
 cimport cython
@@ -953,7 +1009,52 @@ cdef class UMFFactor:
     .. math::
         L U = P R A Q.
 
-    The numeric factorization is not computed until :meth:`.numeric` is called.
+    The numeric factorization is not computed until :meth:`.factorize` is called.
+
+    Properties
+    ----------
+    is_numeric : bool
+        Whether the numeric factorization has been computed.
+    lnz, unz : int
+        Number of nonzeros in :math:`L` and :math:`U`, respectively.
+    nnz : int
+        Total number of nonzeros in :math:`L` and :math:`U`.
+    n_row, n_col : int
+        Number of rows and columns in the input matrix.
+    nz_udiag : int
+        Number of nonzeros on the diagonal of :math:`U`.
+    dtype : :obj:`np.dtype`
+        The data type of the matrix entries (``float64`` or ``complex128``).
+    itype : :obj:`np.dtype`
+        The integer type used for indexing (``int32`` or ``int64``).
+    L : :obj:`scipy.sparse.csr_array`
+        The :math:`L` factor as a sparse CSR matrix.
+    U : :obj:`scipy.sparse.csc_array`
+        The :math:`U` factor as a sparse CSC matrix.
+    perm_r, perm_c : :obj:`np.ndarray`
+        The row and column permutation arrays, :math:`P` and :math:`Q`.
+    R : :obj:`np.ndarray`
+        The row scaling diagonal matrix as a 1D array.
+    info : :obj:`UMFInfo`
+        An object containing information about the factorization.
+    control : :obj:`UMFControl`
+        An object containing settings for the factorization.
+
+    See Also
+    --------
+    UMFControl, umf_factor, umf_solve
+
+    Notes
+    -----
+    This object is an interface to the SuiteSparse UMFPACK library [#umfpack_url]_.
+
+
+    .. versionadded:: 0.5.0
+
+    References
+    ----------
+    .. [#umfpack_url] SuiteSparse UMFPACK
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/tree/dev/UMFPACK
     """
 
     cdef:
@@ -978,6 +1079,17 @@ cdef class UMFFactor:
 
     # TODO allow control kwargs in UMFFactor initialization? or just umf_factor?
     def __init__(self, object A, object control=None):
+        """Compute the symbolic analysis.
+
+        Parameters
+        ----------
+        A : :obj:`np.ndarray` or sparse array
+            The input matrix. Any object that can be converted to
+            a :obj:`~scipy.sparse.csc_array` is accepted.
+        control : :obj:`UMFControl`, optional
+            An object containing settings for the factorization. Default values
+            will be used if not provided.
+        """
         A, _, _ = validate_csc_input(A)
 
         # Initialize the control and info arrays
@@ -997,7 +1109,19 @@ cdef class UMFFactor:
         index_t[::1] indices,
         value_t[::1] data
     ):
-        """Compute the symbolic factorization."""
+        """Compute the symbolic factorization.
+
+        Parameters
+        ----------
+        M, N : int
+            Number of rows and columns of the matrix.
+        indptr : 1D array of index_t
+            The index pointer array of the CSC matrix.
+        indices : 1D array of index_t
+            The row indices array of the CSC matrix.
+        data : 1D array of value_t
+            The data array of the CSC matrix.
+        """
         cdef int status
 
         self._use_int32 = index_t is int32_t
@@ -1106,52 +1230,42 @@ cdef class UMFFactor:
     # -------------------------------------------------------------------------
     @property
     def is_numeric(self):
-        """Whether the numeric factorization is present."""
         return self._symbolic is not NULL and self._numeric is not NULL
 
     @property
     def lnz(self):
-        """Number of entries in the L factor."""
         return int(self._info.lnz if self._info.lnz >= 0 else 0)
 
     @property
     def unz(self):
-        """Number of entries in the U factor."""
         return int(self._info.unz if self._info.unz >= 0 else 0)
 
     @property
     def nnz(self):
-        """Total number of entries in the LU factors."""
         return int(self.lnz + self.unz)
 
     @property
     def n_row(self):
-        """Number of rows of the input matrix."""
         return int(self._info.n_row if self._info.n_row >= 0 else 0)
 
     @property
     def n_col(self):
-        """Number of columns of the input matrix."""
         return int(self._info.n_col if self._info.n_col >= 0 else 0)
 
     @property
     def nz_udiag(self):
-        """Number of nonzeros on the U diagonal."""
         return int(self._info.nz_udiag if self._info.nz_udiag >= 0 else 0)
 
     @property
     def dtype(self):
-        """The data type of the matrix used for factorization."""
         return np.float64 if self._is_real else np.complex128
 
     @property
     def itype(self):
-        """The integer type used for indices in the matrix."""
         return np.int32 if self._use_int32 else np.int64
 
     @property
     def L(self):
-        """The L factor in CSR format."""
         if self._Lp is None or self._Lj is None or self._Lx is None:
             self._get_numeric()
 
@@ -1160,7 +1274,6 @@ cdef class UMFFactor:
 
     @property
     def U(self):
-        """The U factor in CSC format."""
         if self._Up is None or self._Ui is None or self._Ux is None:
             self._get_numeric()
 
@@ -1169,39 +1282,28 @@ cdef class UMFFactor:
 
     @property
     def perm_r(self):
-        """The row permutation vector."""
         if self._P is None:
             self._get_numeric()
         return self._P
 
     @property
     def perm_c(self):
-        """The column permutation vector."""
         if self._Q is None:
             self._get_numeric()
         return self._Q
 
     @property
     def R(self):
-        """The row scaling factors."""
         if self._Rs is None:
             self._get_numeric()
         return self._Rs
 
     @property
     def info(self):
-        """The info parameters from the last UMFPACK call.
-
-        See :class:`UMFInfo` for details.
-        """
         return self._info
 
     @property
     def control(self):
-        """The control parameters used for the factorization.
-
-        See :class:`UMFControl` for details.
-        """
         return self._control
 
     @control.setter
@@ -1264,11 +1366,16 @@ cdef class UMFFactor:
     def factorize(self, object A):
         """Compute the numeric factorization of a sparse matrix.
 
-        This method computes the numeric factorization of a sparse matrix
-        :math:`A` given the symbolic analysis performed in the constructor. The
-        matrix :math:`A` must have the same shape and nonzero pattern as the
-        one used to create this :class:`UMFFactor` object, but need not have
-        the same values.
+        Given the symbolic analysis performed in the constructor,
+        compute the numeric factorization of a sparse matrix :math:`A`
+        and determine a fill-reducing ordering such that:
+
+        .. math::
+            L U = P R A Q.
+
+        The matrix :math:`A` must have the same shape and nonzero pattern as
+        the one used to create this :class:`UMFFactor` object, but need not
+        have the same values.
 
         Parameters
         ----------
@@ -1332,7 +1439,17 @@ cdef class UMFFactor:
         index_t[::1] indices,
         value_t[::1] data,
     ):
-        """Compute the numeric factorization given the CSC arrays."""
+        """Compute the numeric factorization given the CSC arrays.
+
+        Parameters
+        ----------
+        indptr : contiguous 1D array of index_t
+            The index pointer array of the CSC matrix.
+        indices : contiguous 1D array of index_t
+            The row indices array of the CSC matrix.
+        data : contiguous 1D array of value_t
+            The data array of the CSC matrix.
+        """
         cdef int status
 
         # Compute the symbolic factorization
@@ -1417,6 +1534,26 @@ cdef class UMFFactor:
             .. note::
 
                 If :math:`A` is real, then ``'T'`` and ``'H'`` are equivalent.
+
+        Returns
+        -------
+        x : *(N,)* or *(N, K)* :obj:`ndarray` or sparse array
+            The solution vector or matrix. If ``b`` is a 1D array, then ``x`` is
+            returned as a 1D array. If ``b`` is a 2D array with ``K`` columns,
+            then ``x`` is returned as a 2D array with ``K`` columns. If ``b``
+            is a sparse array, then ``x`` is also returned as a sparse array.
+
+        Warns
+        -----
+        :exc:`UMFPACKSingularMatrixWarning`
+            If the matrix is detected to be singular to working precision.
+            In that case, the solution will have infinite or NaN values,
+            but other entries may still be valid.
+
+        Raises
+        ------
+        :exc:`UMFPACKError` or subclass
+            If an error occurs during the solve.
         """
         A, use_int32, itype = validate_csc_input(A, require_square=True)
 
@@ -1511,7 +1648,23 @@ cdef class UMFFactor:
         value_t[::1] data,
         value_t[::1, :] x
     ):
-        """Solve multiple RHS systems."""
+        """Solve multiple RHS systems.
+
+        Parameters
+        ----------
+        sys : int
+            The system type (UMFPACK_A, UMFPACK_Aat, UMFPACK_At).
+        b : 2D array of value_t, shape (N, K)
+            The right-hand side matrix.
+        indptr : contiguous 1D array of index_t
+            The index pointer array of the CSC matrix.
+        indices : contiguous 1D array of index_t
+            The row indices array of the CSC matrix.
+        data : contiguous 1D array of value_t
+            The data array of the CSC matrix.
+        x : 2D array of value_t, shape (N, K)
+            The output solution matrix.
+        """
         cdef:
             Py_ssize_t k
             Py_ssize_t K = b.shape[1]
@@ -1591,7 +1744,7 @@ cdef class UMFFactor:
 
         See Also
         --------
-        :func:`numpy.linalg.slogdet`
+        numpy.linalg.slogdet
         """
         if not self.is_numeric:
             raise ValueError(
@@ -1616,6 +1769,15 @@ cdef class UMFFactor:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def _slogdet(self, value_t[::1] Mx, double[::1] Ex):
+        """Compute the determinant of the matrix.
+
+        Parameters
+        ----------
+        Mx : 1D array of value_t, shape (1,)
+            The mantissa of the determinant.
+        Ex : 1D array of double, shape (1,)
+            The exponent of the determinant.
+        """
         cdef int status
         cdef double* mx_ptr = <double*>&Mx[0]
         cdef double* ex_ptr = &Ex[0]
@@ -1797,7 +1959,21 @@ cdef class UMFFactor:
         index_t[::1] Q,
         double[::1] Rs,
     ):
-        """Call the appropriate UMFPACK get_numeric function."""
+        """Call the appropriate UMFPACK get_numeric function.
+
+        Parameters
+        ----------
+        Lp, Lj, Lx : arrays for the L factor
+            The output arrays for the L factor in CSC format.
+        Up, Ui, Ux : arrays for the U factor
+            The output arrays for the U factor in CSC format.
+        P : array of index_t
+            The output row permutation array.
+        Q : array of index_t
+            The output column permutation array.
+        Rs : array of double
+            The output row scaling factors.
+        """
         cdef int status
         cdef bint do_recip
 
@@ -1924,7 +2100,7 @@ def umf_factor(object A, *, object control=None, **kwargs):
     control : :class:`UMFControl`, optional
         The control parameters to use for the factorization. If not provided,
         default parameters are used.
-    **kwargs : keyword arguments, optional
+    kwargs : keyword arguments, optional
         Additional keyword arguments to pass to :class:`UMFControl` if
         `control` is not provided.
 
@@ -1932,6 +2108,20 @@ def umf_factor(object A, *, object control=None, **kwargs):
     -------
     :class:`UMFFactor`
         The LU factorization of the input matrix.
+
+    Warns
+    -----
+    :exc:`UMFPACKSingularMatrixWarning`
+        If the matrix is exactly singular.
+
+    Raises
+    ------
+    :exc:`UMFPACKError` or subclass
+        If an error occurs during the factorization or solve.
+
+    See Also
+    --------
+    UMFFactor, UMFControl, umf_solve
     """
     if control is None:
         control = UMFControl(**kwargs)
@@ -1964,7 +2154,7 @@ def umf_solve(object A, object b, *, object trans='N', object control=None, **kw
     control : :class:`UMFControl`, optional
         The control parameters to use for the factorization. If not provided,
         default parameters are used.
-    **kwargs : keyword arguments, optional
+    kwargs : keyword arguments, optional
         Additional keyword arguments to pass to :class:`UMFControl` if
         `control` is not provided.
 
@@ -1972,6 +2162,22 @@ def umf_solve(object A, object b, *, object trans='N', object control=None, **kw
     -------
     x : *(N,)* :obj:`ndarray` or sparse array
         The solution vector of the same type as the input right-hand side `b`.
+
+    Warns
+    -----
+    :exc:`UMFPACKSingularMatrixWarning`
+        If the matrix is detected to be singular to working precision.
+        In that case, the solution will have infinite or NaN values,
+        but other entries may still be valid.
+
+    Raises
+    ------
+    :exc:`UMFPACKError` or subclass
+        If an error occurs during the factorization or solve.
+
+    See Also
+    --------
+    UMFFactor, UMFControl, umf_factor
     """
     if control is None:
         control = UMFControl(**kwargs)

@@ -15,6 +15,8 @@ Contents:
 
    cholmod.rst
 
+   umfpack.rst
+
    changes.rst
 
 Indices and tables
