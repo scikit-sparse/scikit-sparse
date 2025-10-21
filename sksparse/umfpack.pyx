@@ -1244,7 +1244,7 @@ cdef class UMFFactor:
 
                 If :math:`A` is real, then ``'T'`` and ``'H'`` are equivalent.
         """
-        A, use_int32, _ = validate_csc_input(A, require_square=True)
+        A, use_int32, itype = validate_csc_input(A, require_square=True)
 
         if use_int32 != self._use_int32:
             raise ValueError(
@@ -1317,7 +1317,9 @@ cdef class UMFFactor:
         self._solve(sys, b, A.indptr, A.indices, A.data, x)
 
         if return_sparse:
-            x = csc_array(x)
+            x = csc_array(x, dtype=A.dtype)
+            x.indptr = x.indptr.astype(itype)
+            x.indices = x.indices.astype(itype)
 
         if return_1D:
             x = x[:, 0]
