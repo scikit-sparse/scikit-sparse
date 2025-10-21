@@ -214,6 +214,36 @@ def test_singleton_sparse(dtype):
     assert_allclose(x.toarray(), b.toarray())
 
 
+@pytest.mark.parametrize("itype", ITYPES)
+def test_itype_1D(davis_example_qr, itype):
+    A = davis_example_qr
+    A.indptr = A.indptr.astype(itype)
+    A.indices = A.indices.astype(itype)
+    N = A.shape[0]
+    expect_x = sparse.coo_array(np.arange(1, N + 1, dtype=A.dtype))
+    b = A @ expect_x
+    x = umf_solve(A, b)
+    assert isinstance(x, sparse.coo_array)
+    assert x.coords[0].dtype == itype
+
+
+@pytest.mark.parametrize("itype", ITYPES)
+def test_itype_2D(davis_example_qr, itype):
+    A = davis_example_qr
+    A.indptr = A.indptr.astype(itype)
+    A.indices = A.indices.astype(itype)
+    N = A.shape[0]
+    K = 3  # arbitrary number of rhs
+    s = np.arange(1, N + 1, dtype=A.dtype)
+    data = np.array([i * s for i in range(1, K + 1)]).T
+    expect_x = sparse.csc_array(data, dtype=A.dtype)
+    b = A @ expect_x
+    x = umf_solve(A, b)
+    assert isinstance(x, sparse.csc_array)
+    assert x.indptr.dtype == itype
+    assert x.indices.dtype == itype
+
+
 def test_exactly_singular(davis_example_qr):
     A = davis_example_qr.todok()
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
@@ -278,7 +308,7 @@ def test_nearly_singular(davis_example_qr):
 @pytest.mark.parametrize("K", [0, 1, 3], ids=lambda k: f"K={k}")
 @pytest.mark.parametrize("is_sparse", [False, True], ids=["dense", "sparse"])
 def test_solve(A, K, is_sparse):
-    atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
+    atol = 1e-12
 
     # Build RHS
     N = A.shape[0]
@@ -345,7 +375,6 @@ def test_ir_steps(davis_example_qr):
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
     N_steps = 0
     c = UMFControl(ir_steps=N_steps)  # arbitrary > default
-    c.report()
     f = umf_factor(A, control=c)
     assert f.control.ir_steps == N_steps
     expect_x = np.arange(1, A.shape[0] + 1, dtype=A.dtype)
@@ -373,7 +402,7 @@ def test_row_scale(davis_example_qr, scale):
         assert_allclose(f.L.diagonal(), 1.0)
 
 
-ORDERINGS = ["none", "cholmod", "amd", "metis", "best"]
+ORDERINGS = ["none", "cholmod", "amd", "metis", "best", "metis_guard"]
 
 
 @pytest.mark.parametrize("ordering", ORDERINGS)
@@ -389,7 +418,7 @@ def test_ordering(davis_example_qr, ordering):
     assert_allclose(x, expect_x, atol=1e-15, strict=True)
     if ordering in [None, "none", "amd", "metis"]:
         assert f.info.ordering_used == ordering
-    else:  # ["cholmod", "best"]
+    else:  # ["cholmod", "best", "metis_guard"]
         # May choose AMD or METIS
         assert f.info.ordering_used in ['amd', 'metis']
 
