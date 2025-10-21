@@ -129,6 +129,53 @@ def test_davis_example_qr(davis_example_qr, itype, dtype):
     assert_LU_equals_A(f, A)
 
 
+def _numpy_slogdet(A):
+    """Compute sign and logdet of A using numpy. Suppress warnings."""
+    # In some versions of numpy, a warning is raised by slogdet for
+    # these complex types: (np.complex64, np.complex128). Make sure that is the
+    # warning that is raised, and not some other warning.
+    with warnings.catch_warnings(record=True) as record:
+        warnings.simplefilter("always")
+        sign, logdet = np.linalg.slogdet(A.toarray())
+
+    if record:
+        assert record[0].category is RuntimeWarning
+        assert "divide by zero" in str(record[0].message) or "invalid value" in str(
+            record[0].message
+        )
+    else:
+        pass
+
+    return sign, logdet
+
+
+@pytest.mark.parametrize("dtype", DTYPES)
+def test_eye_determinant(dtype):
+    N = 3
+    A = 10 * sparse.eye_array(N, dtype=dtype).tocsc()
+    f = umf_factor(A)
+    rtol = 1e-7
+    expect_sign, expect_logdet = _numpy_slogdet(A)
+    assert expect_sign == 1
+    assert expect_logdet == N * np.log(10)
+    assert_allclose(f.slogdet(), (expect_sign, expect_logdet), rtol=rtol, strict=True)
+
+
+@pytest.mark.parametrize("dtype", DTYPES)
+def test_determinant(davis_example_qr, dtype):
+    A = davis_example_qr
+    # Set the data to random values
+    rng = np.random.default_rng(56)
+    A.data = rng.random(len(A.data)).astype(dtype=dtype)
+    if np.issubdtype(dtype, np.complexfloating):
+        A.data += 1j * rng.random(len(A.data)).astype(dtype=dtype)
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+    f = umf_factor(A)
+    rtol = 1e-7
+    expect_sign, expect_logdet = _numpy_slogdet(A)
+    assert_allclose(f.slogdet(), (expect_sign, expect_logdet), rtol=rtol, strict=True)
+
+
 test_As = [
     A
     for dtype in DTYPES
