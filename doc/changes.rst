@@ -3,6 +3,11 @@ Changes
 
 .. module:: sksparse.cholmod
 
+
+v0.5.0
+------
+* Added :mod:`~sksparse.umfpack` submodule.
+
 v0.4.4
 ------
   * Bug in solve with dense array, where base of result is not set correctly, fixed.
