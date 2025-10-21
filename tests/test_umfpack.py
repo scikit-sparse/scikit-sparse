@@ -25,6 +25,7 @@ from sksparse.umfpack import (
     umf_factor,
     umf_solve,
 )
+import warnings
 
 from .helpers import generate_random_matrices
 
@@ -221,8 +222,9 @@ def test_exactly_singular(davis_example_qr):
     lam0 = la.eigvalsh(A.toarray()).min()
 
     # Make A exactly singular
-    A[:, -1] = 0.0
-    A[-1, :] = 0.0
+    s = -3
+    A[:, s] = 0.0
+    A[s, :] = 0.0
     A = A.tocsc()
 
     lam1 = la.eigvalsh(A.toarray()).min()
@@ -230,14 +232,25 @@ def test_exactly_singular(davis_example_qr):
 
     expect_x = sparse.coo_array(np.arange(1, N + 1, dtype=A.dtype))
     b = A @ expect_x
-    with pytest.raises(UMFPACKError, match="indefinite or singular"):
-        # FIXME shouldn't warn *and* raise
-        with pytest.warns(UMFPACKSingularMatrixWarning, match="is singular"):
-            umf_solve(A, b)
+
+    # NOTE umf_solve does some trickery to only warn once, so we expect only
+    # one warning here. pytest.warns(), however, overrides the
+    # "warnings.catch_warnings" context and captures all warnings, so we
+    # manually check the warnings instead.
+    with warnings.catch_warnings(record=True) as ws:
+        x = umf_solve(A, b)
+
+    assert len(ws) == 1
+    w = ws[0]
+    assert w.category == UMFPACKSingularMatrixWarning
+    assert "indefinite or singular to working precision" in str(w.message)
+
+    assert np.isnan(x.toarray()[s])
+    assert_allclose((A @ x).toarray(), b.toarray(), atol=1e-12)
+    idx = ~np.isnan(x.toarray())
+    assert_allclose(x.toarray()[idx], expect_x.toarray()[idx], atol=1e-12)
 
 
-# FIXME doesn't warn?
-@pytest.mark.xfail(reason="FIXME")
 def test_nearly_singular(davis_example_qr):
     A = davis_example_qr.todok()
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
@@ -256,8 +269,9 @@ def test_nearly_singular(davis_example_qr):
 
     expect_x = sparse.coo_array(np.arange(1, N + 1, dtype=A.dtype))
     b = A @ expect_x
-    with pytest.warns(UMFPACKWarning, match="nearly singular"):
-        umf_solve(A, b)
+    f = umf_factor(A, row_scale="none")  # turn off scaling to trigger warning
+    with pytest.warns(UMFPACKSingularMatrixWarning, match="nearly singular"):
+        f.solve(A, b)
 
 
 @pytest.mark.parametrize("A", test_As)
