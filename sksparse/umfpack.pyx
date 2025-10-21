@@ -1502,14 +1502,16 @@ cdef class UMFFactor:
     # -------------------------------------------------------------------------
     #         Private Methods
     # -------------------------------------------------------------------------
-    cdef void _check_rcond(self) except *:
+    cdef int _check_rcond(self) except -1:
         """Check the condition number."""
         cdef double rcond = self._info.rcond
         cdef double eps = np.finfo(np.float64).eps
 
         if rcond == 0:
-            raise UMFPACKError(
+            warnings.warn(
                 "Matrix is indefinite or singular to working precision."
+                "  Results may contain infinite or NaN values.",
+                UMFPACKSingularMatrixWarning
             )
         elif rcond < eps:
             warnings.warn(
@@ -1744,8 +1746,18 @@ def umf_solve(object A, object b, *, object trans='N', object control=None, **kw
     """
     if control is None:
         control = UMFControl(**kwargs)
-    umf = UMFFactor(A, control).factorize(A)
-    return umf.solve(A, b, trans=trans)
+
+    # factorize() and solve() will each warn for a singular matrix,
+    # so we catch the warnings from factorize() and re-raise only once.
+    with warnings.catch_warnings(record=True) as ws:
+        x = UMFFactor(A, control).factorize(A).solve(A, b, trans=trans)
+
+    # Raise only the latest singular matrix warning from solve
+    if ws:
+        w = ws[-1]
+        warnings.warn(w.message, w.category)
+
+    return x
 
 
 # =============================================================================
