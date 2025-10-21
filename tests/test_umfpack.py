@@ -25,7 +25,6 @@ from sksparse.umfpack import (
     UMFPACKError,
     UMFPACKNonpositiveError,
     UMFPACKSingularMatrixWarning,
-    UMFPACKWarning,
     umf_factor,
     umf_solve,
 )
@@ -377,25 +376,25 @@ def test_solve_real(problem):
 # -----------------------------------------------------------------------------
 # Copied from umfpack.h, subject to change
 CONTROL_DEFAULTS = {
-    'print_level': 1,
-    'dense_row': 0.2,
-    'dense_col': 0.2,
-    'pivot_tol': 0.1,
-    'sym_pivot_tol': 0.001,
-    'blas3_block_size': 32,
-    'alloc_init': 0.7,
-    'front_alloc_init': 0.5,
-    'ir_steps': 2,
-    'row_scale': 'sum',  # UMFPACK_SCALE_SUM
-    'strategy': 'auto',  # UMFPACK_STRATEGY_AUTO
-    'amd_dense': 10.0,  # AMD_DEFAULT_DENSE
-    'fixQ': 0,
-    'aggressive': True,
-    'droptol': 0.0,
-    'ordering_method': 'amd',  # UMFPACK_ORDERING_AMD
-    'singletons': True,
-    'sym_thresh': 0.3,
-    'nnzdiag_thresh': 0.9,
+    "print_level": 1,
+    "dense_row": 0.2,
+    "dense_col": 0.2,
+    "pivot_tol": 0.1,
+    "sym_pivot_tol": 0.001,
+    "blas3_block_size": 32,
+    "alloc_init": 0.7,
+    "front_alloc_init": 0.5,
+    "ir_steps": 2,
+    "row_scale": "sum",  # UMFPACK_SCALE_SUM
+    "strategy": "auto",  # UMFPACK_STRATEGY_AUTO
+    "amd_dense": 10.0,  # AMD_DEFAULT_DENSE
+    "fixQ": 0,
+    "aggressive": True,
+    "droptol": 0.0,
+    "ordering_method": "amd",  # UMFPACK_ORDERING_AMD
+    "singletons": True,
+    "sym_thresh": 0.3,
+    "nnzdiag_thresh": 0.9,
 }
 
 
@@ -403,7 +402,9 @@ def test_default_controls():
     c = UMFControl()
     for key, expect_value in CONTROL_DEFAULTS.items():
         actual_value = getattr(c, key)
-        assert actual_value == expect_value, f"Control '{key}': expected {expect_value}, got {actual_value}"
+        assert actual_value == expect_value, (
+            f"Control '{key}': expected {expect_value}, got {actual_value}"
+        )
 
 
 # TODO test IRSTEP == 0 and don't pass in A to solve()
@@ -420,7 +421,6 @@ def test_ir_steps(davis_example_qr):
     assert_allclose(x, expect_x, atol=1e-15, strict=True)
     print(f"{f.info.ir_attempted=}, {f.info.ir_attempted=}")
     assert f.info.ir_attempted == N_steps
-
 
 
 @pytest.mark.parametrize("scale", ["none", "sum", "max"])
@@ -457,8 +457,7 @@ def test_ordering(davis_example_qr, ordering):
         assert f.info.ordering_used == ordering
     else:  # ["cholmod", "best", "metis_guard"]
         # May choose AMD or METIS
-        assert f.info.ordering_used in ['amd', 'metis']
-
+        assert f.info.ordering_used in ["amd", "metis"]
 
 
 # =============================================================================
