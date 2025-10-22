@@ -359,7 +359,8 @@ def btf(A):
     if A.ndim != 2:
         raise ValueError("Input must be 2D.")
 
-    M, N = A.shape
+    cdef Py_ssize_t M = A.shape[0]
+    cdef Py_ssize_t N = A.shape[1]
 
     if M != N:
         raise ValueError("Input must be square.")
@@ -376,7 +377,7 @@ def btf(A):
         raise ValueError("Input must be convertible to CSC format.")
 
     # Choose index width: int32 or int64
-    use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
+    cdef bint use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
     out_dtype = np.int32 if use_int32 else np.int64
 
     if N == 0:
@@ -393,73 +394,67 @@ def btf(A):
         r = np.arange(N + 1, dtype=out_dtype)      # N blocks of size 1
         return p, q, r
 
-    # Declare typed memory views for Cython
-    cdef int32_t[::1] Ap_mv_int32
-    cdef int32_t[::1] Ai_mv_int32
-    cdef int32_t[::1] P_mv_int32
-    cdef int32_t[::1] Q_mv_int32
-    cdef int32_t[::1] R_mv_int32
-    cdef int32_t[::1] Work_mv_int32
-
-    cdef int64_t[::1] Ap_mv_int64
-    cdef int64_t[::1] Ai_mv_int64
-    cdef int64_t[::1] P_mv_int64
-    cdef int64_t[::1] Q_mv_int64
-    cdef int64_t[::1] R_mv_int64
-    cdef int64_t[::1] Work_mv_int64
-
     # Assign memory for the input/output arrays
-    if use_int32:
-        Ap_mv_int32 = np.ascontiguousarray(A.indptr, dtype=np.int32)
-        Ai_mv_int32 = np.ascontiguousarray(A.indices, dtype=np.int32)
-        p = P_mv_int32 = np.zeros(N, dtype=np.int32)
-        q = Q_mv_int32 = np.zeros(N, dtype=np.int32)
-        r = R_mv_int32 = np.zeros(N + 1, dtype=np.int32)
-        Work_mv_int32 = np.zeros(5 * N, dtype=np.int32)
-    else:
-        Ap_mv_int64 = np.ascontiguousarray(A.indptr, dtype=np.int64)
-        Ai_mv_int64 = np.ascontiguousarray(A.indices, dtype=np.int64)
-        p = P_mv_int64 = np.zeros(N, dtype=np.int64)
-        q = Q_mv_int64 = np.zeros(N, dtype=np.int64)
-        r = R_mv_int64 = np.zeros(N + 1, dtype=np.int64)
-        Work_mv_int64 = np.zeros(5 * N, dtype=np.int64)
+    p = np.zeros(N, dtype=out_dtype)
+    q = np.zeros(N, dtype=out_dtype)
+    r = np.zeros(N + 1, dtype=out_dtype)
 
-    maxwork = 0  # TODO default value?
-    cdef double work
-    cdef int32_t nmatch_int32
-    cdef int64_t nmatch_int64
+    cdef double maxwork = 0  # TODO default value?
 
-    if use_int32:
+    _btf(N, A.indptr, A.indices, maxwork, p, q, r)
+
+    return p, q, r
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def _btf(
+    Py_ssize_t N,
+    index_t[::1] Ap,
+    index_t[::1] Ai,
+    double maxwork,
+    index_t[::1] p,
+    index_t[::1] q,
+    index_t[::1] r,
+):
+    cdef:
+        index_t nblocks
+        double work
+        index_t nmatch
+
+    # Define workspace
+    itype = np.int32 if index_t is int32_t else np.int64
+    cdef index_t[::1] workspace = np.zeros(5 * N, dtype=itype)
+
+    if index_t is int32_t:
         nblocks = btf_order(
             N,
-            &Ap_mv_int32[0],
-            &Ai_mv_int32[0],
+            &Ap[0],
+            &Ai[0],
             maxwork,
             &work,
-            &P_mv_int32[0],
-            &Q_mv_int32[0],
-            &R_mv_int32[0],
-            &nmatch_int32,
-            &Work_mv_int32[0]
+            &p[0],
+            &q[0],
+            &r[0],
+            &nmatch,
+            &workspace[0]
         )
     else:
         nblocks = btf_l_order(
             N,
-            &Ap_mv_int64[0],
-            &Ai_mv_int64[0],
+            &Ap[0],
+            &Ai[0],
             maxwork,
             &work,
-            &P_mv_int64[0],
-            &Q_mv_int64[0],
-            &R_mv_int64[0],
-            &nmatch_int64,
-            &Work_mv_int64[0]
+            &p[0],
+            &q[0],
+            &r[0],
+            &nmatch,
+            &workspace[0]
         )
 
     if nblocks < 0:
         raise ValueError(f"BTF failed with error code: {nblocks}")
-
-    return p, q, r
 
 
 def btf_q_permutation(q):
