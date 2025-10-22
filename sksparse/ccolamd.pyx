@@ -32,22 +32,28 @@ References
 * SuiteSparse CCOLAMD:
   https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CCOLAMD
 * CCOLAMD Algorithm Publications:
-  -	T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, An approximate column
-	minimum degree ordering algorithm, ACM Transactions on Mathematical
-	Software, vol. 30, no. 3., pp. 353-376, 2004.
-  -	T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, Algorithm 836: CCOLAMD,
-	an approximate column minimum degree ordering algorithm, ACM
-	Transactions on Mathematical Software, vol. 30, no. 3., pp. 377-380,
-	2004.
+  - T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, An approximate column
+    minimum degree ordering algorithm, ACM Transactions on Mathematical
+    Software, vol. 30, no. 3., pp. 353-376, 2004.
+  - T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, Algorithm 836: CCOLAMD,
+    an approximate column minimum degree ordering algorithm, ACM
+    Transactions on Mathematical Software, vol. 30, no. 3., pp. 377-380,
+    2004.
 """
 
+cimport cython
+
 import numpy as np
-cimport numpy as np
 
 import warnings
 
 from dataclasses import dataclass
 from scipy.sparse import csc_array, issparse, SparseEfficiencyWarning
+
+
+ctypedef fused index_t:
+    int32_t
+    int64_t
 
 
 class CCOLAMDError(Exception):
@@ -71,7 +77,7 @@ class CCOLAMDInternalError(CCOLAMDError, RuntimeError):
 
 
 # Define CCOLAMD error codes
-_CCOLAMD_ERROR_CODES = dict({
+cdef dict _CCOLAMD_ERROR_CODES = {
     CCOLAMD_OK: "ok",
     CCOLAMD_OK_BUT_JUMBLED: "ok but A has unsorted columns or duplicate entries",
     CCOLAMD_ERROR_A_not_present: "A is a null pointer",
@@ -85,7 +91,24 @@ _CCOLAMD_ERROR_CODES = dict({
     CCOLAMD_ERROR_row_index_out_of_bounds: "row index out of bounds",
     CCOLAMD_ERROR_out_of_memory: "out of memory",
     CCOLAMD_ERROR_internal_error: "internal error"
-})
+}
+
+
+cdef int _handle_errors(ok, stats) except -1 with gil:
+    """Handle errors from CCOLAMD."""
+    # Check the return status
+    if ok:
+        assert stats[CCOLAMD_STATUS] == CCOLAMD_OK, \
+            "CCOLAMD returned OK but status is not CCOLAMD_OK."
+    else:
+        if stats[CCOLAMD_STATUS] == CCOLAMD_ERROR_out_of_memory:
+            raise CCOLAMDMemoryError("CCOLAMD ran out of memory.")
+        elif stats[CCOLAMD_STATUS] == CCOLAMD_ERROR_internal_error:
+            raise CCOLAMDInternalError("CCOLAMD encountered an internal error.")
+        else:
+            raise CCOLAMDValueError(
+                f"CCOLAMD returned an error:{_CCOLAMD_ERROR_CODES[stats[CCOLAMD_STATUS]]}."
+            )
 
 
 @dataclass(frozen=True)
@@ -168,14 +191,15 @@ class CCOLAMDStats:
 
 
 def _ccolamd_base(
-    A,
-    constraints=None,
-    is_symmetric=False,
-    dense_row_thresh=None,
-    dense_col_thresh=None,
-    aggressive=None,
-    opt_lu=None,
-    return_info=False
+    object A,
+    *,
+    object constraints=None,
+    bint is_symmetric=False,
+    object dense_row_thresh=None,
+    object dense_col_thresh=None,
+    object aggressive=None,
+    object opt_lu=None,
+    bint return_info=False,
 ):
     """A common base function for ccolamd and csymamd."""
     # Convert dense to sparse CSC
@@ -185,7 +209,8 @@ def _ccolamd_base(
     if A.ndim != 2:
         raise ValueError("Input must be 2D.")
 
-    M, N = A.shape
+    cdef Py_ssize_t M = A.shape[0]
+    cdef Py_ssize_t N = A.shape[1]
 
     if is_symmetric and M != N:
         raise ValueError("Input matrix must be square.")
@@ -202,7 +227,7 @@ def _ccolamd_base(
         raise ValueError("Input must be convertible to CSC format.")
 
     # Choose index width: int32 or int64
-    use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
+    cdef bint use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
     out_dtype = np.int32 if use_int32 else np.int64
 
     if M == 0 or N == 0:
@@ -214,177 +239,188 @@ def _ccolamd_base(
     if N == 1:
         return np.zeros(N, dtype=out_dtype)
 
-    # Get the recommended size for the Alen array
-    if use_int32:
-        Alen = ccolamd_recommended(A.nnz, M, N)
-    else:
-        Alen = ccolamd_l_recommended(A.nnz, M, N)
-
-    if Alen == 0:
-        raise ValueError("Recommended Alen is zero: one of {A.nnz, M, N} is erroneous.")
-
     # Set the default knobs
     knobs = np.zeros(CCOLAMD_KNOBS, dtype=np.double)
-    cdef double[::1] knobs_mv = knobs
-    ccolamd_set_defaults(&knobs_mv[0])
+    cdef double[::1] knobs_view = knobs
+    ccolamd_set_defaults(&knobs_view[0])
 
     # Override with user knobs if provided
     if dense_row_thresh is not None:
-        knobs[CCOLAMD_DENSE_ROW] = float(dense_row_thresh)
+        knobs_view[CCOLAMD_DENSE_ROW] = <float>dense_row_thresh
 
     if dense_col_thresh is not None:
-        knobs[CCOLAMD_DENSE_COL] = float(dense_col_thresh)
+        knobs_view[CCOLAMD_DENSE_COL] = <float>dense_col_thresh
 
     if aggressive is not None:
-        knobs[CCOLAMD_AGGRESSIVE] = 1.0 if aggressive else 0.0
+        knobs_view[CCOLAMD_AGGRESSIVE] = 1.0 if aggressive else 0.0
 
     if opt_lu is not None:
         if opt_lu not in ('lu', 'cholesky'):
             raise ValueError("opt_lu must be either 'lu' or 'cholesky'.")
-        knobs[CCOLAMD_LU] = 1.0 if opt_lu == 'lu' else 0.0
-
-    # Declare typed memory views for Cython
-    cdef int32_t[::1] Ai_mv_int32
-    cdef int64_t[::1] Ai_mv_int64
-
-    cdef int32_t[::1] p_mv_int32
-    cdef int64_t[::1] p_mv_int64
-
-    cdef int32_t[::1] perm_mv_int32
-    cdef int64_t[::1] perm_mv_int64
-
-    cdef int32_t[::1] stats_mv_int32
-    cdef int64_t[::1] stats_mv_int64
-
-    cdef const int32_t[::1] constraints_mv_int32
-    cdef const int64_t[::1] constraints_mv_int64
-
-    # Prepare constraints
-    # Use a raw pointer to pass NULL if no constraints are given
-    cdef const int32_t* C_ptr_int32 = NULL
-    cdef const int64_t* C_ptr_int64 = NULL
+        knobs_view[CCOLAMD_LU] = 1.0 if opt_lu == 'lu' else 0.0
 
     if constraints is not None:
         try:
-            constraints = np.asarray(
-                constraints,
-                dtype=np.int32 if use_int32 else np.int64,
-                order='C'
-            )
-        except ValueError:
-            raise ValueError("Constraints must be an array of integers.")
+            constraints = np.asarray(constraints, dtype=out_dtype, order='C')
+        except TypeError:
+            raise TypeError("Constraints must be an array of integers.")
 
-        if len(constraints) != N:
-            raise ValueError("Constraints must have the same length as the matrix size.")
-
-        if use_int32:
-            constraints_mv_int32 = constraints
-            C_ptr_int32 = &constraints_mv_int32[0]
-        else:
-            constraints_mv_int64 = constraints
-            C_ptr_int64 = &constraints_mv_int64[0]
+    # Allocate output rrays
+    perm = np.zeros(N + 1, dtype=out_dtype)
+    stats = np.zeros(CCOLAMD_STATS, dtype=out_dtype)
 
     if is_symmetric:
-        stype = -1  # only lower triangular part is used in csymamd
-
-    # Compute the ordering
-    if use_int32:
-        stats = stats_mv_int32 = np.zeros(CCOLAMD_STATS, dtype=np.int32)
-
-        if is_symmetric:
-            Ai_mv_int32  = np.array(A.indices, dtype=np.int32, order='C')
-            p_mv_int32 = np.array(A.indptr, dtype=np.int32, order='C')
-            perm_mv_int32 = np.zeros(N + 1, dtype=np.int32, order='C')
-            ok = c_csymamd(
-                N,
-                &Ai_mv_int32[0],
-                &p_mv_int32[0],
-                &perm_mv_int32[0],
-                &knobs_mv[0],
-                &stats_mv_int32[0],
-                calloc,
-                free,
-                C_ptr_int32,
-                stype
-            )
-            # Only take the first N entries of the permutation array
-            q_slice = perm_mv_int32[:N]
-        else:
-            # Copy the arrays, since they are altered in the C function
-            workspace = np.zeros(Alen, dtype=np.int32, order='C')
-            workspace[:A.nnz] = A.indices.copy()
-            Ai_mv_int32 = workspace
-            p_mv_int32 = np.array(A.indptr, dtype=np.int32, copy=True, order='C')
-            ok = c_ccolamd(
-                M,
-                N,
-                Alen,
-                &Ai_mv_int32[0],
-                &p_mv_int32[0],
-                &knobs_mv[0],
-                &stats_mv_int32[0],
-                C_ptr_int32
-            )
-            q_slice = p_mv_int32[:N]
+        _csymamd(N, A.indptr, A.indices, perm, knobs_view, stats, constraints)
     else:
-        stats = stats_mv_int64 = np.zeros(CCOLAMD_STATS, dtype=np.int64)
-
-        if is_symmetric:
-            Ai_mv_int64  = np.array(A.indices, dtype=np.int64, order='C')
-            p_mv_int64 = np.array(A.indptr, dtype=np.int64, order='C')
-            perm_mv_int64 = np.zeros(N + 1, dtype=np.int64, order='C')
-            ok = c_csymamd_l(
-                N,
-                &Ai_mv_int64[0],
-                &p_mv_int64[0],
-                &perm_mv_int64[0],
-                &knobs_mv[0],
-                &stats_mv_int64[0],
-                calloc,
-                free,
-                C_ptr_int64,
-                stype
-            )
-            q_slice = perm_mv_int64[:N]
-        else:
-            # Copy the arrays, since they are altered in the C function
-            workspace = np.zeros(Alen, dtype=np.int64, order='C')
-            workspace[:A.nnz] = A.indices.copy()
-            Ai_mv_int64 = workspace
-            p_mv_int64 = np.array(A.indptr, dtype=np.int64, copy=True, order='C')
-            ok = c_ccolamd_l(
-                M,
-                N,
-                Alen,
-                &Ai_mv_int64[0],
-                &p_mv_int64[0],
-                &knobs_mv[0],
-                &stats_mv_int64[0],
-                C_ptr_int64
-            )
-            q_slice = p_mv_int64[:N]
-
-    # Check the return status
-    if ok:
-        assert stats[CCOLAMD_STATUS] == CCOLAMD_OK, \
-            "CCOLAMD returned OK but status is not CCOLAMD_OK."
-    else:
-        if stats[CCOLAMD_STATUS] == CCOLAMD_ERROR_out_of_memory:
-            raise CCOLAMDMemoryError("CCOLAMD ran out of memory.")
-        elif stats[CCOLAMD_STATUS] == CCOLAMD_ERROR_internal_error:
-            raise CCOLAMDInternalError("CCOLAMD encountered an internal error.")
-        else:
-            raise CCOLAMDValueError(
-                f"CCOLAMD returned an error:{_CCOLAMD_ERROR_CODES[stats[CCOLAMD_STATUS]]}."
-            )
+        _ccolamd(M, N, A.indptr, A.indices, perm, knobs_view, stats, constraints)
 
     # Return the permutation array
-    q = np.asarray(q_slice)
+    q = np.asarray(perm[:N])
 
     if return_info:
         return q, CCOLAMDStats.from_array(stats)
     else:
         return q
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def _ccolamd(
+    Py_ssize_t M,
+    Py_ssize_t N,
+    index_t[::1] Ap,
+    index_t[::1] Ai,
+    index_t[::1] perm,
+    double[::1] knobs,
+    index_t[::1] stats,
+    index_t[::1] constraints=None,
+):
+    """Internal Cython wrapper for CCOLAMD.
+
+    Parameters
+    ----------
+    M : int
+        Number of rows in the matrix.
+    N : int
+        Number of columns in the matrix.
+    Ap : array_like
+        Column pointer array of size (N + 1,).
+    Ai : array_like
+        Row index array of size (nnz,).
+    perm : array_like
+        Output permutation array of size (N + 1,).
+    knobs : array_like
+        Knobs array of size (CCOLAMD_KNOBS,).
+    stats : array_like
+        Stats array of size (CCOLAMD_STATS,).
+    """
+    cdef int ok
+
+    # Get the recommended size for the Alen array
+    cdef index_t Alen = 0
+    cdef Py_ssize_t nnz = Ai.shape[0]
+
+    if index_t is int32_t:
+        Alen = ccolamd_recommended(nnz, M, N)
+    else:
+        Alen = ccolamd_l_recommended(nnz, M, N)
+
+    if Alen == 0:
+        raise ValueError("Recommended Alen is zero: one of {A.nnz, M, N} is erroneous.")
+
+    assert Alen >= nnz, "Recommended Alen is less than nnz."
+
+    cdef index_t *constraints_ptr = NULL
+
+    if constraints is not None:
+        if len(constraints) != N:
+            raise ValueError("Constraints must have the same length as the matrix size.")
+
+        constraints_ptr = &constraints[0]
+
+    # Copy the input arrays, since they are altered in the C function
+    itype = np.int32 if index_t is int32_t else np.int64
+    cdef index_t[::1] Ai_work = np.zeros(Alen, dtype=itype)
+    Ai_work[:nnz] = Ai
+    perm[:] = Ap
+
+    if index_t is int32_t:
+        ok = c_ccolamd(M, N, Alen, &Ai_work[0], &perm[0], &knobs[0], &stats[0], constraints_ptr)
+    else:
+        ok = c_ccolamd_l(M, N, Alen, &Ai_work[0], &perm[0], &knobs[0], &stats[0], constraints_ptr)
+
+    _handle_errors(ok, stats)
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def _csymamd(
+    Py_ssize_t N,
+    index_t[::1] Ap,
+    index_t[::1] Ai,
+    index_t[::1] perm,
+    double[::1] knobs,
+    index_t[::1] stats,
+    index_t[::1] constraints=None,
+):
+    """Internal Cython wrapper for CSYMAMD.
+
+    Parameters
+    ----------
+    M : int
+        Number of rows in the matrix.
+    N : int
+        Number of columns in the matrix.
+    Ap : array_like
+        Column pointer array of size (N + 1,).
+    Ai : array_like
+        Row index array of size (nnz,).
+    perm : array_like
+        Output permutation array of size (N + 1,).
+    knobs : array_like
+        Knobs array of size (COLAMD_KNOBS,).
+    stats : array_like
+        Stats array of size (COLAMD_STATS,).
+    """
+    cdef int ok
+    cdef index_t stype = -1  # only lower triangular part is used in csymamd
+    cdef index_t *constraints_ptr = NULL
+
+    if constraints is not None:
+        if len(constraints) != N:
+            raise ValueError("Constraints must have the same length as the matrix size.")
+
+        constraints_ptr = &constraints[0]
+
+    # Compute the ordering
+    if index_t is int32_t:
+        ok = c_csymamd(
+            N,
+            &Ai[0],
+            &Ap[0],
+            &perm[0],
+            &knobs[0],
+            &stats[0],
+            calloc,
+            free,
+            constraints_ptr,
+            stype
+        )
+    else:
+        ok = c_csymamd_l(
+            N,
+            &Ai[0],
+            &Ap[0],
+            &perm[0],
+            &knobs[0],
+            &stats[0],
+            calloc,
+            free,
+            constraints_ptr,
+            stype
+        )
+
+    _handle_errors(ok, stats)
 
 
 def ccolamd(
@@ -501,9 +537,9 @@ ccolamd_opt_lu_param = """opt_lu : {'lu', 'cholesky'}, optional
 
 ccolamd.__doc__ = _CCOLAMD_DOC_TEMPLATE.format(
     intro=ccolamd_intro,
-	A_param=ccolamd_A_param,
-	opt_lu_param=ccolamd_opt_lu_param,
-	reftag=ccolamd_reftag,
+    A_param=ccolamd_A_param,
+    opt_lu_param=ccolamd_opt_lu_param,
+    reftag=ccolamd_reftag,
 )
 
 
@@ -539,9 +575,9 @@ csymamd_A_param = """A : (N, N) {array_like, sparse matrix}
 
 csymamd.__doc__ = _CCOLAMD_DOC_TEMPLATE.format(
     intro=csymamd_intro,
-	A_param=csymamd_A_param,
-	opt_lu_param='',
-	reftag=csymamd_reftag,
+    A_param=csymamd_A_param,
+    opt_lu_param='',
+    reftag=csymamd_reftag,
 )
 
 
@@ -563,8 +599,8 @@ def ccolamd_get_defaults():
 
     """
     knobs = np.zeros(CCOLAMD_KNOBS, dtype=np.double)
-    cdef double[::1] knobs_mv = knobs
-    ccolamd_set_defaults(&knobs_mv[0])
+    cdef double[::1] knobs_view = knobs
+    ccolamd_set_defaults(&knobs_view[0])
     return dict(
         dense_row_thresh=knobs[CCOLAMD_DENSE_ROW],
         dense_col_thresh=knobs[CCOLAMD_DENSE_COL],

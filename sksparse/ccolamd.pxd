@@ -21,43 +21,45 @@ cdef extern from "ccolamd.h":
     ctypedef void* (*alloc_func)(size_t, size_t)
     ctypedef void (*free_func)(void *)
 
-    # sizes of input and output arrays
-    int CCOLAMD_KNOBS
-    int CCOLAMD_STATS
+    # Get all #defined constants
+    enum:
+        # sizes of input and output arrays
+        CCOLAMD_KNOBS
+        CCOLAMD_STATS
 
-    # indices of knobs
-    int CCOLAMD_DENSE_ROW
-    int CCOLAMD_DENSE_COL
-    int CCOLAMD_AGGRESSIVE
-    int CCOLAMD_LU
+        # indices of knobs
+        CCOLAMD_DENSE_ROW
+        CCOLAMD_DENSE_COL
+        CCOLAMD_AGGRESSIVE
+        CCOLAMD_LU
 
-    # indices of stats
-    int CCOLAMD_DEFRAG_COUNT
-    int CCOLAMD_STATUS
-    int CCOLAMD_INFO1
-    int CCOLAMD_INFO2
-    int CCOLAMD_INFO3
+        # indices of stats
+        CCOLAMD_DEFRAG_COUNT
+        CCOLAMD_STATUS
+        CCOLAMD_INFO1
+        CCOLAMD_INFO2
+        CCOLAMD_INFO3
 
-    # return values of ccolamd
-    int CCOLAMD_OK
-    int CCOLAMD_OK_BUT_JUMBLED
-    int CCOLAMD_ERROR_A_not_present
-    int CCOLAMD_ERROR_p_not_present
-    int CCOLAMD_ERROR_nrow_negative
-    int CCOLAMD_ERROR_ncol_negative
-    int CCOLAMD_ERROR_nnz_negative
-    int CCOLAMD_ERROR_p0_nonzero
-    int CCOLAMD_ERROR_A_too_small
-    int CCOLAMD_ERROR_col_length_negative
-    int CCOLAMD_ERROR_row_index_out_of_bounds
-    int CCOLAMD_ERROR_out_of_memory
-    int CCOLAMD_ERROR_internal_error
+        # return values of ccolamd
+        CCOLAMD_OK
+        CCOLAMD_OK_BUT_JUMBLED
+        CCOLAMD_ERROR_A_not_present
+        CCOLAMD_ERROR_p_not_present
+        CCOLAMD_ERROR_nrow_negative
+        CCOLAMD_ERROR_ncol_negative
+        CCOLAMD_ERROR_nnz_negative
+        CCOLAMD_ERROR_p0_nonzero
+        CCOLAMD_ERROR_A_too_small
+        CCOLAMD_ERROR_col_length_negative
+        CCOLAMD_ERROR_row_index_out_of_bounds
+        CCOLAMD_ERROR_out_of_memory
+        CCOLAMD_ERROR_internal_error
 
     size_t ccolamd_recommended(int32_t nnz, int32_t n_row, int32_t n_col)
     size_t ccolamd_l_recommended(int64_t nnz, int64_t n_row, int64_t n_col)
 
-    void ccolamd_set_defaults(double knobs[])
-    void ccolamd_l_set_defaults(double knobs[])
+    void ccolamd_set_defaults(double knobs[CCOLAMD_KNOBS])
+    void ccolamd_l_set_defaults(double knobs[CCOLAMD_KNOBS])
 
     int c_ccolamd "ccolamd"(
         int32_t n_row,
@@ -65,8 +67,8 @@ cdef extern from "ccolamd.h":
         int32_t Alen,
         int32_t A[],
         int32_t p[],
-        double knobs[],
-        int32_t stats[],
+        double knobs[CCOLAMD_KNOBS],
+        int32_t stats[CCOLAMD_STATS],
         int32_t cmember[]
     )
 
@@ -76,8 +78,8 @@ cdef extern from "ccolamd.h":
         int64_t Alen,
         int64_t A[],
         int64_t p[],
-        double knobs[],
-        int64_t stats[],
+        double knobs[CCOLAMD_KNOBS],
+        int64_t stats[CCOLAMD_STATS],
         int64_t cmember[]
     )
 
@@ -86,8 +88,8 @@ cdef extern from "ccolamd.h":
         int32_t A[],
         int32_t p[],
         int32_t perm[],
-        double knobs[],
-        int32_t stats[],
+        double knobs[CCOLAMD_KNOBS],
+        int32_t stats[CCOLAMD_STATS],
         alloc_func allocate,
         free_func release,
         int32_t cmember[],
@@ -99,8 +101,8 @@ cdef extern from "ccolamd.h":
         int64_t A[],
         int64_t p[],
         int64_t perm[],
-        double knobs[],
-        int64_t stats[],
+        double knobs[CCOLAMD_KNOBS],
+        int64_t stats[CCOLAMD_STATS],
         alloc_func allocate,
         free_func release,
         int64_t cmember[],
