@@ -36,12 +36,17 @@ References
   the Harwell Subroutine Library.
 """
 
-import numpy as np
-cimport numpy as np
+cimport cython
 
+import numpy as np
 import warnings
 
 from scipy.sparse import csc_array, issparse, SparseEfficiencyWarning
+
+
+ctypedef fused index_t:
+    int32_t
+    int64_t
 
 
 def maxtrans(A):
@@ -98,10 +103,11 @@ def maxtrans(A):
     except ValueError:
         raise ValueError("Input must be convertible to CSC format.")
 
-    M, N = A.shape
+    cdef Py_ssize_t M = A.shape[0]
+    cdef Py_ssize_t N = A.shape[1]
 
     # Choose index width: int32 or int64
-    use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
+    cdef bint use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
 
     if M == 0 or N == 0:
         return np.empty(0, dtype=np.int32 if use_int32 else np.int64)
@@ -109,59 +115,58 @@ def maxtrans(A):
     if A.nnz == 0:
         return np.full(M, -1, dtype=np.int32 if use_int32 else np.int64)
 
-    # Declare typed memory views for Cython
-    cdef int32_t[::1] Ap_mv_int32
-    cdef int32_t[::1] Ai_mv_int32
-    cdef int32_t[::1] Match_mv_int32
-    cdef int32_t[::1] Work_mv_int32
+    # Allocate output array
+    jmatch = np.zeros(M, dtype=np.int32 if use_int32 else np.int64)
 
-    cdef int64_t[::1] Ap_mv_int64
-    cdef int64_t[::1] Ai_mv_int64
-    cdef int64_t[::1] Match_mv_int64
-    cdef int64_t[::1] Work_mv_int64
+    cdef double maxwork = 0  # TODO default value?
 
-    if use_int32:
-        Ap_mv_int32 = np.ascontiguousarray(A.indptr, dtype=np.int32)
-        Ai_mv_int32 = np.ascontiguousarray(A.indices, dtype=np.int32)
-        jmatch = Match_mv_int32 = np.zeros(M, dtype=np.int32)
-        Work_mv_int32 = np.zeros(5 * N, dtype=np.int32)
-    else:
-        Ap_mv_int64 = np.ascontiguousarray(A.indptr, dtype=np.int64)
-        Ai_mv_int64 = np.ascontiguousarray(A.indices, dtype=np.int64)
-        jmatch = Match_mv_int64 = np.zeros(M, dtype=np.int64)
-        Work_mv_int64 = np.zeros(5 * N, dtype=np.int64)
+    _maxtrans(M, N, A.indptr, A.indices, maxwork, jmatch)
 
-    # Initialize output variable
+    return jmatch
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def _maxtrans(
+    Py_ssize_t M,
+    Py_ssize_t N,
+    index_t[::1] Ap,
+    index_t[::1] Ai,
+    double maxwork,
+    index_t[::1] jmatch,
+):
+    cdef index_t nnz_diag
     cdef double work
-    maxwork = 0  # TODO default value?
 
-    if use_int32:
+    # Allocate workspace
+    itype = np.int32 if index_t is int32_t else np.int64
+    cdef index_t[::1] workspace = np.zeros(5 * N, dtype=itype)
+
+    if index_t is int32_t:
         nnz_diag = btf_maxtrans(
             M,
             N,
-            &Ap_mv_int32[0],
-            &Ai_mv_int32[0],
+            &Ap[0],
+            &Ai[0],
             maxwork,
             &work,
-            &Match_mv_int32[0],
-            &Work_mv_int32[0]
+            &jmatch[0],
+            &workspace[0]
         )
     else:
         nnz_diag = btf_l_maxtrans(
             M,
             N,
-            &Ap_mv_int64[0],
-            &Ai_mv_int64[0],
+            &Ap[0],
+            &Ai[0],
             maxwork,
             &work,
-            &Match_mv_int64[0],
-            &Work_mv_int64[0]
+            &jmatch[0],
+            &workspace[0]
         )
 
     if nnz_diag < 0:
         raise ValueError(f"BTF maxtrans failed with error code: {nnz_diag}")
-
-    return jmatch
 
 
 def strongcomp(A, qin=None):
