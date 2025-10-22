@@ -41,13 +41,18 @@ References
     Applications, 17(4), 886-905.
 """
 
-import numpy as np
-cimport numpy as np
+cimport cython
 
+import numpy as np
 import warnings
 
 from dataclasses import dataclass
 from scipy.sparse import csc_array, issparse, SparseEfficiencyWarning
+
+
+ctypedef fused index_t:
+    int32_t
+    int64_t
 
 
 class CAMDError(Exception):
@@ -198,7 +203,7 @@ def camd(A, constraints=None, dense_thresh=None, aggressive=None, return_info=Fa
     ----------
     A : (N, N) array_like or sparse matrix
         A square matrix in CSC format or convertible to CSC.
-    contraints : (N,) array_like, optional
+    constraints : (N,) array_like, optional
         A 1D array of constraints for the ordering. Each node `i` in the graph
         of `A` has a constraint, ``constraints[i]``, in the range [0, N-1]. All
         nodes with ``constraints[i] = 0`` are ordered first, followed by nodes
@@ -297,10 +302,10 @@ def camd(A, constraints=None, dense_thresh=None, aggressive=None, return_info=Fa
     if A.shape[0] != A.shape[1]:
         raise ValueError("Input must be square.")
 
-    N = A.shape[0]
+    cdef Py_ssize_t N = A.shape[0]
 
     # Choose index width: int32 or int64
-    use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
+    cdef bint use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
 
     if N == 0:
         return np.empty(0, dtype=np.int32 if use_int32 else np.int64)
@@ -308,88 +313,102 @@ def camd(A, constraints=None, dense_thresh=None, aggressive=None, return_info=Fa
     if A.nnz == 0:
         return np.arange(N, dtype=np.int32 if use_int32 else np.int64)
 
-    # Declare typed memory views for Cython
-    cdef const int32_t[::1] Ap_mv_int32
-    cdef const int32_t[::1] Ai_mv_int32
-    cdef int32_t[::1] p_mv_int32
-    cdef const int32_t[::1] constraints_mv_int32
-
-    cdef const int64_t[::1] Ap_mv_int64
-    cdef const int64_t[::1] Ai_mv_int64
-    cdef int64_t[::1] p_mv_int64
-    cdef const int64_t[::1] constraints_mv_int64
-
-    # Always ensure arrays are contiguous and correct dtype
-    if use_int32:
-        Ap_mv_int32 = np.ascontiguousarray(A.indptr, dtype=np.int32)
-        Ai_mv_int32 = np.ascontiguousarray(A.indices, dtype=np.int32)
-        p = p_mv_int32 = np.empty(N, dtype=np.int32)
-    else:
-        Ap_mv_int64 = np.ascontiguousarray(A.indptr, dtype=np.int64)
-        Ai_mv_int64 = np.ascontiguousarray(A.indices, dtype=np.int64)
-        p = p_mv_int64 = np.empty(N, dtype=np.int64)
-
     # Prepare control parameters
     ctrl = np.empty(CAMD_CONTROL, dtype=np.double)
-    cdef double[::1] ctrl_mv = ctrl
+    cdef double[::1] ctrl_view = ctrl
 
-    camd_defaults(<double*>&ctrl_mv[0])
+    camd_defaults(&ctrl_view[0])
 
     # Update the defaults with user control parameters
     if dense_thresh is not None:
-        ctrl[CAMD_DENSE] = float(dense_thresh)
+        ctrl_view[CAMD_DENSE] = <float>dense_thresh
 
     if aggressive is not None:
-        ctrl[CAMD_AGGRESSIVE] = 1.0 if aggressive else 0.0
+        ctrl_view[CAMD_AGGRESSIVE] = 1.0 if aggressive else 0.0
 
     info = np.zeros(CAMD_INFO, dtype=np.double)
-    cdef double[::1] info_mv = info
+
+    # Prepare output permutation array
+    p = np.empty(N, dtype=np.int32 if use_int32 else np.int64)
+
+    if constraints is not None:
+        # Convert the dtype so the user doesn't have to
+        try:
+            constraints = np.ascontiguousarray(
+                constraints,
+                dtype=np.int32 if use_int32 else np.int64
+            )
+        except TypeError:
+            raise TypeError("Constraints must be an array of integers.")
+
+    _camd_order(N, A.indptr, A.indices, p, ctrl_view, info, constraints)
+
+    if return_info:
+        return p, CAMDInfo.from_array(info)
+    else:
+        return p
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def _camd_order(
+    Py_ssize_t N,
+    index_t[::1] Ap,
+    index_t[::1] Ai,
+    index_t[::1] p,
+    double[::1] ctrl,
+    double[::1] info,
+    index_t[::1] constraints=None,
+):
+    """Internal Cython wrapper for amd_order and amd_l_order.
+
+    Parameters
+    ----------
+    Ap : array_like
+        Column pointer array of the CSC matrix.
+    Ai : array_like
+        Row indices array of the CSC matrix.
+    p : array_like
+        Output permutation array.
+    ctrl : array_like
+        Control parameters array.
+    info : array_like
+        Output information array.
+    constraints : array_like, optional
+        Constraints array.
+    """
+    cdef int status
 
     # Prepare constraints
     # Use a raw pointer to pass NULL if no constraints are given
-    cdef const int32_t* C_ptr_int32 = NULL
-    cdef const int64_t* C_ptr_int64 = NULL
+    cdef index_t* constraints_ptr = NULL
 
     if constraints is not None:
-        try:
-            constraints = np.asarray(
-                constraints,
-                dtype=np.int32 if use_int32 else np.int64,
-                order='C'
-            )
-        except ValueError:
-            raise ValueError("Constraints must be an array of integers.")
-
-        if len(constraints) != N:
+        if constraints.shape[0] != N:
             raise ValueError("Constraints must have the same length as the matrix size.")
 
-        if use_int32:
-            constraints_mv_int32 = constraints
-            C_ptr_int32 = &constraints_mv_int32[0]
-        else:
-            constraints_mv_int64 = constraints
-            C_ptr_int64 = &constraints_mv_int64[0]
+        constraints_ptr = &constraints[0]
 
     # CAMD ordering
-    if use_int32:
+    if index_t is int32_t:
         status = camd_order(
             N,
-            &Ap_mv_int32[0],
-            &Ai_mv_int32[0],
-            &p_mv_int32[0],
-            &ctrl_mv[0],
-            &info_mv[0],
-            C_ptr_int32
+            &Ap[0],
+            &Ai[0],
+            &p[0],
+            &ctrl[0],
+            &info[0],
+            constraints_ptr
         )
     else:
         status = camd_l_order(
             N,
-            &Ap_mv_int64[0],
-            &Ai_mv_int64[0],
-            &p_mv_int64[0],
-            &ctrl_mv[0],
-            &info_mv[0],
-            C_ptr_int64
+            &Ap[0],
+            &Ai[0],
+            &p[0],
+            &ctrl[0],
+            &info[0],
+            constraints_ptr
         )
 
     if status == CAMD_OUT_OF_MEMORY:
@@ -397,11 +416,6 @@ def camd(A, constraints=None, dense_thresh=None, aggressive=None, return_info=Fa
     elif status == CAMD_INVALID:
         dump_info = CAMDInfo.from_array(info)
         raise CAMDInvalidMatrixError(f"camd: input matrix A is invalid:\n{dump_info}")
-
-    if return_info:
-        return p, CAMDInfo.from_array(info)
-    else:
-        return p
 
 
 def camd_default_control():
@@ -420,9 +434,9 @@ def camd_default_control():
         * 'aggressive': Whether to use aggressive absorption.
 
     """
-    cdef double[::1] ctrl_mv = np.empty(CAMD_CONTROL, dtype=np.float64)
-    camd_defaults(&ctrl_mv[0])
+    cdef double[::1] ctrl_view = np.empty(CAMD_CONTROL, dtype=np.float64)
+    camd_defaults(&ctrl_view[0])
     return dict(
-        dense_thresh=ctrl_mv[CAMD_DENSE],
-        aggressive=bool(ctrl_mv[CAMD_AGGRESSIVE]),
+        dense_thresh=ctrl_view[CAMD_DENSE],
+        aggressive=bool(ctrl_view[CAMD_AGGRESSIVE]),
     )
