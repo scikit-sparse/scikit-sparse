@@ -41,13 +41,19 @@ References
     Applications, 17(4), 886-905.
 """
 
+cimport cython
+
 import numpy as np
-cimport numpy as np
 
 import warnings
 
 from dataclasses import dataclass
 from scipy.sparse import csc_array, issparse, SparseEfficiencyWarning
+
+
+ctypedef fused index_t:
+    int32_t
+    int64_t
 
 
 class AMDError(Exception):
@@ -300,70 +306,71 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
     if A.nnz == 0:
         return np.arange(N, dtype=np.int32 if use_int32 else np.int64)
 
-    # Declare typed memory views for Cython
-    cdef const int32_t[::1] Ap_mv_int32
-    cdef const int32_t[::1] Ai_mv_int32
-    cdef int32_t[::1] p_mv_int32
-    cdef const int64_t[::1] Ap_mv_int64
-    cdef const int64_t[::1] Ai_mv_int64
-    cdef int64_t[::1] p_mv_int64
-
-    # Always ensure arrays are contiguous and correct dtype
-    if use_int32:
-        Ap_mv_int32 = np.ascontiguousarray(A.indptr, dtype=np.int32)
-        Ai_mv_int32 = np.ascontiguousarray(A.indices, dtype=np.int32)
-        p = p_mv_int32 = np.empty(N, dtype=np.int32)
-    else:
-        Ap_mv_int64 = np.ascontiguousarray(A.indptr, dtype=np.int64)
-        Ai_mv_int64 = np.ascontiguousarray(A.indices, dtype=np.int64)
-        p = p_mv_int64 = np.empty(N, dtype=np.int64)
-
     # Prepare control parameters
     ctrl = np.empty(AMD_CONTROL, dtype=np.double)
-    cdef double[::1] ctrl_mv = ctrl
+    cdef double[::1] ctrl_view = ctrl
 
-    amd_defaults(<double*>&ctrl_mv[0])
+    amd_defaults(&ctrl_view[0])
 
     # Update the defaults with user control parameters
     if dense_thresh is not None:
-        ctrl[AMD_DENSE] = float(dense_thresh)
+        ctrl_view[AMD_DENSE] = <double>dense_thresh
 
     if aggressive is not None:
-        ctrl[AMD_AGGRESSIVE] = 1.0 if aggressive else 0.0
+        ctrl_view[AMD_AGGRESSIVE] = 1.0 if aggressive else 0.0
 
     info = np.zeros(AMD_INFO, dtype=np.double)
-    cdef double[::1] info_mv = info
+
+    # Prepare output permutation array
+    p = np.empty(N, dtype=np.int32 if use_int32 else np.int64)
+
+    # Compute the ordering
+    _amd_order(A.indptr, A.indices, p, ctrl_view, info)
+
+    if return_info:
+        return p, AMDInfo.from_array(info)
+    else:
+        return p
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def _amd_order(
+    index_t[::1] Ap,
+    index_t[::1] Ai,
+    index_t[::1] p,
+    double[::1] ctrl,
+    double[::1] info
+):
+    """Internal Cython wrapper for amd_order and amd_l_order.
+
+    Parameters
+    ----------
+    Ap : array_like
+        Column pointer array of the CSC matrix.
+    Ai : array_like
+        Row indices array of the CSC matrix.
+    p : array_like
+        Output permutation array.
+    ctrl : array_like
+        Control parameters array.
+    info : array_like
+        Output information array.
+    """
+    cdef int status
+    cdef Py_ssize_t N = Ap.shape[0] - 1
 
     # AMD ordering
-    if use_int32:
-        status = amd_order(
-            N,
-            &Ap_mv_int32[0],
-            &Ai_mv_int32[0],
-            &p_mv_int32[0],
-            &ctrl_mv[0],
-            &info_mv[0]
-        )
+    if index_t is int32_t:
+        status = amd_order(N, &Ap[0], &Ai[0], &p[0], &ctrl[0], &info[0])
     else:
-        status = amd_l_order(
-            N,
-            &Ap_mv_int64[0],
-            &Ai_mv_int64[0],
-            &p_mv_int64[0],
-            &ctrl_mv[0],
-            &info_mv[0]
-        )
+        status = amd_l_order(N, &Ap[0], &Ai[0], &p[0], &ctrl[0], &info[0])
 
     if status == AMD_OUT_OF_MEMORY:
         raise AMDMemoryError("amd: out of memory")
     elif status == AMD_INVALID:
         dump_info = AMDInfo.from_array(info)
         raise AMDInvalidMatrixError(f"amd: input matrix A is invalid:\n{dump_info}")
-
-    if return_info:
-        return p, AMDInfo.from_array(info)
-    else:
-        return p
 
 
 def amd_default_control():
@@ -382,9 +389,9 @@ def amd_default_control():
         * 'aggressive': Whether to use aggressive absorption.
 
     """
-    cdef double[::1] ctrl_mv = np.empty(AMD_CONTROL, dtype=np.float64)
-    amd_defaults(&ctrl_mv[0])
+    cdef double[::1] ctrl_view = np.empty(AMD_CONTROL, dtype=np.float64)
+    amd_defaults(&ctrl_view[0])
     return dict(
-        dense_thresh=ctrl_mv[AMD_DENSE],
-        aggressive=bool(ctrl_mv[AMD_AGGRESSIVE]),
+        dense_thresh=ctrl_view[AMD_DENSE],
+        aggressive=bool(ctrl_view[AMD_AGGRESSIVE]),
     )
