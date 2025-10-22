@@ -32,22 +32,27 @@ References
 * SuiteSparse COLAMD:
   https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/COLAMD
 * COLAMD Algorithm Publications:
-  -	T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, An approximate column
-	minimum degree ordering algorithm, ACM Transactions on Mathematical
-	Software, vol. 30, no. 3., pp. 353-376, 2004.
-  -	T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, Algorithm 836: COLAMD,
-	an approximate column minimum degree ordering algorithm, ACM
-	Transactions on Mathematical Software, vol. 30, no. 3., pp. 377-380,
-	2004.
+  - T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, An approximate column
+    minimum degree ordering algorithm, ACM Transactions on Mathematical
+    Software, vol. 30, no. 3., pp. 353-376, 2004.
+  - T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, Algorithm 836: COLAMD,
+    an approximate column minimum degree ordering algorithm, ACM
+    Transactions on Mathematical Software, vol. 30, no. 3., pp. 377-380,
+    2004.
 """
 
-import numpy as np
-cimport numpy as np
+cimport cython
 
+import numpy as np
 import warnings
 
 from dataclasses import dataclass
 from scipy.sparse import csc_array, issparse, SparseEfficiencyWarning
+
+
+ctypedef fused index_t:
+    int32_t
+    int64_t
 
 
 class COLAMDError(Exception):
@@ -71,7 +76,7 @@ class COLAMDInternalError(COLAMDError, RuntimeError):
 
 
 # Define COLAMD error codes
-_COLAMD_ERROR_CODES = dict({
+cdef dict _COLAMD_ERROR_CODES = {
     COLAMD_OK: "ok",
     COLAMD_OK_BUT_JUMBLED: "ok but A has unsorted columns or duplicate entries",
     COLAMD_ERROR_A_not_present: "A is a null pointer",
@@ -85,7 +90,23 @@ _COLAMD_ERROR_CODES = dict({
     COLAMD_ERROR_row_index_out_of_bounds: "row index out of bounds",
     COLAMD_ERROR_out_of_memory: "out of memory",
     COLAMD_ERROR_internal_error: "internal error"
-})
+}
+
+
+cdef int _handle_errors(int ok, index_t[::1] stats) except -1 with gil:
+    """Handle errors from COLAMD based on the return status and stats array."""
+    if ok:
+        assert stats[COLAMD_STATUS] == COLAMD_OK, \
+            "COLAMD returned OK but status is not COLAMD_OK."
+    else:
+        if stats[COLAMD_STATUS] == COLAMD_ERROR_out_of_memory:
+            raise COLAMDMemoryError("COLAMD ran out of memory.")
+        elif stats[COLAMD_STATUS] == COLAMD_ERROR_internal_error:
+            raise COLAMDInternalError("COLAMD encountered an internal error.")
+        else:
+            raise COLAMDValueError(
+                f"COLAMD returned an error:{_COLAMD_ERROR_CODES[stats[COLAMD_STATUS]]}."
+            )
 
 
 @dataclass(frozen=True)
@@ -168,12 +189,13 @@ class COLAMDStats:
 
 
 def _colamd_base(
-    A,
-    is_symmetric=False,
-    dense_row_thresh=None,
-    dense_col_thresh=None,
-    aggressive=None,
-    return_info=False
+    object A,
+    *,
+    bint is_symmetric=False,
+    object dense_row_thresh=None,
+    object dense_col_thresh=None,
+    object aggressive=None,
+    bint return_info=False
 ):
     """A common base function for colamd and symamd."""
     # Convert dense to sparse CSC
@@ -183,7 +205,8 @@ def _colamd_base(
     if A.ndim != 2:
         raise ValueError("Input must be 2D.")
 
-    M, N = A.shape
+    cdef Py_ssize_t M = A.shape[0]
+    cdef Py_ssize_t N = A.shape[1]
 
     if is_symmetric and M != N:
         raise ValueError("Input matrix must be square.")
@@ -200,7 +223,7 @@ def _colamd_base(
         raise ValueError("Input must be convertible to CSC format.")
 
     # Choose index width: int32 or int64
-    use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
+    cdef bint use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
     out_dtype = np.int32 if use_int32 else np.int64
 
     if M == 0 or N == 0:
@@ -212,135 +235,141 @@ def _colamd_base(
     if N == 1:
         return np.zeros(N, dtype=out_dtype)
 
-    # Get the recommended size for the Alen array
-    if use_int32:
-        Alen = colamd_recommended(A.nnz, M, N)
-    else:
-        Alen = colamd_l_recommended(A.nnz, M, N)
-
-    if Alen == 0:
-        raise ValueError("Recommended Alen is zero: one of {A.nnz, M, N} is erroneous.")
-
     # Set the default knobs
     knobs = np.zeros(COLAMD_KNOBS, dtype=np.double)
-    cdef double[::1] knobs_mv = knobs
-    colamd_set_defaults(&knobs_mv[0])
+    cdef double[::1] knobs_view = knobs
+    colamd_set_defaults(&knobs_view[0])
 
     # Override with user knobs if provided
     if dense_row_thresh is not None:
-        knobs[COLAMD_DENSE_ROW] = float(dense_row_thresh)
+        knobs_view[COLAMD_DENSE_ROW] = <float>dense_row_thresh
 
     if dense_col_thresh is not None:
-        knobs[COLAMD_DENSE_COL] = float(dense_col_thresh)
+        knobs_view[COLAMD_DENSE_COL] = <float>dense_col_thresh
 
     if aggressive is not None:
-        knobs[COLAMD_AGGRESSIVE] = 1.0 if aggressive else 0.0
+        knobs_view[COLAMD_AGGRESSIVE] = 1.0 if aggressive else 0.0
 
-    # Declare typed memory views for Cython
-    cdef int32_t[::1] Ai_mv_int32
-    cdef int64_t[::1] Ai_mv_int64
-
-    cdef int32_t[::1] p_mv_int32
-    cdef int64_t[::1] p_mv_int64
-
-    cdef int32_t[::1] perm_mv_int32
-    cdef int64_t[::1] perm_mv_int64
-
-    cdef int32_t[::1] stats_mv_int32
-    cdef int64_t[::1] stats_mv_int64
+    # Allocate output arrays
+    itype = np.int32 if use_int32 else np.int64
+    perm = np.zeros(N + 1, dtype=itype)
+    stats = np.zeros(COLAMD_STATS, dtype=itype)
 
     # Compute the ordering
-    if use_int32:
-        stats = stats_mv_int32 = np.zeros(COLAMD_STATS, dtype=np.int32)
-
-        if is_symmetric:
-            Ai_mv_int32  = np.array(A.indices, dtype=np.int32, order='C')
-            p_mv_int32 = np.array(A.indptr, dtype=np.int32, order='C')
-            perm_mv_int32 = np.zeros(N + 1, dtype=np.int32, order='C')
-            ok = c_symamd(
-                N,
-                &Ai_mv_int32[0],
-                &p_mv_int32[0],
-                &perm_mv_int32[0],
-                &knobs_mv[0],
-                &stats_mv_int32[0],
-                calloc,
-                free
-            )
-            # Only take the first N entries of the permutation array
-            q_slice = perm_mv_int32[:N]
-        else:
-            # Copy the arrays, since they are altered in the C function
-            workspace = np.zeros(Alen, dtype=np.int32, order='C')
-            workspace[:A.nnz] = A.indices.copy()
-            Ai_mv_int32 = workspace
-            p_mv_int32 = np.array(A.indptr, dtype=np.int32, copy=True, order='C')
-            ok = c_colamd(
-                M,
-                N,
-                Alen,
-                &Ai_mv_int32[0],
-                &p_mv_int32[0],
-                &knobs_mv[0],
-                &stats_mv_int32[0]
-            )
-            q_slice = p_mv_int32[:N]
+    if is_symmetric:
+        _symamd(M, N, A.indptr, A.indices, perm, knobs_view, stats)
     else:
-        stats = stats_mv_int64 = np.zeros(COLAMD_STATS, dtype=np.int64)
-
-        if is_symmetric:
-            Ai_mv_int64  = np.array(A.indices, dtype=np.int64, order='C')
-            p_mv_int64 = np.array(A.indptr, dtype=np.int64, order='C')
-            perm_mv_int64 = np.zeros(N + 1, dtype=np.int64, order='C')
-            ok = c_symamd_l(
-                N,
-                &Ai_mv_int64[0],
-                &p_mv_int64[0],
-                &perm_mv_int64[0],
-                &knobs_mv[0],
-                &stats_mv_int64[0],
-                calloc,
-                free
-            )
-            q_slice = perm_mv_int64[:N]
-        else:
-            # Copy the arrays, since they are altered in the C function
-            workspace = np.zeros(Alen, dtype=np.int64, order='C')
-            workspace[:A.nnz] = A.indices.copy()
-            Ai_mv_int64 = workspace
-            p_mv_int64 = np.array(A.indptr, dtype=np.int64, copy=True, order='C')
-            ok = c_colamd_l(
-                M,
-                N,
-                Alen,
-                &Ai_mv_int64[0],
-                &p_mv_int64[0],
-                &knobs_mv[0],
-                &stats_mv_int64[0]
-            )
-            q_slice = p_mv_int64[:N]
-
-    # Check the return status
-    if ok:
-        assert stats[COLAMD_STATUS] == COLAMD_OK, \
-            "COLAMD returned OK but status is not COLAMD_OK."
-    else:
-        if stats[COLAMD_STATUS] == COLAMD_ERROR_out_of_memory:
-            raise COLAMDMemoryError("COLAMD ran out of memory.")
-        elif stats[COLAMD_STATUS] == COLAMD_ERROR_internal_error:
-            raise COLAMDInternalError("COLAMD encountered an internal error.")
-        else:
-            raise COLAMDValueError(
-                f"COLAMD returned an error:{_COLAMD_ERROR_CODES[stats[COLAMD_STATUS]]}."
-            )
+        _colamd(M, N, A.indptr, A.indices, perm, knobs_view, stats)
 
     # Return the permutation array
-    q = np.asarray(q_slice)
+    q = np.asarray(perm[:N])
 
     if return_info:
         return q, COLAMDStats.from_array(stats)
     else:
         return q
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def _colamd(
+    Py_ssize_t M,
+    Py_ssize_t N,
+    index_t[::1] Ap,
+    index_t[::1] Ai,
+    index_t[::1] perm,
+    double[::1] knobs,
+    index_t[::1] stats
+):
+    """Internal Cython wrapper for COLAMD.
+
+    Parameters
+    ----------
+    M : int
+        Number of rows in the matrix.
+    N : int
+        Number of columns in the matrix.
+    Ap : array_like
+        Column pointer array of size (N + 1,).
+    Ai : array_like
+        Row index array of size (nnz,).
+    perm : array_like
+        Output permutation array of size (N + 1,).
+    knobs : array_like
+        Knobs array of size (COLAMD_KNOBS,).
+    stats : array_like
+        Stats array of size (COLAMD_STATS,).
+    """
+    cdef int ok
+
+    # Get the recommended size for the Alen array
+    cdef index_t Alen = 0
+    cdef Py_ssize_t nnz = Ai.shape[0]
+
+    if index_t is int32_t:
+        Alen = colamd_recommended(nnz, M, N)
+    else:
+        Alen = colamd_l_recommended(nnz, M, N)
+
+    if Alen == 0:
+        raise ValueError("Recommended Alen is zero: one of {A.nnz, M, N} is erroneous.")
+
+    assert Alen >= nnz, "Recommended Alen is less than nnz."
+
+    # Copy the input arrays, since they are altered in the C function
+    itype = np.int32 if index_t is int32_t else np.int64
+    cdef index_t[::1] Ai_work = np.zeros(Alen, dtype=itype)
+    Ai_work[:nnz] = Ai
+    perm[:] = Ap
+
+    # Compute the ordering
+    if index_t is int32_t:
+        ok = c_colamd(M, N, Alen, &Ai_work[0], &perm[0], &knobs[0], &stats[0])
+    else:
+        ok = c_colamd_l(M, N, Alen, &Ai_work[0], &perm[0], &knobs[0], &stats[0])
+
+    _handle_errors(ok, stats)
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def _symamd(
+    Py_ssize_t M,
+    Py_ssize_t N,
+    index_t[::1] Ap,
+    index_t[::1] Ai,
+    index_t[::1] perm,
+    double[::1] knobs,
+    index_t[::1] stats
+):
+    """Internal Cython wrapper for SYMAMD.
+
+    Parameters
+    ----------
+    M : int
+        Number of rows in the matrix.
+    N : int
+        Number of columns in the matrix.
+    Ap : array_like
+        Column pointer array of size (N + 1,).
+    Ai : array_like
+        Row index array of size (nnz,).
+    perm : array_like
+        Output permutation array of size (N + 1,).
+    knobs : array_like
+        Knobs array of size (COLAMD_KNOBS,).
+    stats : array_like
+        Stats array of size (COLAMD_STATS,).
+    """
+    cdef int ok
+
+    # Compute the ordering
+    if index_t is int32_t:
+        ok = c_symamd(N, &Ai[0], &Ap[0], &perm[0], &knobs[0], &stats[0], calloc, free)
+    else:
+        ok = c_symamd_l(N, &Ai[0], &Ap[0], &perm[0], &knobs[0], &stats[0], calloc, free)
+
+    _handle_errors(ok, stats)
 
 
 def colamd(
@@ -491,8 +520,8 @@ def colamd_get_defaults():
 
     """
     knobs = np.zeros(COLAMD_KNOBS, dtype=np.double)
-    cdef double[::1] knobs_mv = knobs
-    colamd_set_defaults(&knobs_mv[0])
+    cdef double[::1] knobs_view = knobs
+    colamd_set_defaults(&knobs_view[0])
     return dict(
         dense_row_thresh=knobs[COLAMD_DENSE_ROW],
         dense_col_thresh=knobs[COLAMD_DENSE_COL],
