@@ -169,10 +169,10 @@ def _maxtrans(
         raise ValueError(f"BTF maxtrans failed with error code: {nnz_diag}")
 
 
-def strongcomp(A, qin=None):
+def strongcomp(A, q=None):
     """Compute the strongly connected components of a directed graph.
 
-    This function finds a symmetric permutation of a sparse matrix so that 
+    This function finds a symmetric permutation of a sparse matrix so that
     ``A[p][:, p]`` is block upper triangular form [#strongcomp_h]_.
 
     Parameters
@@ -180,7 +180,7 @@ def strongcomp(A, qin=None):
     A : (N, N) {array-like, sparse array}
         An array convertible to a sparse matrix in Compressed Sparse Column
         (CSC) format. Must be square.
-    qin : (N,) ndarray of int, optional
+    q : (N,) ndarray of int, optional
         A permutation vector. If provided, find the strongly connected
         components of ``A[:, qin]``.
 
@@ -210,7 +210,8 @@ def strongcomp(A, qin=None):
     if A.ndim != 2:
         raise ValueError("Input must be 2D.")
 
-    M, N = A.shape
+    cdef Py_ssize_t M = A.shape[0]
+    cdef Py_ssize_t N = A.shape[1]
 
     if M != N:
         raise ValueError("Input must be square.")
@@ -227,13 +228,13 @@ def strongcomp(A, qin=None):
         raise ValueError("Input must be convertible to CSC format.")
 
     # Choose index width: int32 or int64
-    use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
+    cdef bint use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
     out_dtype = np.int32 if use_int32 else np.int64
 
     if N == 0:
         p = np.empty(0, dtype=out_dtype)
         r = np.zeros(1, dtype=out_dtype)  # no blocks
-        if qin is not None:
+        if q is not None:
             q = np.empty(0, dtype=out_dtype)
             return p, q, r
         else:
@@ -243,104 +244,72 @@ def strongcomp(A, qin=None):
         p = np.arange(N, dtype=out_dtype)
         r = np.zeros(N + 1, dtype=out_dtype)
         r[-1] = N  # N blocks of size 1
-        if qin is not None:
+        if q is not None:
             q = np.arange(N, dtype=out_dtype)
             return p, q, r
         else:
             return p, r
 
-    # Declare typed memory views for Cython
-    cdef int32_t[::1] Ap_mv_int32
-    cdef int32_t[::1] Ai_mv_int32
-    cdef int32_t[::1] P_mv_int32
-    cdef int32_t[::1] Q_mv_int32
-    cdef int32_t[::1] R_mv_int32
-    cdef int32_t[::1] Work_mv_int32
-
-    cdef int64_t[::1] Ap_mv_int64
-    cdef int64_t[::1] Ai_mv_int64
-    cdef int64_t[::1] P_mv_int64
-    cdef int64_t[::1] Q_mv_int64
-    cdef int64_t[::1] R_mv_int64
-    cdef int64_t[::1] Work_mv_int64
-
-    # Use a NULL pointer for Q if qin is not provided
-    cdef int32_t* Q_ptr_int32 = NULL
-    cdef int64_t* Q_ptr_int64 = NULL
-
-    if qin is not None:
+    if q is not None:
         try:
-            q = np.ascontiguousarray(qin, dtype=np.int32 if use_int32 else np.int64)
-        except ValueError:
-            raise ValueError("qin must be an integer array.")
+            q = np.ascontiguousarray(q, dtype=out_dtype)
+        except TypeError:
+            raise TypeError("qin must be an integer array.")
 
-        if len(q) != N:
-            raise ValueError("qin must have the same length"
-                             "as the number of columns in A.")
+    # Allocate output arrays
+    p = np.zeros(N, dtype=out_dtype)
+    r = np.zeros(N + 1, dtype=out_dtype)
 
-        if use_int32:
-            Q_mv_int32 = q
-            Q_ptr_int32 = &Q_mv_int32[0]
-        else:
-            Q_mv_int64 = q
-            Q_ptr_int64 = &Q_mv_int64[0]
-
-    # Assign memory for the input/output arrays
-    if use_int32:
-        Ap_mv_int32 = np.ascontiguousarray(A.indptr, dtype=np.int32)
-        Ai_mv_int32 = np.ascontiguousarray(A.indices, dtype=np.int32)
-        p = P_mv_int32 = np.zeros(N, dtype=np.int32)
-        R_mv_int32 = np.zeros(N + 1, dtype=np.int32)
-        Work_mv_int32 = np.zeros(4 * N, dtype=np.int32)
-    else:
-        Ap_mv_int64 = np.ascontiguousarray(A.indptr, dtype=np.int64)
-        Ai_mv_int64 = np.ascontiguousarray(A.indices, dtype=np.int64)
-        p = P_mv_int64 = np.zeros(N, dtype=np.int64)
-        R_mv_int64 = np.zeros(N + 1, dtype=np.int64)
-        Work_mv_int64 = np.zeros(4 * N, dtype=np.int64)
-
-    if use_int32:
-        nblocks = btf_strongcomp(
-            N,
-            &Ap_mv_int32[0],
-            &Ai_mv_int32[0],
-            Q_ptr_int32,
-            &P_mv_int32[0],
-            &R_mv_int32[0],
-            &Work_mv_int32[0]
-        )
-    else:
-        nblocks = btf_l_strongcomp(
-            N,
-            &Ap_mv_int64[0],
-            &Ai_mv_int64[0],
-            Q_ptr_int64,
-            &P_mv_int64[0],
-            &R_mv_int64[0],
-            &Work_mv_int64[0]
-        )
-
-    if nblocks < 0:
-        raise ValueError(f"BTF strongcomp failed with error code: {nblocks}")
+    nblocks = _strongcomp(N, A.indptr, A.indices, q, p, r)
 
     # Take only the first nblocks of r
-    if use_int32:
-        r_slice = R_mv_int32[:nblocks + 1]
-    else:
-        r_slice = R_mv_int64[:nblocks + 1]
+    r = np.asarray(r[:nblocks + 1])
 
-    r = np.asarray(r_slice)
-
-    if qin is not None:
+    if q is not None:
         return p, q, r
     else:
         return p, r
 
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def _strongcomp(
+    Py_ssize_t N,
+    index_t[::1] Ap,
+    index_t[::1] Ai,
+    index_t[::1] q,
+    index_t[::1] p,
+    index_t[::1] r,
+):
+    cdef index_t nblocks
+    cdef index_t* q_ptr = NULL
+
+    if q is not None:
+        if len(q) != N:
+            raise ValueError("qin must have the same length"
+                             "as the number of columns in A.")
+
+        q_ptr = &q[0]
+
+    # Assign memory for the input/output arrays
+    itype = np.int32 if index_t is int32_t else np.int64
+    cdef index_t[::1] workspace = np.zeros(4 * N, dtype=itype)
+
+    if index_t is int32_t:
+        nblocks = btf_strongcomp(N, &Ap[0], &Ai[0], q_ptr, &p[0], &r[0], &workspace[0])
+    else:
+        nblocks = btf_l_strongcomp(N, &Ap[0], &Ai[0], q_ptr, &p[0], &r[0], &workspace[0])
+
+    if nblocks < 0:
+        raise ValueError(f"BTF strongcomp failed with error code: {nblocks}")
+
+    return nblocks
+
+
 def btf(A):
     """Permute the square sparse matrix into Block Triangular Form (BTF).
 
-    This function finds a permutation of a sparse matrix so that 
+    This function finds a permutation of a sparse matrix so that
     `PAQ` (``A[p][:, q]``) is block upper triangular form with a zero-free
     diagonal, or with a maximum number of nonzeros on the diagonal if
     a zero-free permutation does not exist [#btf_h]_.
