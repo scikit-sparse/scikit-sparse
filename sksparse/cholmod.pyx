@@ -117,7 +117,40 @@ class CholmodSmallDiagonalWarning(CholmodWarning):
     pass
 
 
-cdef _handle_errors(int status, object minor=None) except * with gil:
+# Known Errors
+cdef dict _ERROR_MAP = {
+    CHOLMOD_NOT_INSTALLED: (
+        CholmodNotInstalledError,
+        "CHOLMOD library is not installed or not found."
+    ),
+    CHOLMOD_OUT_OF_MEMORY: (
+        CholmodOutOfMemoryError,
+        "CHOLMOD ran out of memory."
+    ),
+    CHOLMOD_TOO_LARGE: (
+        CholmodOverflowError,
+        "CHOLMOD encountered an integer overflow."
+    ),
+    CHOLMOD_INVALID: (
+        CholmodInvalidInputError,
+        "CHOLMOD received invalid input."
+    ),
+    CHOLMOD_GPU_PROBLEM: (
+        CholmodGpuProblemError,
+        "CHOLMOD encountered a problem with CUDA."
+    ),
+    CHOLMOD_NOT_POSDEF: (
+        CholmodNotPositiveDefiniteError,
+        "Input matrix is not positive definite."
+    ),
+    CHOLMOD_DSMALL: (
+        CholmodSmallDiagonalWarning,
+        "A diagonal entry is very small, which may lead to numerical instability."
+    ),
+}
+
+
+cdef int _handle_errors(int status, minor=None) except -1 with gil:
     """Handle CHOLMOD errors by raising Python exceptions or warnings.
 
     This function should be called with cholmod_common->status after any
@@ -148,45 +181,16 @@ cdef _handle_errors(int status, object minor=None) except * with gil:
         Raises an appropriate Python exception based on the CHOLMOD status code.
     """
     if status == CHOLMOD_OK:
-        return
+        return 0
 
     status_msg = f"(code {status:d})"
 
-    # Known Errors
-    cdef dict error_map = {
-        CHOLMOD_NOT_INSTALLED: (
-            CholmodNotInstalledError,
-            "CHOLMOD library is not installed or not found."
-        ),
-        CHOLMOD_OUT_OF_MEMORY: (
-            CholmodOutOfMemoryError,
-            "CHOLMOD ran out of memory."
-        ),
-        CHOLMOD_TOO_LARGE: (
-            CholmodOverflowError,
-            "CHOLMOD encountered an integer overflow."
-        ),
-        CHOLMOD_INVALID: (
-            CholmodInvalidInputError,
-            "CHOLMOD received invalid input."
-        ),
-        CHOLMOD_GPU_PROBLEM: (
-            CholmodGpuProblemError,
-            "CHOLMOD encountered a problem with CUDA."
-        ),
-        CHOLMOD_NOT_POSDEF: (
-            CholmodNotPositiveDefiniteError,
-            f"Input matrix is not positive definite. Failed at column {minor}."
-        ),
-        CHOLMOD_DSMALL: (
-            CholmodSmallDiagonalWarning,
-            "A diagonal entry is very small, which may lead to numerical instability."
-        ),
-    }
-
     # Fallback to generic error for unknown codes
-    exc_class, msg = error_map.get(status, CholmodError)
+    exc_class, msg = _ERROR_MAP.get(status, CholmodError)
     full_msg = msg + " " + status_msg
+
+    if minor is not None:
+        full_msg += f" Failed at column {minor}."
 
     if issubclass(exc_class, Warning):
         warnings.warn(full_msg, exc_class)
