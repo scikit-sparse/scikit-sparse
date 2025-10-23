@@ -40,8 +40,12 @@ References
   https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD
 """
 
+from cpython.ref cimport Py_INCREF
+cimport cython
+cimport numpy as np  # TODO cnp
+cimport numpy as cnp  # TODO cnp
+
 import numpy as np
-cimport numpy as np
 
 from scipy.sparse import csc_array, diags_array, eye_array, issparse
 import warnings
@@ -388,9 +392,13 @@ cdef object _csc_from_cholmod_sparse(cholmod_sparse* A, cholmod_common* common):
     cdef _CholmodSparseDestructor base = _CholmodSparseDestructor()
     base.init(A, common)
 
-    for array in (indptr, indices, data):
-        np.set_array_base(array, base)
-        assert np.PyArray_ISWRITEABLE(array)
+    # NOTE need to increment reference count of base manually for each array,
+    # since the PyArray_SetBaseObject steals a reference.
+    cdef int status
+    for arr in (indptr, indices, data):
+        Py_INCREF(base)
+        status = cnp.PyArray_SetBaseObject(arr, base)
+        assert status == 0
 
     return csc_array((data, indices, indptr), shape=(A.nrow, A.ncol))
 
@@ -467,10 +475,15 @@ cdef object _csc_view_from_cholmod_factor(CholeskyFactor py_factor, object ldl=N
         1, [L.nzmax], np_dtypenum, L.x
     )
 
+    # NOTE need to increment reference count of base manually for each array,
+    # since the PyArray_SetBaseObject steals a reference.
     # Take ownership of the data
+    cdef int status
     for array in (indptr, indices, data):
-        np.set_array_base(array, py_factor)
-        np.PyArray_CLEARFLAGS(array, np.NPY_ARRAY_WRITEABLE)  # make read-only
+        Py_INCREF(py_factor)
+        status = cnp.PyArray_SetBaseObject(array, py_factor)
+        assert status == 0
+        cnp.PyArray_CLEARFLAGS(array, cnp.NPY_ARRAY_WRITEABLE)  # make read-only
 
     return csc_array((data, indices, indptr), shape=(L.n, L.n))
 
@@ -833,8 +846,12 @@ cdef np.ndarray _ndarray_from_cholmod_dense(
     # set destructor and check if writeable
     cdef _CholmodDenseDestructor base = _CholmodDenseDestructor()
     base.init(X, use_int32, common)
-    np.set_array_base(arr, base)
-    assert np.PyArray_ISWRITEABLE(arr)
+
+    # NOTE need to increment reference count of base manually, since the
+    # PyArray_SetBaseObject steals a reference.
+    Py_INCREF(base)
+    cdef int status = cnp.PyArray_SetBaseObject(arr, base)
+    assert status == 0
 
     # Cholmod dense matrices are stored in column-major order, so reshape
     arr = arr.reshape((X.nrow, X.ncol), order="F")
@@ -895,10 +912,15 @@ cdef np.ndarray _ndarray_int_view_from_factor(
     if ptr is NULL:
         raise ValueError("The input pointer is NULL.")
 
-    cdef int np_itypenum = np.NPY_INT32 if L.itype == CHOLMOD_INT else np.NPY_INT64
-    cdef np.ndarray p = np.PyArray_SimpleNewFromData(1, [N], np_itypenum, ptr)
-    np.set_array_base(p, py_factor)                   # keep object alive
-    np.PyArray_CLEARFLAGS(p, np.NPY_ARRAY_WRITEABLE)  # set to be read-only
+    cdef int np_itypenum = cnp.NPY_INT32 if L.itype == CHOLMOD_INT else cnp.NPY_INT64
+    p = cnp.PyArray_SimpleNewFromData(1, [N], np_itypenum, ptr)
+
+    # NOTE need to increment reference count of base manually,
+    # since the PyArray_SetBaseObject steals a reference.
+    Py_INCREF(py_factor)
+    cdef int status = cnp.PyArray_SetBaseObject(p, py_factor)
+    assert status == 0
+    cnp.PyArray_CLEARFLAGS(p, cnp.NPY_ARRAY_WRITEABLE)  # set to be read-only
 
     return p
 
