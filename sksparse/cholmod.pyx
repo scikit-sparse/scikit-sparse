@@ -76,6 +76,19 @@ __all__ = [
 ]
 
 
+# Define types
+ctypedef fused index_t:
+    int32_t
+    int64_t
+
+
+ctypedef fused floating_t:
+    float
+    double
+    float complex
+    double complex
+
+
 # Define constants for the mode of cholmod_transpose (see cholmod.h)
 cdef int CHOLMOD_TRANS_PATTERN = 0    # transpose only the pattern
 cdef int CHOLMOD_TRANS_NOCONJ = 1  # numeric (no conjugate)
@@ -205,30 +218,31 @@ cdef int _handle_errors(int status, minor=None) except -1 with gil:
 # -----------------------------------------------------------------------------
 #         CSC <==> CHOLMOD Sparse
 # -----------------------------------------------------------------------------
-cdef _supported_dtypes = (
-    np.bool_,
-    np.float32,
-    np.float64,
-    np.complex64,
-    np.complex128
-)
-
-
-cdef int _single_or_double(np.dtype dtype):
+cdef inline int _single_or_double(floating_t _=0) noexcept:
     """Return the CHOLMOD dtype number for a given NumPy dtype."""
-    return CHOLMOD_SINGLE if dtype in [np.float32, np.complex64] else CHOLMOD_DOUBLE
+    if floating_t is float or floating_t is cython.floatcomplex:
+        return CHOLMOD_SINGLE
+    else:
+        return CHOLMOD_DOUBLE
 
 
-cdef int _real_or_complex(np.dtype dtype):
+cdef inline int _real_or_complex(floating_t _=0) noexcept:
     """Return the CHOLMOD xtype number for a given NumPy dtype."""
-    return CHOLMOD_COMPLEX if np.issubdtype(dtype, np.complexfloating) else CHOLMOD_REAL
+    if floating_t is float or floating_t is double:
+        return CHOLMOD_REAL
+    else:
+        return CHOLMOD_COMPLEX
 
 
-cdef object _cholmod_sparse_from_csc(
-    object A_py,
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def _cholmod_sparse_from_csc(
+    tuple shape not None,
+    index_t[::1] indptr not None,
+    index_t[::1] indices not None,
+    floating_t[::1] data not None,
     int stype,
-    bint use_int32,
-    cholmod_sparse *A_static,
+    uintptr_t A_static,  # cholmod_sparse* as an int
 ):
     """Create a CHOLMOD sparse matrix from a scipy.sparse.csc_array.
 
@@ -236,15 +250,19 @@ cdef object _cholmod_sparse_from_csc(
 
     Parameters
     ----------
-    A_py : (N, N) csc_array
-        The input sparse matrix in Compressed Sparse Column (CSC) format.
+    shape : (2,) tuple of int
+        The shape of the CSC matrix.
+    indptr : (N+1,) array of index_t
+        The column pointer array of the CSC matrix.
+    indices : (nnz,) array of index_t
+        The row indices of the non-zero entries of the matrix.
+    data : (nnz,) array of floating_t
+        The numerical values of the non-zero entries of the matrix.
     stype : int
-        The assumed symmetry type of ``A_py``:
+        The assumed symmetry type of ``A``:
         * -1: lower triangular,
         *  0: unsymmetric,
         *  1: upper triangular.
-    use_int32 : bool
-        Whether to use 32-bit or 64-bit integers for indices and indptr.
     A_static : cholmod_sparse*
         Pointer to a preallocated CHOLMOD sparse matrix structure. Contents
         need not be initialized. Contains the CHOLMOD sparse matrix on output.
@@ -252,7 +270,7 @@ cdef object _cholmod_sparse_from_csc(
     Returns
     -------
     res : csc_array
-        A reference to ``A_py``. There is no use for the output of this
+        A reference to ``A``. There is no use for the output of this
         function, except to keep the underlying data from being garbage
         collected until the cholmod_sparse object is freed.
 
@@ -261,56 +279,34 @@ cdef object _cholmod_sparse_from_csc(
     .. [#sputil_get_sparse] ``sputil2.c`` - CHOLMOD MATLAB utilities
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/sputil2.c
     """
-    if not isinstance(A_py, csc_array):
-        raise ValueError("Input must be a csc_array.")
-
-    dtype = A_py.dtype
-
-    if dtype not in _supported_dtypes:
-        raise ValueError(f"Unsupported data type for CHOLMOD: {dtype}")
-
     # Initialize the CHOLMOD sparse matrix
-    cdef cholmod_sparse* A = A_static
+    cdef cholmod_sparse* A = <cholmod_sparse*>A_static
     memset(A, 0, sizeof(cholmod_sparse))
 
-    A.nrow, A.ncol = A_py.shape
-    A.nzmax = A_py.nnz
+    assert len(shape) == 2
+
+    # Set the matrix dimensions and properties
+    A.nrow = shape[0]
+    A.ncol = shape[1]
+    A.nzmax = indices.shape[0]
     A.packed = True
     A.sorted = True  # NOTE requires input indices to be sorted
-    A.itype = CHOLMOD_INT if use_int32 else CHOLMOD_LONG
+    A.itype = CHOLMOD_INT if index_t is int32_t else CHOLMOD_LONG
     A.stype = -1 if stype < 0 else (0 if stype == 0 else 1)
-    A.dtype = _single_or_double(dtype)
+    A.dtype = _single_or_double[floating_t]()
     A.z = NULL
 
-    cdef np.ndarray indptr = A_py.indptr
-    cdef np.ndarray indices = A_py.indices
-    cdef np.ndarray data = A_py.data
+    # Declare dummy variables to avoid empty array issues
+    cdef index_t dummy_index
+    cdef floating_t dummy_value
 
     # Create the index arrays
-    if use_int32:
-        A.p = <int32_t*>indptr.data
-        A.i = <int32_t*>indices.data
-    else:
-        A.p = <int64_t*>indptr.data
-        A.i = <int64_t*>indices.data
+    A.p = &indptr[0]  # always has size > 0 for a valid csc_array
+    A.i = &indices[0] if indices.size > 0 else &dummy_index
 
     # Get the numerical values of A
-    if dtype == np.bool_:
-        A.xtype = CHOLMOD_PATTERN
-        A.x = NULL
-    else:
-        A.xtype = _real_or_complex(dtype)
-
-        if dtype == np.float32:
-            A.x = <float32_t*>data.data
-        elif dtype == np.float64:
-            A.x = <float64_t*>data.data
-        elif dtype == np.complex64:
-            A.x = <complex64_t*>data.data
-        elif dtype == np.complex128:
-            A.x = <complex128_t*>data.data
-
-    return A_py
+    A.xtype = _real_or_complex[floating_t]()
+    A.x = &data[0] if data.size > 0 else &dummy_value
 
 
 cdef class _CholmodSparseDestructor:
@@ -710,15 +706,16 @@ cdef cholmod_sparse* _cholesky_l_pattern(
 # -----------------------------------------------------------------------------
 #         CSC <==> CHOLMOD Dense
 # -----------------------------------------------------------------------------
-cdef object _cholmod_dense_from_ndarray(np.ndarray X_py, cholmod_dense *X_static):
+cdef void _cholmod_dense_from_ndarray(floating_t[::1, :] Xd, cholmod_dense *X_static):
     """Create a CHOLMOD dense matrix from a numpy.ndarray.
 
     See the CHOLMOD MATLAB interface for details [#sputil_get_dense]_.
 
     Parameters
     ----------
-    X_py : (M, N) ndarray
-        The input sparse matrix. Boolean data types are converted to float64.
+    Xd : (M, N) ndarray
+        The input dense matrix. Must be 2-dimensional in column-major (Fortran)
+        order.
     X_static : cholmod_sparse*
         Pointer to a preallocated CHOLMOD sparse matrix structure. Contents
         need not be initialized. Contains the CHOLMOD sparse matrix on output.
@@ -726,32 +723,15 @@ cdef object _cholmod_dense_from_ndarray(np.ndarray X_py, cholmod_dense *X_static
     Returns
     -------
     res : ndarray
-        A reference to the array ``X_py``. If it has been type-converted, the
-        reference will not be the original array. There is no use for the
-        output of this function, except to keep the underlying data from being
-        garbage collected until the cholmod_sparse object is freed.
+        A reference to the memoryview ``Xd``. There is no use for the output of
+        this function, except to keep the underlying data from being garbage
+        collected until the cholmod_dense object is freed.
 
     References
     ----------
     .. [#sputil_get_dense] ``sputil2.c`` - CHOLMOD MATLAB utilities
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/sputil2.c
     """
-    # NOTE cholmod_dense objects are stored in column-major order.
-    cdef np.ndarray Xd = np.asfortranarray(X_py)
-
-    if Xd.ndim != 2:
-        raise ValueError("Input must be a 2D array.")
-
-    dtype = Xd.dtype
-
-    if dtype not in _supported_dtypes:
-        raise ValueError(f"Unsupported data type for CHOLMOD: {dtype}")
-
-    # Convert boolean to float64, as CHOLMOD does not support boolean dense
-    if dtype == np.bool_:
-        Xd = Xd.astype(np.float64)
-        dtype = Xd.dtype
-
     # Initialize the CHOLMOD dense matrix
     cdef cholmod_dense* X = X_static
     memset(X, 0, sizeof(cholmod_dense))
@@ -760,22 +740,12 @@ cdef object _cholmod_dense_from_ndarray(np.ndarray X_py, cholmod_dense *X_static
     X.ncol = Xd.shape[1]
     X.d = X.nrow
     X.nzmax = X.nrow * X.ncol
-    X.dtype = _single_or_double(dtype)
+    X.dtype = _single_or_double[floating_t]()
     X.z = NULL
 
     # Get the numerical values of X
-    X.xtype = _real_or_complex(dtype)
-
-    if dtype == np.float32:
-        X.x = <float32_t*>Xd.data
-    elif dtype == np.float64:
-        X.x = <float64_t*>Xd.data
-    elif dtype == np.complex64:
-        X.x = <complex64_t*>Xd.data
-    elif dtype == np.complex128:
-        X.x = <complex128_t*>Xd.data
-
-    return Xd
+    X.xtype = _real_or_complex[floating_t]()
+    X.x = &Xd[0, 0]  # guaranteed Xd.size > 0 from internal use
 
 
 cdef class _CholmodDenseDestructor:
@@ -1256,7 +1226,9 @@ cdef class CholeskyFactor:
             transpose = (sym_kind == "col")  # A.T @ A
 
         # keep a reference to the input matrix
-        cdef object _ref = _cholmod_sparse_from_csc(A, stype, self._use_int32, Ac)
+        _cholmod_sparse_from_csc(
+            A.shape, A.indptr, A.indices, A.data, stype, <uintptr_t>Ac
+        )
 
         self._stype = Ac.stype
 
@@ -1619,8 +1591,9 @@ cdef class CholeskyFactor:
         cdef cholmod_sparse *Ac = &Amatrix
 
         stype = self._stype  # set in __cinit__ with sym_kind
-        # Keep a reference to the input matrix to keep it alive
-        cdef object _ref = _cholmod_sparse_from_csc(A, stype, self._use_int32, Ac)
+        _cholmod_sparse_from_csc(
+            A.shape, A.indptr, A.indices, A.data, stype, <uintptr_t>Ac
+        )
 
         # Set beta
         if not np.isscalar(beta):
@@ -1715,7 +1688,6 @@ cdef class CholeskyFactor:
             raise ValueError("b must be a 1D or 2D array.")
 
         cdef size_t N = self._factor.n
-        cdef size_t K = b.shape[1] if b.ndim == 2 else 0
 
         if b.shape[0] != N:
             raise ValueError(
@@ -1726,17 +1698,27 @@ cdef class CholeskyFactor:
         if N == 0:
             return type(b)(b.shape, dtype=b.dtype)
 
+        cdef bint return_1D = b.ndim == 1
+
+        # CHOLMOD requires a 2D array
+        if b.ndim == 1:
+            b = b.reshape((N, 1))
+
         if issparse(b):
-            X = self._solve_sparse(b)
+            X = self._solve_sparse(b.tocsc())
         else:
-            X = self._solve_dense(b)
+            # For LDL, permute the RHS
+            if not self.is_ll:
+                b = b[self.perm]
+
+            X = self._solve_dense(np.asfortranarray(b))
 
         # For LDL, unpermute the solution
         if not self.is_ll:
             X = X[np.argsort(self.perm)]
 
         # Convert to 1D array if input b is 1D
-        if K == 0:
+        if return_1D:
             X = X[:, 0]
 
         return X
@@ -1747,21 +1729,17 @@ cdef class CholeskyFactor:
         cdef cholmod_sparse Bspmatrix
         cdef cholmod_sparse* Bs = &Bspmatrix
 
-        # CHOLMOD expects at least a column vector for the RHS
-        if b.ndim == 1:
-            b = b.reshape((-1, 1)).tocsc()  # (N, 1)
-
         # For LDL, permute the RHS
         if not self.is_ll:
             b = b[self.perm]
 
         cdef int stype = 0
-        cdef bint b_use_int32
 
-        b, b_use_int32, _ = validate_csc_input(b)
+        b, _, _ = validate_csc_input(b)
 
-        # keep a reference to b so it is not garbage collected
-        cdef object _b_ref = _cholmod_sparse_from_csc(b, stype, b_use_int32, &Bspmatrix)
+        _cholmod_sparse_from_csc(
+            b.shape, b.indptr, b.indices, b.data, stype, <uintptr_t>&Bspmatrix
+        )
 
         # Check the condition number before solving
         self._check_rcond()
@@ -1780,22 +1758,15 @@ cdef class CholeskyFactor:
 
         return _csc_from_cholmod_sparse(Xs, self._cm)
 
-    cdef np.ndarray _solve_dense(self, np.ndarray b):
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def _solve_dense(self, floating_t[::1, :] b not None):
         """Solve the system A x = b with a dense right-hand side."""
         # Get the b vector or matrix into CHOLMOD format
         cdef cholmod_dense Bmatrix
         cdef cholmod_dense* Bd = &Bmatrix
 
-        # CHOLMOD expects at least a column vector for the RHS
-        if b.ndim == 1:
-            b = b[:, np.newaxis]  # (N, 1)
-
-        # For LDL, permute the RHS
-        if not self.is_ll:
-            b = b[self.perm]
-
-        # keep a reference to b so it is not garbage collected
-        cdef object _b_ref = _cholmod_dense_from_ndarray(b, &Bmatrix)
+        _cholmod_dense_from_ndarray(b, Bd)
 
         # Check the condition number before solving
         self._check_rcond()
@@ -1862,14 +1833,14 @@ cdef class CholeskyFactor:
             C = C.reshape((-1, 1)).tocsc()  # (N, 1)
 
         cdef int stype = 0  # use all of C
-        cdef bint C_use_int32
-        C, C_use_int32, _ = validate_csc_input(C)
+        C, _, _ = validate_csc_input(C)
 
         cdef cholmod_sparse Cmatrix
         cdef cholmod_sparse* Cc = &Cmatrix
 
-        # Keep a reference to C so it is not garbage collected
-        cdef object _C_ref = _cholmod_sparse_from_csc(C, stype, C_use_int32, &Cmatrix)
+        _cholmod_sparse_from_csc(
+            C.shape, C.indptr, C.indices, C.data, stype, <uintptr_t>&Cmatrix
+        )
 
         # Permute C so it is accepted in "matrix" space.
         # From Modify/cholmod_updown.c:
@@ -1969,9 +1940,10 @@ cdef class CholeskyFactor:
         if C.ndim == 1:
             C = C.reshape((-1, 1)).tocsc()  # (N, 1)
 
-        C, C_use_int32, _ = validate_csc_input(C)
-        # keep a reference to C so it is not garbage collected
-        cdef object _C_ref = _cholmod_sparse_from_csc(C, stype, C_use_int32, &Cmatrix)
+        C, _, _ = validate_csc_input(C)
+        _cholmod_sparse_from_csc(
+            C.shape, C.indptr, C.indices, C.data, stype, <uintptr_t>&Cmatrix
+        )
 
         # Compute the Update
         cdef int ok
@@ -2095,7 +2067,9 @@ cdef class CholeskyFactor:
         cdef cholmod_sparse* Ac = &Amatrix
         cdef int stype = -1  # use tril(A) only
 
-        cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, self._use_int32, Ac)
+        _cholmod_sparse_from_csc(
+            A.shape, A.indptr, A.indices, A.data, stype, <uintptr_t>Ac
+        )
         Ac.xtype = CHOLMOD_PATTERN
         Ac.x = NULL
 
@@ -2695,7 +2669,9 @@ def symbfact(A, *, kind=None, lower=False, return_factor=False):
         stype = -1  # use tril(A) only
 
     # Get sparse *pattern*
-    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, Ac)
+    _cholmod_sparse_from_csc(
+        A.shape, A.indptr, A.indices, A.data, stype, <uintptr_t>Ac
+    )
     Ac.xtype = CHOLMOD_PATTERN
     Ac.x = NULL
 
@@ -2959,7 +2935,9 @@ def etree(A, *, kind=None, return_post=False):
         stype = -1  # use tril(A) only
 
     # Get sparse *pattern*
-    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, Ac)
+    _cholmod_sparse_from_csc(
+        A.shape, A.indptr, A.indices, A.data, stype, <uintptr_t>Ac
+    )
     Ac.xtype = CHOLMOD_PATTERN
     Ac.x = NULL
 
@@ -3135,7 +3113,9 @@ def bisect(A, *, kind=None):
         stype = -1  # use tril(A) only
 
     # Get sparse *pattern*
-    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, Ac)
+    _cholmod_sparse_from_csc(
+        A.shape, A.indptr, A.indices, A.data, stype, <uintptr_t>Ac
+    )
     Ac.xtype = CHOLMOD_PATTERN
     Ac.x = NULL
 
@@ -3468,7 +3448,9 @@ def nesdis(
         stype = -1  # use tril(A) only
 
     # Get sparse *pattern*
-    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, Ac)
+    _cholmod_sparse_from_csc(
+        A.shape, A.indptr, A.indices, A.data, stype, <uintptr_t>Ac
+    )
     Ac.xtype = CHOLMOD_PATTERN
     Ac.x = NULL
 
@@ -3638,7 +3620,9 @@ def metis(A, *, kind=None):
         stype = -1  # use tril(A) only
 
     # Get sparse *pattern*
-    cdef object _A_ref = _cholmod_sparse_from_csc(A, stype, use_int32, Ac)
+    _cholmod_sparse_from_csc(
+        A.shape, A.indptr, A.indices, A.data, stype, <uintptr_t>Ac
+    )
     Ac.xtype = CHOLMOD_PATTERN
     Ac.x = NULL
 
