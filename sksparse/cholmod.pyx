@@ -3233,8 +3233,8 @@ class SeparatorTree():
         to which node ``i`` belongs.
     """
     def __init__(self, cp, cmember):
-        self._cp = cp
-        self._cmember = cmember
+        self._cp = np.ascontiguousarray(cp)
+        self._cmember = np.ascontiguousarray(cmember)
 
     @property
     def cp(self):
@@ -3286,10 +3286,18 @@ class SeparatorTree():
         if nd_small is None:
             nd_small = 200  # see CHOLMOD/MATLAB/nesdis.c
 
-        cdef np.ndarray cp = self._cp
-        cdef np.ndarray cmember = self._cmember
+        return self._prune(self._cp, self._cmember, nd_oksep, nd_small)
 
-        cdef bint use_int32 = cp.dtype == np.int32 and cmember.dtype == np.int32
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def _prune(
+        self,
+        index_t[::1] cp not None,
+        index_t[::1] cmember not None,
+        double nd_oksep,
+        Py_ssize_t nd_small
+    ):
+        cdef bint use_int32 = index_t is int32_t
 
         cdef cholmod_common Common
         cdef cholmod_common *cm = &Common
@@ -3303,19 +3311,14 @@ class SeparatorTree():
         cdef size_t N = cmember.size
 
         # Copy input arrays into new cholmod arrays (modified for output)
-        cdef void *CParent
-        cdef void *CMember
+        cdef index_t *CParent
+        cdef index_t *CMember
 
-        if use_int32:
-            CParent = cholmod_malloc(Nc, sizeof(int32_t), cm)
-            CMember = cholmod_malloc(N, sizeof(int32_t), cm)
-            memcpy(<int32_t*>CParent, <int32_t*>cp.data, Nc * sizeof(int32_t))
-            memcpy(<int32_t*>CMember, <int32_t*>cmember.data, N * sizeof(int32_t))
-        else:
-            CParent = cholmod_l_malloc(Nc, sizeof(int64_t), cm)
-            CMember = cholmod_l_malloc(N, sizeof(int64_t), cm)
-            memcpy(<int64_t*>CParent, <int64_t*>cp.data, Nc * sizeof(int64_t))
-            memcpy(<int64_t*>CMember, <int64_t*>cmember.data, N * sizeof(int64_t))
+        ch_malloc = cholmod_malloc if use_int32 else cholmod_l_malloc
+        CParent = <index_t*>ch_malloc(Nc, sizeof(index_t), cm)
+        CMember = <index_t*>ch_malloc(N, sizeof(index_t), cm)
+        memcpy(CParent, &cp[0], Nc * sizeof(index_t))
+        memcpy(CMember, &cmember[0], N * sizeof(index_t))
 
         cdef int64_t nc_new
 
