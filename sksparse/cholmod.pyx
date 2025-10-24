@@ -1698,6 +1698,9 @@ cdef class CholeskyFactor:
         if N == 0:
             return type(b)(b.shape, dtype=b.dtype)
 
+        # Check the condition number before solving
+        self._check_rcond()
+
         cdef bint return_1D = b.ndim == 1
 
         # CHOLMOD requires a 2D array
@@ -1741,9 +1744,6 @@ cdef class CholeskyFactor:
             b.shape, b.indptr, b.indices, b.data, stype, <uintptr_t>&Bspmatrix
         )
 
-        # Check the condition number before solving
-        self._check_rcond()
-
         # Solve the system
         cdef cholmod_sparse* Xs
 
@@ -1767,9 +1767,6 @@ cdef class CholeskyFactor:
         cdef cholmod_dense* Bd = &Bmatrix
 
         _cholmod_dense_from_ndarray(b, Bd)
-
-        # Check the condition number before solving
-        self._check_rcond()
 
         # Solve the system
         cdef cholmod_dense* Xd
