@@ -42,8 +42,7 @@ References
 
 from cpython.ref cimport Py_INCREF
 cimport cython
-cimport numpy as np  # TODO cnp
-cimport numpy as cnp  # TODO cnp
+cimport numpy as cnp
 
 import numpy as np
 
@@ -327,6 +326,7 @@ cdef class _CholmodSparseDestructor:
     cdef cholmod_sparse* _sparse
     cdef cholmod_common* _common
 
+    # NOTE __cinit__ is a *Python*-level constructor, cannot take C pointers
     cdef void init(self, cholmod_sparse* A, cholmod_common* common):
         assert A is not NULL
         assert common is not NULL
@@ -340,7 +340,7 @@ cdef class _CholmodSparseDestructor:
             cholmod_l_free_sparse(&self._sparse, self._common)
 
 
-cdef inline int _np_itypenum_from_cholmod(int itype):
+cdef inline int _np_itypenum_from_cholmod(int itype) noexcept:
     """Get the NumPy typenum corresponding to the given CHOLMOD itype.
 
     Parameters
@@ -356,7 +356,7 @@ cdef inline int _np_itypenum_from_cholmod(int itype):
     return cnp.NPY_INT32 if itype == CHOLMOD_INT else cnp.NPY_INT64
 
 
-cdef inline int _np_dtypenum_from_cholmod(int xtype, int dtype):
+cdef inline int _np_dtypenum_from_cholmod(int xtype, int dtype) noexcept:
     """Get the NumPy typenum corresponding to the given CHOLMOD xtype and dtype.
 
     Parameters
@@ -402,15 +402,9 @@ cdef object _csc_from_cholmod_sparse(cholmod_sparse* A, cholmod_common* common):
     cdef int np_dtypenum = _np_dtypenum_from_cholmod(A.xtype, A.dtype)
 
     # convert to NumPy arrays
-    cdef np.ndarray indptr = np.PyArray_SimpleNewFromData(
-        1, [A.ncol + 1], np_itypenum, A.p
-    )
-    cdef np.ndarray indices = np.PyArray_SimpleNewFromData(
-        1, [A.nzmax], np_itypenum, A.i
-    )
-    cdef np.ndarray data = np.PyArray_SimpleNewFromData(
-        1, [A.nzmax], np_dtypenum, A.x
-    )
+    indptr = cnp.PyArray_SimpleNewFromData(1, [A.ncol + 1], np_itypenum, A.p)
+    indices = cnp.PyArray_SimpleNewFromData(1, [A.nzmax], np_itypenum, A.i)
+    data = cnp.PyArray_SimpleNewFromData(1, [A.nzmax], np_dtypenum, A.x)
 
     # Take ownership of the data
     cdef _CholmodSparseDestructor base = _CholmodSparseDestructor()
@@ -418,11 +412,10 @@ cdef object _csc_from_cholmod_sparse(cholmod_sparse* A, cholmod_common* common):
 
     # NOTE need to increment reference count of base manually for each array,
     # since the PyArray_SetBaseObject steals a reference.
-    cdef int status
     for arr in (indptr, indices, data):
         Py_INCREF(base)
-        status = cnp.PyArray_SetBaseObject(arr, base)
-        assert status == 0
+        if cnp.PyArray_SetBaseObject(arr, base) < 0:
+            raise MemoryError("Failed to set base object for array.")
 
     return csc_array((data, indices, indptr), shape=(A.nrow, A.ncol))
 
@@ -470,42 +463,38 @@ cdef object _csc_view_from_cholmod_factor(CholeskyFactor py_factor, object ldl=N
         raise ValueError("The factor has no numerical values.")
 
     # Ensure the factor is in simplicial, packed, monotonic format
-    cdef bint use_int32 = L.itype == CHOLMOD_INT
-
     cdef int to_ll = L.is_ll if ldl is None else not ldl
     cdef int to_super = False  # simplicial format
     cdef int to_packed = True
     cdef int to_monotonic = True
 
-    change_factor = cholmod_change_factor if use_int32 else cholmod_l_change_factor
-    change_factor(
-        L.xtype, to_ll, to_super, to_packed, to_monotonic, L, common
-    )
+    if L.itype == CHOLMOD_INT:
+        cholmod_change_factor(
+            L.xtype, to_ll, to_super, to_packed, to_monotonic, L, common
+        )
+    else:
+        cholmod_l_change_factor(
+            L.xtype, to_ll, to_super, to_packed, to_monotonic, L, common
+        )
+
     _handle_errors(common.status)
 
     # Create numpy arrays
     cdef int np_itypenum = _np_itypenum_from_cholmod(L.itype)
     cdef int np_dtypenum = _np_dtypenum_from_cholmod(L.xtype, L.dtype)
 
-    cdef np.ndarray indptr = np.PyArray_SimpleNewFromData(
-        1, [L.n + 1], np_itypenum, L.p
-    )
-    cdef np.ndarray indices = np.PyArray_SimpleNewFromData(
-        1, [L.nzmax], np_itypenum, L.i
-    )
-    cdef np.ndarray data = np.PyArray_SimpleNewFromData(
-        1, [L.nzmax], np_dtypenum, L.x
-    )
+    indptr = cnp.PyArray_SimpleNewFromData(1, [L.n + 1], np_itypenum, L.p)
+    indices = cnp.PyArray_SimpleNewFromData(1, [L.nzmax], np_itypenum, L.i)
+    data = cnp.PyArray_SimpleNewFromData(1, [L.nzmax], np_dtypenum, L.x)
 
     # NOTE need to increment reference count of base manually for each array,
     # since the PyArray_SetBaseObject steals a reference.
     # Take ownership of the data
-    cdef int status
-    for array in (indptr, indices, data):
+    for arr in (indptr, indices, data):
         Py_INCREF(py_factor)
-        status = cnp.PyArray_SetBaseObject(array, py_factor)
-        assert status == 0
-        cnp.PyArray_CLEARFLAGS(array, cnp.NPY_ARRAY_WRITEABLE)  # make read-only
+        if cnp.PyArray_SetBaseObject(arr, py_factor) < 0:
+            raise MemoryError("Failed to set base object for array.")
+        cnp.PyArray_CLEARFLAGS(arr, cnp.NPY_ARRAY_WRITEABLE)  # make read-only
 
     return csc_array((data, indices, indptr), shape=(L.n, L.n))
 
@@ -809,7 +798,7 @@ cdef class _CholmodDenseDestructor:
             cholmod_l_free_dense(&self._dense, self._common)
 
 
-cdef np.ndarray _ndarray_from_cholmod_dense(
+cdef cnp.ndarray _ndarray_from_cholmod_dense(
     cholmod_dense* X, bint use_int32, cholmod_common* common
 ):
     """Create a numpy.ndarray that is a view onto a cholmod_dense object.
@@ -833,9 +822,7 @@ cdef np.ndarray _ndarray_from_cholmod_dense(
     cdef int np_dtypenum = _np_dtypenum_from_cholmod(X.xtype, X.dtype)
 
     # convert to NumPy array
-    cdef np.ndarray arr = np.PyArray_SimpleNewFromData(
-        1, [X.nrow * X.ncol], np_dtypenum, X.x
-    )
+    arr = cnp.PyArray_SimpleNewFromData(1, [X.nrow * X.ncol], np_dtypenum, X.x)
 
     # set destructor and check if writeable
     cdef _CholmodDenseDestructor base = _CholmodDenseDestructor()
@@ -844,16 +831,14 @@ cdef np.ndarray _ndarray_from_cholmod_dense(
     # NOTE need to increment reference count of base manually, since the
     # PyArray_SetBaseObject steals a reference.
     Py_INCREF(base)
-    cdef int status = cnp.PyArray_SetBaseObject(arr, base)
-    assert status == 0
+    if cnp.PyArray_SetBaseObject(arr, base) < 0:
+        raise MemoryError("Failed to set base object for array.")
 
     # Cholmod dense matrices are stored in column-major order, so reshape
-    arr = arr.reshape((X.nrow, X.ncol), order="F")
-
-    return arr
+    return arr.reshape((X.nrow, X.ncol), order="F")
 
 
-cdef np.ndarray _ndarray_copy_from_intptr(void* ptr, size_t N, bint use_int32):
+cdef cnp.ndarray _ndarray_copy_from_intptr(void* ptr, size_t N, bint use_int32):
     """Create a NumPy array from a pointer to an integer array.
 
     Parameters
@@ -873,12 +858,12 @@ cdef np.ndarray _ndarray_copy_from_intptr(void* ptr, size_t N, bint use_int32):
     if ptr is NULL:
         raise ValueError("ptr is NULL, cannot get array")
 
-    cdef int np_itypenum = np.NPY_INT32 if use_int32 else np.NPY_INT64
-    cdef np.ndarray p = np.PyArray_SimpleNewFromData(1, [N], np_itypenum, ptr)
+    cdef int np_itypenum = cnp.NPY_INT32 if use_int32 else cnp.NPY_INT64
+    p = cnp.PyArray_SimpleNewFromData(1, [N], np_itypenum, ptr)
     return p.copy()  # return a copy in case ptr is freed
 
 
-cdef np.ndarray _ndarray_int_view_from_factor(
+cdef cnp.ndarray _ndarray_int_view_from_factor(
     void* ptr, size_t N, CholeskyFactor py_factor
 ):
     """Create a NumPy array from the an integer vector in a CHOLMOD factor.
@@ -906,14 +891,14 @@ cdef np.ndarray _ndarray_int_view_from_factor(
     if ptr is NULL:
         raise ValueError("The input pointer is NULL.")
 
-    cdef int np_itypenum = cnp.NPY_INT32 if L.itype == CHOLMOD_INT else cnp.NPY_INT64
+    cdef int np_itypenum = _np_itypenum_from_cholmod(L.itype)
     p = cnp.PyArray_SimpleNewFromData(1, [N], np_itypenum, ptr)
 
     # NOTE need to increment reference count of base manually,
     # since the PyArray_SetBaseObject steals a reference.
     Py_INCREF(py_factor)
-    cdef int status = cnp.PyArray_SetBaseObject(p, py_factor)
-    assert status == 0
+    if cnp.PyArray_SetBaseObject(p, py_factor) < 0:
+        raise MemoryError("Failed to set base object for array.")
     cnp.PyArray_CLEARFLAGS(p, cnp.NPY_ARRAY_WRITEABLE)  # set to be read-only
 
     return p
@@ -1232,7 +1217,7 @@ cdef class CholeskyFactor:
             self._factor = NULL
             return
 
-        A, use_int32, _ = validate_csc_input(A, require_square=True)
+        A, self._use_int32, _ = validate_csc_input(A, require_square=True)
 
         if sym_kind is None:
             sym_kind = "sym"
@@ -1259,11 +1244,8 @@ cdef class CholeskyFactor:
                 f"Must be one of {set(_ordering_methods.keys())}."
             )
 
-        cdef size_t N = A.shape[0]
-        self._use_int32 = use_int32
-
         # Matrix of all zeros
-        if N > 0 and A.nnz == 0:
+        if A.shape[0] > 0 and A.nnz == 0:
             raise CholmodNotPositiveDefiniteError("Input matrix not positive definite.")
 
         # Get the input matrix into CHOLMOD format
@@ -1280,7 +1262,6 @@ cdef class CholeskyFactor:
             stype = 0                        # unsymmetric A @ A.T or A.T @ A
             transpose = (sym_kind == "col")  # A.T @ A
 
-        # keep a reference to the input matrix
         _cholmod_sparse_from_csc(
             A.shape, A.indptr, A.indices, A.data, stype, <uintptr_t>Ac
         )
@@ -1800,7 +1781,7 @@ cdef class CholeskyFactor:
         # Solve the system
         cdef cholmod_sparse* Xs
 
-        cdef int system = CHOLMOD_A if self.is_ll else CHOLMOD_LDLt
+        cdef int system = CHOLMOD_A if self._factor.is_ll else CHOLMOD_LDLt
 
         if self._use_int32:
             Xs = cholmod_spsolve(system, self._factor, Bs, self._cm)
@@ -1824,7 +1805,7 @@ cdef class CholeskyFactor:
         # Solve the system
         cdef cholmod_dense* Xd
 
-        cdef int system = CHOLMOD_A if self.is_ll else CHOLMOD_LDLt
+        cdef int system = CHOLMOD_A if self._factor.is_ll else CHOLMOD_LDLt
 
         if self._use_int32:
             Xd = cholmod_solve(system, self._factor, Bd, self._cm)
@@ -1835,7 +1816,7 @@ cdef class CholeskyFactor:
 
         return _ndarray_from_cholmod_dense(Xd, self._use_int32, self._cm)
 
-    cdef void _check_rcond(self) except *:
+    cdef int _check_rcond(self) except -1:
         """Check the condition number."""
         cdef double rcond
         cdef double eps = np.finfo(np.float64).eps
@@ -2595,7 +2576,7 @@ ldl.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
 # -----------------------------------------------------------------------------
 #         Symbolic Functions
 # -----------------------------------------------------------------------------
-def symbfact(A, *, kind=None, lower=False, return_factor=False):
+def symbfact(A, *, kind=None, bint lower=False, bint return_factor=False):
     """Symbolic factorization of a sparse matrix for Cholesky or LDL.
 
     This function performs the symbolic factorization of a sparse matrix ``A``
@@ -2653,6 +2634,7 @@ def symbfact(A, *, kind=None, lower=False, return_factor=False):
     .. [#symbfact_c] ``symbfact2.c`` - CHOLMOD MATLAB symbolic factorization function
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/symbfact2.c
     """
+    cdef bint use_int32
     A, use_int32, out_itype = validate_csc_input(A)
 
     if kind is None:
@@ -2661,8 +2643,8 @@ def symbfact(A, *, kind=None, lower=False, return_factor=False):
     if kind not in {"sym", "row", "col", "lo"}:
         raise ValueError(f"Unknown factorization kind: {kind}")
 
-    cdef size_t M = A.shape[0]
-    cdef size_t N = A.shape[1]
+    cdef Py_ssize_t M = A.shape[0]
+    cdef Py_ssize_t N = A.shape[1]
 
     if kind not in ["row", "col"] and M != N:
         raise ValueError(f"Input matrix A must be square, got shape {A.shape}.")
@@ -2878,7 +2860,7 @@ def symbfact(A, *, kind=None, lower=False, return_factor=False):
         return count, h, parent, post
 
 
-def etree(A, *, kind=None, return_post=False):
+def etree(A, *, kind=None, bint return_post=False):
     """Symbolic factorization of a sparse matrix for Cholesky or LDL.
 
     This function determines the elimination tree of a sparse matrix ``A``, and
@@ -2923,6 +2905,7 @@ def etree(A, *, kind=None, return_post=False):
     .. [#etree_c] ``etree2.c`` - CHOLMOD MATLAB symbolic factorization function
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/etree2.c
     """
+    cdef bint use_int32
     A, use_int32, out_itype = validate_csc_input(A)
 
     if kind is None:
@@ -2931,8 +2914,8 @@ def etree(A, *, kind=None, return_post=False):
     if kind not in {"sym", "row", "col", "lo"}:
         raise ValueError(f"Unknown factorization kind: {kind}")
 
-    cdef size_t M = A.shape[0]
-    cdef size_t N = A.shape[1]
+    cdef Py_ssize_t M = A.shape[0]
+    cdef Py_ssize_t N = A.shape[1]
 
     if kind not in ["row", "col"] and M != N:
         raise ValueError(f"Input matrix A must be square, got shape {A.shape}.")
@@ -3107,6 +3090,7 @@ def bisect(A, *, kind=None):
     .. [#bisect_c] ``bisect.c`` - CHOLMOD MATLAB bisect function
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/bisect.c
     """
+    cdef bint use_int32
     A, use_int32, out_itype = validate_csc_input(A)
 
     if kind is None:
@@ -3115,8 +3099,8 @@ def bisect(A, *, kind=None):
     if kind not in {"sym", "row", "col"}:
         raise ValueError(f"Unknown factorization kind: {kind}")
 
-    cdef size_t M = A.shape[0]
-    cdef size_t N = A.shape[1]
+    cdef Py_ssize_t M = A.shape[0]
+    cdef Py_ssize_t N = A.shape[1]
 
     if kind not in ["row", "col"] and M != N:
         raise ValueError(f"Input matrix A must be square, got shape {A.shape}.")
@@ -3307,8 +3291,8 @@ class SeparatorTree():
         else:
             cholmod_l_start(cm)
 
-        cdef size_t Nc = cp.size
-        cdef size_t N = cmember.size
+        cdef Py_ssize_t Nc = cp.shape[0]
+        cdef Py_ssize_t N = cmember.shape[0]
 
         # Copy input arrays into new cholmod arrays (modified for output)
         cdef index_t *CParent
@@ -3355,7 +3339,7 @@ def nesdis(
     A,
     *,
     kind=None,
-    return_separator=False,
+    bint return_separator=False,
     nd_small=None,
     nd_components=None,
     nd_oksep=None,
@@ -3425,6 +3409,7 @@ def nesdis(
     .. [#nesdis_c] ``nesdis.c`` - CHOLMOD MATLAB nesdis function
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/nesdis.c
     """
+    cdef bint use_int32
     A, use_int32, out_itype = validate_csc_input(A)
 
     if kind is None:
@@ -3433,8 +3418,8 @@ def nesdis(
     if kind not in {"sym", "row", "col"}:
         raise ValueError(f"Unknown factorization kind: {kind}")
 
-    cdef size_t M = A.shape[0]
-    cdef size_t N = A.shape[1]
+    cdef Py_ssize_t M = A.shape[0]
+    cdef Py_ssize_t N = A.shape[1]
 
     if kind not in ["row", "col"] and M != N:
         raise ValueError(f"Input matrix A must be square, got shape {A.shape}.")
@@ -3622,6 +3607,7 @@ def metis(A, *, kind=None):
     .. [#metis_c] ``metis.c`` - CHOLMOD MATLAB metis function
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/metis.c
     """
+    cdef bint use_int32
     A, use_int32, out_itype = validate_csc_input(A)
 
     if kind is None:
@@ -3630,8 +3616,8 @@ def metis(A, *, kind=None):
     if kind not in {"sym", "row", "col"}:
         raise ValueError(f"Unknown factorization kind: {kind}")
 
-    cdef size_t M = A.shape[0]
-    cdef size_t N = A.shape[1]
+    cdef Py_ssize_t M = A.shape[0]
+    cdef Py_ssize_t N = A.shape[1]
 
     if kind not in ["row", "col"] and M != N:
         raise ValueError(f"Input matrix A must be square, got shape {A.shape}.")
