@@ -340,15 +340,45 @@ cdef class _CholmodSparseDestructor:
             cholmod_l_free_sparse(&self._sparse, self._common)
 
 
-# dict[xtype, dtype] -> numpy typenum
-cdef dict _np_dtypenum_from_cholmod = {
-    (CHOLMOD_REAL, CHOLMOD_SINGLE): np.NPY_FLOAT32,
-    (CHOLMOD_REAL, CHOLMOD_DOUBLE): np.NPY_FLOAT64,
-    (CHOLMOD_COMPLEX, CHOLMOD_SINGLE): np.NPY_COMPLEX64,
-    (CHOLMOD_COMPLEX, CHOLMOD_DOUBLE): np.NPY_COMPLEX128,
-    (CHOLMOD_PATTERN, CHOLMOD_SINGLE): np.NPY_BOOL,
-    (CHOLMOD_PATTERN, CHOLMOD_DOUBLE): np.NPY_BOOL,
-}
+cdef inline int _np_itypenum_from_cholmod(int itype):
+    """Get the NumPy typenum corresponding to the given CHOLMOD itype.
+
+    Parameters
+    ----------
+    itype : int
+        The CHOLMOD itype of the matrix.
+
+    Returns
+    -------
+    np_itypenum : int
+        The corresponding NumPy typenum.
+    """
+    return cnp.NPY_INT32 if itype == CHOLMOD_INT else cnp.NPY_INT64
+
+
+cdef inline int _np_dtypenum_from_cholmod(int xtype, int dtype):
+    """Get the NumPy typenum corresponding to the given CHOLMOD xtype and dtype.
+
+    Parameters
+    ----------
+    xtype : int
+        The CHOLMOD xtype of the matrix.
+    dtype : int
+        The CHOLMOD dtype of the matrix.
+
+    Returns
+    -------
+    np_dtypenum : int
+        The corresponding NumPy typenum.
+    """
+    if xtype == CHOLMOD_REAL:
+        return cnp.NPY_FLOAT32 if dtype == CHOLMOD_SINGLE else cnp.NPY_FLOAT64
+    elif xtype == CHOLMOD_COMPLEX:
+        return cnp.NPY_COMPLEX64 if dtype == CHOLMOD_SINGLE else cnp.NPY_COMPLEX128
+    elif xtype == CHOLMOD_PATTERN:
+        return cnp.NPY_BOOL
+    else:
+        return cnp.NPY_OBJECT
 
 
 cdef object _csc_from_cholmod_sparse(cholmod_sparse* A, cholmod_common* common):
@@ -368,10 +398,8 @@ cdef object _csc_from_cholmod_sparse(cholmod_sparse* A, cholmod_common* common):
         The array has a base with a destructor that frees the CHOLMOD sparse
         matrix when the array is no longer in use.
     """
-    cdef int np_itypenum = np.NPY_INT32 if A.itype == CHOLMOD_INT else np.NPY_INT64
-    cdef int np_dtypenum = _np_dtypenum_from_cholmod.get(
-        (A.xtype, A.dtype), np.NPY_OBJECT
-    )
+    cdef int np_itypenum = _np_itypenum_from_cholmod(A.itype)
+    cdef int np_dtypenum = _np_dtypenum_from_cholmod(A.xtype, A.dtype)
 
     # convert to NumPy arrays
     cdef np.ndarray indptr = np.PyArray_SimpleNewFromData(
@@ -456,10 +484,8 @@ cdef object _csc_view_from_cholmod_factor(CholeskyFactor py_factor, object ldl=N
     _handle_errors(common.status)
 
     # Create numpy arrays
-    cdef int np_itypenum = np.NPY_INT32 if use_int32 else np.NPY_INT64
-    cdef int np_dtypenum = _np_dtypenum_from_cholmod.get(
-        (L.xtype, L.dtype), np.NPY_OBJECT
-    )
+    cdef int np_itypenum = _np_itypenum_from_cholmod(L.itype)
+    cdef int np_dtypenum = _np_dtypenum_from_cholmod(L.xtype, L.dtype)
 
     cdef np.ndarray indptr = np.PyArray_SimpleNewFromData(
         1, [L.n + 1], np_itypenum, L.p
@@ -804,9 +830,7 @@ cdef np.ndarray _ndarray_from_cholmod_dense(
         has a base with a destructor that frees the CHOLMOD dense matrix when
         the array is no longer in use.
     """
-    cdef int np_dtypenum = _np_dtypenum_from_cholmod.get(
-        (X.xtype, X.dtype), np.NPY_OBJECT
-    )
+    cdef int np_dtypenum = _np_dtypenum_from_cholmod(X.xtype, X.dtype)
 
     # convert to NumPy array
     cdef np.ndarray arr = np.PyArray_SimpleNewFromData(
@@ -954,14 +978,45 @@ cdef void _set_ordering_method(object order, cholmod_common* cm):
         )
 
 
-cdef dict _npdtype_class_from_xdtype = {
-    (CHOLMOD_REAL, CHOLMOD_SINGLE): np.float32,
-    (CHOLMOD_REAL, CHOLMOD_DOUBLE): np.float64,
-    (CHOLMOD_COMPLEX, CHOLMOD_SINGLE): np.complex64,
-    (CHOLMOD_COMPLEX, CHOLMOD_DOUBLE): np.complex128,
-    (CHOLMOD_PATTERN, CHOLMOD_SINGLE): np.bool_,
-    (CHOLMOD_PATTERN, CHOLMOD_DOUBLE): np.bool_,
-}
+cdef inline object _npitype_class_from_iype(int itype):
+    """Get the NumPy integer dtype class corresponding to the given CHOLMOD itype.
+
+    Parameters
+    ----------
+    itype : int
+        The CHOLMOD itype of the matrix.
+
+    Returns
+    -------
+    np_itype_class : type
+        The corresponding NumPy integer dtype class.
+    """
+    return np.int32 if itype == CHOLMOD_INT else np.int64
+
+
+cdef inline object _npdtype_class_from_xdtype(int xtype, int dtype):
+    """Get the NumPy dtype class corresponding to the given CHOLMOD xtype and dtype.
+
+    Parameters
+    ----------
+    xtype : int
+        The CHOLMOD xtype of the matrix.
+    dtype : int
+        The CHOLMOD dtype of the matrix.
+
+    Returns
+    -------
+    np_dtype_class : type
+        The corresponding NumPy dtype class.
+    """
+    if xtype == CHOLMOD_REAL:
+        return np.float32 if dtype == CHOLMOD_SINGLE else np.float64
+    elif xtype == CHOLMOD_COMPLEX:
+        return np.complex64 if dtype == CHOLMOD_SINGLE else np.complex128
+    elif xtype == CHOLMOD_PATTERN:
+        return np.bool_
+    else:
+        return object
 
 
 # -----------------------------------------------------------------------------
@@ -1322,16 +1377,14 @@ cdef class CholeskyFactor:
 
     @property
     def itype(self):
-        return np.dtype(np.int32 if self._factor.itype == CHOLMOD_INT else np.int64)
+        return np.dtype(_npitype_class_from_iype(self._factor.itype))
 
     @property
     def dtype(self):
         # "np.int32" etc. are dtype classes, not actual dtypes. numpy handles
         # both well, but be explicit and return a dtype object.
         return np.dtype(
-            _npdtype_class_from_xdtype.get(
-                (self._factor.xtype, self._factor.dtype), None
-            )
+            _npdtype_class_from_xdtype(self._factor.xtype, self._factor.dtype)
         )
 
     @property
