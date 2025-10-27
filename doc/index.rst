@@ -13,6 +13,8 @@ Contents:
 
    overview.rst
 
+   amd.rst
+
    cholmod.rst
 
    changes.rst
