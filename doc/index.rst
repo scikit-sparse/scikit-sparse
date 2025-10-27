@@ -17,6 +17,8 @@ Contents:
 
    cholmod.rst
 
+   colamd.rst
+
    changes.rst
 
 Indices and tables
