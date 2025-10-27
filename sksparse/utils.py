@@ -75,6 +75,11 @@ def validate_csc_input(A, require_square=False):
     # users would not expect the input matrix to be modified.
     # A = A.copy()
 
+    # Coerce bool or int data to float
+    if np.issubdtype(A.dtype, np.bool_) or np.issubdtype(A.dtype, np.integer):
+        dtype = np.result_type(A.dtype, np.float32)
+        A = A.astype(dtype)
+
     # NOTE as of scipy 1.16.2, A.has_sorted_indices and A.has_canonical_format
     #   are not always set correctly!
     # Manually set the flags to False to force fixing the format.
