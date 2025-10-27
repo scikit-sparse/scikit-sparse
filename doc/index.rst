@@ -15,6 +15,8 @@ Contents:
 
    amd.rst
 
+   btf.rst
+
    camd.rst
 
    colamd.rst
