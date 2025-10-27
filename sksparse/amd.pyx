@@ -45,11 +45,9 @@ cimport cython
 
 import numpy as np
 
-import warnings
-
 from dataclasses import dataclass
-from scipy.sparse import csc_array, issparse, SparseEfficiencyWarning
 
+from .utils import validate_csc_input
 
 ctypedef fused index_t:
     int32_t
@@ -277,34 +275,16 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
     .. [2] SuiteSparse GitHub repository.
         https://github.com/DrTimothyAldenDavis/SuiteSparse
     """
-    # Convert dense to sparse CSC
-    if not issparse(A):
-        A = np.atleast_2d(np.asarray(A))
 
-    try:
-        if not isinstance(A, csc_array):
-            warnings.warn(
-                "Input matrix is not in CSC format. Converting to CSC.",
-                SparseEfficiencyWarning,
-                stacklevel=2
-            )
-            A = csc_array(A)
-    except ValueError:
-        raise ValueError("Input must be convertible to CSC format.")
-
-    if A.shape[0] != A.shape[1]:
-        raise ValueError("Input must be square.")
+    A, _, out_itype = validate_csc_input(A, require_square=True)
 
     N = A.shape[0]
 
-    # Choose index width: int32 or int64
-    use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
-
     if N == 0:
-        return np.empty(0, dtype=np.int32 if use_int32 else np.int64)
+        return np.empty(0, dtype=out_itype)
 
     if A.nnz == 0:
-        return np.arange(N, dtype=np.int32 if use_int32 else np.int64)
+        return np.arange(N, dtype=out_itype)
 
     # Prepare control parameters
     ctrl = np.empty(AMD_CONTROL, dtype=np.double)
@@ -322,10 +302,10 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
     info = np.zeros(AMD_INFO, dtype=np.double)
 
     # Prepare output permutation array
-    p = np.empty(N, dtype=np.int32 if use_int32 else np.int64)
+    p = np.empty(N, dtype=out_itype)
 
     # Compute the ordering
-    _amd_order(A.indptr, A.indices, p, ctrl_view, info)
+    _amd_order(N, A.indptr, A.indices, p, ctrl_view, info)
 
     if return_info:
         return p, AMDInfo.from_array(info)
@@ -336,6 +316,7 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def _amd_order(
+    Py_ssize_t N,
     index_t[::1] Ap,
     index_t[::1] Ai,
     index_t[::1] p,
@@ -346,6 +327,8 @@ def _amd_order(
 
     Parameters
     ----------
+    N : int
+        Number of rows and columns of the input matrix.
     Ap : array_like
         Column pointer array of the CSC matrix.
     Ai : array_like
@@ -358,7 +341,6 @@ def _amd_order(
         Output information array.
     """
     cdef int status
-    cdef Py_ssize_t N = Ap.shape[0] - 1
 
     # AMD ordering
     if index_t is int32_t:

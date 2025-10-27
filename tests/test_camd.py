@@ -12,16 +12,16 @@
 
 """Test cases for the sksparse.camd module."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
-
 from numpy.testing import assert_array_equal
-from pathlib import Path
 from scipy import sparse
-from scipy.sparse import SparseEfficiencyWarning
+
 from sksparse.camd import CAMDInfo, camd, camd_default_control
 
-from .helpers import is_valid_permutation, generate_random_matrices
+from .helpers import generate_random_matrices, is_valid_permutation
 
 
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
@@ -30,24 +30,6 @@ def test_empty_input(itype):
     empty_A.indptr = empty_A.indptr.astype(itype)
     empty_A.indices = empty_A.indices.astype(itype)
     assert_array_equal(camd(empty_A), np.array([], dtype=itype), strict=True)
-
-
-def test_1D_input():
-    with pytest.warns(SparseEfficiencyWarning, match="not in CSC format"):
-        with pytest.raises(ValueError, match="Input must be square"):
-            camd(np.arange(10))
-
-
-def test_nonsquare_input():
-    with pytest.raises(ValueError, match="Input must be square"):
-        camd(sparse.csc_array((3, 4)))
-
-
-def test_ND_input():
-    rng = np.random.default_rng(565656)
-    with pytest.warns(SparseEfficiencyWarning, match="not in CSC format"):
-        with pytest.raises(ValueError, match="Input must be convertible to CSC format"):
-            camd(rng.random((2, 3, 4)))
 
 
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
@@ -73,26 +55,6 @@ def test_singleton_matrix():
     ),
 )
 class TestRandomSquareMatrices:
-    @pytest.mark.parametrize("matrix_type", ["dense", "csc", "coo"])
-    def test_input_type(self, A, matrix_type):
-        match matrix_type:
-            case "dense":
-                A = A.toarray()
-            case "csc":
-                A = A.tocsc()
-            case "coo":
-                A = A.tocoo()
-            case _:
-                raise ValueError(f"Unknown matrix type: {matrix_type}")
-
-        if matrix_type != "csc":
-            with pytest.warns(SparseEfficiencyWarning, match="not in CSC format"):
-                p = camd(A)
-        else:
-            p = camd(A)
-
-        assert is_valid_permutation(p)
-
     @pytest.mark.parametrize("itype", [np.int32, np.int64])
     def test_itype(self, A, itype):
         A.indptr = A.indptr.astype(itype)
@@ -121,8 +83,7 @@ def test_camd_with_dense_rows(dense_thresh):
     #   (A + A.T).astype(bool).sum(axis=1).max() ~ 10
     CAMD_DEFAULT_DENSE = 10  # default value from camd.h
     thresh = int(
-        (dense_thresh if dense_thresh is not None else CAMD_DEFAULT_DENSE)
-        * np.sqrt(N)
+        (dense_thresh if dense_thresh is not None else CAMD_DEFAULT_DENSE) * np.sqrt(N)
     )
 
     N_dense_rows = 10  # arbitrary choice for number of dense rows
@@ -150,22 +111,23 @@ def test_camd_with_dense_rows(dense_thresh):
 def test_info_can_24():
     # The can_24 matrix is used in the SuiteSparse CAMD MATLAB/camd_demo.m file.
     expect_info = CAMDInfo.from_array(
-        np.array([
-            0,     # status
-            24,    # N
-            160,   # nz
-            1,     # symmetry
-            24,    # nzdiag
-            136,   # nz_A_plus_AT
-            0,     # Ndense
-            3288,  # memory
-            0,     # Ncmpa
-            97,    # Lnz
-            97,    # Ndiv
-            275,   # Nmultsubs_LDL
-            453,   # Nmultsubs_LU
-            8,     # dmax
-        ]
+        np.array(
+            [
+                0,  # status
+                24,  # N
+                160,  # nz
+                1,  # symmetry
+                24,  # nzdiag
+                136,  # nz_A_plus_AT
+                0,  # Ndense
+                3288,  # memory
+                0,  # Ncmpa
+                97,  # Lnz
+                97,  # Ndiv
+                275,  # Nmultsubs_LDL
+                453,  # Nmultsubs_LU
+                8,  # dmax
+            ]
         )
     )
 
@@ -221,15 +183,15 @@ class TestConstraints:
         C = np.full(N, 2, dtype=int)
         all_idx = rng.permutation(N)
         C[all_idx[:k]] = 0
-        C[all_idx[k:2*k]] = 1
+        C[all_idx[k : 2 * k]] = 1
 
         p = camd(A, constraints=C)
 
         assert is_valid_permutation(p)
         # Check that the constraints are respected
         assert all(C[p][:k] == 0)
-        assert all(C[p][k:2*k] == 1)
-        assert all(C[p][2*k:] == 2)
+        assert all(C[p][k : 2 * k] == 1)
+        assert all(C[p][2 * k :] == 2)
 
 
 # =============================================================================

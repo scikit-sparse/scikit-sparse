@@ -39,10 +39,8 @@ References
 cimport cython
 
 import numpy as np
-import warnings
 
-from scipy.sparse import csc_array, issparse, SparseEfficiencyWarning
-
+from .utils import validate_csc_input
 
 ctypedef fused index_t:
     int32_t
@@ -84,39 +82,19 @@ def maxtrans(A):
     .. [#maxtrans_h] BTF maxtrans header file:
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/BTF/Include/btf.h
     """
-    # TODO refactor this check to a separate function for all modules
-    # Convert dense to sparse CSC
-    if not issparse(A):
-        A = np.asarray(A)
-
-    if A.ndim != 2:
-        raise ValueError("Input must be 2D.")
-
-    try:
-        if not isinstance(A, csc_array):
-            warnings.warn(
-                "Input matrix is not in CSC format. Converting to CSC.",
-                SparseEfficiencyWarning,
-                stacklevel=2
-            )
-            A = csc_array(A)
-    except ValueError:
-        raise ValueError("Input must be convertible to CSC format.")
+    A, _, out_dtype = validate_csc_input(A)
 
     cdef Py_ssize_t M = A.shape[0]
     cdef Py_ssize_t N = A.shape[1]
 
-    # Choose index width: int32 or int64
-    cdef bint use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
-
     if M == 0 or N == 0:
-        return np.empty(0, dtype=np.int32 if use_int32 else np.int64)
+        return np.empty(0, dtype=out_dtype)
 
     if A.nnz == 0:
-        return np.full(M, -1, dtype=np.int32 if use_int32 else np.int64)
+        return np.full(M, -1, dtype=out_dtype)
 
     # Allocate output array
-    jmatch = np.zeros(M, dtype=np.int32 if use_int32 else np.int64)
+    jmatch = np.zeros(M, dtype=out_dtype)
 
     cdef double maxwork = 0  # TODO default value?
 
@@ -202,34 +180,9 @@ def strongcomp(A, q=None):
     .. [#strongcomp_h] BTF strongcomp header file:
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/BTF/Include/btf.h
     """
-    # TODO refactor this check to a separate function for all modules
-    # Convert dense to sparse CSC
-    if not issparse(A):
-        A = np.asarray(A)
+    A, _, out_dtype = validate_csc_input(A, require_square=True)
 
-    if A.ndim != 2:
-        raise ValueError("Input must be 2D.")
-
-    cdef Py_ssize_t M = A.shape[0]
-    cdef Py_ssize_t N = A.shape[1]
-
-    if M != N:
-        raise ValueError("Input must be square.")
-
-    try:
-        if not isinstance(A, csc_array):
-            warnings.warn(
-                "Input matrix is not in CSC format. Converting to CSC.",
-                SparseEfficiencyWarning,
-                stacklevel=2
-            )
-            A = csc_array(A)
-    except ValueError:
-        raise ValueError("Input must be convertible to CSC format.")
-
-    # Choose index width: int32 or int64
-    cdef bint use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
-    out_dtype = np.int32 if use_int32 else np.int64
+    cdef Py_ssize_t N = A.shape[0]
 
     if N == 0:
         p = np.empty(0, dtype=out_dtype)
@@ -351,34 +304,10 @@ def btf(A):
     .. [#btf_h] BTF header file:
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/BTF/Include/btf.h
     """
-    # TODO refactor this check to a separate function for all modules
-    # Convert dense to sparse CSC
-    if not issparse(A):
-        A = np.asarray(A)
+    A, _, out_dtype = validate_csc_input(A, require_square=True)
 
-    if A.ndim != 2:
-        raise ValueError("Input must be 2D.")
-
-    cdef Py_ssize_t M = A.shape[0]
-    cdef Py_ssize_t N = A.shape[1]
-
-    if M != N:
-        raise ValueError("Input must be square.")
-
-    try:
-        if not isinstance(A, csc_array):
-            warnings.warn(
-                "Input matrix is not in CSC format. Converting to CSC.",
-                SparseEfficiencyWarning,
-                stacklevel=2
-            )
-            A = csc_array(A)
-    except ValueError:
-        raise ValueError("Input must be convertible to CSC format.")
-
-    # Choose index width: int32 or int64
-    cdef bint use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
-    out_dtype = np.int32 if use_int32 else np.int64
+    cdef Py_ssize_t N = A.shape[0]
+    cdef Py_ssize_t M = A.shape[1]
 
     if N == 0:
         p = np.empty(0, dtype=out_dtype)

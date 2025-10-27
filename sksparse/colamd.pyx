@@ -44,10 +44,9 @@ References
 cimport cython
 
 import numpy as np
-import warnings
-
 from dataclasses import dataclass
-from scipy.sparse import csc_array, issparse, SparseEfficiencyWarning
+
+from .utils import validate_csc_input
 
 
 ctypedef fused index_t:
@@ -198,33 +197,10 @@ def _colamd_base(
     bint return_info=False
 ):
     """A common base function for colamd and symamd."""
-    # Convert dense to sparse CSC
-    if not issparse(A):
-        A = np.asarray(A)
-
-    if A.ndim != 2:
-        raise ValueError("Input must be 2D.")
+    A, _, out_dtype = validate_csc_input(A, is_symmetric)
 
     cdef Py_ssize_t M = A.shape[0]
     cdef Py_ssize_t N = A.shape[1]
-
-    if is_symmetric and M != N:
-        raise ValueError("Input matrix must be square.")
-
-    try:
-        if not isinstance(A, csc_array):
-            warnings.warn(
-                "Input matrix is not in CSC format. Converting to CSC.",
-                SparseEfficiencyWarning,
-                stacklevel=2
-            )
-            A = csc_array(A)
-    except ValueError:
-        raise ValueError("Input must be convertible to CSC format.")
-
-    # Choose index width: int32 or int64
-    cdef bint use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
-    out_dtype = np.int32 if use_int32 else np.int64
 
     if M == 0 or N == 0:
         return np.empty(0, dtype=out_dtype)
@@ -251,9 +227,8 @@ def _colamd_base(
         knobs_view[COLAMD_AGGRESSIVE] = 1.0 if aggressive else 0.0
 
     # Allocate output arrays
-    itype = np.int32 if use_int32 else np.int64
-    perm = np.zeros(N + 1, dtype=itype)
-    stats = np.zeros(COLAMD_STATS, dtype=itype)
+    perm = np.zeros(N + 1, dtype=out_dtype)
+    stats = np.zeros(COLAMD_STATS, dtype=out_dtype)
 
     # Compute the ordering
     if is_symmetric:
