@@ -8,36 +8,98 @@
 #  Created: 2025-08-11 14:49
 # =============================================================================
 
-"""sksparse.cholmod: Python interface to the CHOLMOD library.
+"""
+================================================
+Cholesky Decomposition (:mod:`sksparse.cholmod`)
+================================================
 
-This module provides a Python interface to the CHOLMOD library, which is part
-of the SuiteSparse collection by Timothy A. Davis. The main algorithm computes
-the Cholesky factorization of a sparse matrix, and solves linear systems.
+.. currentmodule:: sksparse.cholmod
 
-Interfaces
-----------
-* `cholesky`: Computes the Cholesky factorization of a sparse matrix.
-* `ldl`: Computes the LDL.T factorization of a sparse matrix.
-* `CholeskyFactor`: Class representing a Cholesky factorization.
-* `cho_factor`: Computes the Cholesky factorization of a sparse matrix.
-* `ldl_factor`: Computes the LDL.T factorization of a sparse matrix.
-* `symbfact`: Computes the symbolic factorization of a sparse matrix.
-* `etree`: Computes the elimination tree of a sparse matrix.
-* `bisect`: Bisects a graph using nested dissection.
-* `metis`: Computes a fill-reducing ordering using METIS.
-* `nesdis`: Computes a fill-reducing ordering using NESDIS.
+.. versionadded:: 0.1.0
 
-This wrapper handles both 32-bit and 64-bit integer types, depending on the
-input matrix format.
+.. versionchanged:: 0.5.0
+   Major API updates to more closely resemble the :func:`scipy.linalg.cholesky`
+   dense interface, and incorporate more functions from the CHOLMOD MATLAB
+   interface.
 
-.. versionadded:: 0.5.0
+
+An interface to the SuiteSparse `CHOLMOD
+<https://github.com/DrTimothyAldenDavis/SuiteSparse/tree/dev/CHOLMOD>`_
+package, which computes basic linear algebra operations for sparse, symmetric,
+positive-definite matrices.
+
+
+Function Interface
+------------------
+
+.. autosummary::
+    :toctree: generated/
+    :nosignatures:
+
+    cholesky - Computes the Cholesky factorization of a sparse matrix.
+    ldl - Computes the LDL.T factorization of a sparse matrix.
+
+
+Object Interface
+----------------
+
+.. autosummary::
+    :toctree: generated/
+    :nosignatures:
+
+    cho_factor - Computes the Cholesky factorization of a sparse matrix.
+    ldl_factor - Computes the LDL.T factorization of a sparse matrix.
+    CholeskyFactor - Class representing a Cholesky factorization.
+
+
+Symbolic Analysis
+-----------------
+
+.. autosummary::
+    :toctree: generated/
+    :nosignatures:
+
+    symbfact - Computes the symbolic factorization of a sparse matrix.
+    etree - Computes the elimination tree of a sparse matrix.
+
+
+Graph Partitioning
+------------------
+
+.. autosummary::
+    :toctree: generated/
+    :nosignatures:
+
+    bisect - Bisects a graph using nested dissection.
+    metis - Computes a fill-reducing ordering using METIS.
+    nesdis - Computes a fill-reducing ordering using NESDIS.
+    SeparatorTree - Class representing a separator tree.
+
+
+.. _cholmod-exceptions:
+
+Exceptions and Warnings
+-----------------------
+
+.. autosummary::
+    :toctree: generated/
+
+    CholmodWarning
+    CholmodSmallDiagonalWarning
+
+    CholmodError
+    CholmodNotPositiveDefiniteError
+    CholmodNotInstalledError
+    CholmodOutOfMemoryError
+    CholmodOverflowError
+    CholmodInvalidInputError
+    CholmodGpuProblemError
+
 
 References
 ----------
-* SuiteSparse homepage:
-  https://people.engr.tamu.edu/davis/suitesparse.html
-* SuiteSparse CHOLMOD:
-  https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD
+* `SuiteSparse homepage <https://people.engr.tamu.edu/davis/suitesparse.html>`_
+* `SuiteSparse CHOLMOD <https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD>`_
 """
 
 from cpython.ref cimport Py_INCREF
@@ -98,38 +160,47 @@ cdef int CHOLMOD_TRANS_CONJ = 2  # numeric (conjugate transpose)
 #         Error Handling
 # -----------------------------------------------------------------------------
 class CholmodError(Exception):
+    """Base class for CHOLMOD-related errors."""
     pass
 
 
 class CholmodNotPositiveDefiniteError(CholmodError):
+    """Raised when the input matrix is not positive definite."""
     pass
 
 
 class CholmodNotInstalledError(CholmodError):
+    """Raised when the CHOLMOD library is not installed."""
     pass
 
 
 class CholmodOutOfMemoryError(CholmodError):
+    """Raised when CHOLMOD runs out of memory."""
     pass
 
 
 class CholmodOverflowError(CholmodError):
+    """Raised when CHOLMOD encounters an integer overflow."""
     pass
 
 
 class CholmodInvalidInputError(CholmodError):
+    """Raised when CHOLMOD receives invalid input."""
     pass
 
 
 class CholmodGpuProblemError(CholmodError):
+    """Raised when CHOLMOD encounters a problem with CUDA."""
     pass
 
 
 class CholmodWarning(Warning):
+    """Base class for CHOLMOD-related warnings."""
     pass
 
 
 class CholmodSmallDiagonalWarning(CholmodWarning):
+    """Warning for small diagonal entries."""
     pass
 
 
@@ -1092,31 +1163,9 @@ cdef class CholeskyFactor:
     The numeric factorization is not computed until :meth:`.factorize` is
     called.
 
-    Attributes
-    ----------
-    N : int
-        The number of rows and columns in the factor.
-    is_ll : bool
-        Whether the factor is in ``LL.T`` form (True) or ``LDL.T`` form (False).
-    is_super : bool
-        Whether the factor is in supernodal (True) or simplicial (False) format.
-    itype : np.dtype in {np.int32, np.int64}
-        The integer type used for indices and indptr in the factor.
-    dtype : np.dtype
-        The data type used for numerical values in the factor.
-    colcount : (N,) ndarray of int
-        The number of nonzeros in each column of the factor.
-    nnz : int
-        The number of nonzeros in the factor.
-    order : str or int
-        The ordering method used for the factorization. If an unknown ordering
-        was used, returns the integer value.
-    perm : (N,) ndarray of int
-        A read-only view of the permutation vector used for the factorization.
-
     Parameters
     ----------
-    A : (N, N) {array_like, sparse array}
+    A : (N, N) array_like or sparse array
         An array convertible to a sparse matrix in Compressed Sparse Column
         (CSC) format. The matrix must be square and symmetric positive
         definite. Only the upper or lower triangular part of the matrix is
@@ -1147,16 +1196,14 @@ cdef class CholeskyFactor:
         the natural ordering of the input matrix is used. The other options
         are:
 
-        * ``default``: Use the default method, which first tries AMD, then
-            METIS.
-        * ``best``: Automatically select the best ordering based on the
-            input.
+        * ``default``: Use the default method, which first tries AMD, then METIS.
+        * ``best``: Automatically select the best ordering based on the input.
         * ``metis``: Use the METIS library for graph partitioning.
         * ``nesdis``: Use the NESDIS library for nested dissection.
         * ``amd``: Use the Approximate Minimum Degree (AMD) algorithm.
         * ``colamd``: Use the Approximate Minimum Degree (AMD) algorithm
-            for the symmetric case, or the COLAMD algorithm for the
-            unsymmetric case (:math:`A A^{{\\top}}` or :math:`A^{{\\top}} A`).
+          for the symmetric case, or the COLAMD algorithm for the
+          unsymmetric case (:math:`A A^{{\\top}}` or :math:`A^{{\\top}} A`).
         * ``postordered``: Use natural ordering followed by postordering.
 
         By default, methods other than ``natural`` will also be
@@ -1168,6 +1215,47 @@ cdef class CholeskyFactor:
             matrices, but if the factorization is reused many times, it can
             be worth it.
 
+    Attributes
+    ----------
+    N : int
+        The number of rows and columns in the factor.
+    is_ll : bool
+        Whether the factor is in ``LL.T`` form (True) or ``LDL.T`` form (False).
+    is_super : bool
+        Whether the factor is in supernodal (True) or simplicial (False) format.
+    itype : :obj:`numpy.int32` or :obj:`numpy.int64`
+        The integer type used for indices and indptr in the factor.
+    dtype : numpy.dtype
+        The data type used for numerical values in the factor.
+    colcount : *(N,)* :obj:`numpy.ndarray` of int
+        The number of nonzeros in each column of the factor.
+    nnz : int
+        The number of nonzeros in the factor.
+    order : str or int
+        The ordering method used for the factorization. If an unknown ordering
+        was used, returns the integer value.
+    perm : *(N,)* :obj:`numpy.ndarray` of int
+        A read-only view of the permutation vector used for the factorization.
+    factor : :obj:`~scipy.sparse.csc_array`
+        A view of the the Cholesky factor in Compressed Sparse Column (CSC)
+        format. If ``self.is_ll``, the returned matrix is lower triangular.
+        Otherwise, the matrix view contains the lower triangular and the
+        diagonal factors combined.
+
+        .. note::
+
+            The view is always in lower triangular form, even if the factor was
+            created using ``lower=False``. To get the upper triangular factor,
+            use :obj:`get_factor` with ``lower=False``. To get the split `L`
+            and `D` factors, use :obj:`get_factor` with ``kind="LDL"``.
+
+        .. warning::
+
+            The returned matrix is a view on the internal data of the CHOLMOD
+            factor. It will be modified if the factor is modified (*e.g.*, by
+            calling :meth:`.factorize`). To get a copy, use
+            :meth:`.get_factor`.
+
     Raises
     ------
     CholmodNotPositiveDefiniteError
@@ -1177,17 +1265,18 @@ cdef class CholeskyFactor:
 
     See Also
     --------
-    * :func:`.cholesky` : Factorize a matrix using Cholesky decomposition.
-    * :func:`.ldl` : Factorize a matrix using LDL decomposition.
-    * :func:`.cho_factor` : Factorize a matrix using Cholesky decomposition.
-    * :func:`.ldl_factor` : Factorize a matrix using LDL decomposition.
-
-    .. versionadded:: 0.5.0
+    cholesky, ldl, cho_factor, ldl_factor
 
     Notes
     -----
     The symbolic analysis follows that of the SuiteSparse CHOLMOD ``analyze``
     MATLAB function [#analyze_c]_.
+
+
+    .. versionadded:: 0.1.0
+    .. versionchanged:: 0.5.0
+        Renamed from ``Factor``. Major API updates to more closely resemble the
+        :func:`scipy.linalg.cholesky` dense interface.
 
     References
     ----------
@@ -1391,29 +1480,6 @@ cdef class CholeskyFactor:
 
     @property
     def factor(self):
-        """Return a view of the Cholesky factor.
-
-        .. warning::
-
-            The returned matrix is a view on the internal data of the CHOLMOD
-            factor. It will be modified if the factor is modified (*e.g.*, by
-            calling :meth:`.factorize`). To get a copy, use
-            :meth:`.get_factor`.
-
-        Returns
-        -------
-        L : csc_array
-            The Cholesky factor in Compressed Sparse Column (CSC) format. If
-            ``self.is_ll``, the returned matrix is lower triangular. Otherwise,
-            the matrix view contains the lower triangular and the diagonal
-            factors combined.
-
-        .. note :: The view is always in lower triangular form, even if the
-            factor was created using ``lower=False``. To get the upper
-            triangular factor, use :obj:`get_factor` with ``lower=False``. To
-            get the split `L` and `D` factors, use :obj:`get_factor` with
-            ``kind="LDL"``.
-        """
         return _csc_view_from_cholmod_factor(self)
 
     # -------------------------------------------------------------------------
@@ -2055,20 +2121,19 @@ cdef class CholeskyFactor:
 
         Returns
         -------
-        CholeskyFactor
+        :class:`.CholeskyFactor`
             The current object, for method chaining.
 
         See Also
         --------
-        :func:`.cholesky`, :func:`.ldl`, :meth:`.update`, :meth:`.rowadd`,
-        :meth:`.rowdel`
-
-        .. versionadded:: 0.5.0
+        cholesky, ldl, update, rowadd, rowdel
 
         References
         ----------
         .. [#resymbol_c] ``resymbol.c`` - CHOLMOD MATLAB resymbolization function
             https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/resymbol.c
+
+        .. versionadded:: 0.5.0
         """
         self._require_factorized()
 
@@ -2130,6 +2195,10 @@ cdef class CholeskyFactor:
             The natural logarithm of the determinant of the matrix `A` that was
             factorized.
 
+        See Also
+        --------
+        slogdet, det, numpy.linalg.slogdet, numpy.linalg.det, scipy.linalg.det
+
         Notes
         -----
         This function computes the log-determinant of the matrix `A` from its
@@ -2148,11 +2217,6 @@ cdef class CholeskyFactor:
             \\log \\det(A) = \\sum_i \\log D_{ii}.
 
         .. versionadded:: 0.2
-
-        See Also
-        --------
-        :meth:`.slogdet`, :meth:`.det`, :func:`numpy.linalg.slogdet`,
-        :func:`numpy.linalg.det`, :func:`scipy.linalg.det`
         """
         self._require_factorized()
         if self.is_ll:
@@ -2175,6 +2239,10 @@ cdef class CholeskyFactor:
             The natural logarithm of the absolute value of the determinant of
             the matrix `A` that was factorized.
 
+        See Also
+        --------
+        logdet, det, numpy.linalg.slogdet, numpy.linalg.det, scipy.linalg.det
+
         Notes
         -----
         This function computes the sign and log-determinant of the matrix `A`
@@ -2193,17 +2261,14 @@ cdef class CholeskyFactor:
             \\log \\det(A) = \\sum_i \\log D_{ii}.
 
         .. versionadded:: 0.2
-
-        See Also
-        --------
-        :meth:`.logdet`, :meth:`.det`, :func:`numpy.linalg.slogdet`,
-        :func:`numpy.linalg.det`, :func:`scipy.linalg.det`
         """
         return (self.dtype.type(1.0), self.logdet())
 
     def det(self):
         """Compute the determinant of the matrix from its Cholesky
         factorization.
+
+        .. versionadded:: 0.2
 
         .. warning::
 
@@ -2215,12 +2280,9 @@ cdef class CholeskyFactor:
         det : float
             The determinant of the matrix `A` that was factorized.
 
-        .. versionadded:: 0.2
-
         See Also
         --------
-        :meth:`.logdet`, :meth:`.slogdet`, :func:`numpy.linalg.det`,
-        :func:`numpy.linalg.slogdet`, :func:`scipy.linalg.det`
+        logdet, slogdet, numpy.linalg.det, numpy.linalg.slogdet, scipy.linalg.det
         """
         return np.exp(self.logdet())
 
@@ -2241,6 +2303,10 @@ cdef class CholeskyFactor:
         Ainv : csc_array
             The inverse of the matrix `A` that was factorized.
 
+        See Also
+        --------
+        numpy.linalg.inv, scipy.linalg.inv
+
         Notes
         -----
         This function computes the inverse of the matrix `A` from its Cholesky
@@ -2260,10 +2326,6 @@ cdef class CholeskyFactor:
             A^{-1} = P^{\\top} L^{-\\top} D^{-1} L^{-1} P.
 
         .. versionadded:: 0.2
-
-        See Also
-        --------
-        :func:`numpy.linalg.inv`, :func:`scipy.linalg.inv`
         """
         return self.solve(eye_array(self.N, format='csc', dtype=self.dtype))
 
@@ -2438,12 +2500,17 @@ This function is an interface to the CHOLMOD library, which is part of
 the SuiteSparse collection by Timothy A. Davis. For more details, see the
 documentation in the header file [{doc_tag}]_.
 
-.. versionadded:: 0.5.0
+
+{version_notes}
 
 References
 ----------
 .. [{doc_tag}] ``cholmod.h`` - SuiteSparse CHOLMOD header file.
     https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/Include/cholmod.h
+
+Examples
+--------
+{example}
 """
 
 
@@ -2488,30 +2555,71 @@ If ``beta`` is a scalar value, compute the factorization of:
 where `I` is the identity matrix.
 """
 
-
-_cholesky_see_also = """
-  * :func:`.ldl` : Factorize a matrix using LDL decomposition.
-  * :func:`.ldl_factor` : Factorize a matrix using LDL decomposition."""
-
-
 _cho_factor_returns = """CholeskyFactor
     The factorization object. Use its methods to solve linear systems
     and manipulate the factorization.
 """
 
+_cholesky_example = """
+>>> import numpy as np
+>>> from scipy.sparse import coo_array
+>>> from sksparse.cholmod import cholesky, cho_factor
+>>> # Create a symmetric positive definite matrix from (Davis, Eqn 2.1)
+>>> N = 11
+>>> rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
+>>> cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
+>>> rng = np.random.default_rng(56)
+>>> vals = rng.random(len(rows), dtype=np.float64)
+>>> L = coo_array((vals, (rows, cols)), shape=(N, N))
+>>> A = L + L.T   # make it symmetric
+>>> A.setdiag(N)  # make it strongly positive definite
+>>> A = A.tocsc()
+>>> L, p = cholesky(A, order='amd', lower=True)
+>>> L
+<Compressed Sparse Column sparse array of dtype 'float64'
+        with 30 stored elements and shape (11, 11)>
+>>> p
+array([ 4,  8,  6,  0,  3,  5,  1,  2,  9, 10,  7])
+>>> f = cho_factor(A, order='amd', lower=True)
+>>> f
+CholeskyFactor(N=11, nnz=30, is_ll=True, is_super=False, itype=np.int64,
+    dtype=np.float64, order=natural)
+>>> np.allclose(L.toarray(), f.get_factor().toarray(), atol=1e-15)
+True
+>>> np.array_equal(p, f.get_perm())
+True
+>>> # Solve a linear system
+>>> expect_x = np.arange(N, dtype=np.float64)
+>>> b = A @ expect_x
+>>> x = f.solve(b)
+>>> np.allclose(x, expect_x)
+True
+"""
+
+
 cho_factor.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     intro=_cholesky_intro,
     returns=_cho_factor_returns,
-    see_also=_cholesky_see_also,
+    see_also="cholesky, ldl, ldl_factor",
+    version_notes=".. versionadded:: 0.5.0",
     doc_tag="#cho_factor_h",
+    example=_cholesky_example,
 )
 
+
+_cholesky_version_notes=""".. versionadded:: 0.1.0
+.. versionchanged:: 0.5.0
+    The function now returns the matrix directly instead of a ``Factor``
+    object, and the permutation vector when an ordering method is specified.
+"""
 
 cholesky.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     intro=_cholesky_intro,
     returns=_CHOLESKY_RETURNS.format(ldl_D_output=""),
-    see_also=_cholesky_see_also,
+    see_also="cho_factor, ldl, ldl_factor",
+    version_notes=_cholesky_version_notes,
     doc_tag="#cholesky_h",
+    example=_cholesky_example,
 )
 
 # -----------------------------------------------------------------------------
@@ -2546,30 +2654,71 @@ If ``beta`` is a scalar value, compute the factorization of:
 where `I` is the identity matrix.
 """
 
-
 _ldl_D_output = """D : dia_array
     The diagonal matrix `D` of the factorization, in sparse DIA format.
     The data type will match that of ``A``."""
 
 
-_ldl_see_also = """
-    * :func:`.cholesky` : Factorize a matrix using Cholesky decomposition.
-    * :func:`.cho_factor` : Factorize a matrix using Cholesky decomposition."""
+_ldl_example = """
+>>> import numpy as np
+>>> from scipy.sparse import coo_array
+>>> from sksparse.cholmod import ldl, ldl_factor
+>>> # Create a symmetric positive definite matrix from (Davis, Eqn 2.1)
+>>> N = 11
+>>> rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
+>>> cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
+>>> rng = np.random.default_rng(56)
+>>> vals = rng.random(len(rows), dtype=np.float64)
+>>> L = coo_array((vals, (rows, cols)), shape=(N, N))
+>>> A = L + L.T   # make it symmetric
+>>> A.setdiag(N)  # make it strongly positive definite
+>>> A = A.tocsc()
+>>> L, D, p = ldl(A, order='amd')
+>>> L
+<Compressed Sparse Column sparse array of dtype 'float64'
+        with 30 stored elements and shape (11, 11)>
+>>> D
+<DIAgonal sparse array of dtype 'float64'
+        with 11 stored elements (1 diagonals) and shape (11, 11)>
+>>> p
+array([ 4,  8,  6,  0,  3,  5,  1,  2,  9, 10,  7])
+>>> f = ldl_factor(A, order='amd')
+>>> f
+CholeskyFactor(N=11, nnz=30, is_ll=False, is_super=False, itype=np.int64,
+    dtype=np.float64, order=amd)
+>>> Lf, Df = f.get_factor()
+>>> np.allclose(L.toarray(), Lf.toarray(), atol=1e-15)
+True
+>>> np.allclose(D.toarray(), Df.toarray(), atol=1e-15)
+True
+>>> np.array_equal(p, f.get_perm())
+True
+>>> # Solve a linear system
+>>> expect_x = np.arange(N, dtype=np.float64)
+>>> b = A @ expect_x
+>>> x = f.solve(b)
+>>> np.allclose(x, expect_x)
+True
+"""
 
 
 ldl_factor.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     intro=_ldl_intro,
     returns=_cho_factor_returns,
-    see_also=_ldl_see_also,
+    see_also="ldl, cholesky, cho_factor",
+    version_notes=".. versionadded:: 0.5.0",
     doc_tag="#ldl_factor_h",
+    example=_ldl_example,
 )
 
 
 ldl.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
     intro=_ldl_intro,
     returns=_CHOLESKY_RETURNS.format(ldl_D_output=_ldl_D_output),
-    see_also=_ldl_see_also,
+    see_also="ldl_factor, cholesky, cho_factor",
+    version_notes=".. versionadded:: 0.5.0",
     doc_tag="#ldl_h",
+    example=_ldl_example,
 )
 
 
@@ -2627,12 +2776,45 @@ def symbfact(A, *, kind=None, bint lower=False, bint return_factor=False):
         The symbolic factorization of the matrix. Only returned if
         ``return_factor`` is True.
 
+    See Also
+    --------
+    etree
+
+
     .. versionadded:: 0.5.0
 
     References
     ----------
     .. [#symbfact_c] ``symbfact2.c`` - CHOLMOD MATLAB symbolic factorization function
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/symbfact2.c
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from scipy.sparse import coo_array
+    >>> from sksparse.cholmod import cholesky, symbfact
+    >>> # Create a symmetric positive definite matrix from (Davis, Eqn 2.1)
+    >>> N = 11
+    >>> rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
+    >>> cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
+    >>> rng = np.random.default_rng(56)
+    >>> vals = rng.random(len(rows), dtype=np.float64)
+    >>> L = coo_array((vals, (rows, cols)), shape=(N, N))
+    >>> A = L + L.T   # make it symmetric
+    >>> A.setdiag(N)  # make it strongly positive definite
+    >>> A = A.tocsc()
+    >>> L = cholesky(A, lower=True)
+    >>> count, h, parent, post = symbfact(A)
+    >>> count
+    array([3, 3, 4, 3, 3, 4, 4, 3, 3, 2, 1])
+    >>> np.array_equal(count, np.count_nonzero(L.toarray(), axis=0))
+    True
+    >>> h
+    6
+    >>> parent
+    array([ 5,  2,  7,  5,  7,  6,  8,  9,  9, 10, -1])
+    >>> post
+    array([ 1,  2,  4,  7,  0,  3,  5,  6,  8,  9, 10])
     """
     cdef bint use_int32
     A, use_int32, out_itype = validate_csc_input(A)
@@ -2900,10 +3082,35 @@ def etree(A, *, kind=None, bint return_post=False):
 
     .. versionadded:: 0.5.0
 
+    See Also
+    --------
+    symbfact
+
     References
     ----------
     .. [#etree_c] ``etree2.c`` - CHOLMOD MATLAB symbolic factorization function
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/etree2.c
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from scipy.sparse import coo_array
+    >>> from sksparse.cholmod import etree
+    >>> # Create a symmetric positive definite matrix from (Davis, Eqn 2.1)
+    >>> N = 11
+    >>> rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
+    >>> cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
+    >>> rng = np.random.default_rng(56)
+    >>> vals = rng.random(len(rows), dtype=np.float64)
+    >>> L = coo_array((vals, (rows, cols)), shape=(N, N))
+    >>> A = L + L.T   # make it symmetric
+    >>> A.setdiag(N)  # make it strongly positive definite
+    >>> A = A.tocsc()
+    >>> parent, post = etree(A, return_post=True)
+    >>> parent
+    array([ 5,  2,  7,  5,  7,  6,  8,  9,  9, 10, -1])
+    >>> post
+    array([ 1,  2,  4,  7,  0,  3,  5,  6,  8,  9, 10])
     """
     cdef bint use_int32
     A, use_int32, out_itype = validate_csc_input(A)
@@ -3076,7 +3283,7 @@ def bisect(A, *, kind=None):
 
     See Also
     --------
-    :func:`.nesdis`, :func:`.metis`
+    nesdis, metis
 
     Notes
     -----
@@ -3089,6 +3296,25 @@ def bisect(A, *, kind=None):
     ----------
     .. [#bisect_c] ``bisect.c`` - CHOLMOD MATLAB bisect function
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/bisect.c
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from scipy.sparse import coo_array
+    >>> from sksparse.cholmod import bisect
+    >>> # Create a symmetric positive definite matrix from (Davis, Eqn 2.1)
+    >>> N = 11
+    >>> rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
+    >>> cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
+    >>> rng = np.random.default_rng(56)
+    >>> vals = rng.random(len(rows), dtype=np.float64)
+    >>> L = coo_array((vals, (rows, cols)), shape=(N, N))
+    >>> A = L + L.T   # make it symmetric
+    >>> A.setdiag(N)  # make it strongly positive definite
+    >>> A = A.tocsc()
+    >>> s = bisect(A)
+    >>> s
+    array([0, 1, 1, 0, 1, 0, 0, 1, 0, 2, 2])
     """
     cdef bint use_int32
     A, use_int32, out_itype = validate_csc_input(A)
@@ -3203,16 +3429,18 @@ def bisect(A, *, kind=None):
 class SeparatorTree():
     """The separator tree of a sparse matrix graph.
 
+    .. versionadded:: 0.5.0
+
     This object is typically created by :func:`.nesdis`.
 
     Attributes
     ----------
-    cp : (C,) ndarray of int, optional
+    cp : *(C,)* numpy.ndarray of int, optional
         The separator tree, where ``C`` is the number of components found. The
         value ``cp[c]`` is the parent of the component ``c`` in the separator
         tree, or ``-1`` if ``c`` is the root of the tree. There is a maximum of
         ``N`` components, where ``N`` is the dimension of the input matrix.
-    cmember : (N,) ndarray of int, optional
+    cmember : *(N,)* numpy.ndarray of int, optional
         The component membership vector, where ``cmember[i]`` is the component
         to which node ``i`` belongs.
     """
@@ -3256,8 +3484,6 @@ class SeparatorTree():
         -----
         This function is based on the SuiteSparse CHOLMOD MATLAB interface
         [#septree_c]_.
-
-        .. versionadded:: 0.5.0
 
         References
         ----------
@@ -3395,7 +3621,7 @@ def nesdis(
 
     See Also
     --------
-    :func:`.bisect`, :func:`.metis`
+    bisect, metis
 
     Notes
     -----
@@ -3408,6 +3634,27 @@ def nesdis(
     ----------
     .. [#nesdis_c] ``nesdis.c`` - CHOLMOD MATLAB nesdis function
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/nesdis.c
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from scipy.sparse import coo_array
+    >>> from sksparse.cholmod import nesdis
+    >>> # Create a symmetric positive definite matrix from (Davis, Eqn 2.1)
+    >>> N = 11
+    >>> rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
+    >>> cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
+    >>> rng = np.random.default_rng(56)
+    >>> vals = rng.random(len(rows), dtype=np.float64)
+    >>> L = coo_array((vals, (rows, cols)), shape=(N, N))
+    >>> A = L + L.T   # make it symmetric
+    >>> A.setdiag(N)  # make it strongly positive definite
+    >>> A = A.tocsc()
+    >>> p, s = nesdis(A, return_separator=True)
+    >>> p
+    array([ 1,  4,  6,  8,  0,  3,  5,  2,  9, 10,  7])
+    >>> s
+    SeparatorTree(components=1, nodes=11)
     """
     cdef bint use_int32
     A, use_int32, out_itype = validate_csc_input(A)
@@ -3593,7 +3840,7 @@ def metis(A, *, kind=None):
 
     See Also
     --------
-    :func:`.bisect`, :func:`.nesdis`
+    bisect, nesdis
 
     Notes
     -----
@@ -3606,6 +3853,25 @@ def metis(A, *, kind=None):
     ----------
     .. [#metis_c] ``metis.c`` - CHOLMOD MATLAB metis function
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/metis.c
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from scipy.sparse import coo_array
+    >>> from sksparse.cholmod import metis
+    >>> # Create a symmetric positive definite matrix from (Davis, Eqn 2.1)
+    >>> N = 11
+    >>> rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
+    >>> cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
+    >>> rng = np.random.default_rng(56)
+    >>> vals = rng.random(len(rows), dtype=np.float64)
+    >>> L = coo_array((vals, (rows, cols)), shape=(N, N))
+    >>> A = L + L.T   # make it symmetric
+    >>> A.setdiag(N)  # make it strongly positive definite
+    >>> A = A.tocsc()
+    >>> p = metis(A)
+    >>> p
+    array([ 8,  3,  6,  0,  5,  2,  4,  7,  1,  9, 10])
     """
     cdef bint use_int32
     A, use_int32, out_itype = validate_csc_input(A)

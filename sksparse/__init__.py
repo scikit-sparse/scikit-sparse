@@ -12,14 +12,46 @@
 # 2022-       Aaron Johnson           <aaron9035@gmail.com>
 # 2025-       Bernard Roesler         <bernard.roesler@gmail.com>
 
-"""Sparse matrix tools.
+"""
+===================================
+Scikit Sparse API (:mod:`sksparse`)
+===================================
 
-This is a home for sparse matrix code in Python that plays well with
-scipy.sparse, but that is somehow unsuitable for inclusion in scipy
-proper. Usually this will be because it is released under the GPL.
+.. currentmodule:: sksparse
 
-So far we have a wrapper for the CHOLMOD library for sparse Cholesky
-decomposition. Further contributions are welcome!
+.. toctree::
+   :maxdepth: 1
+   :hidden:
+   :titlesonly:
+
+   sksparse.amd <amd>
+   sksparse.btf <btf>
+   sksparse.camd <camd>
+   sksparse.ccolamd <ccolamd>
+   sksparse.cholmod <cholmod>
+   sksparse.colamd <colamd>
+
+Provides sparse matrix algorithms not found in SciPy, for use with SciPy's
+sparse matrix classes in :mod:`scipy.sparse`.
+
+
+Submodules
+==========
+
+.. autosummary::
+
+   amd
+   btf
+   camd
+   ccolamd
+   cholmod
+   colamd
+
+
+References
+----------
+* `SuiteSparse homepage <https://people.engr.tamu.edu/davis/suitesparse.html>`_
+* `SuiteSparse GitHub <https://github.com/DrTimothyAldenDavis/SuiteSparse>`_
 """
 
 from importlib.metadata import version, PackageNotFoundError

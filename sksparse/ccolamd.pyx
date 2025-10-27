@@ -10,36 +10,62 @@
 #  Created: 2025-07-31 10:13
 # =============================================================================
 
-"""sksparse.ccolamd: Cython interface to CCOLAMD, a column approximate minimum
-degree ordering algorithm.
+"""
+==========================================================================================
+Constrained Column Approximate Minimum Degree (CCOLAMD) Ordering (:mod:`sksparse.ccolamd`)
+==========================================================================================
 
-This module provides a Cython interface to the CCOLAMD algorithm from the
-SuiteSparse library by Timothy A. Davis. The algorithm computes a column
-ordering for sparse matrices that is suitable for various numerical
-factorizations, such as LU and QR.
-
-Interfaces
-----------
-* `ccolamd`: Function to compute the column ordering of any shape sparse matrix.
-
-This wrapper handles both 32-bit and 64-bit integer indices, depending on the
-input matrix format.
+.. currentmodule:: sksparse.ccolamd
 
 .. versionadded:: 0.5.0
 
+Python interface to the `Constrained Column Approximate Minimum Degree
+(CCOLAMD)
+<https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CCOLAMD>`_
+ordering algorithm.
+
+
+.. _ccolamd-interface:
+
+Interface
+---------
+
+.. autosummary::
+   :toctree: generated/
+
+   ccolamd - Function to compute the column ordering of any shape sparse matrix.
+   csymamd - Function to compute the column ordering of a symmetric sparse matrix.
+   ccolamd_get_defaults - Function to get the default knobs for CCOLAMD.
+
+
+.. _ccolamd-exceptions:
+
+Exceptions and Warnings
+-----------------------
+
+.. autosummary::
+   :toctree: generated/
+
+   CCOLAMDError - Base class for CCOLAMD errors.
+   CCOLAMDValueError - Raised when CCOLAMD encounters a value error.
+   CCOLAMDMemoryError - Raised when CCOLAMD runs out of memory.
+   CCOLAMDInternalError - Raised when CCOLAMD encounters an internal error.
+   CCOLAMDStats - Dataclass containing statistics about the ordering.
+
+
 References
 ----------
-* SuiteSparse homepage:
-  https://people.engr.tamu.edu/davis/suitesparse.html
-* SuiteSparse CCOLAMD:
-  https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CCOLAMD
+* `SuiteSparse homepage <https://people.engr.tamu.edu/davis/suitesparse.html>`_
+* `SuiteSparse CCOLAMD <https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CCOLAMD>`_
 * CCOLAMD Algorithm Publications:
-  - T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, An approximate column
-    minimum degree ordering algorithm, ACM Transactions on Mathematical
-    Software, vol. 30, no. 3., pp. 353-376, 2004.
-  - T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, Algorithm 836: CCOLAMD,
-    an approximate column minimum degree ordering algorithm, ACM
-    Transactions on Mathematical Software, vol. 30, no. 3., pp. 377-380,
+
+  * T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, An approximate column
+    minimum degree ordering algorithm, *ACM Transactions on Mathematical
+    Software*, vol. 30, no. 3., pp. 353-376, 2004.
+
+  * T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, Algorithm 836: CCOLAMD,
+    an approximate column minimum degree ordering algorithm, *ACM
+    Transactions on Mathematical Software*, vol. 30, no. 3., pp. 377-380,
     2004.
 """
 
@@ -483,11 +509,16 @@ aggressive : bool, optional
 
 Returns
 -------
-q : (N,) ndarray
+q : (N,) :class:`~numpy.ndarray`
     The permutation vector.
-stats : CCOLAMDStats, optional
+stats : :class:`CCOLAMDStats`, optional
     If ``return_info`` is True, returns an object containing statistics
     about the ordering.
+
+See Also
+--------
+{see_also}
+
 
 .. versionadded:: 0.5.0
 
@@ -495,6 +526,10 @@ References
 ----------
 .. {reftag} ``ccolamd.c`` - SuiteSparse AMD source file.
     https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CCOLAMD/Source/ccolamd.c
+
+Examples
+--------
+{example}
 """
 
 # Define the docstrings
@@ -528,11 +563,34 @@ ccolamd_opt_lu_param = """opt_lu : {'lu', 'cholesky'}, optional
     the ordering is optimized for Cholesky factorization of :math:`A^{\\top}
     A`. If None, uses the default value from CCOLAMD, which is 'cholesky'."""
 
+_ccolamd_example = """\
+>>> import numpy as np
+>>> from scipy.sparse import random_array
+>>> from sksparse.ccolamd import ccolamd
+>>> # Create a non-symmetric matrix
+>>> N = 11
+>>> rng = np.random.default_rng(56)
+>>> A = random_array((N, N - 3), density=0.5, format='csc', rng=rng)
+>>> A.setdiag(N)  # make the diagonal non-zero
+>>> # Constrain the first K nodes to be ordered first
+>>> K = 4
+>>> C = np.full(A.shape[1], K)
+>>> C[:K] = np.arange(K)  # constrained nodes
+>>> p, info = ccolamd(A, constraints=C, return_info=True)
+>>> p
+array([0, 1, 2, 3, 4, 7, 6, 5], dtype=int32)
+>>> info
+CCOLAMDStats(N_rows_ignored=0, N_cols_ignored=0, Ncmpa=0, status=0, info1=-1,
+    info2=-1, info3=0)
+"""
+
 ccolamd.__doc__ = _CCOLAMD_DOC_TEMPLATE.format(
     intro=ccolamd_intro,
     A_param=ccolamd_A_param,
     opt_lu_param=ccolamd_opt_lu_param,
+    see_also="csymamd, ~sksparse.colamd.colamd, ~sksparse.colamd.symamd",
     reftag=ccolamd_reftag,
+    example=_ccolamd_example,
 )
 
 
@@ -556,21 +614,47 @@ Adapted from the CCOLAMD documentation {csymamd_reftag}_:
     `A`.
 """
 
-csymamd_A_param = """A : (N, N) {array_like, sparse matrix}
+csymamd_A_param = """A : (N, N) array_like or sparse matrix
     The input matrix for which to compute the column ordering.
     Must be 2D, square, and convertible to CSC format.
 
     .. note::
+
         This routine only accesses the lower triangular part of ``A``,
         which is *assumed* to be symmetric. If it is not, the results may
         be incorrect or undefined.
+
+"""
+
+_csymamd_example = """\
+>>> import numpy as np
+>>> from scipy.sparse import random_array
+>>> from sksparse.ccolamd import csymamd
+>>> # Create a non-symmetric matrix
+>>> N = 11
+>>> rng = np.random.default_rng(56)
+>>> A = random_array((N, N - 3), density=0.5, format='csc', rng=rng)
+>>> A.setdiag(N)  # make the diagonal non-zero
+>>> A = (A.T @ A).tocsc()  # make A symmetric
+>>> # Constrain the first K nodes to be ordered first
+>>> K = 4
+>>> C = np.full(A.shape[1], K)
+>>> C[:K] = np.arange(K)   # constrained nodes
+>>> p, info = csymamd(A, constraints=C, return_info=True)
+>>> p
+array([0, 1, 2, 3, 7, 6, 5, 4], dtype=int32)
+>>> info
+CCOLAMDStats(N_rows_ignored=0, N_cols_ignored=0, Ncmpa=0, status=0, info1=-1,
+    info2=-1, info3=0)
 """
 
 csymamd.__doc__ = _CCOLAMD_DOC_TEMPLATE.format(
     intro=csymamd_intro,
     A_param=csymamd_A_param,
     opt_lu_param='',
+    see_also="ccolamd, ~sksparse.colamd.colamd, ~sksparse.colamd.symamd",
     reftag=csymamd_reftag,
+    example=_csymamd_example,
 )
 
 
@@ -589,6 +673,7 @@ def ccolamd_get_defaults():
           are permuted to the end of the matrix.
         * 'dense_col_thresh': Like `dense_row_thresh`, but for columns.
         * 'aggressive': Default value for the aggressive knob.
+
 
     .. versionadded:: 0.5.0
     """

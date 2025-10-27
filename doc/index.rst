@@ -6,35 +6,14 @@
 scikit-sparse - Sparse matrix extensions for SciPy
 ==================================================
 
-Contents:
-
 .. toctree::
-   :maxdepth: 3
+   :maxdepth: 1
+   :caption: Contents
 
-   overview.rst
+   Overview <overview>
 
-   amd.rst
+   User Guide <tutorial/index>
 
-   btf.rst
+   API Reference <reference/index>
 
-   camd.rst
-
-   colamd.rst
-
-   ccolamd.rst
-
-   cholmod.rst
-
-   changes.rst
-
-   Python Module Index <modindex>
-
-   Search <search>
-
-Indices and Tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
-
+   Change Log <changes>

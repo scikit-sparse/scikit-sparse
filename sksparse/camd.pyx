@@ -9,38 +9,53 @@
 #     File: camd.pyx
 #  Created: 2025-08-01 13:04
 # =============================================================================
-# cython: language_level=3
 
-"""sksparse.camd: Python interface to the Approximate Minimum Degree (CAMD)
-ordering algorithm.
-
-This module provides a Cython interface to the CAMD algorithm from the
-SuiteSparse library by Timothy A. Davis. The algorithm computes a fill-reducing
-ordering of a sparse matrix, which is useful for improving the performance of
-Cholesky or LU factorization and subsequent linear algebra operations.
-
-Interfaces
-----------
-* `camd`: Main function to compute the CAMD ordering.
-* `CAMDInfo`: Dataclass to hold information statistics returned by the CAMD
-  algorithm.
-* `camd_default_control`: Get the default control parameters for CAMD.
-
-This wrapper handles both 32-bit and 64-bit integer indices, depending on the
-input matrix format.
+"""
+=============================================================================
+Constrained Approximate Minimum Degree (CAMD) Ordering (:mod:`sksparse.camd`)
+=============================================================================
 
 .. versionadded:: 0.5.0
 
+Python interface to the `Constrained Approximate Minimum Degree (CAMD)
+<https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CAMD>`_ ordering
+algorithm.
+
+
+.. _camd-interface:
+
+Interface
+---------
+
+.. autosummary::
+   :toctree: generated/
+
+   CAMDInfo - Dataclass to hold information statistics returned by the CAMD algorithm.
+   camd - Main function to compute the CAMD ordering.
+   camd_default_control - Get the default control parameters for CAMD.
+
+
+.. _camd-exceptions:
+
+Exceptions and Warnings
+-----------------------
+
+.. autosummary::
+   :toctree: generated/
+
+   CAMDError - Base class for CAMD-related errors.
+   CAMDInvalidMatrixError - Raised when the input matrix is invalid for CAMD.
+   CAMDMemoryError - Raised when CAMD runs out of memory.
+
+
 References
 ----------
-* SuiteSparse homepage:
-  https://people.engr.tamu.edu/davis/suitesparse.html
-* SuiteSparse CAMD:
-  https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CAMD
+* `SuiteSparse homepage <https://people.engr.tamu.edu/davis/suitesparse.html>`_
+* `SuiteSparse CAMD <https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CAMD>`_
 * AMD Algorithm Publication:
-  Amestoy, P. R., Davis, T. A., & Duff, I. S. (1996). An approximate
-    minimum degree ordering algorithm. SIAM Journal on Matrix Analysis and
-    Applications, 17(4), 886-905.
+  Amestoy, P. R., Davis, T. A., & Duff, I. S. (1996). An approximate minimum
+  degree ordering algorithm. *SIAM Journal on Matrix Analysis and Applications*,
+  17(4), 886-905.
 """
 
 cimport cython
@@ -100,7 +115,7 @@ class CAMDInfo:
         Number of rows and columns of the input matrix ``A``.
     nz : int
         Number of nonzeros in the input matrix ``A``.
-    symmetry : float in [0, 1]
+    symmetry : :class:`float` :math:`\in [0, 1]`
         Symmetry of pattern of ``A``. The symmetry is the number of "matched"
         off-diagonal entries divided by the total number of off-diagonal
         entries. An entry ``A[i, j]`` is matched if ``A[j, i]`` is also an
@@ -269,7 +284,7 @@ def camd(A, constraints=None, dense_thresh=None, aggressive=None, return_info=Fa
 
     Raises
     ------
-    SparseEfficiencyWarning
+    ~scipy.sparse.SparseEfficiencyWarning
         If the input matrix is not in CSC format, a warning is raised and the
         matrix is converted to CSC format.
     ValueError
@@ -279,6 +294,10 @@ def camd(A, constraints=None, dense_thresh=None, aggressive=None, return_info=Fa
         data types or formats.
     CAMDMemoryError
         If the CAMD algorithm runs out of memory during execution.
+
+    See Also
+    --------
+    ~sksparse.amd.amd, ~sksparse.colamd.colamd, ~sksparse.ccolamd.ccolamd
 
     Notes
     -----
@@ -296,6 +315,33 @@ def camd(A, constraints=None, dense_thresh=None, aggressive=None, return_info=Fa
         https://people.engr.tamu.edu/davis/suitesparse.html
     .. [2] SuiteSparse GitHub repository.
         https://github.com/DrTimothyAldenDavis/SuiteSparse
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from scipy.sparse import coo_array
+    >>> from sksparse.camd import camd
+    >>> # Create a symmetric positive definite matrix from (Davis, Eqn 2.1)
+    >>> N = 11
+    >>> rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
+    >>> cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
+    >>> rng = np.random.default_rng(565656)
+    >>> vals = rng.random(len(rows), dtype=np.float64)
+    >>> L = coo_array((vals, (rows, cols)), shape=(N, N))
+    >>> A = L + L.T   # make it symmetric
+    >>> A.setdiag(N)  # make it strongly positive definite
+    >>> A = A.tocsc()
+    >>> # Constrain the first K nodes to be ordered first
+    >>> K = 4
+    >>> C = np.full(N, K)
+    >>> C[:K] = np.arange(K)  # constrained nodes
+    >>> p, info = camd(A, constraints=C, return_info=True)
+    >>> p
+    array([ 0,  1,  2,  3,  8,  5,  6,  9,  4, 10,  7])
+    >>> info
+    CAMDInfo(status=0, N=11, nz=43, symmetry=1.0, nzdiag=11, nz_A_plus_AT=32,
+        Ndense=0, memory=1248.0, Ncmpa=0, Lnz=19, Ndiv=19, Nmultsubs_LDL=29,
+        Nmultsubs_LU=39, dmax=4)
     """
     A, _, out_itype = validate_csc_input(A, require_square=True)
 
@@ -423,6 +469,7 @@ def camd_default_control():
           columns with more than ``max(dense_thresh * sqrt(N), 16)`` entries
           are permuted to the end of the matrix.
         * 'aggressive': Whether to use aggressive absorption.
+
 
     .. versionadded:: 0.5.0
     """

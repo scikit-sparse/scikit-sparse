@@ -9,38 +9,58 @@
 #     File: amd.pyx
 #  Created: 2025-07-28 11:12
 # =============================================================================
-# cython: language_level=3
 
-"""sksparse.amd: Python interface to the Approximate Minimum Degree (AMD)
-ordering algorithm.
+"""
+===============================================================
+Approximate Minimum Degree (AMD) Ordering (:mod:`sksparse.amd`)
+===============================================================
 
-This module provides a Cython interface to the AMD algorithm from the
-SuiteSparse library by Timothy A. Davis. The algorithm computes a fill-reducing
-ordering of a sparse matrix, which is useful for improving the performance of
-Cholesky or LU factorization and subsequent linear algebra operations.
-
-Interfaces
-----------
-* `amd`: Main function to compute the AMD ordering.
-* `AMDInfo`: Dataclass to hold information statistics returned by the AMD
-  algorithm.
-* `amd_default_control`: Get the default control parameters for AMD.
-
-This wrapper handles both 32-bit and 64-bit integer indices, depending on the
-input matrix format.
+.. currentmodule:: sksparse.amd
 
 .. versionadded:: 0.5.0
 
+Python interface to the `Approximate Minimum Degree (AMD)
+<https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/AMD>`_ ordering
+algorithm.
+
+
+.. _amd-interface:
+
+Interface
+---------
+
+.. autosummary::
+   :toctree: generated/
+
+   AMDInfo - Dataclass to hold information statistics returned by the AMD algorithm.
+   amd - Main function to compute the AMD ordering.
+   amd_default_control - Get the default control parameters for AMD.
+
+
+.. _amd-exceptions:
+
+Exceptions and Warnings
+-----------------------
+
+.. autosummary::
+   :toctree: generated/
+
+   AMDError - Base class for AMD-related errors.
+   AMDInvalidMatrixError - Raised when the input matrix is invalid for AMD.
+   AMDMemoryError - Raised when AMD runs out of memory.
+
+
 References
 ----------
+
 * SuiteSparse homepage:
   https://people.engr.tamu.edu/davis/suitesparse.html
 * SuiteSparse AMD:
   https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/AMD
 * AMD Algorithm Publication:
-  Amestoy, P. R., Davis, T. A., & Duff, I. S. (1996). An approximate
-    minimum degree ordering algorithm. SIAM Journal on Matrix Analysis and
-    Applications, 17(4), 886-905.
+  Amestoy, P. R., Davis, T. A., & Duff, I. S. (1996). An approximate minimum
+  degree ordering algorithm. *SIAM Journal on Matrix Analysis and
+  Applications*, 17(4), 886-905.
 """
 
 cimport cython
@@ -100,7 +120,7 @@ class AMDInfo:
         Number of rows and columns of the input matrix ``A``.
     nz : int
         Number of nonzeros in the input matrix ``A``.
-    symmetry : float in [0, 1]
+    symmetry : :class:`float` :math:`\in [0, 1]`
         Symmetry of pattern of ``A``. The symmetry is the number of "matched"
         off-diagonal entries divided by the total number of off-diagonal
         entries. An entry ``A[i, j]`` is matched if ``A[j, i]`` is also an
@@ -252,16 +272,16 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
 
     Returns
     -------
-    p : ndarray
+    p : :obj:`~numpy.ndarray`
         The permutation vector such that the Cholesky factor of ``A[p][:, p]``
         has fewer nonzeros than the Cholesky factor of ``A``.
-    info : ndarray, optional
+    info : :obj:`~numpy.ndarray`, optional
         Additional information about the ordering process, returned if
         ``return_info`` is True. Contains various statistics and status codes.
 
     Raises
     ------
-    SparseEfficiencyWarning
+    ~scipy.sparse.SparseEfficiencyWarning
         If the input matrix is not in CSC format, a warning is raised and the
         matrix is converted to CSC format.
     ValueError
@@ -271,6 +291,10 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
         data types or formats.
     AMDMemoryError
         If the AMD algorithm runs out of memory during execution.
+
+    See Also
+    --------
+    ~sksparse.camd.camd, ~sksparse.colamd.colamd, ~sksparse.ccolamd.ccolamd
 
     Notes
     -----
@@ -288,6 +312,29 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
         https://people.engr.tamu.edu/davis/suitesparse.html
     .. [2] SuiteSparse GitHub repository.
         https://github.com/DrTimothyAldenDavis/SuiteSparse
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from scipy.sparse import coo_array
+    >>> from sksparse.amd import amd
+    >>> # Create a symmetric positive definite matrix from (Davis, Eqn 2.1)
+    >>> N = 11
+    >>> rows = np.array([5, 6, 2, 7, 9, 10, 5, 9, 7, 10, 8, 9, 10, 9, 10, 10])
+    >>> cols = np.array([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 9])
+    >>> rng = np.random.default_rng(565656)
+    >>> vals = rng.random(len(rows), dtype=np.float64)
+    >>> L = coo_array((vals, (rows, cols)), shape=(N, N))
+    >>> A = L + L.T   # make it symmetric
+    >>> A.setdiag(N)  # make it strongly positive definite
+    >>> A = A.tocsc()
+    >>> p, info = amd(A, return_info=True)
+    >>> p
+    array([ 1,  4,  8,  6,  0,  3,  5,  2,  9, 10,  7])
+    >>> info
+    AMDInfo(status=0, N=11, nz=43, symmetry=1.0, nzdiag=11, nz_A_plus_AT=32,
+        Ndense=0, memory=1096.0, Ncmpa=0, Lnz=19, Ndiv=19, Nmultsubs_LDL=29,
+        Nmultsubs_LU=39, dmax=4)
     """
 
     A, _, out_itype = validate_csc_input(A, require_square=True)
@@ -383,6 +430,7 @@ def amd_default_control():
           columns with more than ``max(dense_thresh * sqrt(N), 16)`` entries
           are permuted to the end of the matrix.
         * 'aggressive': Whether to use aggressive absorption.
+
 
     .. versionadded:: 0.5.0
     """

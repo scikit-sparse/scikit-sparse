@@ -10,37 +10,63 @@
 #  Created: 2025-07-31 10:13
 # =============================================================================
 
-"""sksparse.colamd: Cython interface to COLAMD, a column approximate minimum
-degree ordering algorithm.
+"""
+============================================================================
+Column Approximate Minimum Degree (COLAMD) Ordering (:mod:`sksparse.colamd`)
+============================================================================
 
-This module provides a Cython interface to the COLAMD algorithm from the
-SuiteSparse library by Timothy A. Davis. The algorithm computes a column
-ordering for sparse matrices that is suitable for various numerical
-factorizations, such as LU and QR.
-
-Interfaces
-----------
-* `colamd`: Function to compute the column ordering of any shape sparse matrix.
-
-This wrapper handles both 32-bit and 64-bit integer indices, depending on the
-input matrix format.
+.. currentmodule:: sksparse.colamd
 
 .. versionadded:: 0.5.0
 
+Python interface to the `Column Approximate Minimum Degree (COLAMD)
+<https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/COLAMD>`_ ordering
+algorithm.
+
+
+.. _colamd-interface:
+
+Interface
+---------
+
+.. autosummary::
+   :toctree: generated/
+
+   colamd - Function to compute the column ordering of any shape sparse matrix.
+   symamd - Function to compute the column ordering of a symmetric sparse matrix.
+   colamd_get_defaults - Get the default knobs for COLAMD.
+
+
+.. _colamd-exceptions:
+
+Exceptions and Warnings
+-----------------------
+
+.. autosummary::
+   :toctree: generated/
+
+   COLAMDError - Base class for COLAMD errors.
+   COLAMDValueError - Raised when COLAMD encounters a value error.
+   COLAMDMemoryError - Raised when COLAMD runs out of memory.
+   COLAMDInternalError - Raised when COLAMD encounters an internal error.
+   COLAMDStats - Dataclass containing statistics about the ordering.
+
+
 References
 ----------
-* SuiteSparse homepage:
-  https://people.engr.tamu.edu/davis/suitesparse.html
-* SuiteSparse COLAMD:
-  https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/COLAMD
+* `SuiteSparse homepage <https://people.engr.tamu.edu/davis/suitesparse.html>`_
+* `SuiteSparse COLAMD <https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/COLAMD>`_
 * COLAMD Algorithm Publications:
-  - T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, An approximate column
-    minimum degree ordering algorithm, ACM Transactions on Mathematical
-    Software, vol. 30, no. 3., pp. 353-376, 2004.
-  - T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, Algorithm 836: COLAMD,
-    an approximate column minimum degree ordering algorithm, ACM
-    Transactions on Mathematical Software, vol. 30, no. 3., pp. 377-380,
+
+  * T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, An approximate column
+    minimum degree ordering algorithm, *ACM Transactions on Mathematical
+    Software*, vol. 30, no. 3., pp. 353-376, 2004.
+
+  * T. A. Davis, J. R. Gilbert, S. Larimore, E. Ng, Algorithm 836: COLAMD,
+    an approximate column minimum degree ordering algorithm, *ACM
+    Transactions on Mathematical Software*, vol. 30, no. 3., pp. 377-380,
     2004.
+
 """
 
 cimport cython
@@ -414,11 +440,16 @@ aggressive : bool, optional
 
 Returns
 -------
-q : (N,) ndarray
+q : (N,) :class:`~numpy.ndarray`
     The permutation vector.
-stats : COLAMDStats, optional
+stats : :class:`COLAMDStats`, optional
     If ``return_info`` is True, returns an object containing statistics
     about the ordering.
+
+See Also
+--------
+{see_also}
+
 
 .. versionadded:: 0.5.0
 
@@ -426,6 +457,10 @@ References
 ----------
 .. {reftag} ``colamd.c`` - SuiteSparse AMD source file.
     https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/COLAMD/Source/colamd.c
+
+Examples
+--------
+{example}
 """
 
 # Define the docstrings
@@ -450,12 +485,33 @@ Adapted from the COLAMD documentation {_colamd_reftag}_:
     row interchanges.
 """
 
-_colamd_A_param = """A : (M, N) {array_like, sparse matrix}
+_colamd_A_param = """A : (M, N) array_like or sparse matrix
     The input matrix for which to compute the column ordering.
     Must be 2D and convertible to CSC format. Need not be square."""
 
+_colamd_example = """\
+>>> import numpy as np
+>>> from scipy.sparse import random_array
+>>> from sksparse.colamd import colamd
+>>> # Create a non-symmetric matrix
+>>> N = 11
+>>> rng = np.random.default_rng(56)
+>>> A = random_array((N, N - 3), density=0.5, format='csc', rng=rng)
+>>> A.setdiag(N)  # make the diagonal non-zero
+>>> p, info = colamd(A, return_info=True)
+>>> p
+array([0, 3, 5, 6, 7, 1, 2, 4], dtype=int32)
+>>> info
+COLAMDStats(N_rows_ignored=0, N_cols_ignored=0, Ncmpa=0, status=0, info1=-1,
+    info2=-1, info3=0)
+"""
+
 colamd.__doc__ = _COLAMD_DOC_TEMPLATE.format(
-    intro=_colamd_intro, A_param=_colamd_A_param, reftag=_colamd_reftag,
+    intro=_colamd_intro,
+    A_param=_colamd_A_param,
+    see_also="symamd, ~sksparse.ccolamd.ccolamd, ~sksparse.ccolamd.csymamd",
+    reftag=_colamd_reftag,
+    example=_colamd_example,
 )
 
 
@@ -484,13 +540,37 @@ _symamd_A_param = """A : (N, N) {array_like, sparse matrix}
     Must be 2D, square, and convertible to CSC format.
 
     .. note::
+
         This routine only accesses the lower triangular part of ``A``,
         which is *assumed* to be symmetric. If it is not, the results may
         be incorrect or undefined.
+
+"""
+
+_symamd_example = """\
+>>> import numpy as np
+>>> from scipy.sparse import random_array
+>>> from sksparse.colamd import symamd
+>>> # Create a non-symmetric matrix
+>>> N = 11
+>>> rng = np.random.default_rng(56)
+>>> A = random_array((N, N - 3), density=0.5, format='csc', rng=rng)
+>>> A.setdiag(N)           # make the diagonal non-zero
+>>> A = (A.T @ A).tocsc()  # make it symmetric
+>>> p, info = symamd(A, return_info=True)
+>>> p
+array([4, 6, 7, 0, 1, 2, 3, 5], dtype=int32)
+>>> info
+COLAMDStats(N_rows_ignored=0, N_cols_ignored=0, Ncmpa=0, status=0, info1=-1,
+    info2=-1, info3=0)
 """
 
 symamd.__doc__ = _COLAMD_DOC_TEMPLATE.format(
-    intro=_symamd_intro, A_param=_symamd_A_param, reftag=_symamd_reftag,
+    intro=_symamd_intro,
+    A_param=_symamd_A_param,
+    see_also="colamd, ~sksparse.ccolamd.ccolamd, ~sksparse.ccolamd.csymamd",
+    reftag=_symamd_reftag,
+    example=_symamd_example,
 )
 
 
@@ -509,6 +589,7 @@ def colamd_get_defaults():
           are permuted to the end of the matrix.
         * 'dense_col_thresh': Like `dense_row_thresh`, but for columns.
         * 'aggressive': Default value for the aggressive knob.
+
 
     .. versionadded:: 0.5.0
     """
