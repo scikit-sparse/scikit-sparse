@@ -85,14 +85,22 @@ v0.5.0
     a canonical CSC format, regardless of the input format.
 
 * Create the :mod:`~sksparse.amd` module, which provides the AMD ordering method.
-* Create the :mod:`~sksparse.btf` module, which provides the BTF ordering
-  method.
+* Create the :mod:`~sksparse.btf` module, which provides the BTF ordering method.
 * Create the :mod:`~sksparse.camd` module, which provides the constrained AMD
   ordering method.
 * Create the :mod:`~sksparse.colamd` module, which provides the COLAMD
   ordering method.
 * Create the :mod:`~sksparse.ccolamd` module, which provides the constrained
   COLAMD ordering method.
+* Remove support for the following versions:
+
+  - Python < 3.10
+  - NumPy < 2.0
+  - SciPy < 1.14
+
+  Python 3.9 will reach its end of life in October 2025, so remove support for
+  it now. Numpy will end support for all 1.x versions by September 2025. SciPy
+  v1.14 (released June 2024) will be supported until the end of 2026.
 
 v0.4.4
 ------

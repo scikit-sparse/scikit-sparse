@@ -59,8 +59,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'scikit-sparse'
-copyright = '2016, Antony Lee'
-author = 'Antony Lee'
+copyright = '2016–­2025, The scikit-sparse developers'
+author = 'The scikit-sparse developers'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

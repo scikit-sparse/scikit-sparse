@@ -1,0 +1,85 @@
+name: Build Check
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [build-check]
+
+jobs:
+  build-check:
+    name: Build Check
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install non-python dependencies on mac
+        if: runner.os == 'macOS'
+        run: |
+          brew install suite-sparse
+
+      - name: Install non-python dependencies on linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install libsuitesparse-dev
+
+      - name: Install build tools
+        run: |
+          pip install --upgrade pip
+          pip install build
+
+      - name: Build sdist and wheel
+        run: |
+          python -m build
+
+      - name: List sdist contents
+        run: |
+          echo "---- Source distribution contents ----"
+          tar -tzf dist/*.tar.gz
+
+      - name: List wheel contents
+        run: |
+          echo "---- Wheel contents ----"
+          unzip -l dist/*.whl
+
+      - name: Check wheel for .c/.pyx (should be excluded)
+        run: |
+          if unzip -l dist/*.whl | grep -E '\.c$|\.pyx$'; then
+            echo "::error::Wheel includes Cython source or C files"
+            exit 1
+          fi
+
+      - name: Create new conda env and install wheel
+        shell: bash -l {0}  # use bash as a login shell for conda activation
+        run: |
+          conda create -n test-wheel python=${{ matrix.python-version }} -y
+          conda activate test-wheel
+          conda install -c conda-forge suitesparse -y
+          pip install dist/*.whl
+          python -c "import sksparse; print(sksparse.__version__)"
+
+      - name: Create new conda env and install sdist
+        shell: bash -l {0}  # use bash as a login shell for conda activation
+        run: |
+          conda create -n test-sdist python=${{ matrix.python-version }} -y
+          conda activate test-sdist
+          conda install -c conda-forge suitesparse -y
+          pip install dist/scikit_sparse*.tar.gz
+          python -c "import sksparse; print(sksparse.__version__)"
+
+      - name: Upload built artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: scikit-sparse-dist-${{ matrix.os }}-${{ matrix.python-version }}
+          path: dist/

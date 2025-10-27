@@ -25,8 +25,6 @@ Contents:
 
    cholmod.rst
 
-   .. sksparse._cholmod_internal <_cholmod_internal.rst>
-
    changes.rst
 
    Python Module Index <modindex>
