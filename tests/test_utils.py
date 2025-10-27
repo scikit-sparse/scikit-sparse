@@ -35,7 +35,7 @@ def test_ND_input():
 
 @pytest.mark.parametrize("matrix_type", ["dense", "csc", "coo", "csc_matrix"])
 def test_input_conversion(matrix_type):
-    A = sparse.csc_array(np.arange(12).reshape(3, 4))
+    A = sparse.csc_array(np.arange(12.0).reshape(3, 4))
 
     match matrix_type:
         case "dense":
@@ -52,10 +52,48 @@ def test_input_conversion(matrix_type):
     if matrix_type == "csc":
         result, use_int32, out_itype = validate_csc_input(A)
     else:
-        with pytest.warns(sparse.SparseEfficiencyWarning, match="not in CSC array format"):
+        with pytest.warns(
+            sparse.SparseEfficiencyWarning, match="not in CSC array format"
+        ):
             result, use_int32, out_itype = validate_csc_input(A)
 
     assert isinstance(result, sparse.csc_array)
-    assert_array_equal(result.toarray(), A.toarray() if sparse.issparse(A) else A, strict=True)
+    assert_array_equal(
+        result.toarray(), A.toarray() if sparse.issparse(A) else A, strict=True
+    )
+    assert use_int32
+    assert out_itype == np.int32
+
+
+DTYPES = [
+    bool,
+    int,
+    float,
+    complex,
+    np.bool_,
+    np.int8,
+    np.int16,
+    np.int32,
+    np.int64,
+    np.float32,
+    np.float64,
+    np.complex64,
+    np.complex128,
+]
+
+
+@pytest.mark.parametrize("dtype", DTYPES)
+def test_data_types(dtype):
+    A = sparse.csc_array(np.arange(12).reshape(3, 4)).astype(dtype)
+    result, use_int32, out_itype = validate_csc_input(A)
+    assert isinstance(result, sparse.csc_array)
+
+    # bools and ints are coerced to at least float32
+    if np.issubdtype(dtype, np.bool_) or np.issubdtype(dtype, np.integer):
+        expected_dtype = np.result_type(dtype, np.float32)
+    else:
+        expected_dtype = dtype
+
+    assert result.dtype == expected_dtype
     assert use_int32
     assert out_itype == np.int32

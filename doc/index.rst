@@ -9,7 +9,7 @@ scikit-sparse - Sparse matrix extensions for SciPy
 Contents:
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
 
    overview.rst
 
@@ -25,9 +25,15 @@ Contents:
 
    cholmod.rst
 
+   .. sksparse._cholmod_internal <_cholmod_internal.rst>
+
    changes.rst
 
-Indices and tables
+   Python Module Index <modindex>
+
+   Search <search>
+
+Indices and Tables
 ==================
 
 * :ref:`genindex`

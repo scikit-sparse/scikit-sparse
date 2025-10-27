@@ -4,13 +4,12 @@ Overview
 Introduction
 ------------
 
-The :mod:`scikit-sparse` package (previously known as :mod:`scikits.sparse`)
+The :code:`scikit-sparse` package (previously known as :code:`scikits.sparse`)
 is a companion to the :mod:`scipy.sparse` library for sparse matrix
-manipulation in Python. All :mod:`scikit-sparse` routines expect and
-return :mod:`scipy.sparse` matrices (usually in CSC format). The intent
-of :mod:`scikit-sparse` is to wrap GPL'ed code such as `SuiteSparse
-<http://www.suitesparse.com>`_, which cannot be
-included in SciPy proper.
+manipulation in Python. All :code:`scikit-sparse` routines expect and return
+:mod:`scipy.sparse` matrices (usually in CSC format). The intent of
+:code:`scikit-sparse` is to wrap GPL'ed code such as `SuiteSparse
+<suitesparse_website_>`_, which cannot be included in SciPy proper.
 
 Currently our coverage is rather... sparse, with only a wrapper for
 the CHOLMOD routines for sparse Cholesky decomposition, but we hope
@@ -38,13 +37,13 @@ repository <https://github.com/scikit-sparse/scikit-sparse>`_::
 Requirements
 ------------
 
-Installing :mod:`scikit-sparse` requires:
+Installing :code:`scikit-sparse` requires:
 
 * `Python <http://python.org/>`_
 * `NumPy <http://numpy.scipy.org/>`_
 * `SciPy <http://www.scipy.org/>`_
 * `Cython <http://www.cython.org/>`_
-* CHOLMOD (included in `SuiteSparse <http://www.suitesparse.com>`_)
+* CHOLMOD (included in `SuiteSparse <suitesparse_website_>`_)
 
 Test versions are:
 * Python: 3.7, 3.6
@@ -89,3 +88,5 @@ Developers
 * 2016-2017   `Antony Lee              <anntzer.lee@gmail.com>`_
 * 2016        `Alex Grigorievskiy      <alex.grigorievskiy@gmail.com>`_
 * 2016-2018   `Joscha Reimer           <jor@informatik.uni-kiel.de>`_
+
+.. _suitesparse_website: https://people.engr.tamu.edu/davis/suitesparse.html
