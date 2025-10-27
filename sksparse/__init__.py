@@ -68,5 +68,6 @@ from . import camd
 from . import ccolamd
 from . import cholmod
 from . import colamd
+from . import umfpack
 
-__all__ = ["amd", "btf", "camd", "ccolamd", "cholmod", "colamd"]
+__all__ = ["amd", "btf", "camd", "ccolamd", "cholmod", "colamd", "umfpack"]

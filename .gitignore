@@ -6,6 +6,9 @@ scikits/sparse/cholmod.c
 htmlcov/
 .tox
 .cache
+sksparse/umfpack.c
+doc/generated/
+_dev_scripts/
 
 # Cribbed from numpy's .gitignore:
 
