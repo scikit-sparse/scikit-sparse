@@ -75,7 +75,7 @@ if user_include_dir:
 if user_library_dir:
     LIBRARY_DIRS.append(user_library_dir)
 
-extension_names = ["cholmod", "amd", "camd", "colamd"]
+extension_names = ["cholmod", "amd", "camd", "colamd", "ccolamd"]
 
 setup(
     install_requires=["numpy>=1.13.3", "scipy>=0.19"],

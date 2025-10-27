@@ -17,9 +17,11 @@ Contents:
 
    camd.rst
 
-   cholmod.rst
-
    colamd.rst
+
+   ccolamd.rst
+
+   cholmod.rst
 
    changes.rst
 

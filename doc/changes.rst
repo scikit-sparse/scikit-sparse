@@ -10,6 +10,8 @@ v0.5.0
     ordering method.
   * Create the :mod:`~sksparse.colamd` module, which provides the COLAMD
     ordering method.
+  * Create the :mod:`~sksparse.ccolamd` module, which provides the constrained
+    COLAMD ordering method.
 
 v0.4.4
 ------
