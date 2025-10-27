@@ -32,14 +32,14 @@ q = colamd(A)  # compute the COLAMD ordering
 AQ = A[:, q]   # apply the column ordering to the matrix
 
 # Compute the LU factorization of the original and permuted matrices
-lu = splu(A, permc_spec='NATURAL')
+lu = splu(A, permc_spec="NATURAL")
 L_, U_ = lu.L, lu.U
 
-luq = splu(AQ, permc_spec='NATURAL')
+luq = splu(AQ, permc_spec="NATURAL")
 Lq, Uq = luq.L, luq.U
 
 # Plot the original and permuted matrices
-plt.rcParams.update({'font.size': 10})
+plt.rcParams.update({"font.size": 10})
 
 fig, axs = plt.subplots(num=1, nrows=2, ncols=2, clear=True)
 fig.set_size_inches((6, 6), forward=True)
@@ -65,7 +65,7 @@ ax.set_title(r"Permuted LU Factors $L_q + U_q$")
 ax.set_xlabel(f"{(Lq + Uq).nnz:,} total non-zeros")
 
 for ax in axs.flat:
-    ax.set_aspect('equal')
+    ax.set_aspect("equal")
     ax.set_xticks([])
     ax.set_yticks([])
 

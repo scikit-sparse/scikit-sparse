@@ -97,3 +97,5 @@ def test_data_types(dtype):
     assert result.dtype == expected_dtype
     assert use_int32
     assert out_itype == np.int32
+    assert use_int32
+    assert out_itype == np.int32

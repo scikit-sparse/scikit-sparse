@@ -1,0 +1,17 @@
+# .readthedocs.yaml
+# The version of the configuration file.
+version: 2
+
+build:
+  os: ubuntu-24.04
+  tools:
+    # Use a recent Python version
+    python: "mambaforge-22.9"
+
+conda:
+  environment: doc/environment.yaml
+
+sphinx:
+  configuration: doc/conf.py
+
+formats: all

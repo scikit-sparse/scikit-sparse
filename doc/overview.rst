@@ -1,107 +1,22 @@
+========
 Overview
 ========
 
 Introduction
 ------------
 
-The :code:`scikit-sparse` package (previously known as :code:`scikits.sparse`)
-is a companion to the :mod:`scipy.sparse` library for sparse matrix
-manipulation in Python. All :code:`scikit-sparse` routines expect and return
-:mod:`scipy.sparse` matrices (usually in CSC format). The intent of
-:code:`scikit-sparse` is to wrap GPL'ed code such as `SuiteSparse
-<suitesparse_website_>`_, which cannot be included in SciPy proper.
+The ``scikit-sparse`` package (previously known as ``scikits.sparse``)
+is a companion to the :mod:`scipy.sparse` library for sparse matrix manipulation
+in Python. All :mod:`sksparse` routines expect and return :mod:`scipy.sparse`
+matrices (usually in CSC format). The intent of :mod:`sksparse` is to wrap code
+with a GPL license, such as `SuiteSparse <suitesparse_website_>`_, which cannot
+be included in SciPy proper.
 
-Currently our coverage is rather... sparse, with only a wrapper for
-the CHOLMOD routines for sparse Cholesky decomposition, but we hope
-that this will expand over time. Contributions of new wrappers are
-very welcome, especially if you can follow the style of the existing
-interfaces.
+.. _suitesparse_website: https://people.engr.tamu.edu/davis/suitesparse.html
 
-
-Download
---------
-
-The current release may be downloaded from the Python Package index at
-
-  https://pypi.python.org/pypi/scikit-sparse/
-
-Or from the `homepage <https://github.com/scikit-sparse/scikit-sparse>`_
-at
-
-  https://github.com/scikit-sparse/scikit-sparse/releases
-
-Or the latest *development version* may be found in our `Git
-repository <https://github.com/scikit-sparse/scikit-sparse>`_::
-
-  $ git clone git://github.com/scikit-sparse/scikit-sparse.git
-
-Requirements
-------------
-
-Installing :code:`scikit-sparse` requires:
-
-* `Python <http://python.org/>`_
-* `NumPy <http://numpy.scipy.org/>`_
-* `SciPy <http://www.scipy.org/>`_
-* `Cython <http://www.cython.org/>`_
-* `SuiteSparse <suitesparse_website_>`_
-
-Test versions are:
-
-* Python: 3.10, 3.11, 3.12, 3.13
-* NumPy: 2.0
-* SciPy: 1.14
-* SuiteSparse CHOLMOD: 5.3
-
-(Other versions may work but are untested.)
-
-
-Installation
-------------
-
-Installing SuiteSparse
-++++++++++++++++++++++
-
-To install :mod:`scikit-sparse`, you need to have the `SuiteSparse
-<suitesparse_website_>`_ library installed on your system.
-
-It is recommended that you install SuiteSparse and the scikit-sparse
-dependencies in a virtual environment, to avoid conflicts with other packages.
-We recommend using Anaconda::
-
-    $ conda create -n scikit-sparse python>=3.10 suitesparse
-    $ conda activate scikit-sparse
-
-If you are not using Anaconda, you can install SuiteSparse using your preferred
-package manager.
-
-On MacOS, you can use `Homebrew <http://brew.sh>`_::
-
-  $ brew install suite-sparse
-
-On Debian/Ubuntu systems, the following command should suffice::
-
-  $ sudo apt-get install python-scipy libsuitesparse-dev
-
-On Arch Linux, run::
-
-  $ sudo pacman -S suitesparse
-
-
-Installing Scikit-Sparse
-++++++++++++++++++++++++
-
-Once you have SuiteSparse installed, you can install :mod:`scikit-sparse` with::
-
-  $ conda install -c conda-forge scikit-sparse
-
-or if you prefer to use pip, you can install it with::
-
-  $ pip install scikit-sparse
-
-Check if the installation was successful by running the following command::
-
-  $ python -c "import sksparse; print(sksparse.__version__)"
+.. include:: ../README.rst
+   :start-after: .. start-installation
+   :end-before:  .. end-installation
 
 
 Troubleshooting
@@ -121,11 +36,20 @@ following order:
 
 The first path that contains the SuiteSparse headers and libraries will be used.
 
-To see which SuiteSparse library was found, you can run the following command::
+
+To see which SuiteSparse library was found, you can run the following command on
+MacOS or Linux::
 
     $ CHECK_SKSPARSE_INSTALL=$(python -c 'import sksparse.cholmod; print(sksparse.cholmod.__file__)')
 
-then, on MacOS::
+Then, use one of the following commands depending on your operating system.
+
+
+MacOS
+^^^^^
+
+On MacOS, use the following command to check where the SuiteSparse
+installation was found::
 
     $ otool -L $CHECK_SKSPARSE_INSTALL | grep cholmod
 
@@ -147,6 +71,10 @@ relative path. To resolve this path, run::
 
 which indicates that the library was found on the conda path.
 
+
+Linux
+^^^^^
+
 On Linux, use the following commands instead::
 
     $ ldd $CHECK_SKSPARSE_INSTALL | grep cholmod
@@ -155,12 +83,14 @@ On Linux, use the following commands instead::
 
 also confirming installation on the conda path.
 
+
 Contact
 -------
 
 Post your suggestions and questions directly to our `GitHub Issues page
-<https://github.com/scikit-sparse/scikit-sparse/issues>`_.
+<github_issues_>`_.
 
+.. _github_issues: https://github.com/broesler/scikit-sparse/issues
 
 Developers
 ----------
@@ -176,5 +106,3 @@ Developers
 * 2021-       `Justin Ellis            <justin.ellis18@gmail.com>`_
 * 2022-       `Aaron Johnson           <aaron9035@gmail.com>`_
 * 2025–       `Bernard Roesler         <bernard.roesler@gmail.com>`_
-
-.. _suitesparse_website: https://people.engr.tamu.edu/davis/suitesparse.html

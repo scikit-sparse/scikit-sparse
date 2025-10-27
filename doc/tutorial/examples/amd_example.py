@@ -34,7 +34,7 @@ L = cholesky(A, lower=True)
 Lp = cholesky(PAPT, lower=True)
 
 # Plot the original and permuted matrices
-plt.rcParams.update({'font.size': 10})
+plt.rcParams.update({"font.size": 10})
 
 fig, axs = plt.subplots(num=1, nrows=2, ncols=2, clear=True)
 fig.set_size_inches((6, 6), forward=True)
@@ -60,7 +60,7 @@ ax.set_title(r"Permuted Cholesky Factor $L_p$")
 ax.set_xlabel(f"{Lp.nnz:,} non-zeros")
 
 for ax in axs.flat:
-    ax.set_aspect('equal')
+    ax.set_aspect("equal")
     ax.set_xticks([])
     ax.set_yticks([])
 

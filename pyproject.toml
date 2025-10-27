@@ -4,10 +4,10 @@ requires = ["setuptools>=61.0", "wheel", "Cython>=3.0", "numpy>=2.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "scikit-sparse"
-version = "0.5.0"
+name = "scikit-sparse-dev"
+version = "0.5.0.dev0"
 description = "Scikit-sparse is a Python wrapper for the SuiteSparse sparse matrix library."
-readme = "README.md"
+readme = "README.rst"
 requires-python = ">=3.10"
 license = "BSD-2-Clause"
 license-files = ["LICENSE.txt"]
@@ -50,17 +50,23 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+docs = [
+    "sphinx",
+    "furo",
+    "sphinx-copybutton",
+]
 dev = [
     "build",
     "pre-commit",
     "pytest",
     "ruff",
-    "sphinx",
+    # setuptools gets all docs dependencies too
+    "docs",
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/scikit-sparse/scikit-sparse"
-"Bug Tracker" = "https://github.com/scikit-sparse/scikit-sparse/issues"
+"Homepage" = "https://github.com/broesler/scikit-sparse"
+"Bug Tracker" = "https://github.com/broesler/scikit-sparse/issues"
 
 # This data is excluded from the wheel package, but not necessarily from the
 # sdist (for sdist, see: MANIFEST.in)
@@ -77,9 +83,6 @@ language_level = "3"
 [tool.ruff]
 line-length = 88
 target-version = "py310"
-extend-exclude = [
-    "doc",
-]
 
 [tool.ruff.lint]
 extend-select = [

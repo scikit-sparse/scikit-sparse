@@ -1,8 +1,8 @@
 Changes
 =======
 
-v0.5.0
-------
+v0.5.0.dev0
+-----------
 * Major API updates to the :mod:`sksparse.cholmod` module. The module has been
   updated to resemble the existing :func:`scipy.linalg.cholesky` interface, as
   well as provide additional functions present in the SuiteSparse CHOLMOD
