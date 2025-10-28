@@ -5,9 +5,7 @@ on:
   push:
     branches: 
       - "build-check"
-  release:
-    types:
-      - "published"
+      - "release/*"
 
 jobs:
   build-check:
