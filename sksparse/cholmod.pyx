@@ -3429,8 +3429,6 @@ def bisect(A, *, kind=None):
 class SeparatorTree():
     """The separator tree of a sparse matrix graph.
 
-    .. versionadded:: 0.5.0
-
     This object is typically created by :func:`.nesdis`.
 
     Attributes
@@ -3443,6 +3441,9 @@ class SeparatorTree():
     cmember : *(N,)* numpy.ndarray of int, optional
         The component membership vector, where ``cmember[i]`` is the component
         to which node ``i`` belongs.
+
+
+    .. versionadded:: 0.5.0
     """
     def __init__(self, cp, cmember):
         self._cp = np.ascontiguousarray(cp)
@@ -3450,12 +3451,10 @@ class SeparatorTree():
 
     @property
     def cp(self):
-        """(C,) ndarray of int: The component parent array."""
         return self._cp
 
     @property
     def cmember(self):
-        """(N,) ndarray of int: The component membership array."""
         return self._cmember
 
     def __repr__(self):
