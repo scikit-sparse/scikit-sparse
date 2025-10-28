@@ -43,6 +43,8 @@ Object Interface
     
     umf_factor - Compute the LU factorization of a sparse matrix.
     UMFFactor - An object-oriented interface to UMFPACK.
+    UMFInfo - A dataclass to return UMFPACK info.
+    UMFControl - A dataclass to set UMFPACK control parameters.
 
 
 .. umfpack-exceptions:
@@ -406,72 +408,72 @@ cdef dict _INFO_INDEX = {
 
 
 cdef list _INFO_INT_NAMES = [
-    'status',
-    'n_row',
-    'n_col',
-    'nz',
-    'size_of_unit',
-    'size_of_int',
-    'size_of_long',
-    'size_of_pointer',
-    'size_of_entry',
-    'ndense_row',
-    'nempty_row',
-    'ndense_col',
-    'nempty_col',
-    'symbolic_defrag',
-    'symbolic_peak_memory',
-    'symbolic_size',
-    'strategy_used',
-    'ordering_used',
-    'qfixed',
-    'diag_preferred',
-    'nz_a_plus_at',
-    'nzdiag',
-    'symmetric_lunz',
-    'symmetric_flops',
-    'symmetric_ndense',
-    'symmetric_dmax',
-    'col_singletons',
-    'row_singletons',
-    'n2',
-    's_symmetric',
-    'numeric_size_estimate',
-    'peak_memory_estimate',
-    'flops_estimate',
-    'lnz_estimate',
-    'unz_estimate',
-    'variable_init_estimate',
-    'variable_peak_estimate',
-    'variable_final_estimate',
-    'max_front_size_estimate',
-    'max_front_nrows_estimate',
-    'max_front_ncols_estimate',
-    'numeric_size',
-    'peak_memory',
-    'flops',
-    'lnz',
-    'unz',
-    'variable_init',
-    'variable_peak',
-    'variable_final',
-    'max_front_size',
-    'max_front_nrows',
-    'max_front_ncols',
-    'numeric_defrag',
-    'numeric_realloc',
-    'numeric_costly_realloc',
-    'compressed_pattern',
-    'lu_entries',
-    'nz_udiag',
-    'forced_updates',
-    'noff_diag',
-    'all_lnz',
-    'all_unz',
-    'nzdropped',
-    'ir_taken',
-    'ir_attempted',
-    'solve_flops',
+    "status",
+    "n_row",
+    "n_col",
+    "nz",
+    "size_of_unit",
+    "size_of_int",
+    "size_of_long",
+    "size_of_pointer",
+    "size_of_entry",
+    "ndense_row",
+    "nempty_row",
+    "ndense_col",
+    "nempty_col",
+    "symbolic_defrag",
+    "symbolic_peak_memory",
+    "symbolic_size",
+    "strategy_used",
+    "ordering_used",
+    "qfixed",
+    "diag_preferred",
+    "nz_a_plus_at",
+    "nzdiag",
+    "symmetric_lunz",
+    "symmetric_flops",
+    "symmetric_ndense",
+    "symmetric_dmax",
+    "col_singletons",
+    "row_singletons",
+    "n2",
+    "s_symmetric",
+    "numeric_size_estimate",
+    "peak_memory_estimate",
+    "flops_estimate",
+    "lnz_estimate",
+    "unz_estimate",
+    "variable_init_estimate",
+    "variable_peak_estimate",
+    "variable_final_estimate",
+    "max_front_size_estimate",
+    "max_front_nrows_estimate",
+    "max_front_ncols_estimate",
+    "numeric_size",
+    "peak_memory",
+    "flops",
+    "lnz",
+    "unz",
+    "variable_init",
+    "variable_peak",
+    "variable_final",
+    "max_front_size",
+    "max_front_nrows",
+    "max_front_ncols",
+    "numeric_defrag",
+    "numeric_realloc",
+    "numeric_costly_realloc",
+    "compressed_pattern",
+    "lu_entries",
+    "nz_udiag",
+    "forced_updates",
+    "noff_diag",
+    "all_lnz",
+    "all_unz",
+    "nzdropped",
+    "ir_taken",
+    "ir_attempted",
+    "solve_flops",
 ]
 
 cdef list _INFO_BOOL_NAMES = [
@@ -618,11 +620,12 @@ cdef class UMFInfo:
         Time spent in symbolic factorization, in seconds.
     symbolic_walltime : float
         Wall-clock time spent in symbolic factorization, in seconds.
-    strategy_used : str in ['auto', 'unsymmetric', 'symmetric']
-        Strategy used in the factorization.
-    ordering_used : str in ['cholmod', 'amd', 'given', 'none', 'metis',\
-                             'best', 'user', 'metis_guard']
-        Ordering method used in the factorization.
+    strategy_used : str
+        Strategy used in the factorization. One of:
+        ``{"auto", "unsymmetric", "symmetric"}``.
+    ordering_used : str
+        Ordering method used in the factorization. One of: 
+        ``{"cholmod", "amd", "given", "none", "metis", "best", "user", "metis_guard"}``
     qfixed : bool
         Whether the column permutation Q was fixed.
     diag_preferred : bool
@@ -711,8 +714,8 @@ cdef class UMFInfo:
         Number of nonzeros on the diagonal of :math:`U`.
     rcond : float
         Estimate of the reciprocal of the condition number of :math:`A`.
-    was_scaled : str in ['none', 'sum', 'max']
-        Scaling method used.
+    was_scaled : str
+        Scaling method used. One of: ``{"none", "sum", "max"}``.
     rsmin : float
         `min(max(row))` or `min(sum(row))`, depending on the scaling method.
     rsmax : float
@@ -806,25 +809,25 @@ cdef class UMFControl:
     blas3_block_size : int
         The block size to use in Level-3 BLAS operations. Default value is 32.
     strategy : str
-        The strategy to use in the factorization. Default value is ``'auto'``.
+        The strategy to use in the factorization. Default value is ``auto``.
         Possible values are:
 
-        * ``'auto'``: choose the strategy automatically
-        * ``'unsymmetric'``: order the columns of :math:`A` with COLAMD
-        * ``'symmetric'``: Order the matrix :math:`A + A^{\\top}` with AMD
+        * ``auto``: choose the strategy automatically
+        * ``unsymmetric``: order the columns of :math:`A` with COLAMD
+        * ``symmetric``: Order the matrix :math:`A + A^{\\top}` with AMD
 
     ordering_method : str
-        The ordering method to use. Default value is ``'amd'``. Possible values
+        The ordering method to use. Default value is ``amd``. Possible values
         are:
 
-        * ``'cholmod'``: use AMD/COLAMD, then METIS
-        * ``'amd'``: just use AMD or COLAMD
-        * ``'given'``: use the user-provided ordering
-        * ``'none'``: no ordering
-        * ``'metis'``: use METIS on :math:`A + A^{\\top}` or :math:`A^{\\top} A`
-        * ``'best'``: try AMD/COLAMD, METIS and NESDIS
-        * ``'user'``: use the user-provided function to compute the ordering
-        * ``'metis_guard'``: use METIS for symmetric strategy, try METIS for
+        * ``cholmod``: use AMD/COLAMD, then METIS
+        * ``amd``: just use AMD or COLAMD
+        * ``given``: use the user-provided ordering
+        * ``none``: no ordering
+        * ``metis``: use METIS on :math:`A + A^{\\top}` or :math:`A^{\\top} A`
+        * ``best``: try AMD/COLAMD, METIS and NESDIS
+        * ``user``: use the user-provided function to compute the ordering
+        * ``metis_guard``: use METIS for symmetric strategy, try METIS for
           unsymmetric and fall back to COLAMD if :math:`A` has many dense rows.
 
     fixQ : int
@@ -1000,9 +1003,9 @@ cdef class UMFControl:
 # -----------------------------------------------------------------------------
 # TODO include all solver options?
 cdef dict _TRANS_INDEX = {
-    'N': UMFPACK_A,    # Ax = b
-    'T': UMFPACK_Aat,  # A^T x = b
-    'H': UMFPACK_At,   # A^H x = b
+    "N": UMFPACK_A,    # Ax = b
+    "T": UMFPACK_Aat,  # A^T x = b
+    "H": UMFPACK_At,   # A^H x = b
 }
 
 
@@ -1017,7 +1020,7 @@ cdef class UMFFactor:
 
     The numeric factorization is not computed until :meth:`.factorize` is called.
 
-    Properties
+    Attributes
     ----------
     is_numeric : bool
         Whether the numeric factorization has been computed.
@@ -1029,21 +1032,21 @@ cdef class UMFFactor:
         Number of rows and columns in the input matrix.
     nz_udiag : int
         Number of nonzeros on the diagonal of :math:`U`.
-    dtype : :obj:`np.dtype`
+    dtype : numpy.dtype
         The data type of the matrix entries (``float64`` or ``complex128``).
-    itype : :obj:`np.dtype`
+    itype : numpy.dtype
         The integer type used for indexing (``int32`` or ``int64``).
-    L : :obj:`scipy.sparse.csr_array`
+    L : scipy.sparse.csr_array
         The :math:`L` factor as a sparse CSR matrix.
-    U : :obj:`scipy.sparse.csc_array`
+    U : scipy.sparse.csc_array
         The :math:`U` factor as a sparse CSC matrix.
-    perm_r, perm_c : :obj:`np.ndarray`
+    perm_r, perm_c : numpy.ndarray
         The row and column permutation arrays, :math:`P` and :math:`Q`.
-    R : :obj:`np.ndarray`
+    R : numpy.ndarray
         The row scaling diagonal matrix as a 1D array.
-    info : :obj:`UMFInfo`
+    info : :class:`UMFInfo`
         An object containing information about the factorization.
-    control : :obj:`UMFControl`
+    control : :class:`UMFControl`
         An object containing settings for the factorization.
 
     See Also
@@ -1089,10 +1092,10 @@ cdef class UMFFactor:
 
         Parameters
         ----------
-        A : :obj:`np.ndarray` or sparse array
+        A : numpy.ndarray or sparse array
             The input matrix. Any object that can be converted to
-            a :obj:`~scipy.sparse.csc_array` is accepted.
-        control : :obj:`UMFControl`, optional
+            a :class:`~scipy.sparse.csc_array` is accepted.
+        control : :class:`UMFControl`, optional
             An object containing settings for the factorization. Default values
             will be used if not provided.
         """
@@ -1215,9 +1218,9 @@ cdef class UMFFactor:
 
     def __repr__(self):
         cls_name = self.__class__.__name__
-        dtype = 'float64' if self._is_real else 'complex128'
-        itype = 'int32' if self._use_int32 else 'int64'
-        factor_type = 'numeric' if self.is_numeric else 'symbolic'
+        dtype = "float64" if self._is_real else "complex128"
+        itype = "int32" if self._use_int32 else "int64"
+        factor_type = "numeric" if self.is_numeric else "symbolic"
         min_MN = min(self.n_row, self.n_col)
         L_shape = (self.n_row, min_MN)
         U_shape = (min_MN, self.n_col)
@@ -1385,7 +1388,7 @@ cdef class UMFFactor:
 
         Parameters
         ----------
-        A : *(M, N)* ndarray or sparse array
+        A : (M, N) numpy.ndarray or sparse array
             The input matrix. Must have the same shape and nonzero pattern as
             the matrix used to create this :class:`UMFFactor` object.
 
@@ -1525,41 +1528,36 @@ cdef class UMFFactor:
 
         Parameters
         ----------
-        A : *(N, N)* :obj:`ndarray` or sparse array
+        A : (N, N) numpy.ndarray or sparse array
             The input matrix. Must have the same shape and nonzero pattern as
             the matrix used to create this :class:`UMFFactor` object.
-        b : *(N,)* :obj:`ndarray` or sparse array
+        b : (N,) numpy.ndarray or sparse array
             The right-hand side vector.
         trans : str, optional
             The type of system to solve. Possible values are:
 
-            * ``'N'``: solve :math:`A x = b` (default)
-            * ``'T'``: solve :math:`A^{\\top} x = b`
-            * ``'H'``: solve :math:`A^{H} x = b`
+            * ``N``: solve :math:`A x = b` (default)
+            * ``T``: solve :math:`A^{\\top} x = b`
+            * ``H``: solve :math:`A^{H} x = b`
 
             .. note::
 
-                If :math:`A` is real, then ``'T'`` and ``'H'`` are equivalent.
+                If :math:`A` is real, then ``T`` and ``H`` are equivalent.
 
         Returns
         -------
-        x : *(N,)* or *(N, K)* :obj:`ndarray` or sparse array
+        x : (N,) or (N, K) numpy.ndarray or sparse array
             The solution vector or matrix. If ``b`` is a 1D array, then ``x`` is
             returned as a 1D array. If ``b`` is a 2D array with ``K`` columns,
             then ``x`` is returned as a 2D array with ``K`` columns. If ``b``
             is a sparse array, then ``x`` is also returned as a sparse array.
 
-        Warns
-        -----
+        Raises
+        ------
         :exc:`UMFPACKSingularMatrixWarning`
             If the matrix is detected to be singular to working precision.
             In that case, the solution will have infinite or NaN values,
             but other entries may still be valid.
-
-        Raises
-        ------
-        :exc:`UMFPACKError` or subclass
-            If an error occurs during the solve.
         """
         A, use_int32, itype = validate_csc_input(A, require_square=True)
 
@@ -1629,7 +1627,7 @@ cdef class UMFFactor:
         b = np.asfortranarray(b)
 
         # Allocate the output array
-        x = np.empty_like(b, order='F')
+        x = np.empty_like(b, order="F")
 
         self._solve(sys, b, A.indptr, A.indices, A.data, x)
 
@@ -2088,7 +2086,7 @@ print_level : int, optional
 
 UMFFactor.report_symbolic.__doc__ = _REPORT_DOC.format(kind="symbolic")
 UMFFactor.report_numeric.__doc__ = _REPORT_DOC.format(kind="numeric")
-
+UMFFactor.report_control.__doc__ = UMFControl.report.__doc__
 
 # -----------------------------------------------------------------------------
 #         Convenience Functions
@@ -2101,33 +2099,29 @@ def umf_factor(object A, *, object control=None, **kwargs):
 
     Parameters
     ----------
-    A : *(M, N)* :obj:`ndarray` or sparse array
+    A : (M, N) numpy.ndarray or sparse array
         The input matrix to factorize.
     control : :class:`UMFControl`, optional
         The control parameters to use for the factorization. If not provided,
         default parameters are used.
     kwargs : keyword arguments, optional
         Additional keyword arguments to pass to :class:`UMFControl` if
-        `control` is not provided.
+        ``control`` is not provided.
 
     Returns
     -------
     :class:`UMFFactor`
         The LU factorization of the input matrix.
 
-    Warns
-    -----
-    :exc:`UMFPACKSingularMatrixWarning`
-        If the matrix is exactly singular.
-
     Raises
     ------
-    :exc:`UMFPACKError` or subclass
-        If an error occurs during the factorization or solve.
+    :exc:`UMFPACKSingularMatrixWarning`
+        If the matrix is exactly singular.
 
     See Also
     --------
     UMFFactor, UMFControl, umf_solve
+
 
     .. versionadded:: 0.5.0
     """
@@ -2144,44 +2138,39 @@ def umf_solve(object A, object b, *, object trans='N', object control=None, **kw
 
     Parameters
     ----------
-    A : *(N, N)* :obj:`ndarray` or sparse array
+    A : (N, N) numpy.ndarray or sparse array
         The input matrix.
-    b : *(N,)* :obj:`ndarray` or sparse array
+    b : (N,) numpy.ndarray or sparse array
         The right-hand side vector.
     trans : str, optional
         The type of system to solve. Possible values are:
 
-        * ``'N'``: solve :math:`A x = b` (default)
-        * ``'T'``: solve :math:`A^{\\top} x = b`
-        * ``'H'``: solve :math:`A^{H} x = b`
+        * ``N``: solve :math:`A x = b` (default)
+        * ``T``: solve :math:`A^{\\top} x = b`
+        * ``H``: solve :math:`A^{H} x = b`
 
         .. note::
 
-            If :math:`A` is real, then ``'T'`` and ``'H'`` are equivalent.
+            If :math:`A` is real, then ``T`` and ``H`` are equivalent.
 
     control : :class:`UMFControl`, optional
         The control parameters to use for the factorization. If not provided,
         default parameters are used.
     kwargs : keyword arguments, optional
         Additional keyword arguments to pass to :class:`UMFControl` if
-        `control` is not provided.
+        ``control`` is not provided.
 
     Returns
     -------
-    x : *(N,)* :obj:`ndarray` or sparse array
-        The solution vector of the same type as the input right-hand side `b`.
+    x : (N,) numpy.ndarray or sparse array
+        The solution vector of the same type as the input right-hand side ``b``.
 
-    Warns
-    -----
+    Raises
+    ------
     :exc:`UMFPACKSingularMatrixWarning`
         If the matrix is detected to be singular to working precision.
         In that case, the solution will have infinite or NaN values,
         but other entries may still be valid.
-
-    Raises
-    ------
-    :exc:`UMFPACKError` or subclass
-        If an error occurs during the factorization or solve.
 
     See Also
     --------

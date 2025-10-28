@@ -157,12 +157,12 @@ symbolic analysis and the numerical factorization in one step, and return an
 instance of the :class:`CholeskyFactor` class.
 
 The resulting :class:`CholeskyFactor` object can then be used to solve linear
-systems using its :meth:`.solve` method, or to update the factorization
-in-place using the :meth:`.update`, :meth:`.rowadd`, :meth:`.rowdel`, and
-:meth:`.resymbol` methods.
+systems using its :meth:`CholeskyFactor.solve` method, or to update the
+factorization in-place using the :meth:`.update`, :meth:`.rowadd`,
+:meth:`.rowdel`, and :meth:`.resymbol` methods.
 
-The :meth:`.factorize` method can be called again to factor a new matrix
-with the same sparsity pattern.
+The :meth:`CholeskyFactor.factorize` method can be called again to factor a new
+matrix with the same sparsity pattern.
 
 
 Symbolic Analysis
