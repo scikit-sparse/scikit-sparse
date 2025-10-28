@@ -1994,7 +1994,7 @@ cdef class UMFFactor:
                     <int32_t*>&P[0],
                     <int32_t*>&Q[0],
                     NULL,  # Dx
-                    <int32_t*>do_recip,
+                    <int32_t*>&do_recip,
                     <double*>&Rs[0],
                     self._numeric
                 )
@@ -2009,7 +2009,7 @@ cdef class UMFFactor:
                     <int64_t*>&P[0],
                     <int64_t*>&Q[0],
                     NULL,  # Dx
-                    <int64_t*>do_recip,
+                    <int64_t*>&do_recip,
                     <double*>&Rs[0],
                     self._numeric
                 )
@@ -2028,7 +2028,7 @@ cdef class UMFFactor:
                     <int32_t*>&Q[0],
                     NULL,  # Dx
                     NULL,  # Dz
-                    <int32_t*>do_recip,
+                    <int32_t*>&do_recip,
                     <double*>&Rs[0],
                     self._numeric
                 )
@@ -2046,7 +2046,7 @@ cdef class UMFFactor:
                     <int64_t*>&Q[0],
                     NULL,  # Dx
                     NULL,  # Dz
-                    <int64_t*>do_recip,
+                    <int64_t*>&do_recip,
                     <double*>&Rs[0],
                     self._numeric
                 )
