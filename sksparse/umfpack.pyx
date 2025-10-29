@@ -1571,6 +1571,12 @@ cdef class UMFFactor:
         :exc:`UMFPACKError` or subclass
             If an error occurs during the solve.
         """
+        if self._M != self._N:
+            raise ValueError(
+                "Matrix must be square to use the solve method. "
+                f" Got shape ({self._M=}, {self._N=})."
+            )
+
         cdef int sys
         try:
             sys = _TRANS_INDEX[trans]

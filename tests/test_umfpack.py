@@ -252,6 +252,15 @@ class TestBadBShape:
             f.solve(b)
 
 
+def test_bad_A_shape_solve():
+    A = sparse.csc_array([[1, 2, 3], [3, 4, 4]]).astype(float)
+    assert A.shape == (2, 3)
+    b = np.array([1, 2]).astype(float)
+    f = umf_factor(A)
+    with pytest.raises(ValueError, match="must be square"):
+        f.solve(b)
+
+
 @pytest.mark.parametrize("dtype", DTYPES)
 def test_singleton_dense(dtype):
     singleton_A = sparse.csc_array([[1]], dtype=dtype)
