@@ -37,7 +37,7 @@ DTYPES = [np.float64, np.complex128]
 
 def assert_LU_equals_A(f, A, atol=1e-15):
     """Check that L U = P R A Q."""
-    L, U, p, q, r = f.L, f.U, f.perm_r, f.perm_c, f.R
+    L, U, p, q, r = f.L, f.U, f.perm_r, f.perm_c, f.rscale
     LU = (L @ U).toarray()
     PRAQ = (r[:, np.newaxis] * A).tocsc()[p][:, q].toarray()
     assert_allclose(LU, PRAQ, atol=atol, strict=True)
@@ -495,7 +495,7 @@ def test_row_scale(davis_example_qr, scale):
     assert f.info.was_scaled == scale
     assert_LU_equals_A(f, A)
     if scale in [None, "none"]:
-        assert_allclose(f.R, 1.0)
+        assert_allclose(f.rscale, 1.0)
         assert_allclose(f.L.diagonal(), 1.0)
 
 

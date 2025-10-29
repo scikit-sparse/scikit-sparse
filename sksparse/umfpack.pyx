@@ -1304,7 +1304,7 @@ cdef class UMFFactor:
         return self._Q
 
     @property
-    def R(self):
+    def rscale(self):
         if self._Rs is None:
             self._get_numeric()
         return self._Rs
