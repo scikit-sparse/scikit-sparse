@@ -40,7 +40,7 @@ Object Interface
 .. autosummary::
     :toctree: generated/
     :nosignatures:
-    
+
     umf_factor - Compute the LU factorization of a sparse matrix.
     UMFFactor - An object-oriented interface to UMFPACK.
 
@@ -724,7 +724,7 @@ cdef class UMFInfo:
     alloc_init_used : float
         Initial memory allocation used, as a fraction of total numeric memory.
     forced_updates : int
-        Number of forced updates during numeric factorization. 
+        Number of forced updates during numeric factorization.
     numeric_walltime : float
         Wall-clock time spent in numeric factorization, in seconds.
     noff_diag : int
@@ -1070,7 +1070,10 @@ cdef class UMFFactor:
         UMFInfo _info
         bint _use_int32
         bint _is_real
-        # TODO store A matrix in the factor object for use in numeric and solve??
+        # Store A matrix for use in factorize and solve
+        cnp.ndarray _Ap
+        cnp.ndarray _Ai
+        cnp.ndarray _Ax
         # cached "output" arrays, only extracted from _numeric upon request
         cnp.ndarray _Lp
         cnp.ndarray _Lj
@@ -1083,7 +1086,6 @@ cdef class UMFFactor:
         cnp.ndarray _Rs
         # TODO Dx for diagonal of U?
 
-    # TODO allow control kwargs in UMFFactor initialization? or just umf_factor?
     def __init__(self, object A, object control=None):
         """Compute the symbolic analysis.
 
@@ -1098,12 +1100,17 @@ cdef class UMFFactor:
         """
         A, _, _ = validate_csc_input(A)
 
+        # Cache the matrix data
+        self._Ap = A.indptr
+        self._Ai = A.indices
+        self._Ax = A.data
+
         # Initialize the control and info arrays
         self._control = UMFControl() if control is None else control
         self._info = UMFInfo()
 
         # Compute the symbolic analysis
-        self._init_symbolic(A.shape[0], A.shape[1], A.indptr, A.indices, A.data)
+        self._init_symbolic(A.shape[0], A.shape[1], self._Ap, self._Ai, self._Ax)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -1369,7 +1376,7 @@ cdef class UMFFactor:
 
         return umf
 
-    def factorize(self, object A):
+    def factorize(self, object A=None):
         """Compute the numeric factorization of a sparse matrix.
 
         Given the symbolic analysis performed in the constructor,
@@ -1379,15 +1386,17 @@ cdef class UMFFactor:
         .. math::
             L U = P R A Q.
 
-        The matrix :math:`A` must have the same shape and nonzero pattern as
-        the one used to create this :class:`UMFFactor` object, but need not
-        have the same values.
+        If given, the matrix :math:`A` must have the same shape and nonzero
+        pattern as the one used to create this :class:`UMFFactor` object, but
+        need not have the same values.
 
         Parameters
         ----------
-        A : *(M, N)* ndarray or sparse array
+        A : *(M, N)* ndarray or sparse array, optional
             The input matrix. Must have the same shape and nonzero pattern as
-            the matrix used to create this :class:`UMFFactor` object.
+            the matrix used to create this :class:`UMFFactor` object. If not
+            provided, the original matrix given to the constructor will be
+            used.
 
         Returns
         -------
@@ -1404,23 +1413,27 @@ cdef class UMFFactor:
             "Cannot perform numeric factorization."
         )
 
-        A, use_int32, _ = validate_csc_input(A)
+        if A is not None:
+            A, _, itype = validate_csc_input(A)
 
-        if use_int32 != self._use_int32:
-            raise ValueError(
-                "The integer size of the input matrix does not match "
-                "the one used for symbolic factorization. "
-                f"Expected '{'int32' if self._use_int32 else 'int64'}', "
-                f"got '{'int32' if use_int32 else 'int64'}'."
-            )
+            if itype != self.itype:
+                raise ValueError(
+                    "The integer size of the input matrix does not match "
+                    "the one used for symbolic factorization. "
+                    f"Expected '{self.itype}', got '{itype}'."
+                )
 
-        if _is_real_dtype(A.dtype) != self._is_real:
-            raise ValueError(
-                "The data type of the input matrix does not match "
-                "the one used for symbolic factorization. "
-                f"Expected {'float64' if self._is_real else 'complex128'}, "
-                f"got {A.dtype}."
-            )
+            if A.dtype != self.dtype:
+                raise ValueError(
+                    "The data type of the input matrix does not match "
+                    "the one used for symbolic factorization. "
+                    f"Expected '{self.dtype}', got '{A.dtype}'."
+                )
+
+            # Update cached matrix data
+            self._Ap = A.indptr
+            self._Ai = A.indices
+            self._Ax = A.data
 
         # Clear cached output arrays
         self._Lp = None
@@ -1433,7 +1446,7 @@ cdef class UMFFactor:
         self._Q = None
         self._Rs = None
 
-        self._factorize(A.indptr, A.indices, A.data)
+        self._factorize(self._Ap, self._Ai, self._Ax)
 
         return self
 
@@ -1507,9 +1520,7 @@ cdef class UMFFactor:
         _handle_errors(status)
 
     # TODO allow x as input?
-    # TODO see umfpack_wsolve. Provide workspace for multiple solves?
-    # TODO A is *only* needed if info.ir_steps > 0 and sys == UMFPACK_A*.
-    def solve(self, object A, object b, *, object trans='N'):
+    def solve(self, object b, object A=None, *, object trans='N'):
         """Solve a linear system using the LU factorization.
 
         This method solves one of the following linear systems:
@@ -1525,11 +1536,11 @@ cdef class UMFFactor:
 
         Parameters
         ----------
-        A : *(N, N)* :obj:`ndarray` or sparse array
-            The input matrix. Must have the same shape and nonzero pattern as
-            the matrix used to create this :class:`UMFFactor` object.
         b : *(N,)* :obj:`ndarray` or sparse array
             The right-hand side vector.
+        A : *(N, N)* :obj:`ndarray` or sparse array, optional
+            The input matrix. Must have the same shape and nonzero pattern as
+            the matrix used to create this :class:`UMFFactor` object.
         trans : str, optional
             The type of system to solve. Possible values are:
 
@@ -1561,24 +1572,6 @@ cdef class UMFFactor:
         :exc:`UMFPACKError` or subclass
             If an error occurs during the solve.
         """
-        A, use_int32, itype = validate_csc_input(A, require_square=True)
-
-        if use_int32 != self._use_int32:
-            raise ValueError(
-                "The integer size of the input matrix does not match "
-                "the one used for symbolic factorization. "
-                f"Expected '{'int32' if self._use_int32 else 'int64'}', "
-                f"got '{'int32' if use_int32 else 'int64'}'."
-            )
-
-        if _is_real_dtype(A.dtype) != self._is_real:
-            raise ValueError(
-                "The data type of the input matrix does not match "
-                "the one used for symbolic factorization. "
-                f"Expected {'float64' if self._is_real else 'complex128'}, "
-                f"got {A.dtype}."
-            )
-
         cdef int sys
         try:
             sys = _TRANS_INDEX[trans]
@@ -1591,15 +1584,37 @@ cdef class UMFFactor:
         if not (isinstance(b, np.ndarray) or issparse(b)):
             raise ValueError("b must be an ndarray or sparse matrix.")
 
-        if b.dtype != A.dtype:
+        if A is not None:
+            A, _, itype = validate_csc_input(A, require_square=True)
+
+            if itype != self.itype:
+                raise ValueError(
+                    "The integer size of the input matrix does not match "
+                    "the one used for symbolic factorization. "
+                    f"Expected '{self.itype}', got '{itype}'."
+                )
+
+            if A.dtype != self.dtype:
+                raise ValueError(
+                    "The data type of the input matrix does not match "
+                    "the one used for symbolic factorization. "
+                    f"Expected '{self.dtype}', got '{A.dtype}'."
+                )
+
+            # Update cached matrix data
+            self._Ap = A.indptr
+            self._Ai = A.indices
+            self._Ax = A.data
+
+        if b.dtype != self.dtype:
             raise ValueError(
-                f"LHS and RHS dtypes do not match. {A.dtype=} and {b.dtype=}"
+                f"LHS and RHS dtypes do not match. {self.dtype=} and {b.dtype=}"
             )
 
         if b.ndim not in (1, 2):
             raise ValueError("b must be a 1D or 2D array.")
 
-        cdef Py_ssize_t N = A.shape[0]
+        cdef size_t N = <size_t>self._info.data[UMFPACK_NROW]
         cdef bint return_1D = b.ndim == 1
 
         if b.shape[0] != N:
@@ -1609,7 +1624,7 @@ cdef class UMFFactor:
 
         cdef bint return_sparse = issparse(b)
 
-        if issparse(b):
+        if return_sparse:
             b = b.toarray()
         else:
             b = np.asarray(b)
@@ -1631,18 +1646,19 @@ cdef class UMFFactor:
         # Allocate the output array
         x = np.empty_like(b, order='F')
 
-        self._solve(sys, b, A.indptr, A.indices, A.data, x)
+        self._solve(sys, b, self._Ap, self._Ai, self._Ax, x)
 
         if return_sparse:
-            x = csc_array(x, dtype=A.dtype)
-            x.indptr = x.indptr.astype(itype)
-            x.indices = x.indices.astype(itype)
+            x = csc_array(x, dtype=b.dtype)
+            x.indptr = x.indptr.astype(self.itype)
+            x.indices = x.indices.astype(self.itype)
 
         if return_1D:
             x = x[:, 0]
 
         return x
 
+    # TODO see umfpack_wsolve. Provide workspace for multiple solves?
     @cython.boundscheck(False)  # for-loop guaranteed in-bounds
     @cython.wraparound(False)
     def _solve(
@@ -2133,7 +2149,7 @@ def umf_factor(object A, *, object control=None, **kwargs):
     """
     if control is None:
         control = UMFControl(**kwargs)
-    return UMFFactor(A, control).factorize(A)
+    return UMFFactor(A, control).factorize()
 
 
 def umf_solve(object A, object b, *, object trans='N', object control=None, **kwargs):
@@ -2196,7 +2212,7 @@ def umf_solve(object A, object b, *, object trans='N', object control=None, **kw
     # factorize() and solve() will each warn for a singular matrix,
     # so we catch the warnings from factorize() and re-raise only once.
     with warnings.catch_warnings(record=True) as ws:
-        x = UMFFactor(A, control).factorize(A).solve(A, b, trans=trans)
+        x = UMFFactor(A, control).factorize().solve(b, trans=trans)
 
     # Raise only the latest singular matrix warning from solve
     if ws:
