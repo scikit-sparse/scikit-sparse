@@ -1233,6 +1233,10 @@ cdef class UMFFactor:
                 else:
                     umfpack_zl_free_numeric(&self._numeric)
 
+    def __iter__(self):
+        for attr in ['L', 'U', 'perm_r', 'perm_c', 'rscale']:
+            yield getattr(self, attr)
+
     def __repr__(self):
         cls_name = self.__class__.__name__
         factor_type = 'numeric' if self.is_numeric else 'symbolic'

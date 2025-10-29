@@ -181,6 +181,14 @@ def test_determinant(davis_example_qr, dtype):
     assert_allclose(f.slogdet(), (expect_sign, expect_logdet), rtol=rtol, strict=True)
 
 
+def test_iter(davis_example_qr):
+    A = davis_example_qr
+    L, U, p, q, r = umf_factor(A)
+    LU = (L @ U).toarray()
+    PRAQ = (r[:, np.newaxis] * A).tocsc()[p][:, q].toarray()
+    assert_allclose(LU, PRAQ, atol=1e-15, strict=True)
+
+
 test_As = [
     A
     for dtype in DTYPES
