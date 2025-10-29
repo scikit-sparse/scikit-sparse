@@ -1070,6 +1070,9 @@ cdef class UMFFactor:
         UMFInfo _info
         bint _use_int32
         bint _is_real
+        size_t _M
+        size_t _N
+        size_t _N_inner  # min(M, N) inner dimension of LU
         # Store A matrix for use in factorize and solve
         cnp.ndarray _Ap
         cnp.ndarray _Ai
@@ -1194,6 +1197,11 @@ cdef class UMFFactor:
 
         _handle_errors(status)
 
+        # Store matrix shape (ensure non-negative before cast)
+        self._M = <size_t>max(self._info.data[UMFPACK_NROW], 0)
+        self._N = <size_t>max(self._info.data[UMFPACK_NCOL], 0)
+        self._N_inner = min(self._M, self._N)
+
     def __dealloc__(self):
         """Free UMFPACK symbolic and numeric objects."""
         if self._symbolic is not NULL:
@@ -1225,9 +1233,8 @@ cdef class UMFFactor:
         dtype = 'float64' if self._is_real else 'complex128'
         itype = 'int32' if self._use_int32 else 'int64'
         factor_type = 'numeric' if self.is_numeric else 'symbolic'
-        min_MN = min(self.n_row, self.n_col)
-        L_shape = (self.n_row, min_MN)
-        U_shape = (min_MN, self.n_col)
+        L_shape = (self._M, self._N_inner)
+        U_shape = (self._N_inner, self._N)
         return (
             f"<{cls_name} {factor_type} factor of dtype '{dtype}' "
             f"with '{itype}' indices:\n"
@@ -1258,12 +1265,8 @@ cdef class UMFFactor:
         return int(self.lnz + self.unz)
 
     @property
-    def n_row(self):
-        return int(self._info.n_row if self._info.n_row >= 0 else 0)
-
-    @property
-    def n_col(self):
-        return int(self._info.n_col if self._info.n_col >= 0 else 0)
+    def shape(self):
+        return (self._M, self._N)
 
     @property
     def nz_udiag(self):
@@ -1282,7 +1285,7 @@ cdef class UMFFactor:
         if self._Lp is None or self._Lj is None or self._Lx is None:
             self._get_numeric()
 
-        L_shape = (self.n_row, min(self.n_row, self.n_col))
+        L_shape = (self._M, self._N_inner)
         return csr_array((self._Lx, self._Lj, self._Lp), shape=L_shape)
 
     @property
@@ -1290,7 +1293,7 @@ cdef class UMFFactor:
         if self._Up is None or self._Ui is None or self._Ux is None:
             self._get_numeric()
 
-        U_shape = (min(self.n_row, self.n_col), self.n_col)
+        U_shape = (self._N_inner, self._N)
         return csc_array((self._Ux, self._Ui, self._Up), shape=U_shape)
 
     @property
@@ -1332,6 +1335,9 @@ cdef class UMFFactor:
 
         umf._use_int32 = self._use_int32
         umf._is_real = self._is_real
+        umf._M = self._M
+        umf._N = self._N
+        umf._N_inner = self._N_inner
 
         cdef int status
 
@@ -1364,14 +1370,21 @@ cdef class UMFFactor:
         umf._control = self._control
         umf._info = self._info
 
+        umf._Ap = None if self._Ap is None else self._Ap.copy()
+        umf._Ai = None if self._Ai is None else self._Ai.copy()
+        umf._Ax = None if self._Ax is None else self._Ax.copy()
+
         umf._Lp = None if self._Lp is None else self._Lp.copy()
         umf._Lj = None if self._Lj is None else self._Lj.copy()
         umf._Lx = None if self._Lx is None else self._Lx.copy()
+
         umf._Up = None if self._Up is None else self._Up.copy()
         umf._Ui = None if self._Ui is None else self._Ui.copy()
         umf._Ux = None if self._Ux is None else self._Ux.copy()
+
         umf._P = None if self._P is None else self._P.copy()
         umf._Q = None if self._Q is None else self._Q.copy()
+
         umf._Rs = None if self._Rs is None else self._Rs.copy()
 
         return umf
@@ -1889,11 +1902,11 @@ cdef class UMFFactor:
     # -------------------------------------------------------------------------
     def _check_input_matrix(self, object A, object itype):
         """Check that the input matrix matches the existing factorization."""
-        if A.shape != (self.n_row, self.n_col):
+        if A.shape != self.shape:
             raise ValueError(
                 "The shape of the input matrix does not match "
                 "the one used for symbolic factorization. "
-                f"Expected {(self.n_row, self.n_col)}, got {A.shape}."
+                f"Expected {self.shape}, got {A.shape}."
             )
 
         if itype != self.itype:
@@ -1939,24 +1952,22 @@ cdef class UMFFactor:
         cdef:
             size_t lnz = self._info.lnz
             size_t unz = self._info.unz
-            size_t n_row = self._info.n_row
-            size_t n_col = self._info.n_col
 
         dtype = np.dtype(np.double if self._is_real else np.cdouble)
         itype = np.dtype(np.int32 if self._use_int32 else np.int64)
 
         # Create output arrays
-        self._Lp = np.empty(n_row + 1, dtype=itype)
+        self._Lp = np.empty(self._M + 1, dtype=itype)
         self._Lj = np.empty(lnz, dtype=itype)
         self._Lx = np.empty(lnz, dtype=dtype)
 
-        self._Up = np.empty(n_col + 1, dtype=itype)
+        self._Up = np.empty(self._N + 1, dtype=itype)
         self._Ui = np.empty(unz, dtype=itype)
         self._Ux = np.empty(unz, dtype=dtype)
 
-        self._P = np.empty(n_row, dtype=itype)
-        self._Q = np.empty(n_col, dtype=itype)
-        self._Rs = np.empty(n_row, dtype=np.float64)  # always real
+        self._P = np.empty(self._M, dtype=itype)
+        self._Q = np.empty(self._N, dtype=itype)
+        self._Rs = np.empty(self._M, dtype=np.float64)  # always real
 
         self._dispatch_get_numeric(
             self._Lp, self._Lj, self._Lx,
