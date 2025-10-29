@@ -1257,11 +1257,11 @@ cdef class UMFFactor:
 
     @property
     def lnz(self):
-        return int(self.info.lnz if self.info.lnz >= 0 else 0)
+        return int(max(self.info.data[UMFPACK_LNZ], 0))
 
     @property
     def unz(self):
-        return int(self.info.unz if self.info.unz >= 0 else 0)
+        return int(max(self.info.data[UMFPACK_UNZ], 0))
 
     @property
     def nnz(self):
@@ -1273,7 +1273,7 @@ cdef class UMFFactor:
 
     @property
     def nz_udiag(self):
-        return int(self.info.nz_udiag if self.info.nz_udiag >= 0 else 0)
+        return int(max(self.info.data[UMFPACK_UDIAG_NZ], 0))
 
     @property
     def L(self):
@@ -1915,7 +1915,7 @@ cdef class UMFFactor:
 
     cdef int _check_rcond(self) except -1:
         """Check the condition number."""
-        cdef double rcond = self.info.rcond
+        cdef double rcond = self.info.data[UMFPACK_RCOND]
         cdef double eps = np.finfo(np.float64).eps
 
         if rcond == 0:
@@ -1939,18 +1939,14 @@ cdef class UMFFactor:
                 "Run `UMFFactor.factorize(A)` first."
             )
 
-        cdef:
-            size_t lnz = self.info.lnz
-            size_t unz = self.info.unz
-
         # Create output arrays
         self._Lp = np.empty(self._M + 1, dtype=self.itype)
-        self._Lj = np.empty(lnz, dtype=self.itype)
-        self._Lx = np.empty(lnz, dtype=self.dtype)
+        self._Lj = np.empty(self.lnz, dtype=self.itype)
+        self._Lx = np.empty(self.lnz, dtype=self.dtype)
 
         self._Up = np.empty(self._N + 1, dtype=self.itype)
-        self._Ui = np.empty(unz, dtype=self.itype)
-        self._Ux = np.empty(unz, dtype=self.dtype)
+        self._Ui = np.empty(self.unz, dtype=self.itype)
+        self._Ux = np.empty(self.unz, dtype=self.dtype)
 
         self._P = np.empty(self._M, dtype=self.itype)
         self._Q = np.empty(self._N, dtype=self.itype)
