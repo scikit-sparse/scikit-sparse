@@ -57,8 +57,7 @@ def test_zero_input():
     zero_A = sparse.csc_array((N, N))
     f = UMFFactor(zero_A)
     assert f.nnz == 0
-    assert f.n_row == N
-    assert f.n_col == N
+    assert f.shape == (N, N)
     assert f.itype == zero_A.indptr.dtype
     assert f.dtype == zero_A.dtype
     with pytest.raises(UMFPACKError, match="Numeric factorization not present"):
@@ -70,8 +69,7 @@ def test_singleton():
     singleton_A = sparse.csc_array([[1]], dtype=dtype)
     f = UMFFactor(singleton_A)
     assert f.nnz == 0
-    assert f.n_row == 1
-    assert f.n_col == 1
+    assert f.shape == (1, 1)
     assert f.itype == singleton_A.indptr.dtype
     assert f.dtype == dtype
 
@@ -97,6 +95,13 @@ def test_bad_factorize_type(davis_example_qr):
     f = UMFFactor(A)
     with pytest.raises(ValueError, match="type.*does not match"):
         f.factorize(A.astype(np.complex128))
+
+
+def test_bad_factorize_shape(davis_example_qr):
+    A = davis_example_qr
+    f = UMFFactor(A)
+    with pytest.raises(ValueError, match="shape.*does not match"):
+        f.factorize(A[:-1, :])  # remove last row
 
 
 @pytest.mark.parametrize("itype", ITYPES)
@@ -224,34 +229,34 @@ class TestBadBShape:
     def test_b_0D_dense(self, f, A):
         b = np.empty([])
         with pytest.raises(ValueError, match="must be a 1D or 2D array"):
-            f.solve(A, b)
+            f.solve(b)
 
     def test_b_3D_dense(self, f, A):
         b = np.empty((2, 3, 4))
         with pytest.raises(ValueError, match="must be a 1D or 2D array"):
-            f.solve(A, b)
+            f.solve(b)
 
     def test_b_3D_sparse(self, f, A):
         b = sparse.coo_array((2, 3, 4))
         with pytest.raises(ValueError, match="must be a 1D or 2D array"):
-            f.solve(A, b)
+            f.solve(b)
 
     def test_b_KD_dense(self, f, A, N):
         b = np.empty((N - 1, N))
         with pytest.raises(ValueError, match="same number of rows as A"):
-            f.solve(A, b)
+            f.solve(b)
 
     def test_b_KD_sparse(self, f, A, N):
         b = sparse.csc_array((N - 1, N))
         with pytest.raises(ValueError, match="same number of rows as A"):
-            f.solve(A, b)
+            f.solve(b)
 
 
 @pytest.mark.parametrize("dtype", DTYPES)
 def test_singleton_dense(dtype):
     singleton_A = sparse.csc_array([[1]], dtype=dtype)
     b = np.array([1], dtype=dtype)
-    x = UMFFactor(singleton_A).factorize(singleton_A).solve(singleton_A, b)
+    x = UMFFactor(singleton_A).factorize().solve(b)
     assert_allclose(x, b)
 
 
@@ -259,7 +264,7 @@ def test_singleton_dense(dtype):
 def test_singleton_sparse(dtype):
     singleton_A = sparse.csc_array([[1]], dtype=dtype)
     b = sparse.coo_array([1], dtype=dtype)
-    x = UMFFactor(singleton_A).factorize(singleton_A).solve(singleton_A, b)
+    x = UMFFactor(singleton_A).factorize().solve(b)
     assert_allclose(x.toarray(), b.toarray())
 
 
@@ -350,7 +355,7 @@ def test_nearly_singular(davis_example_qr):
     b = A @ expect_x
     f = umf_factor(A, row_scale="none")  # turn off scaling to trigger warning
     with pytest.warns(UMFPACKSingularMatrixWarning, match="nearly singular"):
-        f.solve(A, b)
+        f.solve(b)
 
 
 @pytest.mark.parametrize("A", test_As)
@@ -454,7 +459,6 @@ def test_default_controls():
         )
 
 
-# TODO test IRSTEP == 0 and don't pass in A to solve()
 def test_ir_steps(davis_example_qr):
     A = davis_example_qr
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
@@ -464,7 +468,7 @@ def test_ir_steps(davis_example_qr):
     assert f.control.ir_steps == N_steps
     expect_x = np.arange(1, A.shape[0] + 1, dtype=A.dtype)
     b = A @ expect_x
-    x = f.solve(A, b)
+    x = f.solve(b)
     assert_allclose(x, expect_x, atol=1e-15, strict=True)
     print(f"{f.info.ir_attempted=}, {f.info.ir_attempted=}")
     assert f.info.ir_attempted == N_steps
@@ -478,7 +482,7 @@ def test_row_scale(davis_example_qr, scale):
     # Row scaling can be done *after* symbolic, but *before* numeric
     f.control.row_scale = scale
     assert f.control.row_scale == scale
-    f.factorize(A)
+    f.factorize()
     assert f.info.was_scaled == scale
     assert_LU_equals_A(f, A)
     if scale in [None, "none"]:
@@ -497,7 +501,7 @@ def test_ordering(davis_example_qr, ordering):
     f = umf_factor(A, ordering_method=ordering)
     expect_x = np.arange(1, A.shape[0] + 1, dtype=A.dtype)
     b = A @ expect_x
-    x = f.solve(A, b)
+    x = f.solve(b)
     assert_LU_equals_A(f, A)
     assert_allclose(x, expect_x, atol=1e-15, strict=True)
     if ordering in [None, "none", "amd", "metis"]:
