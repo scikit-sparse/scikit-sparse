@@ -89,9 +89,20 @@ def test_types(davis_example_qr, itype, dtype):
 # -----------------------------------------------------------------------------
 #         Numeric Factorization
 # -----------------------------------------------------------------------------
-def test_bad_factorize_type(davis_example_qr):
+def test_bad_factorize_itype(davis_example_qr):
     A = davis_example_qr
-    A.data = A.data.astype(np.float64)
+    A.indptr = A.indptr.astype(np.int32)
+    A.indices = A.indices.astype(np.int32)
+    f = UMFFactor(A)
+    B = A.copy()
+    B.indptr = B.indptr.astype(np.int64)
+    B.indices = B.indices.astype(np.int64)
+    with pytest.raises(ValueError, match="integer.*does not match"):
+        f.factorize(B)
+
+
+def test_bad_factorize_dtype(davis_example_qr):
+    A = davis_example_qr.astype(np.float64)
     f = UMFFactor(A)
     with pytest.raises(ValueError, match="type.*does not match"):
         f.factorize(A.astype(np.complex128))
