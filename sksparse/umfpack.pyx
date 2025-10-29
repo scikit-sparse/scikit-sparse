@@ -1415,21 +1415,7 @@ cdef class UMFFactor:
 
         if A is not None:
             A, _, itype = validate_csc_input(A)
-
-            if itype != self.itype:
-                raise ValueError(
-                    "The integer size of the input matrix does not match "
-                    "the one used for symbolic factorization. "
-                    f"Expected '{self.itype}', got '{itype}'."
-                )
-
-            if A.dtype != self.dtype:
-                raise ValueError(
-                    "The data type of the input matrix does not match "
-                    "the one used for symbolic factorization. "
-                    f"Expected '{self.dtype}', got '{A.dtype}'."
-                )
-
+            self._check_input_matrix(A, itype)
             # Update cached matrix data
             self._Ap = A.indptr
             self._Ai = A.indices
@@ -1586,21 +1572,7 @@ cdef class UMFFactor:
 
         if A is not None:
             A, _, itype = validate_csc_input(A, require_square=True)
-
-            if itype != self.itype:
-                raise ValueError(
-                    "The integer size of the input matrix does not match "
-                    "the one used for symbolic factorization. "
-                    f"Expected '{self.itype}', got '{itype}'."
-                )
-
-            if A.dtype != self.dtype:
-                raise ValueError(
-                    "The data type of the input matrix does not match "
-                    "the one used for symbolic factorization. "
-                    f"Expected '{self.dtype}', got '{A.dtype}'."
-                )
-
+            self._check_input_matrix(A, itype)
             # Update cached matrix data
             self._Ap = A.indptr
             self._Ai = A.indices
@@ -1915,6 +1887,29 @@ cdef class UMFFactor:
     # -------------------------------------------------------------------------
     #         Private Methods
     # -------------------------------------------------------------------------
+    def _check_input_matrix(self, object A, object itype):
+        """Check that the input matrix matches the existing factorization."""
+        if A.shape != (self.n_row, self.n_col):
+            raise ValueError(
+                "The shape of the input matrix does not match "
+                "the one used for symbolic factorization. "
+                f"Expected {(self.n_row, self.n_col)}, got {A.shape}."
+            )
+
+        if itype != self.itype:
+            raise ValueError(
+                "The integer size of the input matrix does not match "
+                "the one used for symbolic factorization. "
+                f"Expected '{self.itype}', got '{itype}'."
+            )
+
+        if A.dtype != self.dtype:
+            raise ValueError(
+                "The data type of the input matrix does not match "
+                "the one used for symbolic factorization. "
+                f"Expected '{self.dtype}', got '{A.dtype}'."
+            )
+
     cdef int _check_rcond(self) except -1:
         """Check the condition number."""
         cdef double rcond = self._info.rcond
