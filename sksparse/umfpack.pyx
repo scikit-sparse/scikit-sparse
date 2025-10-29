@@ -1681,14 +1681,13 @@ cdef class UMFFactor:
         cdef:
             Py_ssize_t k
             Py_ssize_t K = b.shape[1]
-            double* data_ptr
+            double* data_ptr = <double*>&data[0]
             double* x_ptr
             double* b_ptr
 
         for k in range(K):
             # NOTE numpy complex arrays store real and imag parts interleaved,
             # so we can just pass the pointer to the data as double*
-            data_ptr = <double*>&data[0]
             x_ptr = <double*>&x[0, k]
             b_ptr = <double*>&b[0, k]
 
