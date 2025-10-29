@@ -1073,6 +1073,8 @@ cdef class UMFFactor:
         size_t _M
         size_t _N
         size_t _N_inner  # min(M, N) inner dimension of LU
+        readonly object itype
+        readonly object dtype
         # Store A matrix for use in factorize and solve
         cnp.ndarray _Ap
         cnp.ndarray _Ai
@@ -1202,6 +1204,9 @@ cdef class UMFFactor:
         self._N = <size_t>max(self._info.data[UMFPACK_NCOL], 0)
         self._N_inner = min(self._M, self._N)
 
+        self.itype = np.dtype(np.int32 if self._use_int32 else np.int64)
+        self.dtype = np.dtype(np.float64 if self._is_real else np.complex128)
+
     def __dealloc__(self):
         """Free UMFPACK symbolic and numeric objects."""
         if self._symbolic is not NULL:
@@ -1230,14 +1235,12 @@ cdef class UMFFactor:
 
     def __repr__(self):
         cls_name = self.__class__.__name__
-        dtype = 'float64' if self._is_real else 'complex128'
-        itype = 'int32' if self._use_int32 else 'int64'
         factor_type = 'numeric' if self.is_numeric else 'symbolic'
         L_shape = (self._M, self._N_inner)
         U_shape = (self._N_inner, self._N)
         return (
-            f"<{cls_name} {factor_type} factor of dtype '{dtype}' "
-            f"with '{itype}' indices:\n"
+            f"<{cls_name} {factor_type} factor of dtype '{self.dtype}' "
+            f"with '{self.itype}' indices:\n"
             f"    L: {L_shape} with {self.lnz} stored elements\n"
             f"    U: {U_shape} with {self.unz} stored elements>"
         )
@@ -1271,14 +1274,6 @@ cdef class UMFFactor:
     @property
     def nz_udiag(self):
         return int(self._info.nz_udiag if self._info.nz_udiag >= 0 else 0)
-
-    @property
-    def dtype(self):
-        return np.float64 if self._is_real else np.complex128
-
-    @property
-    def itype(self):
-        return np.int32 if self._use_int32 else np.int64
 
     @property
     def L(self):
@@ -1338,6 +1333,8 @@ cdef class UMFFactor:
         umf._M = self._M
         umf._N = self._N
         umf._N_inner = self._N_inner
+        umf.itype = self.itype
+        umf.dtype = self.dtype
 
         cdef int status
 
@@ -1764,7 +1761,7 @@ cdef class UMFFactor:
                 "Cannot compute determinant."
             )
 
-        Mx = np.empty(1, dtype=np.float64 if self._is_real else np.complex128)
+        Mx = np.empty(1, dtype=self.dtype)
         Ex = np.empty(1, dtype=np.float64)
 
         self._slogdet(Mx, Ex)
@@ -1958,20 +1955,17 @@ cdef class UMFFactor:
             size_t lnz = self._info.lnz
             size_t unz = self._info.unz
 
-        dtype = np.dtype(np.double if self._is_real else np.cdouble)
-        itype = np.dtype(np.int32 if self._use_int32 else np.int64)
-
         # Create output arrays
-        self._Lp = np.empty(self._M + 1, dtype=itype)
-        self._Lj = np.empty(lnz, dtype=itype)
-        self._Lx = np.empty(lnz, dtype=dtype)
+        self._Lp = np.empty(self._M + 1, dtype=self.itype)
+        self._Lj = np.empty(lnz, dtype=self.itype)
+        self._Lx = np.empty(lnz, dtype=self.dtype)
 
-        self._Up = np.empty(self._N + 1, dtype=itype)
-        self._Ui = np.empty(unz, dtype=itype)
-        self._Ux = np.empty(unz, dtype=dtype)
+        self._Up = np.empty(self._N + 1, dtype=self.itype)
+        self._Ui = np.empty(unz, dtype=self.itype)
+        self._Ux = np.empty(unz, dtype=self.dtype)
 
-        self._P = np.empty(self._M, dtype=itype)
-        self._Q = np.empty(self._N, dtype=itype)
+        self._P = np.empty(self._M, dtype=self.itype)
+        self._Q = np.empty(self._N, dtype=self.itype)
         self._Rs = np.empty(self._M, dtype=np.float64)  # always real
 
         self._dispatch_get_numeric(
