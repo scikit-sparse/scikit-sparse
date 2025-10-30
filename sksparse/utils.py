@@ -92,6 +92,6 @@ def validate_csc_input(A, require_square=False):
 
     # Choose index width: int32 or int64
     use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
-    out_itype = np.int32 if use_int32 else np.int64
+    out_itype = np.dtype(np.int32 if use_int32 else np.int64)
 
     return A, use_int32, out_itype
