@@ -759,6 +759,9 @@ cdef class UMFInfo:
 
     cdef double data[UMFPACK_INFO]
 
+    # NOTE no __cinit__ needed, as this object is only created within the
+    # UMFFactor object and initialized/filled by UMFPACK umfpack_symbolic.
+
     def __getattr__(self, name):
         try:
             value = self.data[_INFO_INDEX[name]]

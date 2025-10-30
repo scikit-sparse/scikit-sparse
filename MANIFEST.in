@@ -2,6 +2,6 @@
 # Files to be included in the source distribution (not in the wheel)
 include LICENSE.txt
 include README.rst
-recursive-include sksparse *.pyx *.pxd *.c
+recursive-include src/sksparse *.pyx *.pxd *.c
 recursive-exclude tests *
 recursive-exclude *.egg-info *

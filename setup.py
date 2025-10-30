@@ -89,7 +89,7 @@ extension_names = ["cholmod", "amd", "btf", "camd", "colamd", "ccolamd", "umfpac
 extensions = [
     Extension(
         f"sksparse.{name}",
-        [f"sksparse/{name}.pyx"],
+        [f"src/sksparse/{name}.pyx"],
         include_dirs=INCLUDE_DIRS,
         library_dirs=LIBRARY_DIRS,
         libraries=[name],
