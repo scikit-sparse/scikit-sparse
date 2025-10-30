@@ -86,6 +86,14 @@ def test_types(davis_example_qr, itype, dtype):
     assert f.dtype == dtype
 
 
+@pytest.mark.parametrize("dtype", [np.float32, np.float64, np.complex64, np.complex128])
+def test_type_promotion(davis_example_qr, dtype):
+    A = davis_example_qr.astype(dtype)
+    f = UMFFactor(A)
+    expect_dtype = np.float64 if np.issubdtype(dtype, np.floating) else np.complex128
+    assert f.dtype == expect_dtype
+
+
 # -----------------------------------------------------------------------------
 #         Numeric Factorization
 # -----------------------------------------------------------------------------
