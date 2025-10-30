@@ -68,6 +68,7 @@ def test_singleton():
     dtype = np.float64
     singleton_A = sparse.csc_array([[1]], dtype=dtype)
     f = UMFFactor(singleton_A)
+    assert not f.is_numeric
     assert f.nnz == 0
     assert f.shape == (1, 1)
     assert f.itype == singleton_A.indptr.dtype
