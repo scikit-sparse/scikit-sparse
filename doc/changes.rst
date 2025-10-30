@@ -1,8 +1,8 @@
 Changes
 =======
 
-v0.5.0.dev0
------------
+v0.5.0
+------
 * Major API updates to the :mod:`sksparse.cholmod` module. The module has been
   updated to resemble the existing :func:`scipy.linalg.cholesky` interface, as
   well as provide additional functions present in the SuiteSparse CHOLMOD
@@ -92,20 +92,18 @@ v0.5.0.dev0
   ordering method.
 * Create the :mod:`~sksparse.ccolamd` module, which provides the constrained
   COLAMD ordering method.
+* Create the :mod:`~sksparse.umfpack` submodule, which provides an interface to
+  the UMFPACK sparse LU solver.
 * Remove support for the following versions:
 
   - Python < 3.10
   - NumPy < 2.0
   - SciPy < 1.14
+  - SuiteSparse < 7.4.0
 
   Python 3.9 will reach its end of life in October 2025, so remove support for
   it now. Numpy will end support for all 1.x versions by September 2025. SciPy
   v1.14 (released June 2024) will be supported until the end of 2026.
-
-
-v0.5.0
-------
-* Added :mod:`~sksparse.umfpack` submodule.
 
 v0.4.4
 ------
