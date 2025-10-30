@@ -1089,7 +1089,6 @@ cdef class UMFFactor:
         cnp.ndarray _P
         cnp.ndarray _Q
         cnp.ndarray _Rs
-        # TODO Dx for diagonal of U?
 
     def __init__(self, object A, object control=None):
         """Compute the symbolic analysis.
@@ -1647,7 +1646,6 @@ cdef class UMFFactor:
 
         return x
 
-    # TODO see umfpack_wsolve. Provide workspace for multiple solves?
     @cython.boundscheck(False)  # for-loop guaranteed in-bounds
     @cython.wraparound(False)
     def _solve(
