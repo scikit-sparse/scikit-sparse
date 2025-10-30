@@ -40,7 +40,7 @@ Object Interface
 .. autosummary::
     :toctree: generated/
     :nosignatures:
-    
+
     umf_factor - Compute the LU factorization of a sparse matrix.
     UMFFactor - An object-oriented interface to UMFPACK.
     UMFInfo - A dataclass to return UMFPACK info.
@@ -727,7 +727,7 @@ cdef class UMFInfo:
     alloc_init_used : float
         Initial memory allocation used, as a fraction of total numeric memory.
     forced_updates : int
-        Number of forced updates during numeric factorization. 
+        Number of forced updates during numeric factorization.
     numeric_walltime : float
         Wall-clock time spent in numeric factorization, in seconds.
     noff_diag : int
@@ -1069,11 +1069,19 @@ cdef class UMFFactor:
     cdef:
         void *_symbolic
         void *_numeric
-        UMFControl _control
-        UMFInfo _info
+        public UMFControl control
+        readonly UMFInfo info
         bint _use_int32
         bint _is_real
-        # TODO store A matrix in the factor object for use in numeric and solve??
+        size_t _M
+        size_t _N
+        size_t _N_inner  # min(M, N) inner dimension of LU
+        readonly object itype
+        readonly object dtype
+        # Store A matrix for use in factorize and solve
+        cnp.ndarray _Ap
+        cnp.ndarray _Ai
+        cnp.ndarray _Ax
         # cached "output" arrays, only extracted from _numeric upon request
         cnp.ndarray _Lp
         cnp.ndarray _Lj
@@ -1084,9 +1092,7 @@ cdef class UMFFactor:
         cnp.ndarray _P
         cnp.ndarray _Q
         cnp.ndarray _Rs
-        # TODO Dx for diagonal of U?
 
-    # TODO allow control kwargs in UMFFactor initialization? or just umf_factor?
     def __init__(self, object A, object control=None):
         """Compute the symbolic analysis.
 
@@ -1101,12 +1107,26 @@ cdef class UMFFactor:
         """
         A, _, _ = validate_csc_input(A)
 
+        # Promote single to double precision
+        if not (
+            np.issubdtype(A.dtype, np.float64) or np.issubdtype(A.dtype, np.complex128)
+        ):
+            if np.issubdtype(A.dtype, np.floating):
+                A = A.astype(np.promote_types(A.dtype, np.float64))
+            elif np.issubdtype(A.dtype, np.complexfloating):
+                A = A.astype(np.promote_types(A.dtype, np.complex128))
+
+        # Cache the matrix data
+        self._Ap = A.indptr
+        self._Ai = A.indices
+        self._Ax = A.data
+
         # Initialize the control and info arrays
-        self._control = UMFControl() if control is None else control
-        self._info = UMFInfo()
+        self.control = UMFControl() if control is None else control
+        self.info = UMFInfo()
 
         # Compute the symbolic analysis
-        self._init_symbolic(A.shape[0], A.shape[1], A.indptr, A.indices, A.data)
+        self._init_symbolic(A.shape[0], A.shape[1], self._Ap, self._Ai, self._Ax)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -1148,8 +1168,8 @@ cdef class UMFFactor:
                     <int32_t*>&indices[0],
                     <double*>&data[0],
                     &self._symbolic,
-                    self._control.data,
-                    self._info.data
+                    self.control.data,
+                    self.info.data
                 )
             else:
                 status = umfpack_dl_symbolic(
@@ -1159,8 +1179,8 @@ cdef class UMFFactor:
                     <int64_t*>&indices[0],
                     <double*>&data[0],
                     &self._symbolic,
-                    self._control.data,
-                    self._info.data
+                    self.control.data,
+                    self.info.data
                 )
         else:
             if self._use_int32:
@@ -1172,8 +1192,8 @@ cdef class UMFFactor:
                     <double*>&data[0],
                     NULL,
                     &self._symbolic,
-                    self._control.data,
-                    self._info.data
+                    self.control.data,
+                    self.info.data
                 )
             else:
                 status = umfpack_zl_symbolic(
@@ -1184,11 +1204,19 @@ cdef class UMFFactor:
                     <double*>&data[0],
                     NULL,
                     &self._symbolic,
-                    self._control.data,
-                    self._info.data
+                    self.control.data,
+                    self.info.data
                 )
 
         _handle_errors(status)
+
+        # Store matrix shape (ensure non-negative before cast)
+        self._M = <size_t>max(self.info.data[UMFPACK_NROW], 0)
+        self._N = <size_t>max(self.info.data[UMFPACK_NCOL], 0)
+        self._N_inner = min(self._M, self._N)
+
+        self.itype = np.dtype(np.int32 if self._use_int32 else np.int64)
+        self.dtype = np.dtype(np.float64 if self._is_real else np.complex128)
 
     def __dealloc__(self):
         """Free UMFPACK symbolic and numeric objects."""
@@ -1216,17 +1244,18 @@ cdef class UMFFactor:
                 else:
                     umfpack_zl_free_numeric(&self._numeric)
 
+    def __iter__(self):
+        for attr in ['L', 'U', 'perm_r', 'perm_c', 'rscale']:
+            yield getattr(self, attr)
+
     def __repr__(self):
         cls_name = self.__class__.__name__
-        dtype = "float64" if self._is_real else "complex128"
-        itype = "int32" if self._use_int32 else "int64"
-        factor_type = "numeric" if self.is_numeric else "symbolic"
-        min_MN = min(self.n_row, self.n_col)
-        L_shape = (self.n_row, min_MN)
-        U_shape = (min_MN, self.n_col)
+        factor_type = 'numeric' if self.is_numeric else 'symbolic'
+        L_shape = (self._M, self._N_inner)
+        U_shape = (self._N_inner, self._N)
         return (
-            f"<{cls_name} {factor_type} factor of dtype '{dtype}' "
-            f"with '{itype}' indices:\n"
+            f"<{cls_name} {factor_type} factor of dtype '{self.dtype}' "
+            f"with '{self.itype}' indices:\n"
             f"    L: {L_shape} with {self.lnz} stored elements\n"
             f"    U: {U_shape} with {self.unz} stored elements>"
         )
@@ -1243,42 +1272,30 @@ cdef class UMFFactor:
 
     @property
     def lnz(self):
-        return int(self._info.lnz if self._info.lnz >= 0 else 0)
+        return int(max(self.info.data[UMFPACK_LNZ], 0))
 
     @property
     def unz(self):
-        return int(self._info.unz if self._info.unz >= 0 else 0)
+        return int(max(self.info.data[UMFPACK_UNZ], 0))
 
     @property
     def nnz(self):
         return int(self.lnz + self.unz)
 
     @property
-    def n_row(self):
-        return int(self._info.n_row if self._info.n_row >= 0 else 0)
-
-    @property
-    def n_col(self):
-        return int(self._info.n_col if self._info.n_col >= 0 else 0)
+    def shape(self):
+        return (self._M, self._N)
 
     @property
     def nz_udiag(self):
-        return int(self._info.nz_udiag if self._info.nz_udiag >= 0 else 0)
-
-    @property
-    def dtype(self):
-        return np.float64 if self._is_real else np.complex128
-
-    @property
-    def itype(self):
-        return np.int32 if self._use_int32 else np.int64
+        return int(max(self.info.data[UMFPACK_UDIAG_NZ], 0))
 
     @property
     def L(self):
         if self._Lp is None or self._Lj is None or self._Lx is None:
             self._get_numeric()
 
-        L_shape = (self.n_row, min(self.n_row, self.n_col))
+        L_shape = (self._M, self._N_inner)
         return csr_array((self._Lx, self._Lj, self._Lp), shape=L_shape)
 
     @property
@@ -1286,7 +1303,7 @@ cdef class UMFFactor:
         if self._Up is None or self._Ui is None or self._Ux is None:
             self._get_numeric()
 
-        U_shape = (min(self.n_row, self.n_col), self.n_col)
+        U_shape = (self._N_inner, self._N)
         return csc_array((self._Ux, self._Ui, self._Up), shape=U_shape)
 
     @property
@@ -1302,22 +1319,10 @@ cdef class UMFFactor:
         return self._Q
 
     @property
-    def R(self):
+    def rscale(self):
         if self._Rs is None:
             self._get_numeric()
         return self._Rs
-
-    @property
-    def info(self):
-        return self._info
-
-    @property
-    def control(self):
-        return self._control
-
-    @control.setter
-    def control(self, UMFControl control):
-        self._control = control
 
     # -------------------------------------------------------------------------
     #         Public Methods
@@ -1328,6 +1333,11 @@ cdef class UMFFactor:
 
         umf._use_int32 = self._use_int32
         umf._is_real = self._is_real
+        umf._M = self._M
+        umf._N = self._N
+        umf._N_inner = self._N_inner
+        umf.itype = self.itype
+        umf.dtype = self.dtype
 
         cdef int status
 
@@ -1357,22 +1367,29 @@ cdef class UMFFactor:
 
         _handle_errors(status)
 
-        umf._control = self._control
-        umf._info = self._info
+        umf.control = self.control
+        umf.info = self.info
+
+        umf._Ap = None if self._Ap is None else self._Ap.copy()
+        umf._Ai = None if self._Ai is None else self._Ai.copy()
+        umf._Ax = None if self._Ax is None else self._Ax.copy()
 
         umf._Lp = None if self._Lp is None else self._Lp.copy()
         umf._Lj = None if self._Lj is None else self._Lj.copy()
         umf._Lx = None if self._Lx is None else self._Lx.copy()
+
         umf._Up = None if self._Up is None else self._Up.copy()
         umf._Ui = None if self._Ui is None else self._Ui.copy()
         umf._Ux = None if self._Ux is None else self._Ux.copy()
+
         umf._P = None if self._P is None else self._P.copy()
         umf._Q = None if self._Q is None else self._Q.copy()
+
         umf._Rs = None if self._Rs is None else self._Rs.copy()
 
         return umf
 
-    def factorize(self, object A):
+    def factorize(self, object A=None):
         """Compute the numeric factorization of a sparse matrix.
 
         Given the symbolic analysis performed in the constructor,
@@ -1382,15 +1399,17 @@ cdef class UMFFactor:
         .. math::
             L U = P R A Q.
 
-        The matrix :math:`A` must have the same shape and nonzero pattern as
-        the one used to create this :class:`UMFFactor` object, but need not
-        have the same values.
+        If given, the matrix :math:`A` must have the same shape and nonzero
+        pattern as the one used to create this :class:`UMFFactor` object, but
+        need not have the same values.
 
         Parameters
         ----------
         A : (M, N) numpy.ndarray or sparse array
             The input matrix. Must have the same shape and nonzero pattern as
-            the matrix used to create this :class:`UMFFactor` object.
+            the matrix used to create this :class:`UMFFactor` object. If not
+            provided, the original matrix given to the constructor will be
+            used.
 
         Returns
         -------
@@ -1407,23 +1426,13 @@ cdef class UMFFactor:
             "Cannot perform numeric factorization."
         )
 
-        A, use_int32, _ = validate_csc_input(A)
-
-        if use_int32 != self._use_int32:
-            raise ValueError(
-                "The integer size of the input matrix does not match "
-                "the one used for symbolic factorization. "
-                f"Expected '{'int32' if self._use_int32 else 'int64'}', "
-                f"got '{'int32' if use_int32 else 'int64'}'."
-            )
-
-        if _is_real_dtype(A.dtype) != self._is_real:
-            raise ValueError(
-                "The data type of the input matrix does not match "
-                "the one used for symbolic factorization. "
-                f"Expected {'float64' if self._is_real else 'complex128'}, "
-                f"got {A.dtype}."
-            )
+        if A is not None:
+            A, _, itype = validate_csc_input(A)
+            self._check_input_matrix(A, itype)
+            # Update cached matrix data
+            self._Ap = A.indptr
+            self._Ai = A.indices
+            self._Ax = A.data
 
         # Clear cached output arrays
         self._Lp = None
@@ -1436,7 +1445,7 @@ cdef class UMFFactor:
         self._Q = None
         self._Rs = None
 
-        self._factorize(A.indptr, A.indices, A.data)
+        self._factorize(self._Ap, self._Ai, self._Ax)
 
         return self
 
@@ -1470,8 +1479,8 @@ cdef class UMFFactor:
                     <double*>&data[0],
                     self._symbolic,
                     &self._numeric,
-                    self._control.data,
-                    self._info.data
+                    self.control.data,
+                    self.info.data
                 )
             else:
                 status = umfpack_dl_numeric(
@@ -1480,8 +1489,8 @@ cdef class UMFFactor:
                     <double*>&data[0],
                     self._symbolic,
                     &self._numeric,
-                    self._control.data,
-                    self._info.data
+                    self.control.data,
+                    self.info.data
                 )
         else:
             if self._use_int32:
@@ -1492,8 +1501,8 @@ cdef class UMFFactor:
                     NULL,
                     self._symbolic,
                     &self._numeric,
-                    self._control.data,
-                    self._info.data
+                    self.control.data,
+                    self.info.data
                 )
             else:
                 status = umfpack_zl_numeric(
@@ -1503,16 +1512,14 @@ cdef class UMFFactor:
                     NULL,
                     self._symbolic,
                     &self._numeric,
-                    self._control.data,
-                    self._info.data
+                    self.control.data,
+                    self.info.data
                 )
 
         _handle_errors(status)
 
     # TODO allow x as input?
-    # TODO see umfpack_wsolve. Provide workspace for multiple solves?
-    # TODO A is *only* needed if info.ir_steps > 0 and sys == UMFPACK_A*.
-    def solve(self, object A, object b, *, object trans='N'):
+    def solve(self, object b, object A=None, *, object trans='N'):
         """Solve a linear system using the LU factorization.
 
         This method solves one of the following linear systems:
@@ -1528,11 +1535,11 @@ cdef class UMFFactor:
 
         Parameters
         ----------
-        A : (N, N) numpy.ndarray or sparse array
-            The input matrix. Must have the same shape and nonzero pattern as
-            the matrix used to create this :class:`UMFFactor` object.
         b : (N,) numpy.ndarray or sparse array
             The right-hand side vector.
+        A : (N, N) numpy.ndarray or sparse array, optional
+            The input matrix. Must have the same shape and nonzero pattern as
+            the matrix used to create this :class:`UMFFactor` object.
         trans : str, optional
             The type of system to solve. Possible values are:
 
@@ -1559,22 +1566,10 @@ cdef class UMFFactor:
             In that case, the solution will have infinite or NaN values,
             but other entries may still be valid.
         """
-        A, use_int32, itype = validate_csc_input(A, require_square=True)
-
-        if use_int32 != self._use_int32:
+        if self._M != self._N:
             raise ValueError(
-                "The integer size of the input matrix does not match "
-                "the one used for symbolic factorization. "
-                f"Expected '{'int32' if self._use_int32 else 'int64'}', "
-                f"got '{'int32' if use_int32 else 'int64'}'."
-            )
-
-        if _is_real_dtype(A.dtype) != self._is_real:
-            raise ValueError(
-                "The data type of the input matrix does not match "
-                "the one used for symbolic factorization. "
-                f"Expected {'float64' if self._is_real else 'complex128'}, "
-                f"got {A.dtype}."
+                "Matrix must be square to use the solve method. "
+                f" Got shape ({self._M=}, {self._N=})."
             )
 
         cdef int sys
@@ -1589,15 +1584,23 @@ cdef class UMFFactor:
         if not (isinstance(b, np.ndarray) or issparse(b)):
             raise ValueError("b must be an ndarray or sparse matrix.")
 
-        if b.dtype != A.dtype:
+        if A is not None:
+            A, _, itype = validate_csc_input(A, require_square=True)
+            self._check_input_matrix(A, itype)
+            # Update cached matrix data
+            self._Ap = A.indptr
+            self._Ai = A.indices
+            self._Ax = A.data
+
+        if b.dtype != self.dtype:
             raise ValueError(
-                f"LHS and RHS dtypes do not match. {A.dtype=} and {b.dtype=}"
+                f"LHS and RHS dtypes do not match. {self.dtype=} and {b.dtype=}"
             )
 
         if b.ndim not in (1, 2):
             raise ValueError("b must be a 1D or 2D array.")
 
-        cdef Py_ssize_t N = A.shape[0]
+        cdef size_t N = <size_t>self.info.data[UMFPACK_NROW]
         cdef bint return_1D = b.ndim == 1
 
         if b.shape[0] != N:
@@ -1607,7 +1610,7 @@ cdef class UMFFactor:
 
         cdef bint return_sparse = issparse(b)
 
-        if issparse(b):
+        if return_sparse:
             b = b.toarray()
         else:
             b = np.asarray(b)
@@ -1629,12 +1632,12 @@ cdef class UMFFactor:
         # Allocate the output array
         x = np.empty_like(b, order="F")
 
-        self._solve(sys, b, A.indptr, A.indices, A.data, x)
+        self._solve(sys, b, self._Ap, self._Ai, self._Ax, x)
 
         if return_sparse:
-            x = csc_array(x, dtype=A.dtype)
-            x.indptr = x.indptr.astype(itype)
-            x.indices = x.indices.astype(itype)
+            x = csc_array(x, dtype=b.dtype)
+            x.indptr = x.indptr.astype(self.itype)
+            x.indices = x.indices.astype(self.itype)
 
         if return_1D:
             x = x[:, 0]
@@ -1672,14 +1675,13 @@ cdef class UMFFactor:
         cdef:
             Py_ssize_t k
             Py_ssize_t K = b.shape[1]
-            double* data_ptr
+            double* data_ptr = <double*>&data[0]
             double* x_ptr
             double* b_ptr
 
         for k in range(K):
             # NOTE numpy complex arrays store real and imag parts interleaved,
             # so we can just pass the pointer to the data as double*
-            data_ptr = <double*>&data[0]
             x_ptr = <double*>&x[0, k]
             b_ptr = <double*>&b[0, k]
 
@@ -1694,8 +1696,8 @@ cdef class UMFFactor:
                         x_ptr,
                         b_ptr,
                         self._numeric,
-                        self._control.data,
-                        self._info.data
+                        self.control.data,
+                        self.info.data
                     )
                 else:
                     status = umfpack_dl_solve(
@@ -1706,8 +1708,8 @@ cdef class UMFFactor:
                         x_ptr,
                         b_ptr,
                         self._numeric,
-                        self._control.data,
-                        self._info.data
+                        self.control.data,
+                        self.info.data
                     )
             else:
                 if self._use_int32:
@@ -1722,8 +1724,8 @@ cdef class UMFFactor:
                         b_ptr,
                         NULL,
                         self._numeric,
-                        self._control.data,
-                        self._info.data
+                        self.control.data,
+                        self.info.data
                     )
                 else:
                     status = umfpack_zl_solve(
@@ -1737,8 +1739,8 @@ cdef class UMFFactor:
                         b_ptr,
                         NULL,
                         self._numeric,
-                        self._control.data,
-                        self._info.data
+                        self.control.data,
+                        self.info.data
                     )
 
             _handle_errors(status)
@@ -1756,7 +1758,7 @@ cdef class UMFFactor:
                 "Cannot compute determinant."
             )
 
-        Mx = np.empty(1, dtype=np.float64 if self._is_real else np.complex128)
+        Mx = np.empty(1, dtype=self.dtype)
         Ex = np.empty(1, dtype=np.float64)
 
         self._slogdet(Mx, Ex)
@@ -1789,20 +1791,20 @@ cdef class UMFFactor:
         if self._is_real:
             if self._use_int32:
                 status = umfpack_di_get_determinant(
-                    mx_ptr, ex_ptr, self._numeric, self._info.data
+                    mx_ptr, ex_ptr, self._numeric, self.info.data
                 )
             else:
                 status = umfpack_dl_get_determinant(
-                    mx_ptr, ex_ptr, self._numeric, self._info.data
+                    mx_ptr, ex_ptr, self._numeric, self.info.data
                 )
         else:
             if self._use_int32:
                 status = umfpack_zi_get_determinant(
-                    mx_ptr, NULL, ex_ptr, self._numeric, self._info.data
+                    mx_ptr, NULL, ex_ptr, self._numeric, self.info.data
                 )
             else:
                 status = umfpack_zl_get_determinant(
-                    mx_ptr, NULL, ex_ptr, self._numeric, self._info.data
+                    mx_ptr, NULL, ex_ptr, self._numeric, self.info.data
                 )
 
         _handle_errors(status)
@@ -1831,75 +1833,98 @@ cdef class UMFFactor:
         """
         cdef int pl
         if print_level is None:
-            pl = self._control.print_level
+            pl = self.control.print_level
         else:
             pl = print_level
 
-        cdef int old_pl = self._control.print_level
-        self._control.print_level = pl
+        cdef int old_pl = self.control.print_level
+        self.control.print_level = pl
 
-        umfpack_di_report_info(self._control.data, self._info.data)
+        umfpack_di_report_info(self.control.data, self.info.data)
 
         # restore old print level
-        self._control.print_level = old_pl
+        self.control.print_level = old_pl
 
     def report_control(self):
-        self._control.report()
+        self.control.report()
 
     def report_symbolic(self, object print_level=4):
         cdef int pl
         if print_level is None:
-            pl = self._control.print_level
+            pl = self.control.print_level
         else:
             pl = print_level
 
-        cdef int old_pl = self._control.print_level
-        self._control.print_level = pl
+        cdef int old_pl = self.control.print_level
+        self.control.print_level = pl
 
         if self._is_real:
             if self._use_int32:
-                umfpack_di_report_symbolic(self._symbolic, self._control.data)
+                umfpack_di_report_symbolic(self._symbolic, self.control.data)
             else:
-                umfpack_dl_report_symbolic(self._symbolic, self._control.data)
+                umfpack_dl_report_symbolic(self._symbolic, self.control.data)
         else:
             if self._use_int32:
-                umfpack_zi_report_symbolic(self._symbolic, self._control.data)
+                umfpack_zi_report_symbolic(self._symbolic, self.control.data)
             else:
-                umfpack_zl_report_symbolic(self._symbolic, self._control.data)
+                umfpack_zl_report_symbolic(self._symbolic, self.control.data)
 
         # restore old print level
-        self._control.print_level = old_pl
+        self.control.print_level = old_pl
 
     def report_numeric(self, object print_level=4):
         cdef int pl
         if print_level is None:
-            pl = self._control.print_level
+            pl = self.control.print_level
         else:
             pl = print_level
 
-        cdef int old_pl = self._control.print_level
-        self._control.print_level = pl
+        cdef int old_pl = self.control.print_level
+        self.control.print_level = pl
 
         if self._is_real:
             if self._use_int32:
-                umfpack_di_report_numeric(self._numeric, self._control.data)
+                umfpack_di_report_numeric(self._numeric, self.control.data)
             else:
-                umfpack_dl_report_numeric(self._numeric, self._control.data)
+                umfpack_dl_report_numeric(self._numeric, self.control.data)
         else:
             if self._use_int32:
-                umfpack_zi_report_numeric(self._numeric, self._control.data)
+                umfpack_zi_report_numeric(self._numeric, self.control.data)
             else:
-                umfpack_zl_report_numeric(self._numeric, self._control.data)
+                umfpack_zl_report_numeric(self._numeric, self.control.data)
 
         # restore old print level
-        self._control.print_level = old_pl
+        self.control.print_level = old_pl
 
     # -------------------------------------------------------------------------
     #         Private Methods
     # -------------------------------------------------------------------------
+    def _check_input_matrix(self, object A, object itype):
+        """Check that the input matrix matches the existing factorization."""
+        if A.shape != self.shape:
+            raise ValueError(
+                "The shape of the input matrix does not match "
+                "the one used for symbolic factorization. "
+                f"Expected {self.shape}, got {A.shape}."
+            )
+
+        if itype != self.itype:
+            raise ValueError(
+                "The integer size of the input matrix does not match "
+                "the one used for symbolic factorization. "
+                f"Expected '{self.itype}', got '{itype}'."
+            )
+
+        if A.dtype != self.dtype:
+            raise ValueError(
+                "The data type of the input matrix does not match "
+                "the one used for symbolic factorization. "
+                f"Expected '{self.dtype}', got '{A.dtype}'."
+            )
+
     cdef int _check_rcond(self) except -1:
         """Check the condition number."""
-        cdef double rcond = self._info.rcond
+        cdef double rcond = self.info.data[UMFPACK_RCOND]
         cdef double eps = np.finfo(np.float64).eps
 
         if rcond == 0:
@@ -1923,27 +1948,18 @@ cdef class UMFFactor:
                 "Run `UMFFactor.factorize(A)` first."
             )
 
-        cdef:
-            size_t lnz = self._info.lnz
-            size_t unz = self._info.unz
-            size_t n_row = self._info.n_row
-            size_t n_col = self._info.n_col
-
-        dtype = np.dtype(np.double if self._is_real else np.cdouble)
-        itype = np.dtype(np.int32 if self._use_int32 else np.int64)
-
         # Create output arrays
-        self._Lp = np.empty(n_row + 1, dtype=itype)
-        self._Lj = np.empty(lnz, dtype=itype)
-        self._Lx = np.empty(lnz, dtype=dtype)
+        self._Lp = np.empty(self._M + 1, dtype=self.itype)
+        self._Lj = np.empty(self.lnz, dtype=self.itype)
+        self._Lx = np.empty(self.lnz, dtype=self.dtype)
 
-        self._Up = np.empty(n_col + 1, dtype=itype)
-        self._Ui = np.empty(unz, dtype=itype)
-        self._Ux = np.empty(unz, dtype=dtype)
+        self._Up = np.empty(self._N + 1, dtype=self.itype)
+        self._Ui = np.empty(self.unz, dtype=self.itype)
+        self._Ux = np.empty(self.unz, dtype=self.dtype)
 
-        self._P = np.empty(n_row, dtype=itype)
-        self._Q = np.empty(n_col, dtype=itype)
-        self._Rs = np.empty(n_row, dtype=np.float64)  # always real
+        self._P = np.empty(self._M, dtype=self.itype)
+        self._Q = np.empty(self._N, dtype=self.itype)
+        self._Rs = np.empty(self._M, dtype=np.float64)  # always real
 
         self._dispatch_get_numeric(
             self._Lp, self._Lj, self._Lx,
@@ -2127,7 +2143,7 @@ def umf_factor(object A, *, object control=None, **kwargs):
     """
     if control is None:
         control = UMFControl(**kwargs)
-    return UMFFactor(A, control).factorize(A)
+    return UMFFactor(A, control).factorize()
 
 
 def umf_solve(object A, object b, *, object trans='N', object control=None, **kwargs):
@@ -2185,7 +2201,7 @@ def umf_solve(object A, object b, *, object trans='N', object control=None, **kw
     # factorize() and solve() will each warn for a singular matrix,
     # so we catch the warnings from factorize() and re-raise only once.
     with warnings.catch_warnings(record=True) as ws:
-        x = UMFFactor(A, control).factorize(A).solve(A, b, trans=trans)
+        x = UMFFactor(A, control).factorize().solve(b, trans=trans)
 
     # Raise only the latest singular matrix warning from solve
     if ws:
