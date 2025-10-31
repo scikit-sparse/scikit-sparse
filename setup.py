@@ -84,7 +84,16 @@ except Exception:
 INCLUDE_DIRS.append(str(Path(sys.prefix) / "include"))
 INCLUDE_DIRS.append("/usr/include/suitesparse")  # Linux default path
 
-extension_names = ["cholmod", "amd", "btf", "camd", "colamd", "ccolamd", "umfpack"]
+extension_names = [
+    "cholmod",
+    "amd",
+    "btf",
+    "camd",
+    "colamd",
+    "ccolamd",
+    "klu",
+    "umfpack",
+]
 
 extensions = [
     Extension(
