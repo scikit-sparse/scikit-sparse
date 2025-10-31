@@ -561,15 +561,15 @@ cdef class KLUFactor:
         # Create output arrays
         Lp = np.empty(self._N + 1, dtype=self.itype)
         Li = np.empty(self.lnz, dtype=self.itype)
-        Lx = np.empty(self.lnz, dtype=self.dtype)
+        Lx = np.empty(self.lnz, dtype=np.float64)
 
         Up = np.empty(self._N + 1, dtype=self.itype)
         Ui = np.empty(self.unz, dtype=self.itype)
-        Ux = np.empty(self.unz, dtype=self.dtype)
+        Ux = np.empty(self.unz, dtype=np.float64)
 
         Fp = np.empty(self._N + 1, dtype=self.itype)
         Fi = np.empty(self.nzoff, dtype=self.itype)
-        Fx = np.empty(self.nzoff, dtype=self.dtype)
+        Fx = np.empty(self.nzoff, dtype=np.float64)
 
         self._P = np.empty(self._N, dtype=self.itype)
         self._Q = np.empty(self._N, dtype=self.itype)
