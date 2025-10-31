@@ -329,6 +329,9 @@ cdef class KLUFactor:
 
     @property
     def lnz(self):
+        if self._numeric is NULL and self._l_numeric is NULL:
+            return None
+
         if self._use_int32:
             return int(max(self._numeric.lnz, 0))
         else:
@@ -336,6 +339,9 @@ cdef class KLUFactor:
 
     @property
     def unz(self):
+        if self._numeric is NULL and self._l_numeric is NULL:
+            return None
+
         if self._use_int32:
             return int(max(self._numeric.unz, 0))
         else:
@@ -344,9 +350,9 @@ cdef class KLUFactor:
     @property
     def nzoff(self):
         if self._use_int32:
-            return int(max(self._numeric.nzoff, 0))
+            return int(max(self._symbolic.nzoff, 0))
         else:
-            return int(max(self._l_numeric.nzoff, 0))
+            return int(max(self._l_symbolic.nzoff, 0))
 
     @property
     def nblocks(self):
@@ -357,6 +363,8 @@ cdef class KLUFactor:
 
     @property
     def nnz(self):
+        if self.lnz is None or self.unz is None:
+            return None
         return int(self.lnz + self.unz)
 
     @property
