@@ -111,57 +111,57 @@ cdef extern from "klu.h":
         int64_t do_btf
         int64_t structural_rank
 
-    # ctypedef struct klu_numeric:
-    #     int32_t n
-    #     int32_t nblocks
-    #     int32_t lnz
-    #     int32_t unz
-    #     int32_t max_lnz_block
-    #     int32_t max_unz_block
-    #     int32_t *Pnum
-    #     int32_t *Pinv
-    #     int32_t *Lip
-    #     int32_t *Uip
-    #     int32_t *Llen
-    #     int32_t *Ulen
-    #     void **LUbx
-    #     size_t *LUsize
-    #     void *Udiag
-    #     double *Rs
-    #     size_t worksize
-    #     void *Work
-    #     void *Xwork
-    #     int32_t *Iwork
-    #     int32_t *Offp
-    #     int32_t *Offi
-    #     void *Offx
-    #     int32_t nzoff
+    ctypedef struct klu_numeric:
+        int32_t n
+        int32_t nblocks
+        int32_t lnz
+        int32_t unz
+        int32_t max_lnz_block
+        int32_t max_unz_block
+        int32_t *Pnum
+        int32_t *Pinv
+        int32_t *Lip
+        int32_t *Uip
+        int32_t *Llen
+        int32_t *Ulen
+        void **LUbx
+        size_t *LUsize
+        void *Udiag
+        double *Rs
+        size_t worksize
+        void *Work
+        void *Xwork
+        int32_t *Iwork
+        int32_t *Offp
+        int32_t *Offi
+        void *Offx
+        int32_t nzoff
 
-    # ctypedef struct klu_l_numeric:
-    #     int64_t n
-    #     int64_t nblocks
-    #     int64_t lnz
-    #     int64_t unz
-    #     int64_t max_lnz_block
-    #     int64_t max_unz_block
-    #     int64_t *Pnum
-    #     int64_t *Pinv
-    #     int64_t *Lip
-    #     int64_t *Uip
-    #     int64_t *Llen
-    #     int64_t *Ulen
-    #     void **LUbx
-    #     size_t *LUsize
-    #     void *Udiag
-    #     double *Rs
-    #     size_t worksize
-    #     void *Work
-    #     void *Xwork
-    #     int64_t *Iwork
-    #     int64_t *Offp
-    #     int64_t *Offi
-    #     void *Offx
-    #     int64_t nzoff
+    ctypedef struct klu_l_numeric:
+        int64_t n
+        int64_t nblocks
+        int64_t lnz
+        int64_t unz
+        int64_t max_lnz_block
+        int64_t max_unz_block
+        int64_t *Pnum
+        int64_t *Pinv
+        int64_t *Lip
+        int64_t *Uip
+        int64_t *Llen
+        int64_t *Ulen
+        void **LUbx
+        size_t *LUsize
+        void *Udiag
+        double *Rs
+        size_t worksize
+        void *Work
+        void *Xwork
+        int64_t *Iwork
+        int64_t *Offp
+        int64_t *Offi
+        void *Offx
+        int64_t nzoff
 
     # ---------------------------------------------------------------------------------
     #         Functions
@@ -183,5 +183,123 @@ cdef extern from "klu.h":
         klu_l_common *Common
     )
 
+    klu_numeric *klu_factor(
+        int32_t Ap[],
+        int32_t Ai[],
+        double Ax[],
+        klu_symbolic *Symbolic,
+        klu_common *Common
+    )
+
+    klu_numeric *klu_z_factor(
+        int32_t Ap[],
+        int32_t Ai[],
+        double Ax[],
+        klu_symbolic *Symbolic,
+        klu_common *Common
+    )
+
+    klu_l_numeric *klu_l_factor(
+        int64_t Ap[],
+        int64_t Ai[],
+        double Ax[],
+        klu_l_symbolic *Symbolic,
+        klu_l_common *Common
+    )
+
+    klu_l_numeric *klu_zl_factor(
+        int64_t Ap[],
+        int64_t Ai[],
+        double Ax[],
+        klu_l_symbolic *Symbolic,
+        klu_l_common *Common
+    )
+
+    int klu_extract(
+        klu_numeric *Numeric,
+        klu_symbolic *Symbolic,
+        int32_t *Lp,
+        int32_t *Li,
+        double *Lx,
+        int32_t *Up,
+        int32_t *Ui,
+        double *Ux,
+        int32_t *Fp,
+        int32_t *Fi,
+        double *Fx,
+        int32_t *P,
+        int32_t *Q,
+        double *Rs,
+        int32_t *R,
+        klu_common *Common
+    )
+
+    int klu_z_extract(
+        klu_numeric *Numeric,
+        klu_symbolic *Symbolic,
+        int32_t *Lp,
+        int32_t *Li,
+        double *Lx,
+        double *Lz,
+        int32_t *Up,
+        int32_t *Ui,
+        double *Ux,
+        double *Uz,
+        int32_t *Fp,
+        int32_t *Fi,
+        double *Fx,
+        double *Fz,
+        int32_t *P,
+        int32_t *Q,
+        double *Rs,
+        int32_t *R,
+        klu_common *Common
+    )
+
+    int klu_l_extract(
+        klu_l_numeric *Numeric,
+        klu_l_symbolic *Symbolic,
+        int64_t *Lp,
+        int64_t *Li,
+        double *Lx,
+        int64_t *Up,
+        int64_t *Ui,
+        double *Ux,
+        int64_t *Fp,
+        int64_t *Fi,
+        double *Fx,
+        int64_t *P,
+        int64_t *Q,
+        double *Rs,
+        int64_t *R,
+        klu_l_common *Common
+    )
+
+    int klu_zl_extract(
+        klu_l_numeric *Numeric,
+        klu_l_symbolic *Symbolic,
+        int64_t *Lp,
+        int64_t *Li,
+        double *Lx,
+        double *Lz,
+        int64_t *Up,
+        int64_t *Ui,
+        double *Ux,
+        double *Uz,
+        int64_t *Fp,
+        int64_t *Fi,
+        double *Fx,
+        double *Fz,
+        int64_t *P,
+        int64_t *Q,
+        double *Rs,
+        int64_t *R,
+        klu_l_common *Common
+    )
+
     int klu_free_symbolic(klu_symbolic **Symbolic, klu_common *Common)
     int klu_l_free_symbolic(klu_l_symbolic **Symbolic, klu_l_common *Common)
+    int klu_free_numeric(klu_numeric **Numeric, klu_common *Common)
+    int klu_z_free_numeric (klu_numeric **Numeric, klu_common *Common)
+    int klu_l_free_numeric (klu_l_numeric **Numeric, klu_l_common *Common)
+    int klu_zl_free_numeric (klu_l_numeric **Numeric, klu_l_common *Common)

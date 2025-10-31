@@ -74,7 +74,7 @@ cimport cython
 cimport numpy as cnp
 
 import numpy as np
-from scipy.sparse import issparse, csr_array, csc_array
+from scipy.sparse import issparse, csc_array
 import warnings
 
 from .utils import validate_csc_input
@@ -177,6 +177,7 @@ cdef int _handle_errors(int status) except -1 with gil:
 #         KLU Class Interface
 # -------------------------------------------------------------------------------------
 # TODO use 2 separate objects for int32 and int64 versions?
+# TODO add docs note on difference of row scaling vs UMFPACK
 cdef class KLUFactor:
     """Class to compute and store the KLU factorization of a sparse matrix.
 
@@ -184,7 +185,7 @@ cdef class KLUFactor:
     and determines a fill-reducing ordering such that:
 
     .. math::
-        L U + F = R P A Q.
+        L U + F = R^{-1} P A Q.
 
     The numeric factorization is not computed until :meth:`.factorize` is called.
 
@@ -192,8 +193,8 @@ cdef class KLUFactor:
     ----------
     N : int
         The number of rows/columns in the matrix.
-    L : scipy.sparse.csr_array
-        The :math:`L` factor as a sparse CSR matrix.
+    L : scipy.sparse.csc_array
+        The :math:`L` factor as a sparse CSC matrix.
     U : scipy.sparse.csc_array
         The :math:`U` factor as a sparse CSC matrix.
     perm_r, perm_c : numpy.ndarray
@@ -213,14 +214,39 @@ cdef class KLUFactor:
     """
 
     cdef:
-        readonly Py_ssize_t N
+        readonly Py_ssize_t _N
+        readonly object itype
+        readonly object dtype
         bint _use_int32
+        bint _is_real
+        # settings + output info
         klu_common _common
         klu_common* _cm
         klu_l_common _l_common
         klu_l_common* _l_cm
+        # Symbolic analysis
         klu_symbolic* _symbolic
         klu_l_symbolic* _l_symbolic
+        # Numeric factorization
+        klu_numeric* _numeric
+        klu_l_numeric* _l_numeric
+        # Cached output arrays
+        cnp.ndarray _Lp
+        cnp.ndarray _Li
+        cnp.ndarray _Lx
+        cnp.ndarray _Lz
+        cnp.ndarray _Up
+        cnp.ndarray _Ui
+        cnp.ndarray _Ux
+        cnp.ndarray _Uz
+        cnp.ndarray _Fp
+        cnp.ndarray _Fi
+        cnp.ndarray _Fx
+        cnp.ndarray _Fz
+        cnp.ndarray _P
+        cnp.ndarray _Q
+        cnp.ndarray _Rs
+        cnp.ndarray _R
 
     # TODO pass options either via kwargs or struct
     def __init__(self, object A):
@@ -234,9 +260,9 @@ cdef class KLUFactor:
         """
         A, _, _ = validate_csc_input(A, require_square=True)
 
-        self.N = A.shape[0]
+        self._N = A.shape[0]
 
-        self._init_symbolic(self.N, A.indptr, A.indices)
+        self._init_symbolic(self._N, A.indptr, A.indices, A.data)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -244,7 +270,8 @@ cdef class KLUFactor:
         self,
         Py_ssize_t N,
         index_t[::1] indptr,
-        index_t[::1] indices
+        index_t[::1] indices,
+        value_t[::1] data,
     ):
         """Compute the symbolic factorization.
 
@@ -257,9 +284,8 @@ cdef class KLUFactor:
         indices : 1D array of index_t
             The row indices array of the CSC matrix.
         """
-        cdef int status
-
         self._use_int32 = index_t is int32_t
+        self._is_real = value_t is double
 
         if self._use_int32:
             self._cm = &self._common
@@ -284,11 +310,433 @@ cdef class KLUFactor:
             )
             _handle_errors(self._l_cm.status)
 
+        self.itype = np.dtype(np.int32 if self._use_int32 else np.int64)
+        self.dtype = np.dtype(np.float64 if self._is_real else np.complex128)
+
     def __dealloc__(self):
         """Deallocate KLU objects."""
         if self._use_int32:
             if self._symbolic is not NULL:
                 klu_free_symbolic(&self._symbolic, self._cm)
+            if self._numeric is not NULL:
+                if self._is_real:
+                    klu_free_numeric(&self._numeric, self._cm)
+                else:
+                    klu_z_free_numeric(&self._numeric, self._cm)
         else:
             if self._l_symbolic is not NULL:
                 klu_l_free_symbolic(&self._l_symbolic, self._l_cm)
+            if self._l_numeric is not NULL:
+                if self._is_real:
+                    klu_l_free_numeric(&self._l_numeric, self._l_cm)
+                else:
+                    klu_zl_free_numeric(&self._l_numeric, self._l_cm)
+
+    # ---------------------------------------------------------------------------------
+    #         Properties
+    # ---------------------------------------------------------------------------------
+    @property
+    def is_numeric(self):
+        if self._use_int32:
+            return self._symbolic is not NULL and self._numeric is not NULL
+        else:
+            return self._l_symbolic is not NULL and self._l_numeric is not NULL
+
+    @property
+    def lnz(self):
+        if self._use_int32:
+            return int(max(self._numeric.lnz, 0))
+        else:
+            return int(max(self._l_numeric.lnz, 0))
+
+    @property
+    def unz(self):
+        if self._use_int32:
+            return int(max(self._numeric.unz, 0))
+        else:
+            return int(max(self._l_numeric.unz, 0))
+
+    @property
+    def nzoff(self):
+        if self._use_int32:
+            return int(max(self._numeric.nzoff, 0))
+        else:
+            return int(max(self._l_numeric.nzoff, 0))
+
+    @property
+    def nblocks(self):
+        if self._use_int32:
+            return int(max(self._symbolic.nblocks, 0))
+        else:
+            return int(max(self._l_symbolic.nblocks, 0))
+
+    @property
+    def nnz(self):
+        return int(self.lnz + self.unz)
+
+    @property
+    def shape(self):
+        return (self._N, self._N)
+
+    @property
+    def L(self):
+        if self._Lp is None:  # others are all set together
+            self._get_numeric()
+
+        if self._is_real:
+            return csc_array((self._Lx, self._Li, self._Lp), shape=self.shape)
+        else:
+            assert self._Lz is not None
+            data = self._Lx + 1j * self._Lz
+            return csc_array((data, self._Li, self._Lp), shape=self.shape)
+
+    @property
+    def U(self):
+        if self._Up is None:  # others are all set together
+            self._get_numeric()
+
+        if self._is_real:
+            return csc_array((self._Ux, self._Ui, self._Up), shape=self.shape)
+        else:
+            assert self._Uz is not None
+            data = self._Ux + 1j * self._Uz
+            return csc_array((data, self._Ui, self._Up), shape=self.shape)
+
+    @property
+    def F(self):
+        if self._Fp is None:  # others are all set together
+            self._get_numeric()
+
+        if self._is_real:
+            return csc_array((self._Fx, self._Fi, self._Fp), shape=self.shape)
+        else:
+            assert self._Fz is not None
+            data = self._Fx + 1j * self._Fz
+            return csc_array((data, self._Fi, self._Fp), shape=self.shape)
+
+    @property
+    def perm_r(self):
+        if self._P is None:
+            self._get_numeric()
+        return self._P
+
+    @property
+    def perm_c(self):
+        if self._Q is None:
+            self._get_numeric()
+        return self._Q
+
+    @property
+    def rscale(self):
+        if self._Rs is None:
+            self._get_numeric()
+        return self._Rs
+
+    @property
+    def rblocks(self):
+        if self._R is None:
+            self._get_numeric()
+        return self._R
+
+    # ---------------------------------------------------------------------------------
+    #         Public API
+    # ---------------------------------------------------------------------------------
+    def factorize(self, object A):
+        """Compute the numeric factorization of the matrix.
+
+        Computes the numeric factorization of a sparse matrix :math:`A`
+        and determines a fill-reducing ordering such that:
+
+        .. math::
+            L U + F = R P A Q.
+
+        If given, the matrix :math:`A` must have the same shape and nonzero
+        pattern as the one used to create this :class:`KLUFactor` object, but
+        need not have the same values.
+
+        Parameters
+        ----------
+        A : (N, N) numpy.ndarray or sparse array
+            The input matrix. Must have the same shape and nonzero pattern as
+            the matrix used to create this :class:`KLUFactor` object. If not
+            provided, the original matrix given to the constructor will be
+            used.
+
+        Returns
+        -------
+        :class:`KLUFactor`
+            The current object, for method chaining.
+        """
+        _msg = "Symbolic analysis not present. Cannot perform numeric factorization."
+        if self._use_int32:
+            assert self._symbolic is not NULL, _msg
+        else:
+            assert self._l_symbolic is not NULL, _msg
+
+        A, _, itype = validate_csc_input(A, require_square=True)
+        self._check_input_matrix(A, itype)
+
+        self._factorize(A.indptr, A.indices, A.data)
+
+        return self
+
+    def _factorize(
+        self,
+        index_t[::1] indptr,
+        index_t[::1] indices,
+        value_t[::1] data,
+    ):
+        """Compute the numeric factorization given the CSC arrays.
+
+        Parameters
+        ----------
+        indptr : contiguous 1D array of index_t
+            The index pointer array of the CSC matrix.
+        indices : contiguous 1D array of index_t
+            The row indices array of the CSC matrix.
+        data : contiguous 1D array of value_t
+            The data array of the CSC matrix.
+        """
+        # Compute the symbolic factorization
+        if self._use_int32:
+            if self._is_real:
+                self._numeric = klu_factor(
+                    <int32_t*>&indptr[0],
+                    <int32_t*>&indices[0],
+                    <double*>&data[0],
+                    self._symbolic,
+                    self._cm
+                )
+            else:
+                self._numeric = klu_z_factor(
+                    <int32_t*>&indptr[0],
+                    <int32_t*>&indices[0],
+                    <double*>&data[0],
+                    self._symbolic,
+                    self._cm
+                )
+            _handle_errors(self._cm.status)
+        else:
+            if self._is_real:
+                self._l_numeric = klu_l_factor(
+                    <int64_t*>&indptr[0],
+                    <int64_t*>&indices[0],
+                    <double*>&data[0],
+                    self._l_symbolic,
+                    self._l_cm
+                )
+            else:
+                self._l_numeric = klu_zl_factor(
+                    <int64_t*>&indptr[0],
+                    <int64_t*>&indices[0],
+                    <double*>&data[0],
+                    self._l_symbolic,
+                    self._l_cm
+                )
+            _handle_errors(self._l_cm.status)
+
+    # ---------------------------------------------------------------------------------
+    #         Private API
+    # ---------------------------------------------------------------------------------
+    def _check_input_matrix(self, object A, object itype):
+        """Check that the input matrix matches the existing factorization."""
+        if A.shape != self.shape:
+            raise ValueError(
+                "The shape of the input matrix does not match "
+                "the one used for symbolic factorization. "
+                f"Expected {self.shape}, got {A.shape}."
+            )
+
+        if itype != self.itype:
+            raise ValueError(
+                "The integer size of the input matrix does not match "
+                "the one used for symbolic factorization. "
+                f"Expected '{self.itype}', got '{itype}'."
+            )
+
+        if A.dtype != self.dtype:
+            raise ValueError(
+                "The data type of the input matrix does not match "
+                "the one used for symbolic factorization. "
+                f"Expected '{self.dtype}', got '{A.dtype}'."
+            )
+
+    cdef void _get_numeric(self) except *:
+        """Extract the numeric factorization data from UMFPACK."""
+        if (self._use_int32 and self._numeric is NULL) or (
+            not self._use_int32 and self._l_numeric is NULL
+        ):
+            raise KLUError(
+                "Numeric factorization not present. Run `KLUFactor.factorize(A)` first."
+            )
+
+        # Create output arrays
+        self._Lp = np.empty(self._N + 1, dtype=self.itype)
+        self._Li = np.empty(self.lnz, dtype=self.itype)
+        self._Lx = np.empty(self.lnz, dtype=self.dtype)
+
+        self._Up = np.empty(self._N + 1, dtype=self.itype)
+        self._Ui = np.empty(self.unz, dtype=self.itype)
+        self._Ux = np.empty(self.unz, dtype=self.dtype)
+
+        self._Fp = np.empty(self._N + 1, dtype=self.itype)
+        self._Fi = np.empty(self.nzoff, dtype=self.itype)
+        self._Fx = np.empty(self.nzoff, dtype=self.dtype)
+
+        self._P = np.empty(self._N, dtype=self.itype)
+        self._Q = np.empty(self._N, dtype=self.itype)
+        self._Rs = np.empty(self._N, dtype=np.float64)  # always real
+        self._R = np.empty(self.nblocks + 1, dtype=self.itype)
+
+        if self._is_real:
+            self._dispatch_get_numeric(
+                self._Lp, self._Li, self._Lx,
+                self._Up, self._Ui, self._Ux,
+                self._Fp, self._Fi, self._Fx,
+                self._P,
+                self._Q,
+                self._Rs,
+                self._R
+            )
+        else:
+            # Allocate imaginary parts
+            self._Lz = np.empty(self.lnz, dtype=np.float64)
+            self._Uz = np.empty(self.unz, dtype=np.float64)
+            self._Fz = np.empty(self.nzoff, dtype=np.float64)
+
+            self._dispatch_get_z_numeric(
+                self._Lp, self._Li, self._Lx, self._Lz,
+                self._Up, self._Ui, self._Ux, self._Uz,
+                self._Fp, self._Fi, self._Fx, self._Fz,
+                self._P,
+                self._Q,
+                self._Rs,
+                self._R
+            )
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def _dispatch_get_numeric(
+        self,
+        index_t[::1] Lp, index_t[::1] Li, value_t[::1] Lx,
+        index_t[::1] Up, index_t[::1] Ui, value_t[::1] Ux,
+        index_t[::1] Fp, index_t[::1] Fi, value_t[::1] Fx,
+        index_t[::1] P,
+        index_t[::1] Q,
+        double[::1] Rs,
+        index_t[::1] R,
+    ):
+        """Call the appropriate UMFPACK get_numeric function.
+
+        Parameters
+        ----------
+        Lp, Li, Lx : arrays for the L factor
+            The output arrays for the L factor in CSC format.
+        Up, Ui, Ux : arrays for the U factor
+            The output arrays for the U factor in CSC format.
+        Fp, Fi, Fx : arrays for the F factor
+            The output arrays for the F factor in CSC format.
+        P : array of index_t
+            The output row permutation array.
+        Q : array of index_t
+            The output column permutation array.
+        Rs : array of double
+            The output row scaling factors.
+        R : array of index_t
+            The output block boundaries.
+        """
+        cdef int status
+
+        # Extract the numeric factorization
+        if self._use_int32:
+            status = klu_extract(
+                self._numeric,
+                self._symbolic,
+                <int32_t*>&Lp[0], <int32_t*>&Li[0], <double*>&Lx[0],
+                <int32_t*>&Up[0], <int32_t*>&Ui[0], <double*>&Ux[0],
+                <int32_t*>&Fp[0], <int32_t*>&Fi[0], <double*>&Fx[0],
+                <int32_t*>&P[0],
+                <int32_t*>&Q[0],
+                <double*>&Rs[0],
+                <int32_t*>&R[0],
+                self._cm
+            )
+        else:
+            status = klu_l_extract(
+                self._l_numeric,
+                self._l_symbolic,
+                <int64_t*>&Lp[0], <int64_t*>&Li[0], <double*>&Lx[0],
+                <int64_t*>&Up[0], <int64_t*>&Ui[0], <double*>&Ux[0],
+                <int64_t*>&Fp[0], <int64_t*>&Fi[0], <double*>&Fx[0],
+                <int64_t*>&P[0],
+                <int64_t*>&Q[0],
+                <double*>&Rs[0],
+                <int64_t*>&R[0],
+                self._l_cm
+            )
+
+        _handle_errors(status)
+
+    # TODO may be able to *just* use this call but pass "None"/NULL for imaginary parts
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def _dispatch_get_z_numeric(
+        self,
+        index_t[::1] Lp, index_t[::1] Li, value_t[::1] Lx, value_t[::1] Lz,
+        index_t[::1] Up, index_t[::1] Ui, value_t[::1] Ux, value_t[::1] Uz,
+        index_t[::1] Fp, index_t[::1] Fi, value_t[::1] Fx, value_t[::1] Fz,
+        index_t[::1] P,
+        index_t[::1] Q,
+        double[::1] Rs,
+        index_t[::1] R,
+    ):
+        """Call the appropriate UMFPACK get_numeric function.
+
+        Parameters
+        ----------
+        Lp, Li, Lx, Lz : arrays for the L factor
+            The output arrays for the L factor in CSC format.
+        Up, Ui, Ux, Uz : arrays for the U factor
+            The output arrays for the U factor in CSC format.
+        Fp, Fi, Fx, Fz : arrays for the F factor
+            The output arrays for the F factor in CSC format.
+        P : array of index_t
+            The output row permutation array.
+        Q : array of index_t
+            The output column permutation array.
+        Rs : array of double
+            The output row scaling factors.
+        R : array of index_t
+            The output block boundaries.
+        """
+        cdef int status
+
+        # Extract the numeric factorization
+        if self._use_int32:
+            status = klu_z_extract(
+                self._numeric,
+                self._symbolic,
+                <int32_t*>&Lp[0], <int32_t*>&Li[0], <double*>&Lx[0], <double*>&Lz[0],
+                <int32_t*>&Up[0], <int32_t*>&Ui[0], <double*>&Ux[0], <double*>&Uz[0],
+                <int32_t*>&Fp[0], <int32_t*>&Fi[0], <double*>&Fx[0], <double*>&Fz[0],
+                <int32_t*>&P[0],
+                <int32_t*>&Q[0],
+                <double*>&Rs[0],
+                <int32_t*>&R[0],
+                self._cm
+            )
+        else:
+            status = klu_zl_extract(
+                self._l_numeric,
+                self._l_symbolic,
+                <int64_t*>&Lp[0], <int64_t*>&Li[0], <double*>&Lx[0], <double*>&Lz[0],
+                <int64_t*>&Up[0], <int64_t*>&Ui[0], <double*>&Ux[0], <double*>&Uz[0],
+                <int64_t*>&Fp[0], <int64_t*>&Fi[0], <double*>&Fx[0], <double*>&Fz[0],
+                <int64_t*>&P[0],
+                <int64_t*>&Q[0],
+                <double*>&Rs[0],
+                <int64_t*>&R[0],
+                self._l_cm
+            )
+
+        _handle_errors(status)
