@@ -305,18 +305,6 @@ cdef int _handle_errors(int status) except -1 with gil:
 
 
 # -----------------------------------------------------------------------------
-#         Helpers
-# -----------------------------------------------------------------------------
-cdef bint _is_real_dtype(cnp.dtype dtype):
-    if np.issubdtype(dtype, np.float64):
-        return True
-    elif np.issubdtype(dtype, np.complex128):
-        return False
-    else:
-        raise TypeError(f"dtype must be float64 or complex128. Got {dtype=}")
-
-
-# -----------------------------------------------------------------------------
 #         Parameter Mappings
 # -----------------------------------------------------------------------------
 cdef dict _INFO_INDEX = {
