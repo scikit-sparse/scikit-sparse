@@ -183,7 +183,8 @@ cdef extern from "klu.h":
         klu_l_common *Common
     )
 
-    klu_numeric *klu_factor(
+    # NOTE alias so we can use "def klu_factor(...)" externally
+    klu_numeric* c_klu_factor "klu_factor"(
         int32_t Ap[],
         int32_t Ai[],
         double Ax[],

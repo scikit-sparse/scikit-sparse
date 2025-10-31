@@ -480,7 +480,7 @@ cdef class KLUFactor:
         # Compute the numeric factorization
         if self._use_int32:
             if self._is_real:
-                self._numeric = klu_factor(
+                self._numeric = c_klu_factor(
                     <int32_t*>&indptr[0],
                     <int32_t*>&indices[0],
                     <double*>&data[0],
@@ -726,3 +726,37 @@ cdef class KLUFactor:
                 self._l_cm
             )
             _handle_errors(self._l_cm.status)
+
+
+# -----------------------------------------------------------------------------
+#         Convenience Functions
+# -----------------------------------------------------------------------------
+def klu_factor(object A):
+    """Compute the LU factorization of a sparse matrix using KLU.
+
+    This is a convenience function that creates a :class:`KLUFactor` object,
+    computes the numeric factorization, and returns the resulting object.
+
+    Parameters
+    ----------
+    A : (M, N) numpy.ndarray or sparse array
+        The input matrix to factorize.
+
+    Returns
+    -------
+    :class:`KLUFactor`
+        The LU factorization of the input matrix.
+
+    Raises
+    ------
+    :exc:`KLUSingularMatrixWarning`
+        If the matrix is exactly singular.
+
+    See Also
+    --------
+    KLUFactor, klu_solve
+
+
+    .. versionadded:: 0.5.0
+    """
+    return KLUFactor(A).factorize(A)
