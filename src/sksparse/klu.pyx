@@ -177,7 +177,7 @@ cdef int _handle_errors(int status) except -1 with gil:
 #         KLU Class Interface
 # -------------------------------------------------------------------------------------
 # TODO use 2 separate objects for int32 and int64 versions?
-# TODO add docs note on difference of row scaling vs UMFPACK
+# TODO add docs note on difference of row scaling vs KLU
 cdef class KLUFactor:
     """Class to compute and store the KLU factorization of a sparse matrix.
 
@@ -230,23 +230,8 @@ cdef class KLUFactor:
         # Numeric factorization
         klu_numeric* _numeric
         klu_l_numeric* _l_numeric
-        # Cached output arrays
-        cnp.ndarray _Lp
-        cnp.ndarray _Li
-        cnp.ndarray _Lx
-        cnp.ndarray _Lz
-        cnp.ndarray _Up
-        cnp.ndarray _Ui
-        cnp.ndarray _Ux
-        cnp.ndarray _Uz
-        cnp.ndarray _Fp
-        cnp.ndarray _Fi
-        cnp.ndarray _Fx
-        cnp.ndarray _Fz
-        cnp.ndarray _P
-        cnp.ndarray _Q
-        cnp.ndarray _Rs
-        cnp.ndarray _R
+        # Cached factor objects
+        object _L, _U, _F, _P, _Q, _Rs, _R
 
     # TODO pass options either via kwargs or struct
     def __init__(self, object A):
@@ -380,39 +365,21 @@ cdef class KLUFactor:
 
     @property
     def L(self):
-        if self._Lp is None:  # others are all set together
+        if self._L is None:
             self._get_numeric()
-
-        if self._is_real:
-            return csc_array((self._Lx, self._Li, self._Lp), shape=self.shape)
-        else:
-            assert self._Lz is not None
-            data = self._Lx + 1j * self._Lz
-            return csc_array((data, self._Li, self._Lp), shape=self.shape)
+        return self._L
 
     @property
     def U(self):
-        if self._Up is None:  # others are all set together
+        if self._U is None:
             self._get_numeric()
-
-        if self._is_real:
-            return csc_array((self._Ux, self._Ui, self._Up), shape=self.shape)
-        else:
-            assert self._Uz is not None
-            data = self._Ux + 1j * self._Uz
-            return csc_array((data, self._Ui, self._Up), shape=self.shape)
+        return self._U
 
     @property
     def F(self):
-        if self._Fp is None:  # others are all set together
+        if self._F is None:
             self._get_numeric()
-
-        if self._is_real:
-            return csc_array((self._Fx, self._Fi, self._Fp), shape=self.shape)
-        else:
-            assert self._Fz is not None
-            data = self._Fx + 1j * self._Fz
-            return csc_array((data, self._Fi, self._Fp), shape=self.shape)
+        return self._F
 
     @property
     def perm_r(self):
@@ -476,10 +443,23 @@ cdef class KLUFactor:
         A, _, itype = validate_csc_input(A, require_square=True)
         self._check_input_matrix(A, itype)
 
+        # TODO free any existing numeric factorization?
+
+        # Clear cached factor objects
+        self._L = None
+        self._U = None
+        self._F = None
+        self._P = None
+        self._Q = None
+        self._Rs = None
+        self._R = None
+
         self._factorize(A.indptr, A.indices, A.data)
 
         return self
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def _factorize(
         self,
         index_t[::1] indptr,
@@ -497,7 +477,7 @@ cdef class KLUFactor:
         data : contiguous 1D array of value_t
             The data array of the CSC matrix.
         """
-        # Compute the symbolic factorization
+        # Compute the numeric factorization
         if self._use_int32:
             if self._is_real:
                 self._numeric = klu_factor(
@@ -562,7 +542,7 @@ cdef class KLUFactor:
             )
 
     cdef void _get_numeric(self) except *:
-        """Extract the numeric factorization data from UMFPACK."""
+        """Extract and cache the numeric factors from the klu_numeric struct."""
         if (self._use_int32 and self._numeric is NULL) or (
             not self._use_int32 and self._l_numeric is NULL
         ):
@@ -571,17 +551,17 @@ cdef class KLUFactor:
             )
 
         # Create output arrays
-        self._Lp = np.empty(self._N + 1, dtype=self.itype)
-        self._Li = np.empty(self.lnz, dtype=self.itype)
-        self._Lx = np.empty(self.lnz, dtype=self.dtype)
+        Lp = np.empty(self._N + 1, dtype=self.itype)
+        Li = np.empty(self.lnz, dtype=self.itype)
+        Lx = np.empty(self.lnz, dtype=self.dtype)
 
-        self._Up = np.empty(self._N + 1, dtype=self.itype)
-        self._Ui = np.empty(self.unz, dtype=self.itype)
-        self._Ux = np.empty(self.unz, dtype=self.dtype)
+        Up = np.empty(self._N + 1, dtype=self.itype)
+        Ui = np.empty(self.unz, dtype=self.itype)
+        Ux = np.empty(self.unz, dtype=self.dtype)
 
-        self._Fp = np.empty(self._N + 1, dtype=self.itype)
-        self._Fi = np.empty(self.nzoff, dtype=self.itype)
-        self._Fx = np.empty(self.nzoff, dtype=self.dtype)
+        Fp = np.empty(self._N + 1, dtype=self.itype)
+        Fi = np.empty(self.nzoff, dtype=self.itype)
+        Fx = np.empty(self.nzoff, dtype=self.dtype)
 
         self._P = np.empty(self._N, dtype=self.itype)
         self._Q = np.empty(self._N, dtype=self.itype)
@@ -590,29 +570,37 @@ cdef class KLUFactor:
 
         if self._is_real:
             self._dispatch_get_numeric(
-                self._Lp, self._Li, self._Lx,
-                self._Up, self._Ui, self._Ux,
-                self._Fp, self._Fi, self._Fx,
+                Lp, Li, Lx,
+                Up, Ui, Ux,
+                Fp, Fi, Fx,
                 self._P,
                 self._Q,
                 self._Rs,
                 self._R
             )
+
+            self._L = csc_array((Lx, Li, Lp), shape=self.shape)
+            self._U = csc_array((Ux, Ui, Up), shape=self.shape)
+            self._F = csc_array((Fx, Fi, Fp), shape=self.shape)
         else:
             # Allocate imaginary parts
-            self._Lz = np.empty(self.lnz, dtype=np.float64)
-            self._Uz = np.empty(self.unz, dtype=np.float64)
-            self._Fz = np.empty(self.nzoff, dtype=np.float64)
+            Lz = np.empty(self.lnz, dtype=np.float64)
+            Uz = np.empty(self.unz, dtype=np.float64)
+            Fz = np.empty(self.nzoff, dtype=np.float64)
 
             self._dispatch_get_z_numeric(
-                self._Lp, self._Li, self._Lx, self._Lz,
-                self._Up, self._Ui, self._Ux, self._Uz,
-                self._Fp, self._Fi, self._Fx, self._Fz,
+                Lp, Li, Lx, Lz,
+                Up, Ui, Ux, Uz,
+                Fp, Fi, Fx, Fz,
                 self._P,
                 self._Q,
                 self._Rs,
                 self._R
             )
+
+            self._L = csc_array((Lx + 1j * Lz, Li, Lp), shape=self.shape)
+            self._U = csc_array((Ux + 1j * Uz, Ui, Up), shape=self.shape)
+            self._F = csc_array((Fx + 1j * Fz, Fi, Fp), shape=self.shape)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -626,7 +614,7 @@ cdef class KLUFactor:
         double[::1] Rs,
         index_t[::1] R,
     ):
-        """Call the appropriate UMFPACK get_numeric function.
+        """Call the appropriate KLU extract function.
 
         Parameters
         ----------
@@ -645,11 +633,9 @@ cdef class KLUFactor:
         R : array of index_t
             The output block boundaries.
         """
-        cdef int status
-
         # Extract the numeric factorization
         if self._use_int32:
-            status = klu_extract(
+            klu_extract(
                 self._numeric,
                 self._symbolic,
                 <int32_t*>&Lp[0], <int32_t*>&Li[0], <double*>&Lx[0],
@@ -661,8 +647,9 @@ cdef class KLUFactor:
                 <int32_t*>&R[0],
                 self._cm
             )
+            _handle_errors(self._cm.status)
         else:
-            status = klu_l_extract(
+            klu_l_extract(
                 self._l_numeric,
                 self._l_symbolic,
                 <int64_t*>&Lp[0], <int64_t*>&Li[0], <double*>&Lx[0],
@@ -674,8 +661,7 @@ cdef class KLUFactor:
                 <int64_t*>&R[0],
                 self._l_cm
             )
-
-        _handle_errors(status)
+            _handle_errors(self._l_cm.status)
 
     # TODO may be able to *just* use this call but pass "None"/NULL for imaginary parts
     @cython.boundscheck(False)
@@ -690,7 +676,7 @@ cdef class KLUFactor:
         double[::1] Rs,
         index_t[::1] R,
     ):
-        """Call the appropriate UMFPACK get_numeric function.
+        """Call the appropriate KLU extract function.
 
         Parameters
         ----------
@@ -713,7 +699,7 @@ cdef class KLUFactor:
 
         # Extract the numeric factorization
         if self._use_int32:
-            status = klu_z_extract(
+            klu_z_extract(
                 self._numeric,
                 self._symbolic,
                 <int32_t*>&Lp[0], <int32_t*>&Li[0], <double*>&Lx[0], <double*>&Lz[0],
@@ -725,8 +711,9 @@ cdef class KLUFactor:
                 <int32_t*>&R[0],
                 self._cm
             )
+            _handle_errors(self._cm.status)
         else:
-            status = klu_zl_extract(
+            klu_zl_extract(
                 self._l_numeric,
                 self._l_symbolic,
                 <int64_t*>&Lp[0], <int64_t*>&Li[0], <double*>&Lx[0], <double*>&Lz[0],
@@ -738,5 +725,4 @@ cdef class KLUFactor:
                 <int64_t*>&R[0],
                 self._l_cm
             )
-
-        _handle_errors(status)
+            _handle_errors(self._l_cm.status)
