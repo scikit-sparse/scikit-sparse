@@ -134,6 +134,8 @@ def test_davis_example_qr(davis_example_qr, itype, dtype):
 
     f = umf_factor(A)
     assert f.is_numeric
+    assert f.L is f.L  # test cached properties
+    assert f.U is f.U
 
     # Get the factors
     p, q = f.perm_r, f.perm_c

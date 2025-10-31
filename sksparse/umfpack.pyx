@@ -131,7 +131,7 @@ class UMFPACKError(Exception):
     pass
 
 
-class UMFPACKOutOfMemoryError(UMFPACKError):
+class UMFPACKOutOfMemoryError(MemoryError, UMFPACKError):
     """UMFPACK ran out of memory."""
     pass
 
