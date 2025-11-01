@@ -317,6 +317,10 @@ cdef class KLUFactor:
                 else:
                     klu_zl_free_numeric(&self._l_numeric, self._l_cm)
 
+    def __iter__(self):
+        for attr in ['L', 'U', 'perm_r', 'perm_c', 'rscale', 'F', 'rblocks']:
+            yield getattr(self, attr)
+
     # ---------------------------------------------------------------------------------
     #         Properties
     # ---------------------------------------------------------------------------------

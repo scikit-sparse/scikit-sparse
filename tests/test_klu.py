@@ -144,5 +144,13 @@ def test_davis_example_qr(davis_example_qr, itype, dtype):
     assert_LU_equals_A(f, A)
 
 
+def test_iter(davis_example_qr):
+    A = davis_example_qr
+    L, U, p, q, r, F, _rblocks = klu_factor(A)
+    LUF = (L @ U + F).toarray()
+    PRinvAQ = ((1 / r)[:, np.newaxis] * A[p][:, q]).toarray()
+    assert_allclose(LUF, PRinvAQ, atol=1e-15, strict=True)
+
+
 # =============================================================================
 # =============================================================================
