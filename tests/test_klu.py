@@ -12,7 +12,7 @@
 
 import numpy as np
 import pytest
-from numpy.testing import assert_allclose
+from numpy.testing import assert_allclose, assert_array_equal
 from scipy import sparse
 
 from sksparse.klu import (
@@ -125,22 +125,20 @@ def test_davis_example_qr(davis_example_qr, itype, dtype):
     assert f.shape == A.shape
 
     # Get the factors
-    # p, q = f.perm_r, f.perm_c
+    p, q = f.perm_r, f.perm_c
 
-    # TODO
-    # # Values from MATLAB klu
-    # # >> [L, U, P, Q, R] = klu(A);
-    # # >> [p j x] = find(P');
-    # # >> [q j x] = find(Q);
-    # expect_p = np.array([0, 3, 1, 2, 6, 7, 4, 5], dtype=itype)
-    # expect_q = np.array([0, 3, 1, 2, 6, 7, 5, 4], dtype=itype)
+    # Values from MATLAB klu
+    # >> [LU, info, c] = klu(A);
+    # >> LU.p - 1
+    # >> LU.q - 1
+    expect_p = np.array([4, 7, 5, 1, 2, 0, 6, 3], dtype=itype)
+    expect_q = np.array([4, 5, 7, 1, 2, 0, 6, 3], dtype=itype)
 
-    # assert_array_equal(p, expect_p)
-    # assert_array_equal(q, expect_q)
-    # assert f.lnz == 15  # == nnz(L) in MATLAB
-    # assert f.unz == 16  # == nnz(U) in MATLAB
-    # assert f.nnz == 31  # == nnz(L) + nnz(U) in MATLAB
-    # assert f.nz_udiag == 8  # == nnz(diag(U)) in MATLAB
+    assert_array_equal(p, expect_p)
+    assert_array_equal(q, expect_q)
+    assert f.lnz == 16  # == nnz(L) in MATLAB
+    assert f.unz == 17  # == nnz(U) in MATLAB
+    assert f.nnz == 33  # == nnz(L) + nnz(U) in MATLAB
     assert_LU_equals_A(f, A)
 
 
