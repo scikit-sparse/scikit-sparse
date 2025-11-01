@@ -47,7 +47,9 @@ def test_zero_input():
     N = 10  # arbitrary
     zero_A = sparse.csc_array((N, N))
     f = KLUFactor(zero_A)
-    # FIXME these will segfault
+    assert not f.is_numeric
+    assert f.lnz is None
+    assert f.unz is None
     assert f.nnz is None
     assert f.shape == (N, N)
     assert f.itype == zero_A.indptr.dtype
@@ -59,9 +61,11 @@ def test_zero_input():
 def test_singleton():
     dtype = np.float64
     singleton_A = sparse.csc_array([[1]], dtype=dtype)
-    f = KLUFactor(singleton_A)
-    assert not f.is_numeric
-    assert f.nnz is None
+    f = KLUFactor(singleton_A).factorize(singleton_A)
+    assert f.is_numeric
+    assert f.lnz == 1
+    assert f.unz == 1
+    assert f.nnz == 2  # nnz(L) + nnz(U)
     assert f.shape == (1, 1)
     assert f.itype == singleton_A.indptr.dtype
     assert f.dtype == dtype
@@ -118,6 +122,7 @@ def test_davis_example_qr(davis_example_qr, itype, dtype):
 
     f = klu_factor(A)
     assert f.is_numeric
+    assert f.shape == A.shape
 
     # Get the factors
     # p, q = f.perm_r, f.perm_c

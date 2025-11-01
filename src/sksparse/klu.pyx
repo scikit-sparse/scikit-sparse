@@ -329,37 +329,51 @@ cdef class KLUFactor:
 
     @property
     def lnz(self):
-        if self._numeric is NULL and self._l_numeric is NULL:
-            return None
-
         if self._use_int32:
-            return int(max(self._numeric.lnz, 0))
+            if self._numeric is NULL:
+                return None
+            val = self._numeric.lnz
         else:
-            return int(max(self._l_numeric.lnz, 0))
+            if self._l_numeric is NULL:
+                return None
+            val = self._l_numeric.lnz
+        return int(val) if val >= 0 else None
 
     @property
     def unz(self):
-        if self._numeric is NULL and self._l_numeric is NULL:
-            return None
-
         if self._use_int32:
-            return int(max(self._numeric.unz, 0))
+            if self._numeric is NULL:
+                return None
+            val = self._numeric.unz
         else:
-            return int(max(self._l_numeric.unz, 0))
+            if self._l_numeric is NULL:
+                return None
+            val = self._l_numeric.unz
+        return int(val) if val >= 0 else None
 
     @property
     def nzoff(self):
         if self._use_int32:
-            return int(max(self._symbolic.nzoff, 0))
+            if self._numeric is NULL:
+                return None
+            val = self._numeric.nzoff
         else:
-            return int(max(self._l_symbolic.nzoff, 0))
+            if self._l_numeric is NULL:
+                return None
+            val = self._l_numeric.nzoff
+        return int(val) if val >= 0 else None
 
     @property
     def nblocks(self):
         if self._use_int32:
-            return int(max(self._symbolic.nblocks, 0))
+            if self._symbolic is NULL:
+                return None
+            val = self._symbolic.nblocks
         else:
-            return int(max(self._l_symbolic.nblocks, 0))
+            if self._l_symbolic is NULL:
+                return None
+            val = self._l_symbolic.nblocks
+        return int(val) if val >= 0 else None
 
     @property
     def nnz(self):
