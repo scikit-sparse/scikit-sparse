@@ -469,8 +469,6 @@ cdef class KLUFactor:
         A, _, itype = validate_csc_input(A, require_square=True)
         self._check_input_matrix(A, itype)
 
-        # TODO free any existing numeric factorization?
-
         # Clear cached factor objects
         self._L = None
         self._U = None
@@ -506,6 +504,7 @@ cdef class KLUFactor:
         # Compute the numeric factorization
         if self._use_int32:
             if self._is_real:
+                klu_free_numeric(&self._numeric, self._cm)
                 self._numeric = c_klu_factor(
                     <int32_t*>&indptr[0],
                     <int32_t*>&indices[0],
@@ -514,6 +513,7 @@ cdef class KLUFactor:
                     self._cm
                 )
             else:
+                klu_z_free_numeric(&self._numeric, self._cm)
                 self._numeric = klu_z_factor(
                     <int32_t*>&indptr[0],
                     <int32_t*>&indices[0],
@@ -524,6 +524,7 @@ cdef class KLUFactor:
             _handle_errors(self._cm.status)
         else:
             if self._is_real:
+                klu_l_free_numeric(&self._l_numeric, self._l_cm)
                 self._l_numeric = klu_l_factor(
                     <int64_t*>&indptr[0],
                     <int64_t*>&indices[0],
@@ -532,6 +533,7 @@ cdef class KLUFactor:
                     self._l_cm
                 )
             else:
+                klu_zl_free_numeric(&self._l_numeric, self._l_cm)
                 self._l_numeric = klu_zl_factor(
                     <int64_t*>&indptr[0],
                     <int64_t*>&indices[0],
