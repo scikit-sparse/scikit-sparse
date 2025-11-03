@@ -176,6 +176,13 @@ cdef int _handle_errors(int status) except -1 with gil:
 # -------------------------------------------------------------------------------------
 #         KLU Class Interface
 # -------------------------------------------------------------------------------------
+cdef dict _ROW_SCALE_INDEX = {
+    "none_no_check": -1,
+    "none": 0,
+    "sum": 1,
+    "max": 2,
+}
+
 # TODO use 2 separate objects for int32 and int64 versions?
 # TODO add docs note on difference of row scaling vs KLU
 cdef class KLUFactor:
@@ -233,8 +240,7 @@ cdef class KLUFactor:
         # Cached factor objects
         object _L, _U, _F, _P, _Q, _Rs, _R
 
-    # TODO pass options either via kwargs or struct
-    def __init__(self, object A):
+    def __init__(self, A, *, row_scale=None):
         """Compute the KLU factorization of a sparse matrix.
 
         Parameters
@@ -242,10 +248,42 @@ cdef class KLUFactor:
         A : (N, N) numpy.ndarray or sparse array
             The input matrix. Any object that can be converted to
             a :class:`~scipy.sparse.csc_array` is accepted.
+        row_scale : str, optional
+            The row-scaling method. Accepted values are:
+
+            * ``none_no_check`` : no scaling, and no error check.
+            * ``none`` : no scaling, but check for zero rows.
+            * ``sum`` : scale rows to have unit 1-norm.
+            * ``max`` : scale rows to have unit infinity-norm.
+
+            Default is ``None``, which uses the ``KLU`` default setting of ``max``
+            (subject to change).
+
         """
-        A, _, _ = validate_csc_input(A, require_square=True)
+        A, self._use_int32, _ = validate_csc_input(A, require_square=True)
 
         self._N = A.shape[0]
+
+        scale = None
+        if row_scale is not None:
+            try:
+                scale = _ROW_SCALE_INDEX[row_scale]
+            except KeyError:
+                raise ValueError(
+                    f"Invalid value for row_scale: {scale}. "
+                    f"Expected one of {list(_ROW_SCALE_INDEX.keys())}"
+                )
+
+        if self._use_int32:
+            self._cm = &self._common
+            assert klu_defaults(self._cm)
+            if scale is not None:
+                self._cm.scale = scale
+        else:
+            self._l_cm = &self._l_common
+            assert klu_l_defaults(self._l_cm)
+            if scale is not None:
+                self._l_cm.scale = scale
 
         self._init_symbolic(self._N, A.indptr, A.indices, A.data)
 
@@ -269,13 +307,9 @@ cdef class KLUFactor:
         indices : 1D array of index_t
             The row indices array of the CSC matrix.
         """
-        self._use_int32 = index_t is int32_t
         self._is_real = value_t is double
 
         if self._use_int32:
-            self._cm = &self._common
-            assert klu_defaults(self._cm)
-
             self._symbolic = klu_analyze(
                 N,
                 <int32_t*>&indptr[0],
@@ -284,9 +318,6 @@ cdef class KLUFactor:
             )
             _handle_errors(self._cm.status)
         else:
-            self._l_cm = &self._l_common
-            assert klu_l_defaults(self._l_cm)
-
             self._l_symbolic = klu_l_analyze(
                 N,
                 <int64_t*>&indptr[0],
@@ -966,7 +997,7 @@ cdef class KLUFactor:
 # -----------------------------------------------------------------------------
 #         Convenience Functions
 # -----------------------------------------------------------------------------
-def klu_factor(object A):
+def klu_factor(A, *, row_scale=None):
     """Compute the LU factorization of a sparse matrix using KLU.
 
     This is a convenience function that creates a :class:`KLUFactor` object,
@@ -994,10 +1025,10 @@ def klu_factor(object A):
 
     .. versionadded:: 0.5.0
     """
-    return KLUFactor(A).factorize(A)
+    return KLUFactor(A, row_scale=row_scale).factorize(A)
 
 
-def klu_solve(object A, object b):
+def klu_solve(A, b, *, row_scale=None):
     """Solve a linear system using KLU.
 
     This is a convenience function that creates a :class:`KLUFactor` object,
@@ -1023,4 +1054,4 @@ def klu_solve(object A, object b):
 
     .. versionadded:: 0.5.0
     """
-    return KLUFactor(A).factorize(A).solve(b)
+    return KLUFactor(A, row_scale=row_scale).factorize(A).solve(b)
