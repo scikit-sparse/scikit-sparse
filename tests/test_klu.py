@@ -114,7 +114,31 @@ def test_bad_factorize_shape(davis_example_qr):
         f.factorize(A[:-1, :-1])  # remove last row and col
 
 
-# TODO test bad factorize *structure*
+def test_bad_factorize_structure(davis_example_qr):
+    A = davis_example_qr
+    f = KLUFactor(A)
+    B = A.copy().todok()
+    # Change the structure of the matrix by adding a new non-zero
+    B[0, 1] = 2.3
+    B = B.tocsc()
+    B.indptr = B.indptr.astype(A.indptr.dtype)
+    B.indices = B.indices.astype(A.indices.dtype)
+    f.factorize(B)  # passes
+    assert_LU_equals_A(f, B)
+
+
+@pytest.mark.xfail(reason="Does not error, but gives wrong answer.")
+def test_bad_refactorize_structure(davis_example_qr):
+    A = davis_example_qr
+    f = klu_factor(A)
+    B = A.copy().todok()
+    # Change the structure of the matrix by adding a new non-zero
+    B[0, 1] = 2.3
+    B = B.tocsc()
+    B.indptr = B.indptr.astype(A.indptr.dtype)
+    B.indices = B.indices.astype(A.indices.dtype)
+    f.factorize(B)  # just gives wrong answer without error
+    assert_LU_equals_A(f, B)
 
 
 @pytest.mark.parametrize("itype", ITYPES)

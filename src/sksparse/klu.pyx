@@ -443,9 +443,15 @@ cdef class KLUFactor:
         .. math::
             L U + F = R P A Q.
 
-        If given, the matrix :math:`A` must have the same shape and nonzero
-        pattern as the one used to create this :class:`KLUFactor` object, but
-        need not have the same values.
+        If given, the matrix :math:`A` must have the same shape and nonzero pattern as
+        the one used to create this :class:`KLUFactor` object, but need not have the
+        same values. 
+
+        .. warning::
+
+            No check is made on the non-zero structure of the input matrix, so if it is
+            different from the one used for the symbolic analysis, the results will be
+            incorrect without raising an error.
 
         Parameters
         ----------
