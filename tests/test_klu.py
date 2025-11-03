@@ -121,8 +121,6 @@ def test_bad_factorize_structure(davis_example_qr):
     # Change the structure of the matrix by adding a new non-zero
     B[0, 1] = 2.3
     B = B.tocsc()
-    B.indptr = B.indptr.astype(A.indptr.dtype)
-    B.indices = B.indices.astype(A.indices.dtype)
     f.factorize(B)  # passes
     assert_LU_equals_A(f, B)
 
@@ -135,8 +133,6 @@ def test_bad_refactorize_structure(davis_example_qr):
     # Change the structure of the matrix by adding a new non-zero
     B[0, 1] = 2.3
     B = B.tocsc()
-    B.indptr = B.indptr.astype(A.indptr.dtype)
-    B.indices = B.indices.astype(A.indices.dtype)
     f.factorize(B)  # just gives wrong answer without error
     assert_LU_equals_A(f, B)
 
