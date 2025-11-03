@@ -611,6 +611,113 @@ cdef class KLUFactor:
                 )
             _handle_errors(self._l_cm.status)
 
+    def solve(self, object b):
+        """Solve a linear system using the KLU factorization.
+
+        This method solves the linear system:
+
+        .. math::
+            A x = b
+
+        using the LU factorization of :math:`A` previously computed by
+        :meth:`.factorize`.
+
+        Parameters
+        ----------
+        b : (N,) or (N, K) numpy.ndarray
+            The right-hand side vector or matrix.
+
+        Returns
+        -------
+        x : (N,) or (N, K) numpy.ndarray or sparse array
+            The solution vector or matrix. If ``b`` is a 1D array, then ``x`` is
+            returned as a 1D array. If ``b`` is a 2D array with ``K`` columns,
+            then ``x`` is returned as a 2D array with ``K`` columns. If ``b``
+            is a sparse array, then ``x`` is also returned as a sparse array.
+        """
+        if not (isinstance(b, np.ndarray) or issparse(b)):
+            raise ValueError("b must be an ndarray or sparse matrix.")
+
+        if b.dtype != self.dtype:
+            raise ValueError(
+                f"LHS and RHS dtypes do not match. {self.dtype=} and {b.dtype=}"
+            )
+
+        if b.ndim not in (1, 2):
+            raise ValueError("b must be a 1D or 2D array.")
+
+        cdef bint return_1D = b.ndim == 1
+        cdef size_t K = 1 if b.ndim == 1 else b.shape[1]
+
+        if b.shape[0] != self._N:
+            raise ValueError(
+                "Right-hand side b must have the same number of rows as A."
+            )
+
+        # TODO Check the condition number
+        # self._check_rcond()
+
+        cdef bint return_sparse = issparse(b)
+
+        if return_sparse:
+            b = b.toarray()
+        else:
+            b = np.asarray(b)
+
+        # Ensure columns are contiguous for multiple RHS
+        b = np.asfortranarray(b)
+
+        # TODO allow overwrite_b=True
+        # klu_solve expects B as a column-oriented 1D array
+        # The klu_solve function overwrites the input with the output
+        x = b.copy().reshape(-1, order='F')
+
+        self._solve(K, x)
+
+        # Reshape X into a  2D array
+        x = x.reshape(self._N, K, order='F')
+
+        if return_sparse:
+            x = csc_array(x, dtype=b.dtype)
+            x.indptr = x.indptr.astype(self.itype)
+            x.indices = x.indices.astype(self.itype)
+
+        if return_1D:
+            x = x[:, 0]
+
+        return x
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def _solve(self, size_t K, value_t[::1] x):
+        """Solve Ax = b.
+
+        Parameters
+        ----------
+        K : int
+            The number of right-hand sides to solve.
+        x : (N * K,) array_like
+            The right-hand side matrix on input, in column-oriented form, solution on output.
+        """
+        cdef double *x_ptr = <double*>&x[0]
+
+        if self._use_int32:
+            if self._is_real:
+                c_klu_solve(self._symbolic, self._numeric, self._N, K, x_ptr, self._cm)
+            else:
+                klu_z_solve(self._symbolic, self._numeric, self._N, K, x_ptr, self._cm)
+            _handle_errors(self._cm.status)
+        else:
+            if self._is_real:
+                klu_l_solve(
+                    self._l_symbolic, self._l_numeric, self._N, K, x_ptr, self._l_cm
+                )
+            else:
+                klu_zl_solve(
+                    self._l_symbolic, self._l_numeric, self._N, K, x_ptr, self._l_cm
+                )
+            _handle_errors(self._l_cm.status)
+
     # ---------------------------------------------------------------------------------
     #         Private API
     # ---------------------------------------------------------------------------------
@@ -856,3 +963,32 @@ def klu_factor(object A):
     .. versionadded:: 0.5.0
     """
     return KLUFactor(A).factorize(A)
+
+
+def klu_solve(object A, object b):
+    """Solve a linear system using KLU.
+
+    This is a convenience function that creates a :class:`KLUFactor` object,
+    computes the numeric factorization, and solves the linear system.
+
+    Parameters
+    ----------
+    A : (N, N) numpy.ndarray or sparse array
+        The input matrix to factorize.
+    b : (N,) or (N, K) numpy.ndarray
+        The right-hand side vector or matrix.
+
+    Returns
+    -------
+    x : (N,) or (N, K) numpy.ndarray or sparse array
+        The solution vector or matrix of the same type and shape as the input
+        right-hand side ``b``.
+
+    See Also
+    --------
+    KLUFactor, klu_solve
+
+
+    .. versionadded:: 0.5.0
+    """
+    return KLUFactor(A).factorize(A).solve(b)
