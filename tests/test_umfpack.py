@@ -56,7 +56,7 @@ def test_zero_input():
     N = 10  # arbitrary
     zero_A = sparse.csc_array((N, N))
     f = UMFFactor(zero_A)
-    assert f.nnz == 0
+    assert f.nnz is None
     assert f.shape == (N, N)
     assert f.itype == zero_A.indptr.dtype
     assert f.dtype == zero_A.dtype
@@ -67,9 +67,11 @@ def test_zero_input():
 def test_singleton():
     dtype = np.float64
     singleton_A = sparse.csc_array([[1]], dtype=dtype)
-    f = UMFFactor(singleton_A)
-    assert not f.is_numeric
-    assert f.nnz == 0
+    f = umf_factor(singleton_A)
+    assert f.is_numeric
+    assert f.lnz == 1
+    assert f.unz == 1
+    assert f.nnz == 2
     assert f.shape == (1, 1)
     assert f.itype == singleton_A.indptr.dtype
     assert f.dtype == dtype

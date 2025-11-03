@@ -1249,14 +1249,18 @@ cdef class UMFFactor:
 
     @property
     def lnz(self):
-        return int(max(self.info.data[UMFPACK_LNZ], 0))
+        val = self.info.data[UMFPACK_LNZ]
+        return int(val) if val >= 0 else None
 
     @property
     def unz(self):
-        return int(max(self.info.data[UMFPACK_UNZ], 0))
+        val = self.info.data[UMFPACK_UNZ]
+        return int(val) if val >= 0 else None
 
     @property
     def nnz(self):
+        if self.lnz is None or self.unz is None:
+            return None
         return int(self.lnz + self.unz)
 
     @property
@@ -1265,7 +1269,8 @@ cdef class UMFFactor:
 
     @property
     def nz_udiag(self):
-        return int(max(self.info.data[UMFPACK_UDIAG_NZ], 0))
+        val = self.info.data[UMFPACK_UDIAG_NZ]
+        return int(val) if val >= 0 else None
 
     @property
     def L(self):
