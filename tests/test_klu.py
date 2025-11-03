@@ -15,6 +15,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose, assert_array_equal
+from scipy import linalg as la
 from scipy import sparse
 from scipy.io import mmread
 
@@ -22,6 +23,7 @@ from sksparse.klu import (
     KLUError,
     KLUFactor,
     KLUInvalidError,
+    KLUSingularMatrixWarning,
     klu_factor,
     klu_solve,
 )
@@ -297,6 +299,53 @@ def test_itype_2D(davis_example_qr, itype):
     assert isinstance(x, sparse.csc_array)
     assert x.indptr.dtype == itype
     assert x.indices.dtype == itype
+
+
+def test_exactly_singular(davis_example_qr):
+    A = davis_example_qr.todok()
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+
+    N = A.shape[0]
+    lam0 = la.eigvalsh(A.toarray()).min()
+
+    # Make A exactly singular
+    s = -3
+    A[:, s] = 0.0
+    A[s, :] = 0.0
+    A = A.tocsc()
+
+    lam1 = la.eigvalsh(A.toarray()).min()
+    print(f"\nMin eigenvalue: {lam0:.2e} -> {lam1:.2e}\n")
+
+    expect_x = sparse.coo_array(np.arange(1, N + 1, dtype=A.dtype))
+    b = A @ expect_x
+
+    with pytest.raises(KLUError, match="indefinite or singular to working precision"):
+        klu_solve(A, b)
+
+
+@pytest.mark.xfail(reason="Need to turn off row-scaling to get the warning.")
+def test_nearly_singular(davis_example_qr):
+    A = davis_example_qr.todok()
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+
+    N = A.shape[0]
+    lam0 = la.eigvalsh(A.toarray()).min()
+
+    # Make A nearly singular
+    A[:, -1] = 0.0
+    A[-1, :] = 0.0
+    A[-1, -1] = 0.5 * np.finfo(A.dtype).eps
+    A = A.tocsc()
+
+    lam1 = la.eigvalsh(A.toarray()).min()
+    print(f"\nMin eigenvalue: {lam0:.2e} -> {lam1:.2e}\n")
+
+    expect_x = sparse.coo_array(np.arange(1, N + 1, dtype=A.dtype))
+    b = A @ expect_x
+    f = klu_factor(A)
+    with pytest.warns(KLUSingularMatrixWarning, match="nearly singular"):
+        f.solve(b)
 
 
 @pytest.mark.parametrize("A", test_As)
