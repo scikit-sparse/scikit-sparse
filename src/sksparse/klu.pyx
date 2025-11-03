@@ -174,6 +174,109 @@ cdef int _handle_errors(int status) except -1 with gil:
 
 
 # -------------------------------------------------------------------------------------
+#         KLU Control and Info Classes
+# -------------------------------------------------------------------------------------
+cdef object _get_row_scale_string(int scale):
+    """Convert KLU row scaling integer to string."""
+    if scale == -1:
+        return "none_no_check"
+    elif scale == 0:
+        return "none"
+    elif scale == 1:
+        return "sum"
+    elif scale == 2:
+        return "max"
+    else:
+        return "unknown"
+
+
+cdef object _get_ordering_string(int ordering):
+    """Convert KLU ordering integer to string."""
+    if ordering == 0:
+        return "AMD"
+    elif ordering == 1:
+        return "COLAMD"
+    elif ordering == 2:
+        return "user-given"
+    elif ordering == 3:
+        return "user function"
+    else:
+        return "unknown"
+
+
+@cython.dataclasses.dataclass(frozen=True)
+cdef class KLUInfo:
+    """A dataclass to store KLU information."""
+    noffdiag : int | None = None
+    nrealloc : int | None = None
+    rcond : double | None = None
+    singular_col : int | None = None
+    rgrowth : double | None = None
+    flops : int | None = None
+    nblocks : int | None = None
+    ordering : str | None = None
+    row_scale : str | None = None
+    lnz : int | None = None
+    unz : int | None = None
+    nzoff : int | None = None
+    tol : double | None = None
+    memory : int | None = None
+
+    cdef KLUInfo update_from_klu(
+        self, klu_symbolic* symbolic, klu_numeric* numeric, klu_common* cm
+    ):
+        """Update a KLUInfo object from KLU structs."""
+        if cm is not NULL:
+            self.noffdiag = cm.noffdiag
+            self.nrealloc = cm.nrealloc
+            self.rcond = cm.rcond
+            self.singular_col = cm.singular_col
+            self.rgrowth = cm.rgrowth
+            self.flops = <int>cm.flops
+            self.ordering = _get_ordering_string(cm.ordering)
+            self.row_scale = _get_row_scale_string(cm.scale)
+            self.tol = cm.tol
+            self.memory = <int>cm.memusage
+
+        if symbolic is not NULL:
+            self.nblocks = symbolic.nblocks
+
+        if numeric is not NULL:
+            self.lnz = <int>numeric.lnz
+            self.unz = <int>numeric.unz
+            self.nzoff = <int>numeric.nzoff
+
+        return self
+
+    cdef KLUInfo update_from_l_klu(
+        self, klu_l_symbolic* symbolic, klu_l_numeric* numeric, klu_l_common* cm
+    ):
+        """Create a KLUInfo object from KLU structs."""
+        if cm is not NULL:
+            self.noffdiag = cm.noffdiag
+            self.nrealloc = cm.nrealloc
+            self.rcond = cm.rcond
+            self.singular_col = cm.singular_col
+            self.rgrowth = cm.rgrowth
+            self.flops = <int>cm.flops
+            self.ordering = _get_ordering_string(cm.ordering)
+            self.row_scale = _get_row_scale_string(cm.scale)
+            self.tol = cm.tol
+            self.memory = <int>cm.memusage
+
+        if symbolic is not NULL:
+            self.nblocks = symbolic.nblocks
+
+        if numeric is not NULL:
+            self.lnz = <int>numeric.lnz
+            self.unz = <int>numeric.unz
+            self.nzoff = <int>numeric.nzoff
+
+        return self
+
+
+
+# -------------------------------------------------------------------------------------
 #         KLU Class Interface
 # -------------------------------------------------------------------------------------
 cdef dict _ROW_SCALE_INDEX = {
@@ -183,7 +286,6 @@ cdef dict _ROW_SCALE_INDEX = {
     "max": 2,
 }
 
-# TODO use 2 separate objects for int32 and int64 versions?
 # TODO add docs note on difference of row scaling vs KLU
 cdef class KLUFactor:
     """Class to compute and store the KLU factorization of a sparse matrix.
@@ -231,6 +333,7 @@ cdef class KLUFactor:
         klu_common* _cm
         klu_l_common _l_common
         klu_l_common* _l_cm
+        KLUInfo _info
         # Symbolic analysis
         klu_symbolic* _symbolic
         klu_l_symbolic* _l_symbolic
@@ -462,6 +565,31 @@ cdef class KLUFactor:
             self._get_numeric()
         return self._R
 
+    @property
+    def info(self):
+        """Get information about the factorization and solve process."""
+        if self._info is None:
+            self._info = KLUInfo()
+
+        # Compute flops to store in info (needs "is_real" info)
+        if self._use_int32:
+            if self._is_real:
+                klu_flops(self._symbolic, self._numeric, self._cm)
+            else:
+                klu_z_flops(self._symbolic, self._numeric, self._cm)
+        else:
+            if self._is_real:
+                klu_l_flops(self._l_symbolic, self._l_numeric, self._l_cm)
+            else:
+                klu_zl_flops(self._l_symbolic, self._l_numeric, self._l_cm)
+
+        if self._use_int32:
+            self._info.update_from_klu(self._symbolic, self._numeric, self._cm)
+        else:
+            self._info.update_from_l_klu(self._l_symbolic, self._l_numeric, self._l_cm)
+
+        return self._info
+
     # ---------------------------------------------------------------------------------
     #         Public API
     # ---------------------------------------------------------------------------------
@@ -580,6 +708,7 @@ cdef class KLUFactor:
                     self._l_cm
                 )
             _handle_errors(self._l_cm.status)
+
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
