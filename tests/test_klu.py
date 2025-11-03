@@ -22,6 +22,8 @@ from sksparse.klu import (
     klu_factor,
 )
 
+from .helpers import generate_random_matrices
+
 ITYPES = [np.int32, np.int64]
 DTYPES = [np.float64, np.complex128]
 
@@ -112,6 +114,9 @@ def test_bad_factorize_shape(davis_example_qr):
         f.factorize(A[:-1, :-1])  # remove last row and col
 
 
+# TODO test bad factorize *structure*
+
+
 @pytest.mark.parametrize("itype", ITYPES)
 @pytest.mark.parametrize("dtype", DTYPES)
 def test_davis_example_qr(davis_example_qr, itype, dtype):
@@ -148,6 +153,36 @@ def test_iter(davis_example_qr):
     LUF = (L @ U + F).toarray()
     PRinvAQ = ((1 / r)[:, np.newaxis] * A[p][:, q]).toarray()
     assert_allclose(LUF, PRinvAQ, atol=1e-15, strict=True)
+
+
+test_As = [
+    A
+    for dtype in DTYPES
+    for A in generate_random_matrices(N_trials=10, N_max=200, d_scale=0.05, dtype=dtype)
+]
+
+
+@pytest.mark.parametrize("copy", [False])
+@pytest.mark.parametrize("A", test_As)
+def test_refactor(A, copy):
+    atol = 1e-10
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+    f = klu_factor(A)
+    assert_LU_equals_A(f, A, atol=atol)
+    # Create a new matrix with the same sparsity pattern but different values
+    B = A.copy()
+    rng = np.random.default_rng(56)
+    B.data = rng.random(len(B.data)).astype(dtype=B.dtype)
+    # Factor the new matrix with the same sparsity pattern
+    # $ TODO
+    # if copy:
+    #     g = f.copy()
+    #     assert g is not f
+    #     g.factorize(B)
+    #     assert_LU_equals_A(g, B, atol=atol)
+    # else:
+    f.factorize(B)
+    assert_LU_equals_A(f, B, atol=atol)
 
 
 # =============================================================================
