@@ -1054,4 +1054,14 @@ def klu_solve(A, b, *, row_scale=None):
 
     .. versionadded:: 0.5.0
     """
-    return KLUFactor(A, row_scale=row_scale).factorize(A).solve(b)
+    # factorize() and solve() will each warn for a singular matrix,
+    # so we catch the warnings from factorize() and re-raise only once.
+    with warnings.catch_warnings(record=True) as ws:
+        x = KLUFactor(A, row_scale=row_scale).factorize(A).solve(b)
+
+    # Raise only the latest singular matrix warning from solve
+    if ws:
+        w = ws[-1]
+        warnings.warn(w.message, w.category)
+
+    return x
