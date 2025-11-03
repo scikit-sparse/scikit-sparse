@@ -1434,6 +1434,19 @@ cdef class UMFFactor:
         """
         cdef int status
 
+        # Free existing numeric factorization
+        if self._numeric is not NULL:
+            if self._is_real:
+                if self._use_int32:
+                    umfpack_di_free_numeric(&self._numeric)
+                else:
+                    umfpack_dl_free_numeric(&self._numeric)
+            else:
+                if self._use_int32:
+                    umfpack_zi_free_numeric(&self._numeric)
+                else:
+                    umfpack_zl_free_numeric(&self._numeric)
+
         # Compute the symbolic factorization
         if self._is_real:
             if self._use_int32:
