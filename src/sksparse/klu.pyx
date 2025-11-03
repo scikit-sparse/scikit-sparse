@@ -478,7 +478,12 @@ cdef class KLUFactor:
         self._Rs = None
         self._R = None
 
-        self._factorize(A.indptr, A.indices, A.data)
+        if self._numeric is not NULL or self._l_numeric is not NULL:
+            # Refactorize with existing numeric struct
+            self._refactorize(A.indptr, A.indices, A.data)
+        else:
+            # Allocate and compute new numeric struct
+            self._factorize(A.indptr, A.indices, A.data)
 
         return self
 
@@ -504,7 +509,6 @@ cdef class KLUFactor:
         # Compute the numeric factorization
         if self._use_int32:
             if self._is_real:
-                klu_free_numeric(&self._numeric, self._cm)
                 self._numeric = c_klu_factor(
                     <int32_t*>&indptr[0],
                     <int32_t*>&indices[0],
@@ -513,7 +517,6 @@ cdef class KLUFactor:
                     self._cm
                 )
             else:
-                klu_z_free_numeric(&self._numeric, self._cm)
                 self._numeric = klu_z_factor(
                     <int32_t*>&indptr[0],
                     <int32_t*>&indices[0],
@@ -524,7 +527,6 @@ cdef class KLUFactor:
             _handle_errors(self._cm.status)
         else:
             if self._is_real:
-                klu_l_free_numeric(&self._l_numeric, self._l_cm)
                 self._l_numeric = klu_l_factor(
                     <int64_t*>&indptr[0],
                     <int64_t*>&indices[0],
@@ -533,12 +535,72 @@ cdef class KLUFactor:
                     self._l_cm
                 )
             else:
-                klu_zl_free_numeric(&self._l_numeric, self._l_cm)
                 self._l_numeric = klu_zl_factor(
                     <int64_t*>&indptr[0],
                     <int64_t*>&indices[0],
                     <double*>&data[0],
                     self._l_symbolic,
+                    self._l_cm
+                )
+            _handle_errors(self._l_cm.status)
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def _refactorize(
+        self,
+        index_t[::1] indptr,
+        index_t[::1] indices,
+        value_t[::1] data,
+    ):
+        """Re-compute the numeric factorization given the CSC arrays.
+
+        Parameters
+        ----------
+        indptr : contiguous 1D array of index_t
+            The index pointer array of the CSC matrix.
+        indices : contiguous 1D array of index_t
+            The row indices array of the CSC matrix.
+        data : contiguous 1D array of value_t
+            The data array of the CSC matrix.
+        """
+        # Compute the numeric factorization
+        if self._use_int32:
+            if self._is_real:
+                klu_refactor(
+                    <int32_t*>&indptr[0],
+                    <int32_t*>&indices[0],
+                    <double*>&data[0],
+                    self._symbolic,
+                    self._numeric,
+                    self._cm
+                )
+            else:
+                klu_z_refactor(
+                    <int32_t*>&indptr[0],
+                    <int32_t*>&indices[0],
+                    <double*>&data[0],
+                    self._symbolic,
+                    self._numeric,
+                    self._cm
+                )
+            _handle_errors(self._cm.status)
+        else:
+            if self._is_real:
+                klu_l_refactor(
+                    <int64_t*>&indptr[0],
+                    <int64_t*>&indices[0],
+                    <double*>&data[0],
+                    self._l_symbolic,
+                    self._l_numeric,
+                    self._l_cm
+                )
+            else:
+                klu_zl_refactor(
+                    <int64_t*>&indptr[0],
+                    <int64_t*>&indices[0],
+                    <double*>&data[0],
+                    self._l_symbolic,
+                    self._l_numeric,
                     self._l_cm
                 )
             _handle_errors(self._l_cm.status)

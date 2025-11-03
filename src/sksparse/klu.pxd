@@ -216,6 +216,43 @@ cdef extern from "klu.h":
         klu_l_common *Common
     )
 
+
+    int klu_refactor(
+        int32_t Ap[],
+        int32_t Ai[],
+        double Ax[],
+        klu_symbolic *Symbolic,
+        klu_numeric *Numeric,
+        klu_common *Common
+    )
+
+    int klu_z_refactor(
+        int32_t Ap[],
+        int32_t Ai[],
+        double Ax[],
+        klu_symbolic *Symbolic,
+        klu_numeric *Numeric,
+        klu_common *Common
+    )
+
+    int klu_l_refactor(
+        int64_t Ap[],
+        int64_t Ai[],
+        double Ax[],
+        klu_l_symbolic *Symbolic,
+        klu_l_numeric *Numeric,
+        klu_l_common *Common
+    )
+
+    int klu_zl_refactor(
+        int64_t Ap[],
+        int64_t Ai[],
+        double Ax[],
+        klu_l_symbolic *Symbolic,
+        klu_l_numeric *Numeric,
+        klu_l_common *Common
+    )
+
     int klu_extract(
         klu_numeric *Numeric,
         klu_symbolic *Symbolic,
