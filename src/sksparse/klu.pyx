@@ -654,8 +654,8 @@ cdef class KLUFactor:
                 "Right-hand side b must have the same number of rows as A."
             )
 
-        # TODO Check the condition number
-        # self._check_rcond()
+        # Check the condition number
+        self._check_rcond()
 
         cdef bint return_sparse = issparse(b)
 
@@ -742,6 +742,38 @@ cdef class KLUFactor:
                 "The data type of the input matrix does not match "
                 "the one used for symbolic factorization. "
                 f"Expected '{self.dtype}', got '{A.dtype}'."
+            )
+
+    cdef int _check_rcond(self) except -1:
+        """Check a crude estimate of the condition number.
+
+        Computes ``min(abs(U.diagonal())) / max(abs(U.diagonal()))``. See
+        ``klu_condest`` for more accurate estimate from the full LU decomposition.
+        """
+        # Compute the condition number estimate
+        if self._use_int32:
+            if self._is_real:
+                klu_rcond(self._symbolic, self._numeric, self._cm)
+            else:
+                klu_z_rcond(self._symbolic, self._numeric, self._cm)
+            _handle_errors(self._cm.status)
+        else:
+            if self._is_real:
+                klu_l_rcond(self._l_symbolic, self._l_numeric, self._l_cm)
+            else:
+                klu_zl_rcond(self._l_symbolic, self._l_numeric, self._l_cm)
+            _handle_errors(self._l_cm.status)
+
+        cdef double rcond = self._cm.rcond if self._use_int32 else self._l_cm.rcond
+        cdef double eps = np.finfo(np.float64).eps
+
+        if rcond == 0:
+            raise KLUError("Matrix is indefinite or singular to working precision.")
+        elif rcond < eps:
+            warnings.warn(
+                "Matrix is nearly singular."
+                f"  Results may be inaccurate (rcond={rcond:.2e}).",
+                KLUSingularMatrixWarning
             )
 
     cdef void _get_numeric(self) except *:
