@@ -19,9 +19,11 @@ from numpy.testing import assert_allclose, assert_array_equal
 from scipy import linalg as la
 from scipy import sparse
 from scipy.io import mmread
+
 from sksparse.umfpack import (
     UMFControl,
     UMFFactor,
+    UMFPACKDifferentPatternError,
     UMFPACKError,
     UMFPACKNonpositiveError,
     UMFPACKSingularMatrixWarning,
@@ -124,6 +126,32 @@ def test_bad_factorize_shape(davis_example_qr):
     f = UMFFactor(A)
     with pytest.raises(ValueError, match="shape.*does not match"):
         f.factorize(A[:-1, :])  # remove last row
+
+
+def test_bad_factorize_structure(davis_example_qr):
+    A = davis_example_qr
+    f = UMFFactor(A)
+    B = A.copy().todok()
+    # Change the structure of the matrix by adding a new non-zero
+    B[0, 1] = 2.3
+    B = B.tocsc()
+    B.indptr = B.indptr.astype(A.indptr.dtype)
+    B.indices = B.indices.astype(A.indices.dtype)
+    with pytest.raises(UMFPACKDifferentPatternError, match="different nonzero pattern"):
+        f.factorize(B)
+
+
+def test_bad_refactorize_structure(davis_example_qr):
+    A = davis_example_qr
+    f = umf_factor(A)
+    B = A.copy().todok()
+    # Change the structure of the matrix by adding a new non-zero
+    B[0, 1] = 2.3
+    B = B.tocsc()
+    B.indptr = B.indptr.astype(A.indptr.dtype)
+    B.indices = B.indices.astype(A.indices.dtype)
+    with pytest.raises(UMFPACKDifferentPatternError, match="different nonzero pattern"):
+        f.factorize(B)
 
 
 @pytest.mark.parametrize("itype", ITYPES)
