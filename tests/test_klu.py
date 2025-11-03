@@ -324,7 +324,6 @@ def test_exactly_singular(davis_example_qr):
         klu_solve(A, b)
 
 
-@pytest.mark.xfail(reason="Need to turn off row-scaling to get the warning.")
 def test_nearly_singular(davis_example_qr):
     A = davis_example_qr.todok()
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
@@ -343,7 +342,7 @@ def test_nearly_singular(davis_example_qr):
 
     expect_x = sparse.coo_array(np.arange(1, N + 1, dtype=A.dtype))
     b = A @ expect_x
-    f = klu_factor(A)
+    f = klu_factor(A, row_scale="none")  # disable row-scaling to trigger warning
     with pytest.warns(KLUSingularMatrixWarning, match="nearly singular"):
         f.solve(b)
 
