@@ -182,7 +182,7 @@ cdef int _handle_errors(int status) except -1 with gil:
 # -------------------------------------------------------------------------------------
 #         KLU Control and Info Classes
 # -------------------------------------------------------------------------------------
-cdef object _get_row_scale_string(int scale):
+cdef object _get_scale_string(int scale):
     """Convert KLU row scaling integer to string."""
     if scale == -1:
         return "none_no_check"
@@ -207,9 +207,10 @@ cdef object _get_ordering_string(int ordering):
     elif ordering == 3:
         return "user function"
     else:
-        return "unknown"
+        return ""
 
 
+# TODO add docs
 @cython.dataclasses.dataclass(frozen=True)
 cdef class KLUInfo:
     """A dataclass to store KLU information."""
@@ -221,7 +222,7 @@ cdef class KLUInfo:
     flops : int | None = None
     nblocks : int | None = None
     ordering : str | None = None
-    row_scale : str | None = None
+    scale : str | None = None
     lnz : int | None = None
     unz : int | None = None
     nzoff : int | None = None
@@ -240,7 +241,7 @@ cdef class KLUInfo:
             self.rgrowth = cm.rgrowth
             self.flops = <int>cm.flops
             self.ordering = _get_ordering_string(cm.ordering)
-            self.row_scale = _get_row_scale_string(cm.scale)
+            self.scale = _get_scale_string(cm.scale)
             self.tol = cm.tol
             self.memory = <int>cm.memusage
 
@@ -266,7 +267,7 @@ cdef class KLUInfo:
             self.rgrowth = cm.rgrowth
             self.flops = <int>cm.flops
             self.ordering = _get_ordering_string(cm.ordering)
-            self.row_scale = _get_row_scale_string(cm.scale)
+            self.scale = _get_scale_string(cm.scale)
             self.tol = cm.tol
             self.memory = <int>cm.memusage
 
@@ -279,6 +280,182 @@ cdef class KLUInfo:
             self.nzoff = <int>numeric.nzoff
 
         return self
+
+
+cdef dict _SCALE_INDEX = {
+    "none_no_check": -1,
+    "none": 0,
+    "sum": 1,
+    "max": 2,
+}
+
+
+cdef dict _ORDERING_INDEX = {
+    "AMD": 0,
+    "COLAMD": 1,
+    "user-given": 2,
+    "user function": 3,
+}
+
+
+cdef list _CONTROL_KEYS = [
+    "tol",
+    "memgrow",
+    "initmem_amd",
+    "initmem",
+    "maxwork",
+    "btf",
+    "ordering",
+    "scale",
+]
+
+
+# TODO add docs
+cdef class KLUControl:
+    """A dataclass to set KLU control parameters.
+
+    Attributes
+    ----------
+    scale 
+        The row-scaling method. Accepted values are:
+
+        * ``none_no_check`` 
+        * ``none`` 
+        * ``sum`` 
+        * ``max`` 
+
+        Default is ``None``, which uses the ``KLU`` default setting of ``max``.
+    """
+    cdef:
+        double _FLOAT_NONE
+        int _INT_NONE
+        double _tol
+        double _memgrow
+        double _initmem_amd
+        double _initmem
+        double _maxwork
+        int _btf
+        int _ordering
+        int _scale
+
+    def __cinit__(self, **kwargs):
+        """Initialize the KLUControl object."""
+        self._FLOAT_NONE = -999.0
+        self._INT_NONE = -999
+
+        self._tol = self._FLOAT_NONE
+        self._memgrow = self._FLOAT_NONE
+        self._initmem_amd = self._FLOAT_NONE
+        self._initmem = self._FLOAT_NONE
+        self._maxwork = self._FLOAT_NONE
+        self._btf = self._INT_NONE
+        self._ordering = self._INT_NONE
+        self._scale = self._INT_NONE
+
+        for key, value in kwargs.items():
+            try:
+                setattr(self, key, value)
+            except KeyError:
+                raise KeyError(
+                    f"Invalid control parameter: {key}. "
+                    f"Expected one of {self.__dict__.keys()}"
+                )
+
+    @property
+    def tol(self):
+        return None if self._tol == self._FLOAT_NONE else self._tol
+
+    @tol.setter
+    def tol(self, value):
+        self._tol = value if value is not None else self._FLOAT_NONE
+
+    @property
+    def memgrow(self):
+        return None if self._memgrow == self._FLOAT_NONE else self._memgrow
+
+    @memgrow.setter
+    def memgrow(self, value):
+        self._memgrow = value if value is not None else self._FLOAT_NONE
+
+    @property
+    def initmem_amd(self):
+        return None if self._initmem_amd == self._FLOAT_NONE else self._initmem_amd
+
+    @initmem_amd.setter
+    def initmem_amd(self, value):
+        self._initmem_amd = value if value is not None else self._FLOAT_NONE
+
+    @property
+    def initmem(self):
+        return None if self._initmem == self._FLOAT_NONE else self._initmem
+
+    @initmem.setter
+    def initmem(self, value):
+        self._initmem = value if value is not None else self._FLOAT_NONE
+
+    @property
+    def maxwork(self):
+        return None if self._maxwork == self._FLOAT_NONE else self._maxwork
+
+    @maxwork.setter
+    def maxwork(self, value):
+        self._maxwork = value if value is not None else self._FLOAT_NONE
+
+    @property
+    def btf(self):
+        return None if self._btf == self._INT_NONE else self._btf
+
+    @btf.setter
+    def btf(self, value):
+        self._btf = value if value is not None else self._INT_NONE
+
+    @property
+    def ordering(self):
+        return _get_ordering_string(self._ordering)
+
+    @ordering.setter
+    def ordering(self, value):
+        if value is None:
+            self._ordering = self._INT_NONE
+            return
+
+        try:
+            self._ordering = _ORDERING_INDEX[value]
+        except KeyError:
+            raise ValueError(
+                f"Invalid value for 'ordering': {value}. "
+                f"Expected one of {list(_ORDERING_INDEX.keys())}"
+            )
+
+    @property
+    def scale(self):
+        return _get_scale_string(self._scale)
+
+    @scale.setter
+    def scale(self, value):
+        if value is None:
+            self._scale = self._INT_NONE
+            return
+
+        try:
+            self._scale = _SCALE_INDEX[value]
+        except KeyError:
+            raise ValueError(
+                f"Invalid value for 'scale': {value}. "
+                f"Expected one of {list(_SCALE_INDEX.keys())}"
+            )
+
+    def __iter__(self):
+        cdef str k
+        for k in _CONTROL_KEYS:
+            yield (k, getattr(self, k))
+
+    def __repr__(self):
+        attrs = ",\n    ".join(f"{k}={repr(v)}" for k, v in self)
+        return f"{self.__class__.__name__}(\n    {attrs}\n)"
+
+    def __str__(self):
+        return self.__repr__()
 
 
 # -------------------------------------------------------------------------------------
@@ -465,13 +642,6 @@ cdef int _copy_l_numeric(
 # -------------------------------------------------------------------------------------
 #         KLU Class Interface
 # -------------------------------------------------------------------------------------
-cdef dict _ROW_SCALE_INDEX = {
-    "none_no_check": -1,
-    "none": 0,
-    "sum": 1,
-    "max": 2,
-}
-
 # TODO add docs note on difference of row scaling vs KLU
 cdef class KLUFactor:
     """Class to compute and store the KLU factorization of a sparse matrix.
@@ -529,8 +699,7 @@ cdef class KLUFactor:
         # Cached factor objects
         object _L, _U, _F, _P, _Q, _Rs, _R
 
-    # TODO accept all parameters from klu_common
-    def __init__(self, A, *, row_scale=None):
+    def __init__(self, A, KLUControl control=None):
         """Compute the KLU factorization of a sparse matrix.
 
         Parameters
@@ -538,44 +707,53 @@ cdef class KLUFactor:
         A : (N, N) numpy.ndarray or sparse array
             The input matrix. Any object that can be converted to
             a :class:`~scipy.sparse.csc_array` is accepted.
-        row_scale : str, optional
-            The row-scaling method. Accepted values are:
-
-            * ``none_no_check`` : no scaling, and no error check.
-            * ``none`` : no scaling, but check for zero rows.
-            * ``sum`` : scale rows to have unit 1-norm.
-            * ``max`` : scale rows to have unit infinity-norm.
-
-            Default is ``None``, which uses the ``KLU`` default setting of ``max``
-            (subject to change).
-
+        control : :class:`KLUControl`, optional
+            An optional :class:`KLUControl` object to set the factorization parameters.
+            If not provided, default parameters are used.
         """
         A, self._use_int32, _ = validate_csc_input(A, require_square=True)
 
         self._N = A.shape[0]
+        self._init_common(control)
+        self._init_symbolic(self._N, A.indptr, A.indices, A.data)
 
-        scale = None
-        if row_scale is not None:
-            try:
-                scale = _ROW_SCALE_INDEX[row_scale]
-            except KeyError:
-                raise ValueError(
-                    f"Invalid value for row_scale: {scale}. "
-                    f"Expected one of {list(_ROW_SCALE_INDEX.keys())}"
-                )
-
+    cdef int _init_common(self, KLUControl control=None) except -1:
+        """Initialize the KLU common struct with default or user settings."""
+        # Initialize common struct with defaults
         if self._use_int32:
             self._cm = &self._common
             assert klu_defaults(self._cm)
-            if scale is not None:
-                self._cm.scale = scale
         else:
             self._l_cm = &self._l_common
             assert klu_l_defaults(self._l_cm)
-            if scale is not None:
-                self._l_cm.scale = scale
 
-        self._init_symbolic(self._N, A.indptr, A.indices, A.data)
+        if control is None:
+            return 0
+
+        # Set user-defined control parameters
+        cdef double _FNONE = control._FLOAT_NONE
+        cdef int _INONE = control._INT_NONE
+
+        if self._use_int32:
+            self._cm.tol         = self._cm.tol if control._tol is _FNONE else control._tol
+            self._cm.memgrow     = self._cm.memgrow if control._memgrow is _FNONE else control._memgrow
+            self._cm.initmem_amd = self._cm.initmem_amd if control._initmem_amd is _FNONE else control._initmem_amd
+            self._cm.initmem     = self._cm.initmem if control._initmem is _FNONE else control._initmem
+            self._cm.maxwork     = self._cm.maxwork if control._maxwork is _FNONE else control._maxwork
+            self._cm.btf         = self._cm.btf if control._btf is _INONE else control._btf
+            self._cm.ordering    = self._cm.ordering if control._ordering is _INONE else control._ordering
+            self._cm.scale       = self._cm.scale if control._scale is _INONE else control._scale
+        else:
+            self._l_cm.tol         = self._l_cm.tol if control._tol is _FNONE else control._tol
+            self._l_cm.memgrow     = self._l_cm.memgrow if control._memgrow is _FNONE else control._memgrow
+            self._l_cm.initmem_amd = self._l_cm.initmem_amd if control._initmem_amd is _FNONE else control._initmem_amd
+            self._l_cm.initmem     = self._l_cm.initmem if control._initmem is _FNONE else control._initmem
+            self._l_cm.maxwork     = self._l_cm.maxwork if control._maxwork is _FNONE else control._maxwork
+            self._l_cm.btf         = self._l_cm.btf if control._btf is _INONE else control._btf
+            self._l_cm.ordering    = self._l_cm.ordering if control._ordering is _INONE else control._ordering
+            self._l_cm.scale       = self._l_cm.scale if control._scale is _INONE else control._scale
+
+        return 0
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -839,7 +1017,7 @@ cdef class KLUFactor:
 
         If given, the matrix :math:`A` must have the same shape and nonzero pattern as
         the one used to create this :class:`KLUFactor` object, but need not have the
-        same values. 
+        same values.
 
         .. warning::
 
@@ -1438,7 +1616,7 @@ cdef class KLUFactor:
 # -----------------------------------------------------------------------------
 #         Convenience Functions
 # -----------------------------------------------------------------------------
-def klu_factor(A, *, row_scale=None):
+def klu_factor(A, *, control=None, **kwargs):
     """Compute the LU factorization of a sparse matrix using KLU.
 
     This is a convenience function that creates a :class:`KLUFactor` object,
@@ -1448,6 +1626,11 @@ def klu_factor(A, *, row_scale=None):
     ----------
     A : (M, N) numpy.ndarray or sparse array
         The input matrix to factorize.
+    control : :class:`KLUControl`, optional
+        An optional :class:`KLUControl` object to set the factorization parameters.
+        If not provided, default parameters are used.
+    **kwargs
+        Additional keyword arguments passed to the :class:`KLUControl` constructor.
 
     Returns
     -------
@@ -1466,10 +1649,12 @@ def klu_factor(A, *, row_scale=None):
 
     .. versionadded:: 0.5.0
     """
-    return KLUFactor(A, row_scale=row_scale).factorize(A)
+    if control is None:
+        control = KLUControl(**kwargs)
+    return KLUFactor(A, control).factorize(A)
 
 
-def klu_solve(A, b, *, row_scale=None):
+def klu_solve(A, b, *, control=None, **kwargs):
     """Solve a linear system using KLU.
 
     This is a convenience function that creates a :class:`KLUFactor` object,
@@ -1481,6 +1666,11 @@ def klu_solve(A, b, *, row_scale=None):
         The input matrix to factorize.
     b : (N,) or (N, K) numpy.ndarray
         The right-hand side vector or matrix.
+    control : :class:`KLUControl`, optional
+        An optional :class:`KLUControl` object to set the factorization parameters.
+        If not provided, default parameters are used.
+    **kwargs
+        Additional keyword arguments passed to the :class:`KLUControl` constructor.
 
     Returns
     -------
@@ -1495,10 +1685,13 @@ def klu_solve(A, b, *, row_scale=None):
 
     .. versionadded:: 0.5.0
     """
+    if control is None:
+        control = KLUControl(**kwargs)
+
     # factorize() and solve() will each warn for a singular matrix,
     # so we catch the warnings from factorize() and re-raise only once.
     with warnings.catch_warnings(record=True) as ws:
-        x = KLUFactor(A, row_scale=row_scale).factorize(A).solve(b)
+        x = KLUFactor(A, control).factorize(A).solve(b)
 
     # Raise only the latest singular matrix warning from solve
     if ws:
