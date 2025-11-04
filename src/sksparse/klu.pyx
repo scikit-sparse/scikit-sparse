@@ -73,6 +73,7 @@ References
 cimport cython
 cimport numpy as cnp
 
+from copy import deepcopy
 import numpy as np
 from scipy.sparse import issparse, csc_array
 import warnings
@@ -91,6 +92,11 @@ ctypedef fused index_t:
 ctypedef fused value_t:
     double
     double complex
+
+
+ctypedef fused common_t:
+    klu_common
+    klu_l_common
 
 
 # -------------------------------------------------------------------------------------
@@ -275,6 +281,186 @@ cdef class KLUInfo:
         return self
 
 
+# -------------------------------------------------------------------------------------
+#         Copy Functions
+# -------------------------------------------------------------------------------------
+cdef inline void* _malloc_copy(
+    const void* src,
+    size_t n,
+    size_t size,
+    const common_t* cm
+) except NULL:
+    """Allocate memory and copy data from src to the new memory."""
+    if cm is NULL:
+        return NULL
+
+    cdef void* dest
+
+    if common_t is klu_common:
+        dest = klu_malloc(n, size, <klu_common*>cm)
+    else:
+        dest = klu_l_malloc(n, size, <klu_l_common*>cm)
+
+    if dest is NULL:
+        return NULL
+
+    if n > 0:
+        memcpy(dest, src, n * size)
+
+    return dest
+
+
+cdef int _copy_symbolic(
+    klu_symbolic* dest,
+    const klu_symbolic* src,
+    const klu_common* cm
+) except -1:
+    """Deep copy a KLU symbolic struct."""
+    if src is NULL or dest is NULL:
+        raise ValueError("Source and destination pointers must not be NULL.")
+
+    # Copy the top-level data and pointers
+    memcpy(dest, src, sizeof(klu_symbolic))
+
+    cdef size_t n = src.n
+
+    # Deep copy internal arrays
+    dest.Lnz = <double*>_malloc_copy(src.Lnz, n, sizeof(double), cm)
+    dest.P = <int32_t*>_malloc_copy(src.P, n, sizeof(int32_t), cm)
+    dest.Q = <int32_t*>_malloc_copy(src.Q, n, sizeof(int32_t), cm)
+    dest.R = <int32_t*>_malloc_copy(src.R, n + 1, sizeof(int32_t), cm)
+
+    return 0
+
+
+cdef int _copy_l_symbolic(
+    klu_l_symbolic* dest,
+    const klu_l_symbolic* src,
+    const klu_l_common* cm,
+) except -1:
+    """Deep copy a KLU symbolic struct."""
+    if src is NULL or dest is NULL:
+        raise ValueError("Source and destination pointers must not be NULL.")
+
+    # Copy the top-level data and pointers
+    memcpy(dest, src, sizeof(klu_l_symbolic))
+
+    cdef size_t n = src.n
+
+    # Deep copy internal arrays
+    dest.Lnz = <double*>_malloc_copy(src.Lnz, n, sizeof(double), cm)
+    dest.P = <int64_t*>_malloc_copy(src.P, n, sizeof(int64_t), cm)
+    dest.Q = <int64_t*>_malloc_copy(src.Q, n, sizeof(int64_t), cm)
+    dest.R = <int64_t*>_malloc_copy(src.R, n + 1, sizeof(int64_t), cm)
+
+    return 0
+
+
+cdef int _copy_numeric(
+    klu_numeric* dest,
+    const klu_numeric* src,
+    const klu_common* cm,
+    value_t _dummy=0
+) except -1:
+    """Deep copy a KLU numeric struct."""
+    if src is NULL or dest is NULL:
+        raise ValueError("Source and destination pointers must not be NULL.")
+
+    # Copy the top-level data and pointers
+    memcpy(dest, src, sizeof(klu_numeric))
+
+    cdef size_t n = src.n
+    cdef size_t nblocks = src.nblocks
+
+    # Deep copy internal arrays
+    dest.Pnum = <int32_t*>_malloc_copy(src.Pnum, n, sizeof(int32_t), cm)
+    dest.Pinv = <int32_t*>_malloc_copy(src.Pinv, n, sizeof(int32_t), cm)
+    dest.Lip = <int32_t*>_malloc_copy(src.Lip, n, sizeof(int32_t), cm)
+    dest.Uip = <int32_t*>_malloc_copy(src.Uip, n, sizeof(int32_t), cm)
+    dest.Llen = <int32_t*>_malloc_copy(src.Llen, n, sizeof(int32_t), cm)
+    dest.Ulen = <int32_t*>_malloc_copy(src.Ulen, n, sizeof(int32_t), cm)
+    dest.Udiag = <value_t*>_malloc_copy(src.Udiag, n, sizeof(value_t), cm)
+    dest.LUsize = <size_t*>_malloc_copy(src.LUsize, nblocks, sizeof(size_t), cm)
+
+    cdef size_t k
+
+    if src.LUbx is not NULL and nblocks > 0:
+        dest.LUbx = <void**>klu_malloc(nblocks, sizeof(value_t*), cm)
+        if dest.LUbx is not NULL:
+            for k in range(nblocks):
+                dest.LUbx[k] = <value_t*>_malloc_copy(
+                    src.LUbx[k], src.LUsize[k], sizeof(value_t), cm
+                )
+
+    cdef size_t np1 = n + 1
+    cdef size_t nzoffp1 = <size_t>src.nzoff + 1
+
+    dest.Offp = <int32_t*>_malloc_copy(src.Offp, np1, sizeof(int32_t), cm)
+    dest.Offi = <int32_t*>_malloc_copy(src.Offi, nzoffp1, sizeof(int32_t), cm)
+    dest.Offx = <value_t*>_malloc_copy(src.Offx, nzoffp1, sizeof(value_t), cm)
+
+    dest.Rs = <double*>_malloc_copy(src.Rs, n, sizeof(double), cm)
+
+    # Workspace encompasses Xwork and Iwork, so just copy Work
+    dest.Work = _malloc_copy(src.Work, src.worksize, sizeof(value_t), cm)
+    dest.Xwork = dest.Work
+    dest.Iwork = <int32_t*>(<value_t*>dest.Xwork + n)
+
+    return 0
+
+
+cdef int _copy_l_numeric(
+    klu_l_numeric* dest,
+    const klu_l_numeric* src,
+    const klu_l_common* cm,
+    value_t _dummy=0
+) except -1:
+    """Deep copy a KLU numeric struct."""
+    if src is NULL or dest is NULL:
+        raise ValueError("Source and destination pointers must not be NULL.")
+
+    # Copy the top-level data and pointers
+    memcpy(dest, src, sizeof(klu_l_numeric))
+
+    cdef size_t n = src.n
+    cdef size_t nblocks = src.nblocks
+
+    # Deep copy internal arrays
+    dest.Pnum = <int64_t*>_malloc_copy(src.Pnum, n, sizeof(int64_t), cm)
+    dest.Pinv = <int64_t*>_malloc_copy(src.Pinv, n, sizeof(int64_t), cm)
+    dest.Lip = <int64_t*>_malloc_copy(src.Lip, n, sizeof(int64_t), cm)
+    dest.Uip = <int64_t*>_malloc_copy(src.Uip, n, sizeof(int64_t), cm)
+    dest.Llen = <int64_t*>_malloc_copy(src.Llen, n, sizeof(int64_t), cm)
+    dest.Ulen = <int64_t*>_malloc_copy(src.Ulen, n, sizeof(int64_t), cm)
+    dest.Udiag = <value_t*>_malloc_copy(src.Udiag, n, sizeof(value_t), cm)
+    dest.LUsize = <size_t*>_malloc_copy(src.LUsize, nblocks, sizeof(size_t), cm)
+
+    cdef size_t k
+
+    if src.LUbx is not NULL and nblocks > 0:
+        dest.LUbx = <void**>klu_l_malloc(nblocks, sizeof(value_t*), cm)
+        if dest.LUbx is not NULL:
+            for k in range(nblocks):
+                dest.LUbx[k] = <value_t*>_malloc_copy(
+                    src.LUbx[k], src.LUsize[k], sizeof(value_t), cm
+                )
+
+    cdef size_t np1 = n + 1
+    cdef size_t nzoffp1 = <size_t>src.nzoff + 1
+
+    dest.Offp = <int64_t*>_malloc_copy(src.Offp, np1, sizeof(int64_t), cm)
+    dest.Offi = <int64_t*>_malloc_copy(src.Offi, nzoffp1, sizeof(int64_t), cm)
+    dest.Offx = <value_t*>_malloc_copy(src.Offx, nzoffp1, sizeof(value_t), cm)
+
+    dest.Rs = <double*>_malloc_copy(src.Rs, n, sizeof(double), cm)
+
+    # Workspace encompasses Xwork and Iwork, so just copy Work
+    dest.Work = _malloc_copy(src.Work, src.worksize, sizeof(value_t), cm)
+    dest.Xwork = dest.Work
+    dest.Iwork = <int64_t*>(<value_t*>dest.Xwork + n)
+
+    return 0
+
 
 # -------------------------------------------------------------------------------------
 #         KLU Class Interface
@@ -323,7 +509,7 @@ cdef class KLUFactor:
     """
 
     cdef:
-        readonly Py_ssize_t _N
+        Py_ssize_t _N
         readonly object itype
         readonly object dtype
         bint _use_int32
@@ -343,6 +529,7 @@ cdef class KLUFactor:
         # Cached factor objects
         object _L, _U, _F, _P, _Q, _Rs, _R
 
+    # TODO accept all parameters from klu_common
     def __init__(self, A, *, row_scale=None):
         """Compute the KLU factorization of a sparse matrix.
 
@@ -593,6 +780,54 @@ cdef class KLUFactor:
     # ---------------------------------------------------------------------------------
     #         Public API
     # ---------------------------------------------------------------------------------
+    def copy(self):
+        """Return a deep copy of the current KLUFactor object."""
+        cdef KLUFactor klu = KLUFactor.__new__(KLUFactor)
+
+        klu._N = self._N
+        klu.itype = self.itype
+        klu.dtype = self.dtype
+        klu._use_int32 = self._use_int32
+        klu._is_real = self._is_real
+        klu._info = deepcopy(self._info)
+
+        # settings + output info
+        if self._use_int32:
+            klu._cm = &klu._common
+            memcpy(klu._cm, self._cm, sizeof(klu_common))
+
+            klu._symbolic = <klu_symbolic*>klu_malloc(1, sizeof(klu_symbolic), klu._cm)
+            _copy_symbolic(klu._symbolic, self._symbolic, klu._cm)
+
+            klu._numeric = <klu_numeric*>klu_malloc(1, sizeof(klu_numeric), klu._cm)
+            if self._is_real:
+                _copy_numeric[double](klu._numeric, self._numeric, klu._cm)
+            else:
+                _copy_numeric[cython.doublecomplex](klu._numeric, self._numeric, klu._cm)
+        else:
+            klu._l_cm = &klu._l_common
+            memcpy(klu._l_cm, self._l_cm, sizeof(klu_l_common))
+
+            klu._l_symbolic = <klu_l_symbolic*>klu_l_malloc(1, sizeof(klu_l_symbolic), klu._l_cm)
+            _copy_l_symbolic(klu._l_symbolic, self._l_symbolic, klu._l_cm)
+
+            klu._l_numeric = <klu_l_numeric*>klu_l_malloc(1, sizeof(klu_l_numeric), klu._l_cm)
+            if self._is_real:
+                _copy_l_numeric[double](klu._l_numeric, self._l_numeric, klu._l_cm)
+            else:
+                _copy_l_numeric[cython.doublecomplex](klu._l_numeric, self._l_numeric, klu._l_cm)
+
+        # Cached factor objects
+        klu._L = None if self._L is None else self._L.copy()
+        klu._U = None if self._U is None else self._U.copy()
+        klu._F = None if self._F is None else self._F.copy()
+        klu._P = None if self._P is None else self._P.copy()
+        klu._Q = None if self._Q is None else self._Q.copy()
+        klu._Rs = None if self._Rs is None else self._Rs.copy()
+        klu._R = None if self._R is None else self._R.copy()
+
+        return klu
+
     def factorize(self, object A):
         """Compute the numeric factorization of the matrix.
 
@@ -777,6 +1012,7 @@ cdef class KLUFactor:
                 )
             _handle_errors(self._l_cm.status)
 
+    # TODO solve x.T A = b.T
     def solve(self, object b):
         """Solve a linear system using the KLU factorization.
 

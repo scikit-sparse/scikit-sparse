@@ -10,6 +10,7 @@
 # distutils: language = c
 
 from libc.stdint cimport int32_t, int64_t
+from libc.string cimport memcpy
 
 
 cdef extern from "klu.h":
@@ -481,7 +482,14 @@ cdef extern from "klu.h":
 
     int klu_free_symbolic(klu_symbolic **Symbolic, klu_common *Common)
     int klu_l_free_symbolic(klu_l_symbolic **Symbolic, klu_l_common *Common)
+
     int klu_free_numeric(klu_numeric **Numeric, klu_common *Common)
     int klu_z_free_numeric (klu_numeric **Numeric, klu_common *Common)
     int klu_l_free_numeric (klu_l_numeric **Numeric, klu_l_common *Common)
     int klu_zl_free_numeric (klu_l_numeric **Numeric, klu_l_common *Common)
+
+    void *klu_malloc(size_t n, size_t size, klu_common *Common)
+    void *klu_l_malloc(size_t n, size_t size, klu_l_common *Common)
+
+    void *klu_free(void *p, size_t n, size_t size, klu_common *Common)
+    void *klu_l_free(void *p, size_t n, size_t size, klu_l_common *Common)
