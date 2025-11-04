@@ -650,6 +650,12 @@ cdef class KLUFactor:
             # Allocate and compute new numeric struct
             self._factorize(A.indptr, A.indices, A.data)
 
+        # Compute reciprocal pivot growth for KLUInfo O(|A| + |U|)
+        self._rgrowth(A.indptr, A.indices, A.data)
+
+        # Compute rough condition number estimate min(abs(diag(U)) / max(abs(diag(U)))
+        self._rcond()
+
         return self
 
     @cython.boundscheck(False)
@@ -904,13 +910,8 @@ cdef class KLUFactor:
                 f"Expected '{self.dtype}', got '{A.dtype}'."
             )
 
-    cdef int _check_rcond(self) except -1:
-        """Check a crude estimate of the condition number.
-
-        Computes ``min(abs(U.diagonal())) / max(abs(U.diagonal()))``. See
-        ``klu_condest`` for more accurate estimate from the full LU decomposition.
-        """
-        # Compute the condition number estimate
+    cdef int _rcond(self) except -1:
+        """Compute the condition number estimate."""
         if self._use_int32:
             if self._is_real:
                 klu_rcond(self._symbolic, self._numeric, self._cm)
@@ -924,6 +925,12 @@ cdef class KLUFactor:
                 klu_zl_rcond(self._l_symbolic, self._l_numeric, self._l_cm)
             _handle_errors(self._l_cm.status)
 
+    cdef int _check_rcond(self) except -1:
+        """Check a rough estimate of the condition number.
+
+        Computes ``min(abs(U.diagonal())) / max(abs(U.diagonal()))``. See
+        ``klu_condest`` for more accurate estimate from the full LU decomposition.
+        """
         cdef double rcond = self._cm.rcond if self._use_int32 else self._l_cm.rcond
         cdef double eps = np.finfo(np.float64).eps
 
@@ -935,6 +942,54 @@ cdef class KLUFactor:
                 f"  Results may be inaccurate (rcond={rcond:.2e}).",
                 KLUSingularMatrixWarning
             )
+
+    def _rgrowth(
+        self,
+        index_t[::1] indptr,
+        index_t[::1] indices,
+        value_t[::1] data
+    ):
+        """Compute the growth factor of the LU factorization."""
+        if self._use_int32:
+            if self._is_real:
+                klu_rgrowth(
+                    <int32_t*>&indptr[0],
+                    <int32_t*>&indices[0],
+                    <double*>&data[0],
+                    self._symbolic,
+                    self._numeric,
+                    self._cm
+                )
+            else:
+                klu_z_rgrowth(
+                    <int32_t*>&indptr[0],
+                    <int32_t*>&indices[0],
+                    <double*>&data[0],
+                    self._symbolic,
+                    self._numeric,
+                    self._cm
+                )
+            _handle_errors(self._cm.status)
+        else:
+            if self._is_real:
+                klu_l_rgrowth(
+                    <int64_t*>&indptr[0],
+                    <int64_t*>&indices[0],
+                    <double*>&data[0],
+                    self._l_symbolic,
+                    self._l_numeric,
+                    self._l_cm
+                )
+            else:
+                klu_zl_rgrowth(
+                    <int64_t*>&indptr[0],
+                    <int64_t*>&indices[0],
+                    <double*>&data[0],
+                    self._l_symbolic,
+                    self._l_numeric,
+                    self._l_cm
+                )
+            _handle_errors(self._l_cm.status)
 
     cdef void _get_numeric(self) except *:
         """Extract and cache the numeric factors from the klu_numeric struct."""
