@@ -934,8 +934,15 @@ cdef class KLUFactor:
         cdef double rcond = self._cm.rcond if self._use_int32 else self._l_cm.rcond
         cdef double eps = np.finfo(np.float64).eps
 
+        cdef int singular_col = (
+            self._cm.singular_col if self._use_int32 else self._l_cm.singular_col
+        )
+
         if rcond == 0:
-            raise KLUError("Matrix is indefinite or singular to working precision.")
+            raise KLUError(
+                "Matrix is indefinite or singular to working precision. "
+                f"Failed on column {singular_col}."
+            )
         elif rcond < eps:
             warnings.warn(
                 "Matrix is nearly singular."
