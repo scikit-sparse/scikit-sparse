@@ -412,5 +412,30 @@ def test_solve_real(problem):
     assert_allclose(x, expect_x, atol=1e-7)
 
 
+# -----------------------------------------------------------------------------
+#         Test Control and Info
+# -----------------------------------------------------------------------------
+def test_info(davis_example_qr):
+    A = davis_example_qr
+    f = klu_factor(A)
+    info = f.info
+    # Values from MATLAB klu
+    # >> [LU, info, c] = klu(A);
+    assert info.noffdiag == 0
+    assert info.nrealloc == 0
+    assert_allclose(info.rcond, 0.084848, rtol=1e-4)
+    assert info.singular_col == 8  # dimension of A
+    assert_allclose(info.rgrowth, 0.509, rtol=1e-3)
+    assert info.flops == 28
+    assert info.nblocks == 1
+    assert info.ordering == "AMD"
+    assert info.row_scale == "max"
+    assert info.lnz == 16
+    assert info.unz == 17
+    assert info.nzoff == 0
+    assert info.tol == 0.001
+    assert info.memory != 0  # number varies with system
+
+
 # =============================================================================
 # =============================================================================
