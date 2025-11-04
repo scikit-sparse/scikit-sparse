@@ -190,11 +190,14 @@ test_As = [
 ]
 
 
-@pytest.mark.parametrize("copy", [False])
+@pytest.mark.parametrize("copy", [False, True])
+@pytest.mark.parametrize("itype", ITYPES)
 @pytest.mark.parametrize("A", test_As)
-def test_refactor(A, copy):
+def test_refactor(A, itype, copy):
     atol = 1e-8
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
+    A.indptr = A.indptr.astype(itype)
+    A.indices = A.indices.astype(itype)
     f = klu_factor(A)
     assert_LU_equals_A(f, A, atol=atol)
     # Create a new matrix with the same sparsity pattern but different values
@@ -202,15 +205,14 @@ def test_refactor(A, copy):
     rng = np.random.default_rng(56)
     B.data = rng.random(len(B.data)).astype(dtype=B.dtype)
     # Factor the new matrix with the same sparsity pattern
-    # $ TODO
-    # if copy:
-    #     g = f.copy()
-    #     assert g is not f
-    #     g.factorize(B)
-    #     assert_LU_equals_A(g, B, atol=atol)
-    # else:
-    f.factorize(B)
-    assert_LU_equals_A(f, B, atol=atol)
+    if copy:
+        g = f.copy()
+        assert g is not f
+        g.factorize(B)
+        assert_LU_equals_A(g, B, atol=atol)
+    else:
+        f.factorize(B)
+        assert_LU_equals_A(f, B, atol=atol)
 
 
 @pytest.mark.parametrize("A", test_As[:1])
