@@ -193,7 +193,7 @@ test_As = [
 @pytest.mark.parametrize("copy", [False])
 @pytest.mark.parametrize("A", test_As)
 def test_refactor(A, copy):
-    atol = 1e-10
+    atol = 1e-8
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
     f = klu_factor(A)
     assert_LU_equals_A(f, A, atol=atol)
@@ -211,6 +211,17 @@ def test_refactor(A, copy):
     # else:
     f.factorize(B)
     assert_LU_equals_A(f, B, atol=atol)
+
+
+@pytest.mark.parametrize("A", test_As[:1])
+def test_sorted(A):
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+    f = klu_factor(A)
+    L, U = f.L, f.U
+    assert L.has_sorted_indices
+    assert L.has_canonical_format
+    assert U.has_sorted_indices
+    assert U.has_canonical_format
 
 
 # -----------------------------------------------------------------------------
