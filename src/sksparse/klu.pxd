@@ -289,6 +289,30 @@ cdef extern from "klu.h":
         klu_l_common *Common
     )
 
+    int klu_sort(
+        klu_symbolic *Symbolic,
+        klu_numeric *Numeric,
+        klu_common *Common
+    )
+
+    int klu_z_sort(
+        klu_symbolic *Symbolic,
+        klu_numeric *Numeric,
+        klu_common *Common
+    )
+
+    int klu_l_sort(
+        klu_l_symbolic *Symbolic,
+        klu_l_numeric *Numeric,
+        klu_l_common *Common
+    )
+
+    int klu_zl_sort(
+        klu_l_symbolic *Symbolic,
+        klu_l_numeric *Numeric,
+        klu_l_common *Common
+    )
+
     int klu_rcond(
         klu_symbolic *Symbolic,
         klu_numeric *Numeric,

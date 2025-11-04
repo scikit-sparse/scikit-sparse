@@ -1025,8 +1025,23 @@ cdef class KLUFactor:
         self._Rs = np.empty(self._N, dtype=np.float64)  # always real
         self._R = np.empty(self.nblocks + 1, dtype=self.itype)
 
+        # Sort the row indices so the output has canonical format
+        if self._use_int32:
+            if self._is_real:
+                klu_sort(self._symbolic, self._numeric, self._cm)
+            else:
+                klu_z_sort(self._symbolic, self._numeric, self._cm)
+            _handle_errors(self._cm.status)
+        else:
+            if self._is_real:
+                klu_l_sort(self._l_symbolic, self._l_numeric, self._l_cm)
+            else:
+                klu_zl_sort(self._l_symbolic, self._l_numeric, self._l_cm)
+            _handle_errors(self._l_cm.status)
+
+        # Extract the numeric factorization
         if self._is_real:
-            self._dispatch_get_numeric(
+            self._extract(
                 Lp, Li, Lx,
                 Up, Ui, Ux,
                 Fp, Fi, Fx,
@@ -1045,7 +1060,7 @@ cdef class KLUFactor:
             Uz = np.empty(self.unz, dtype=np.float64)
             Fz = np.empty(self.nzoff, dtype=np.float64)
 
-            self._dispatch_get_z_numeric(
+            self._z_extract(
                 Lp, Li, Lx, Lz,
                 Up, Ui, Ux, Uz,
                 Fp, Fi, Fx, Fz,
@@ -1061,7 +1076,7 @@ cdef class KLUFactor:
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def _dispatch_get_numeric(
+    def _extract(
         self,
         index_t[::1] Lp, index_t[::1] Li, value_t[::1] Lx,
         index_t[::1] Up, index_t[::1] Ui, value_t[::1] Ux,
@@ -1120,10 +1135,9 @@ cdef class KLUFactor:
             )
             _handle_errors(self._l_cm.status)
 
-    # TODO may be able to *just* use this call but pass "None"/NULL for imaginary parts
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def _dispatch_get_z_numeric(
+    def _z_extract(
         self,
         index_t[::1] Lp, index_t[::1] Li, value_t[::1] Lx, value_t[::1] Lz,
         index_t[::1] Up, index_t[::1] Ui, value_t[::1] Ux, value_t[::1] Uz,
