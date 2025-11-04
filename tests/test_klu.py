@@ -355,7 +355,8 @@ def test_nearly_singular(davis_example_qr):
 
     expect_x = sparse.coo_array(np.arange(1, N + 1, dtype=A.dtype))
     b = A @ expect_x
-    f = klu_factor(A, row_scale="none")  # disable row-scaling to trigger warning
+    f = klu_factor(A, scale="none")  # disable row-scaling to trigger warning
+    print(f"{f.info.scale=}")
     with pytest.warns(KLUSingularMatrixWarning, match="nearly singular"):
         f.solve(b)
 
@@ -442,12 +443,46 @@ def test_info(davis_example_qr):
     assert info.flops == 28
     assert info.nblocks == 1
     assert info.ordering == "AMD"
-    assert info.row_scale == "max"
+    assert info.scale == "max"
     assert info.lnz == 16
     assert info.unz == 17
     assert info.nzoff == 0
     assert info.tol == 0.001
     assert info.memory != 0  # number varies with system
+
+
+@pytest.mark.parametrize("scale", [None, "none_no_check", "none", "sum", "max"])
+def test_row_scale(davis_example_qr, scale):
+    A = davis_example_qr
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+    f = klu_factor(A, scale=scale)
+    if scale is None:
+        assert f.info.scale == "max"  # default
+    else:
+        assert f.info.scale == scale
+    assert_LU_equals_A(f, A)
+    if scale == "none":
+        assert_allclose(f.L.diagonal(), 1.0)
+
+
+ORDERINGS = [None, "AMD", "COLAMD"]
+
+
+@pytest.mark.parametrize("ordering", ORDERINGS)
+def test_ordering(davis_example_qr, ordering):
+    A = davis_example_qr
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+    # Ordering must be done *before* symbolic factorization
+    f = klu_factor(A, ordering=ordering)
+    expect_x = np.arange(1, A.shape[0] + 1, dtype=A.dtype)
+    b = A @ expect_x
+    x = f.solve(b)
+    assert_LU_equals_A(f, A)
+    assert_allclose(x, expect_x, atol=1e-15, strict=True)
+    if ordering is None:
+        assert f.info.ordering == "AMD"  # default
+    else:
+        assert f.info.ordering == ordering
 
 
 # =============================================================================
