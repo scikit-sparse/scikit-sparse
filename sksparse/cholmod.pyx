@@ -1060,19 +1060,6 @@ cdef void _copy_cholmod_common(cholmod_common* dest, cholmod_common* src):
     # Skip SPQR related fields and GPU related fields
 
 
-cdef void _cleanup_factor(CholeskyFactor cf):
-    """Deallocate memory used by a CholeskyFactor."""
-    if cf._cm is not NULL:
-        if cf._use_int32:
-            if cf._factor is not NULL:
-                cholmod_free_factor(&cf._factor, cf._cm)
-            cholmod_finish(cf._cm)
-        else:
-            if cf._factor is not NULL:
-                cholmod_l_free_factor(&cf._factor, cf._cm)
-            cholmod_l_finish(cf._cm)
-
-
 cdef class CholeskyFactor:
     """The main object used for creating and manipulating a Cholesky factor.
 
@@ -1264,43 +1251,47 @@ cdef class CholeskyFactor:
 
         self._stype = Ac.stype
 
-        try:
-            self._cm = &self._Common
+        # Initialize the Common object
+        self._cm = &self._Common
 
+        if self._use_int32:
+            cholmod_start(self._cm)
+        else:
+            cholmod_l_start(self._cm)
+
+        self._cm.supernodal = _supernodal_modes[supernodal_mode]
+        _set_ordering_method(order, self._cm)
+
+        # Analyze the matrix, but do not factorize yet
+        if transpose:
             if self._use_int32:
-                cholmod_start(self._cm)
+                C = cholmod_transpose(Ac, CHOLMOD_TRANS_PATTERN, self._cm)
+                self._factor = cholmod_analyze(Ac, self._cm)
+                cholmod_free_sparse(&C, self._cm)
             else:
-                cholmod_l_start(self._cm)
-
-            self._cm.supernodal = _supernodal_modes[supernodal_mode]
-            _set_ordering_method(order, self._cm)
-
-            # Analyze the matrix, but do not factorize yet
-            if transpose:
-                if self._use_int32:
-                    C = cholmod_transpose(Ac, CHOLMOD_TRANS_PATTERN, self._cm)
-                    self._factor = cholmod_analyze(Ac, self._cm)
-                    cholmod_free_sparse(&C, self._cm)
-                else:
-                    C = cholmod_l_transpose(Ac, CHOLMOD_TRANS_PATTERN, self._cm)
-                    self._factor = cholmod_l_analyze(Ac, self._cm)
-                    cholmod_l_free_sparse(&C, self._cm)
+                C = cholmod_l_transpose(Ac, CHOLMOD_TRANS_PATTERN, self._cm)
+                self._factor = cholmod_l_analyze(Ac, self._cm)
+                cholmod_l_free_sparse(&C, self._cm)
+        else:
+            if self._use_int32:
+                self._factor = cholmod_analyze(Ac, self._cm)
             else:
-                if self._use_int32:
-                    self._factor = cholmod_analyze(Ac, self._cm)
-                else:
-                    self._factor = cholmod_l_analyze(Ac, self._cm)
+                self._factor = cholmod_l_analyze(Ac, self._cm)
 
-            # Check for errors
-            _handle_errors(self._cm.status, self._factor.minor)
-
-        except Exception as e:
-            _cleanup_factor(self)
-            raise e
+        # Check for errors
+        _handle_errors(self._cm.status, self._factor.minor)
 
     def __dealloc__(self):
         """Deallocate memory used by the CholeskyFactor."""
-        _cleanup_factor(self)
+        if self._cm is not NULL:
+            if self._use_int32:
+                if self._factor is not NULL:
+                    cholmod_free_factor(&self._factor, self._cm)
+                cholmod_finish(self._cm)
+            else:
+                if self._factor is not NULL:
+                    cholmod_l_free_factor(&self._factor, self._cm)
+                cholmod_l_finish(self._cm)
 
     def _require_factorized(self):
         """Raise an error if the factor is symbolic only."""
