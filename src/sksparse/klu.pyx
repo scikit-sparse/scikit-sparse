@@ -114,6 +114,16 @@ ctypedef fused common_t:
     klu_l_common
 
 
+ctypedef fused symbolic_t:
+    klu_symbolic
+    klu_l_symbolic
+
+
+ctypedef fused numeric_t:
+    klu_numeric
+    klu_l_numeric
+
+
 # -------------------------------------------------------------------------------------
 #         Warnings and Errors
 # -------------------------------------------------------------------------------------
@@ -567,6 +577,25 @@ cdef inline void* _malloc_copy(
     return dest
 
 
+cdef inline void _copy_symbolic_values(
+    symbolic_t* dest,
+    const symbolic_t* src,
+):
+    """Copy the top-level values of a KLU symbolic struct, excluding pointers."""
+    dest.symmetry = src.symmetry
+    dest.est_flops = src.est_flops
+    dest.lnz = src.lnz
+    dest.unz = src.unz
+    dest.n = src.n
+    dest.nz = src.nz
+    dest.nzoff = src.nzoff
+    dest.nblocks = src.nblocks
+    dest.maxblock = src.maxblock
+    dest.ordering = src.ordering
+    dest.do_btf = src.do_btf
+    dest.structural_rank = src.structural_rank
+
+
 cdef int _copy_symbolic(
     klu_symbolic* dest,
     const klu_symbolic* src,
@@ -576,9 +605,9 @@ cdef int _copy_symbolic(
     if src is NULL or dest is NULL:
         raise ValueError("Source and destination pointers must not be NULL.")
 
-    # Copy the top-level data and pointers
+    # Copy the top-level data, but *not* pointers
     print("[_copy_symbolic]: Copying symbolic struct", flush=True)
-    memcpy(dest, src, sizeof(klu_symbolic))
+    _copy_symbolic_values(dest, src)
 
     cdef size_t n = src.n
 
@@ -602,7 +631,7 @@ cdef int _copy_l_symbolic(
         raise ValueError("Source and destination pointers must not be NULL.")
 
     # Copy the top-level data and pointers
-    memcpy(dest, src, sizeof(klu_l_symbolic))
+    _copy_symbolic_values(dest, src)
 
     cdef size_t n = src.n
 
@@ -613,6 +642,21 @@ cdef int _copy_l_symbolic(
     dest.R = <int64_t*>_malloc_copy(src.R, n + 1, sizeof(int64_t), cm)
 
     return 0
+
+
+cdef inline void _copy_numeric_values(
+    numeric_t* dest,
+    const numeric_t* src,
+):
+    """Copy the top-level values of a KLU numeric struct, excluding pointers."""
+    dest.n = src.n
+    dest.nblocks = src.nblocks
+    dest.lnz = src.lnz
+    dest.unz = src.unz
+    dest.max_lnz_block = src.max_lnz_block
+    dest.max_unz_block = src.max_unz_block
+    dest.worksize = src.worksize
+    dest.nzoff = src.nzoff
 
 
 cdef int _copy_numeric(
@@ -627,7 +671,7 @@ cdef int _copy_numeric(
 
     # Copy the top-level data and pointers
     print("[_copy_numeric]: Copying numeric struct", flush=True)
-    memcpy(dest, src, sizeof(klu_numeric))
+    _copy_numeric_values(dest, src)
 
     cdef size_t n = src.n
     cdef size_t nblocks = src.nblocks
@@ -690,7 +734,7 @@ cdef int _copy_l_numeric(
         raise ValueError("Source and destination pointers must not be NULL.")
 
     # Copy the top-level data and pointers
-    memcpy(dest, src, sizeof(klu_l_numeric))
+    _copy_numeric_values(dest, src)
 
     cdef size_t n = src.n
     cdef size_t nblocks = src.nblocks
