@@ -280,7 +280,7 @@ cdef int _handle_errors(int status, minor=None) except -1 with gil:
         full_msg += f" Failed at column {minor}."
 
     if issubclass(exc_class, Warning):
-        warnings.warn(full_msg, exc_class)
+        warnings.warn(full_msg, exc_class, stacklevel=2)
     else:
         raise exc_class(full_msg)
 
@@ -1131,24 +1131,6 @@ cdef void _copy_cholmod_common(cholmod_common* dest, cholmod_common* src):
     # Skip SPQR related fields and GPU related fields
 
 
-cdef void _cleanup_factor(CholeskyFactor cf):
-    """Deallocate memory used by a CholeskyFactor."""
-    if cf._cm is not NULL:
-        if cf._use_int32:
-            if cf._factor is not NULL:
-                cholmod_free_factor(&cf._factor, cf._cm)
-            cholmod_finish(cf._cm)
-        else:
-            if cf._factor is not NULL:
-                cholmod_l_free_factor(&cf._factor, cf._cm)
-            cholmod_l_finish(cf._cm)
-
-
-# Define a special internal class for copying CholeskyFactor only
-cdef class _CopySentinel:
-    pass
-
-
 cdef class CholeskyFactor:
     """The main object used for creating and manipulating a Cholesky factor.
 
@@ -1272,11 +1254,12 @@ cdef class CholeskyFactor:
     The symbolic analysis follows that of the SuiteSparse CHOLMOD ``analyze``
     MATLAB function [#analyze_c]_.
 
+    .. warning::
+    
+        Calling ``CholeskyFactor.__new__(CholeskyFactor)`` will leave the object in an
+        "unsafe" state, since the internal CHOLMOD structures will not be initialized.
+        Always use the constructor ``CholeskyFactor(...)`` to create a new object.
 
-    .. versionadded:: 0.1.0
-    .. versionchanged:: 0.5.0
-        Renamed from ``Factor``. Major API updates to more closely resemble the
-        :func:`scipy.linalg.cholesky` dense interface.
 
     References
     ----------
@@ -1291,7 +1274,7 @@ cdef class CholeskyFactor:
     cdef bint _is_lower
     cdef int _stype
 
-    def __cinit__(
+    def __init__(
         self,
         object A,
         *,
@@ -1300,12 +1283,6 @@ cdef class CholeskyFactor:
         object sym_kind=None,
         object supernodal_mode=None,
     ):
-        # Internal value to create an empty class during a copy
-        if A is _CopySentinel:
-            self._cm = NULL
-            self._factor = NULL
-            return
-
         A, self._use_int32, _ = validate_csc_input(A, require_square=True)
 
         if sym_kind is None:
@@ -1357,43 +1334,47 @@ cdef class CholeskyFactor:
 
         self._stype = Ac.stype
 
-        try:
-            self._cm = &self._Common
+        # Initialize the Common object
+        self._cm = &self._Common
 
+        if self._use_int32:
+            cholmod_start(self._cm)
+        else:
+            cholmod_l_start(self._cm)
+
+        self._cm.supernodal = _supernodal_modes[supernodal_mode]
+        _set_ordering_method(order, self._cm)
+
+        # Analyze the matrix, but do not factorize yet
+        if transpose:
             if self._use_int32:
-                cholmod_start(self._cm)
+                C = cholmod_transpose(Ac, CHOLMOD_TRANS_PATTERN, self._cm)
+                self._factor = cholmod_analyze(Ac, self._cm)
+                cholmod_free_sparse(&C, self._cm)
             else:
-                cholmod_l_start(self._cm)
-
-            self._cm.supernodal = _supernodal_modes[supernodal_mode]
-            _set_ordering_method(order, self._cm)
-
-            # Analyze the matrix, but do not factorize yet
-            if transpose:
-                if self._use_int32:
-                    C = cholmod_transpose(Ac, CHOLMOD_TRANS_PATTERN, self._cm)
-                    self._factor = cholmod_analyze(Ac, self._cm)
-                    cholmod_free_sparse(&C, self._cm)
-                else:
-                    C = cholmod_l_transpose(Ac, CHOLMOD_TRANS_PATTERN, self._cm)
-                    self._factor = cholmod_l_analyze(Ac, self._cm)
-                    cholmod_l_free_sparse(&C, self._cm)
+                C = cholmod_l_transpose(Ac, CHOLMOD_TRANS_PATTERN, self._cm)
+                self._factor = cholmod_l_analyze(Ac, self._cm)
+                cholmod_l_free_sparse(&C, self._cm)
+        else:
+            if self._use_int32:
+                self._factor = cholmod_analyze(Ac, self._cm)
             else:
-                if self._use_int32:
-                    self._factor = cholmod_analyze(Ac, self._cm)
-                else:
-                    self._factor = cholmod_l_analyze(Ac, self._cm)
+                self._factor = cholmod_l_analyze(Ac, self._cm)
 
-            # Check for errors
-            _handle_errors(self._cm.status, self._factor.minor)
-
-        except Exception as e:
-            _cleanup_factor(self)
-            raise e
+        # Check for errors
+        _handle_errors(self._cm.status, self._factor.minor)
 
     def __dealloc__(self):
         """Deallocate memory used by the CholeskyFactor."""
-        _cleanup_factor(self)
+        if self._cm is not NULL:
+            if self._use_int32:
+                if self._factor is not NULL:
+                    cholmod_free_factor(&self._factor, self._cm)
+                cholmod_finish(self._cm)
+            else:
+                if self._factor is not NULL:
+                    cholmod_l_free_factor(&self._factor, self._cm)
+                cholmod_l_finish(self._cm)
 
     def _require_factorized(self):
         """Raise an error if the factor is symbolic only."""
@@ -1499,7 +1480,7 @@ cdef class CholeskyFactor:
         CholeskyFactor
             A deep copy of the CholeskyFactor object.
         """
-        cdef CholeskyFactor cf = CholeskyFactor.__new__(CholeskyFactor, _CopySentinel)
+        cdef CholeskyFactor cf = CholeskyFactor.__new__(CholeskyFactor)
 
         cf._cm = &cf._Common
 
