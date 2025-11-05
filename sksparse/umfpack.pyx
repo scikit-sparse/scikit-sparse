@@ -299,7 +299,7 @@ cdef int _handle_errors(int status) except -1 with gil:
     full_msg = f"{msg} (code {status:d})"
 
     if issubclass(exc_class, Warning):
-        warnings.warn(full_msg, exc_class)
+        warnings.warn(full_msg, exc_class, stacklevel=2)
     else:
         raise exc_class(full_msg)
 
