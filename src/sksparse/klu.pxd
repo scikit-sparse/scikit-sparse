@@ -290,6 +290,44 @@ cdef extern from "klu.h":
         klu_l_common *Common
     )
 
+    int klu_tsolve(
+        klu_symbolic *Symbolic,
+        klu_numeric *Numeric,
+        int32_t ldim,
+        int32_t nrhs,
+        double B[],
+        klu_common *Common
+    )
+
+    int klu_z_tsolve(
+        klu_symbolic *Symbolic,
+        klu_numeric *Numeric,
+        int32_t ldim,
+        int32_t nrhs,
+        double B[],
+        int conj_solve,
+        klu_common *Common
+    )
+
+    int klu_l_tsolve(
+        klu_l_symbolic *Symbolic,
+        klu_l_numeric *Numeric,
+        int64_t ldim,
+        int64_t nrhs,
+        double B[],
+        klu_l_common *Common
+    )
+
+    int klu_zl_tsolve(
+        klu_l_symbolic *Symbolic,
+        klu_l_numeric *Numeric,
+        int64_t ldim,
+        int64_t nrhs,
+        double B[],
+        int conj_solve,
+        klu_l_common *Common
+    )
+
     int klu_sort(
         klu_symbolic *Symbolic,
         klu_numeric *Numeric,

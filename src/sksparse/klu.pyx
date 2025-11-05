@@ -1255,17 +1255,22 @@ cdef class KLUFactor:
                 )
             _handle_errors(self._l_cm.status)
 
-    # TODO solve x.T A = b.T
-    def solve(self, object b):
-        """Solve a linear system using the KLU factorization.
+    def solve(self, object b, *, bint transpose=False):
+        r"""Solve a linear system using the KLU factorization.
 
-        This method solves the linear system:
+        This method solves the linear system for :math:`x` given the right-hand side
+        :math:`b` as either a vector or a matrix with multiple right-hand sides,
 
         .. math::
             A x = b
 
-        using the LU factorization of :math:`A` previously computed by
-        :meth:`.factorize`.
+        if ``transpose=False``, or
+
+        .. math::
+            x A = b \Longleftrightarrow A^H x^H = b^H
+
+        if ``transpose=True``, using the LU factorization of :math:`A` previously
+        computed by :meth:`.factorize`.
 
         Parameters
         ----------
@@ -1292,11 +1297,13 @@ cdef class KLUFactor:
             raise ValueError("b must be a 1D or 2D array.")
 
         cdef bint return_1D = b.ndim == 1
-        cdef size_t K = 1 if b.ndim == 1 else b.shape[1]
+        cdef size_t N = b.shape[0] if b.ndim == 1 else (b.shape[1] if transpose else b.shape[0])
+        cdef size_t K = 1 if b.ndim == 1 else (b.shape[0] if transpose else b.shape[1])
 
-        if b.shape[0] != self._N:
+        if N != self._N:
             raise ValueError(
-                "Right-hand side b must have the same number of rows as A."
+                "Right-hand side b must have compatible shape with A. "
+                f"Got {b.shape=}, but A.shape={self.shape} ({transpose=})."
             )
 
         # Check the condition number
@@ -1313,11 +1320,19 @@ cdef class KLUFactor:
         b = np.asfortranarray(b)
 
         # TODO allow overwrite_b=True
-        # klu_solve expects B as a column-oriented 1D array
         # The klu_solve function overwrites the input with the output
-        x = b.copy().reshape(-1, order='F')
+        x = b.copy()
 
-        self._solve(K, x)
+        if transpose:
+            x = x.T.conj()
+
+        # klu_solve expects B as a column-oriented 1D array
+        x = x.reshape(-1, order='F')
+
+        if transpose:
+            self._tsolve(K, x)
+        else:
+            self._solve(K, x)
 
         # Reshape X into a  2D array
         x = x.reshape(self._N, K, order='F')
@@ -1329,6 +1344,9 @@ cdef class KLUFactor:
 
         if return_1D:
             x = x[:, 0]
+
+        if transpose:
+            x = x.T.conj()
 
         return x
 
@@ -1360,6 +1378,65 @@ cdef class KLUFactor:
             else:
                 klu_zl_solve(
                     self._l_symbolic, self._l_numeric, self._N, K, x_ptr, self._l_cm
+                )
+            _handle_errors(self._l_cm.status)
+
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def _tsolve(self, size_t K, value_t[::1] x):
+        """Solve xA = b.
+
+        Parameters
+        ----------
+        K : int
+            The number of right-hand sides to solve.
+        x : (N * K,) array_like
+            The right-hand side matrix on input, in column-oriented form, solution on output.
+        """
+        cdef double *x_ptr = <double*>&x[0]
+        cdef int conj_solve = True
+
+        if self._use_int32:
+            if self._is_real:
+                klu_tsolve(
+                    self._symbolic,
+                    self._numeric,
+                    self._N,
+                    K,
+                    x_ptr,
+                    self._cm
+                )
+            else:
+                klu_z_tsolve(
+                    self._symbolic,
+				    self._numeric,
+				    self._N,
+				    K,
+				    x_ptr,
+                    conj_solve,
+				    self._cm
+                )
+            _handle_errors(self._cm.status)
+        else:
+            if self._is_real:
+                klu_l_tsolve(
+                    self._l_symbolic,
+				    self._l_numeric,
+				    self._N,
+				    K,
+				    x_ptr,
+				    self._l_cm
+                )
+            else:
+                klu_zl_tsolve(
+                    self._l_symbolic,
+                    self._l_numeric,
+                    self._N,
+                    K,
+                    x_ptr,
+                    conj_solve,
+                    self._l_cm
                 )
             _handle_errors(self._l_cm.status)
 
@@ -1681,7 +1758,7 @@ cdef class KLUFactor:
 # -----------------------------------------------------------------------------
 #         Convenience Functions
 # -----------------------------------------------------------------------------
-def klu_factor(A, *, control=None, **kwargs):
+def klu_factor(A, *, KLUControl control=None, **kwargs):
     """Compute the LU factorization of a sparse matrix using KLU.
 
     This is a convenience function that creates a :class:`KLUFactor` object,
@@ -1719,7 +1796,7 @@ def klu_factor(A, *, control=None, **kwargs):
     return KLUFactor(A, control).factorize(A)
 
 
-def klu_solve(A, b, *, control=None, **kwargs):
+def klu_solve(A, b, *, KLUControl control=None, bint transpose=False, **kwargs):
     """Solve a linear system using KLU.
 
     This is a convenience function that creates a :class:`KLUFactor` object,
@@ -1734,6 +1811,8 @@ def klu_solve(A, b, *, control=None, **kwargs):
     control : :class:`KLUControl`, optional
         An optional :class:`KLUControl` object to set the factorization parameters.
         If not provided, default parameters are used.
+    transpose : bool, optional
+        If True, solve :math:`x A = b`, otherwise, solve :math:`A x = b`.
     **kwargs
         Additional keyword arguments passed to the :class:`KLUControl` constructor.
 
@@ -1756,7 +1835,7 @@ def klu_solve(A, b, *, control=None, **kwargs):
     # factorize() and solve() will each warn for a singular matrix,
     # so we catch the warnings from factorize() and re-raise only once.
     with warnings.catch_warnings(record=True) as ws:
-        x = KLUFactor(A, control).factorize(A).solve(b)
+        x = KLUFactor(A, control).factorize(A).solve(b, transpose=transpose)
 
     # Raise only the latest singular matrix warning from solve
     if ws:
