@@ -455,7 +455,7 @@ def test_info(davis_example_qr):
     assert info.unz == 17
     assert info.nzoff == 0
     assert info.tol == 0.001
-    assert info.memory != 0  # number varies with system
+    assert info.mempeak != 0  # number varies with system
 
 
 @pytest.mark.parametrize("scale", [None, "none_no_check", "none", "sum", "max"])
