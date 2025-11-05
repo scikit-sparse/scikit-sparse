@@ -23,6 +23,7 @@ from scipy.io import mmread
 from sksparse.umfpack import (
     UMFControl,
     UMFFactor,
+    UMFPACKDifferentPatternError,
     UMFPACKError,
     UMFPACKNonpositiveError,
     UMFPACKSingularMatrixWarning,
@@ -57,7 +58,7 @@ def test_zero_input():
     N = 10  # arbitrary
     zero_A = sparse.csc_array((N, N))
     f = UMFFactor(zero_A)
-    assert f.nnz == 0
+    assert f.nnz is None
     assert f.shape == (N, N)
     assert f.itype == zero_A.indptr.dtype
     assert f.dtype == zero_A.dtype
@@ -68,9 +69,11 @@ def test_zero_input():
 def test_singleton():
     dtype = np.float64
     singleton_A = sparse.csc_array([[1]], dtype=dtype)
-    f = UMFFactor(singleton_A)
-    assert not f.is_numeric
-    assert f.nnz == 0
+    f = umf_factor(singleton_A)
+    assert f.is_numeric
+    assert f.lnz == 1
+    assert f.unz == 1
+    assert f.nnz == 2
     assert f.shape == (1, 1)
     assert f.itype == singleton_A.indptr.dtype
     assert f.dtype == dtype
@@ -125,6 +128,32 @@ def test_bad_factorize_shape(davis_example_qr):
         f.factorize(A[:-1, :])  # remove last row
 
 
+def test_bad_factorize_structure(davis_example_qr):
+    A = davis_example_qr
+    f = UMFFactor(A)
+    B = A.copy().todok()
+    # Change the structure of the matrix by adding a new non-zero
+    B[0, 1] = 2.3
+    B = B.tocsc()
+    B.indptr = B.indptr.astype(A.indptr.dtype)
+    B.indices = B.indices.astype(A.indices.dtype)
+    with pytest.raises(UMFPACKDifferentPatternError, match="different nonzero pattern"):
+        f.factorize(B)
+
+
+def test_bad_refactorize_structure(davis_example_qr):
+    A = davis_example_qr
+    f = umf_factor(A)
+    B = A.copy().todok()
+    # Change the structure of the matrix by adding a new non-zero
+    B[0, 1] = 2.3
+    B = B.tocsc()
+    B.indptr = B.indptr.astype(A.indptr.dtype)
+    B.indices = B.indices.astype(A.indices.dtype)
+    with pytest.raises(UMFPACKDifferentPatternError, match="different nonzero pattern"):
+        f.factorize(B)
+
+
 @pytest.mark.parametrize("itype", ITYPES)
 @pytest.mark.parametrize("dtype", DTYPES)
 def test_davis_example_qr(davis_example_qr, itype, dtype):
@@ -135,6 +164,8 @@ def test_davis_example_qr(davis_example_qr, itype, dtype):
 
     f = umf_factor(A)
     assert f.is_numeric
+    assert f.L is f.L  # test cached properties
+    assert f.U is f.U
 
     # Get the factors
     p, q = f.perm_r, f.perm_c
@@ -355,22 +386,10 @@ def test_exactly_singular(davis_example_qr):
     expect_x = sparse.coo_array(np.arange(1, N + 1, dtype=A.dtype))
     b = A @ expect_x
 
-    # NOTE umf_solve does some trickery to only warn once, so we expect only
-    # one warning here. pytest.warns(), however, overrides the
-    # "warnings.catch_warnings" context and captures all warnings, so we
-    # manually check the warnings instead.
-    with warnings.catch_warnings(record=True) as ws:
-        x = umf_solve(A, b)
-
-    assert len(ws) == 1
-    w = ws[0]
-    assert w.category == UMFPACKSingularMatrixWarning
-    assert "indefinite or singular to working precision" in str(w.message)
-
-    assert np.isnan(x.toarray()[s])
-    assert_allclose((A @ x).toarray(), b.toarray(), atol=1e-12)
-    idx = ~np.isnan(x.toarray())
-    assert_allclose(x.toarray()[idx], expect_x.toarray()[idx], atol=1e-12)
+    with pytest.raises(
+        UMFPACKError, match="indefinite or singular to working precision"
+    ):
+        umf_solve(A, b)
 
 
 def test_nearly_singular(davis_example_qr):
