@@ -695,7 +695,7 @@ cdef int _copy_numeric(
         print(f"[_copy_numeric]: LUsize[{k}] = {dest.LUsize[k]}", flush=True)
 
     print("[_copy_numeric]: Copying LUbx blocks", flush=True)
-    if src.LUbx is not NULL and nblocks > 0:
+    if src.LUbx is not NULL:
         dest.LUbx = <void**>klu_malloc(nblocks, sizeof(value_t*), cm)
         if dest.LUbx is not NULL:
             for k in range(nblocks):
@@ -751,7 +751,7 @@ cdef int _copy_l_numeric(
 
     cdef size_t k
 
-    if src.LUbx is not NULL and nblocks > 0:
+    if src.LUbx is not NULL:
         dest.LUbx = <void**>klu_l_malloc(nblocks, sizeof(value_t*), cm)
         if dest.LUbx is not NULL:
             for k in range(nblocks):
