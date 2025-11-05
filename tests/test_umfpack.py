@@ -386,22 +386,10 @@ def test_exactly_singular(davis_example_qr):
     expect_x = sparse.coo_array(np.arange(1, N + 1, dtype=A.dtype))
     b = A @ expect_x
 
-    # NOTE umf_solve does some trickery to only warn once, so we expect only
-    # one warning here. pytest.warns(), however, overrides the
-    # "warnings.catch_warnings" context and captures all warnings, so we
-    # manually check the warnings instead.
-    with warnings.catch_warnings(record=True) as ws:
-        x = umf_solve(A, b)
-
-    assert len(ws) == 1
-    w = ws[0]
-    assert w.category == UMFPACKSingularMatrixWarning
-    assert "indefinite or singular to working precision" in str(w.message)
-
-    assert np.isnan(x.toarray()[s])
-    assert_allclose((A @ x).toarray(), b.toarray(), atol=1e-12)
-    idx = ~np.isnan(x.toarray())
-    assert_allclose(x.toarray()[idx], expect_x.toarray()[idx], atol=1e-12)
+    with pytest.raises(
+        UMFPACKError, match="indefinite or singular to working precision"
+    ):
+        umf_solve(A, b)
 
 
 def test_nearly_singular(davis_example_qr):
