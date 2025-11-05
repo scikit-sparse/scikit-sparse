@@ -190,6 +190,21 @@ test_As = [
 ]
 
 
+@pytest.mark.parametrize("itype", ITYPES)
+@pytest.mark.parametrize("A", test_As)
+def test_copy_symbolic(A, itype):
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+    A.indptr = A.indptr.astype(itype)
+    A.indices = A.indices.astype(itype)
+    f = KLUFactor(A)
+    g = f.copy()
+    assert g is not f
+    assert g.shape == f.shape
+    assert g.itype == f.itype
+    assert g.dtype == f.dtype
+    assert g.info == f.info
+
+
 @pytest.mark.parametrize("copy", [False, True])
 @pytest.mark.parametrize("itype", ITYPES)
 @pytest.mark.parametrize("A", test_As)
