@@ -1910,11 +1910,7 @@ cdef class UMFFactor:
         cdef double eps = np.finfo(np.float64).eps
 
         if rcond == 0:
-            warnings.warn(
-                "Matrix is indefinite or singular to working precision."
-                "  Results may contain infinite or NaN values.",
-                UMFPACKSingularMatrixWarning
-            )
+            raise UMFPACKError("Matrix is indefinite or singular to working precision.")
         elif rcond < eps:
             warnings.warn(
                 "Matrix is nearly singular."
