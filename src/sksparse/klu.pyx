@@ -210,10 +210,41 @@ cdef object _get_ordering_string(int ordering):
         return ""
 
 
-# TODO add docs
 @cython.dataclasses.dataclass(frozen=True)
 cdef class KLUInfo:
-    """A dataclass to store KLU information."""
+    """A dataclass to store KLU information.
+
+    Attributes
+    ----------
+    noffdiag : int
+        Number of off-diagonal entries in the matrix.
+    nrealloc : int
+        Number of memory reallocations during factorization.
+    rcond : double
+        Estimate of the reciprocal of the condition number.
+    singular_col : int
+        Index of the first singular column, if any.
+    rgrowth : double
+        The reciprocal pivot growth factor.
+    flops : int
+        Estimated number of floating-point operations.
+    nblocks : int
+        Number of blocks in the BTF ordering of the matrix.
+    ordering : str
+        The fill-reducing ordering used.
+    scale : str
+        The row-scaling method used.
+    lnz : int
+        Number of nonzeros in the L factor.
+    unz : int
+        Number of nonzeros in the U factor.
+    nzoff : int
+        Number of nonzeros in the F factor ("offset").
+    tol : double
+        The pivot tolerance used.
+    memory : int
+        Memory usage in bytes.
+    """
     noffdiag : int | None = None
     nrealloc : int | None = None
     rcond : double | None = None
@@ -310,13 +341,39 @@ cdef list _CONTROL_KEYS = [
 ]
 
 
-# TODO add docs
 cdef class KLUControl:
     """A dataclass to set KLU control parameters.
 
     Attributes
     ----------
-    scale 
+    tol : float
+        The pivot tolerance. Default is ``None``, which uses the ``KLU`` default of
+        ``0.001``.
+    memgrow : float
+        The memory growth factor. Default is ``None``, which uses the ``KLU``
+        default of ``1.2``.
+    initmem_amd : float
+        The initial memory allocation factor for AMD. Default is ``None``, which
+        uses the ``KLU`` default of ``1.2``.
+    initmem : float
+        The initial memory allocation factor for the numeric factorization.
+        Default is ``None``, which uses the ``KLU`` default of ``10``.
+    maxwork : float
+        The maximum work done by BTF. Default is ``None``, which uses the ``KLU``
+        default of ``0``, or unlimited.
+    btf : bool
+        Whether to use BTF pre-ordering. Default is ``None``, which uses the
+        ``KLU`` default of ``True``.
+    ordering : str
+        The fill-reducing ordering. Accepted values are:
+
+        * ``AMD``: Approximate Minimum Degree ordering.
+        * ``COLAMD`` : Column Approximate Minimum Degree ordering.
+        * ``user-given``: User-provided ordering (not yet supported).
+        * ``user function``: User-defined ordering function (not yet supported).
+
+        Default is ``None``, which uses the ``KLU`` default setting of ``AMD``.
+    scale : str
         The row-scaling method. Accepted values are:
 
         * ``none_no_check`` 
@@ -642,7 +699,6 @@ cdef int _copy_l_numeric(
 # -------------------------------------------------------------------------------------
 #         KLU Class Interface
 # -------------------------------------------------------------------------------------
-# TODO add docs note on difference of row scaling vs KLU
 cdef class KLUFactor:
     """Class to compute and store the KLU factorization of a sparse matrix.
 
@@ -653,6 +709,15 @@ cdef class KLUFactor:
         L U + F = R^{-1} P A Q.
 
     The numeric factorization is not computed until :meth:`.factorize` is called.
+
+    .. note::
+
+        From the ``klu.m`` documentation:
+
+            Note that the use of the scale factor R differs between KLU and UMFPACK
+            (and the LU function, which is based on UMFPACK).  In LU, the factorization
+            is ``L*U = P*(R1\A)*Q;`` in KLU it is ``L*U+F = R2\(P*A*Q)``.  ``R1`` and
+            ``R2`` are related via ``R2 = P*R1*P'``, or equivalently ``R2 = R1(p,p)``.
 
     Attributes
     ----------
