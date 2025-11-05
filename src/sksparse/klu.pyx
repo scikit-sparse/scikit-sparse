@@ -203,9 +203,9 @@ cdef object _get_ordering_string(int ordering):
     elif ordering == 1:
         return "COLAMD"
     elif ordering == 2:
-        return "user-given"
+        return "user_perm"
     elif ordering == 3:
-        return "user function"
+        return "user_func"
     else:
         return ""
 
@@ -324,8 +324,8 @@ cdef dict _SCALE_INDEX = {
 cdef dict _ORDERING_INDEX = {
     "AMD": 0,
     "COLAMD": 1,
-    "user-given": 2,
-    "user function": 3,
+    "user_perm": 2,
+    "user_func": 3,
 }
 
 
@@ -369,8 +369,8 @@ cdef class KLUControl:
 
         * ``AMD``: Approximate Minimum Degree ordering.
         * ``COLAMD`` : Column Approximate Minimum Degree ordering.
-        * ``user-given``: User-provided ordering (not yet supported).
-        * ``user function``: User-defined ordering function (not yet supported).
+        * ``user_perm``: User-provided ordering (not yet supported).
+        * ``user_func``: User-defined ordering function (not yet supported).
 
         Default is ``None``, which uses the ``KLU`` default setting of ``AMD``.
     scale : str
@@ -418,6 +418,7 @@ cdef class KLUControl:
                     f"Expected one of {self.__dict__.keys()}"
                 )
 
+    # TODO add validation in setters (like 0 <= tol <= 1)
     @property
     def tol(self):
         return None if self._tol == self._FLOAT_NONE else self._tol
@@ -475,6 +476,11 @@ cdef class KLUControl:
         if value is None:
             self._ordering = self._INT_NONE
             return
+
+        if value in ["user_perm", "user_func"]:
+            raise NotImplementedError(
+                f"The ordering method '{value}' is not yet supported."
+            )
 
         try:
             self._ordering = _ORDERING_INDEX[value]
