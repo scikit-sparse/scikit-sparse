@@ -42,7 +42,7 @@ jobs:
       - name: Install dependencies and package
         run: |
           pip install --upgrade pip
-          pip install -e .[dev]
+          pip install -v -e .[dev]
 
       - name: Display installed packages
         run: |
@@ -52,7 +52,7 @@ jobs:
         run:  ruff check
 
       - name: Test with pytest
-        run: pytest
+        run: pytest -v
 
       - name: Build Docs
         run: |
