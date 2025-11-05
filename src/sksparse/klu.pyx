@@ -71,9 +71,7 @@ References
 """
 
 cimport cython
-cimport numpy as cnp
 
-from copy import deepcopy
 import numpy as np
 from scipy.sparse import issparse, csc_array
 import warnings
@@ -1159,13 +1157,13 @@ cdef class KLUFactor:
                     _copy_l_numeric[cython.doublecomplex](klu._l_numeric, self._l_numeric, klu._l_cm)
 
         # Cached factor objects
-        klu._L = None if self._L is None else self._L.copy()
-        klu._U = None if self._U is None else self._U.copy()
-        klu._F = None if self._F is None else self._F.copy()
-        klu._P = None if self._P is None else self._P.copy()
-        klu._Q = None if self._Q is None else self._Q.copy()
-        klu._Rs = None if self._Rs is None else self._Rs.copy()
-        klu._R = None if self._R is None else self._R.copy()
+        klu._L = self._L.copy() if self._L is not None else None
+        klu._U = self._U.copy() if self._U is not None else None
+        klu._F = self._F.copy() if self._F is not None else None
+        klu._P = self._P.copy() if self._P is not None else None
+        klu._Q = self._Q.copy() if self._Q is not None else None
+        klu._Rs = self._Rs.copy() if self._Rs is not None else None
+        klu._R = self._R.copy() if self._R is not None else None
 
         return klu
 
@@ -1290,7 +1288,6 @@ cdef class KLUFactor:
                     self._l_cm
                 )
             _handle_errors(self._l_cm.status)
-
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -1459,7 +1456,8 @@ cdef class KLUFactor:
         K : int
             The number of right-hand sides to solve.
         x : (N * K,) array_like
-            The right-hand side matrix on input, in column-oriented form, solution on output.
+            The right-hand side matrix on input, in column-oriented form, solution on
+            output.
         """
         cdef double *x_ptr = <double*>&x[0]
 
@@ -1480,7 +1478,6 @@ cdef class KLUFactor:
                 )
             _handle_errors(self._l_cm.status)
 
-
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def _tsolve(self, size_t K, value_t[::1] x):
@@ -1491,7 +1488,8 @@ cdef class KLUFactor:
         K : int
             The number of right-hand sides to solve.
         x : (N * K,) array_like
-            The right-hand side matrix on input, in column-oriented form, solution on output.
+            The right-hand side matrix on input, in column-oriented form, solution on
+            output.
         """
         cdef double *x_ptr = <double*>&x[0]
         cdef int conj_solve = True
@@ -1509,23 +1507,23 @@ cdef class KLUFactor:
             else:
                 klu_z_tsolve(
                     self._symbolic,
-				    self._numeric,
-				    self._N,
-				    K,
-				    x_ptr,
+                    self._numeric,
+                    self._N,
+                    K,
+                    x_ptr,
                     conj_solve,
-				    self._cm
+                    self._cm
                 )
             _handle_errors(self._cm.status)
         else:
             if self._is_real:
                 klu_l_tsolve(
                     self._l_symbolic,
-				    self._l_numeric,
-				    self._N,
-				    K,
-				    x_ptr,
-				    self._l_cm
+                    self._l_numeric,
+                    self._N,
+                    K,
+                    x_ptr,
+                    self._l_cm
                 )
             else:
                 klu_zl_tsolve(
@@ -1824,8 +1822,6 @@ cdef class KLUFactor:
         R : array of index_t
             The output block boundaries.
         """
-        cdef int status
-
         # Extract the numeric factorization
         if self._use_int32:
             klu_z_extract(
@@ -1902,7 +1898,7 @@ def klu_solve(A, b, *, KLUControl control=None, bint transpose=False, **kwargs):
     r"""Solve a linear system using KLU.
 
     This function solves a linear system for :math:`x` given the right-hand side
-    :math:`b` as either a vector or a matrix with multiple right-hand sides. 
+    :math:`b` as either a vector or a matrix with multiple right-hand sides.
 
     If ``transpose=False``, solve
 
