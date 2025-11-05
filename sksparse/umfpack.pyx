@@ -1512,8 +1512,8 @@ cdef class UMFFactor:
 
         Parameters
         ----------
-        b : *(N,)* :obj:`ndarray` or sparse array
-            The right-hand side vector.
+        b : *(N,)* or *(N, K)* :obj:`ndarray` or sparse array
+            The right-hand side vector or matrix
         A : *(N, N)* :obj:`ndarray` or sparse array, optional
             The input matrix. Must have the same shape and nonzero pattern as
             the matrix used to create this :class:`UMFFactor` object.
@@ -2146,8 +2146,8 @@ def umf_solve(object A, object b, *, object trans='N', object control=None, **kw
     ----------
     A : *(N, N)* :obj:`ndarray` or sparse array
         The input matrix.
-    b : *(N,)* :obj:`ndarray` or sparse array
-        The right-hand side vector.
+    b : *(N,)* or *(N, K)* :obj:`ndarray` or sparse array
+        The right-hand side vector or matrix.
     trans : str, optional
         The type of system to solve. Possible values are:
 
@@ -2168,8 +2168,9 @@ def umf_solve(object A, object b, *, object trans='N', object control=None, **kw
 
     Returns
     -------
-    x : *(N,)* :obj:`ndarray` or sparse array
-        The solution vector of the same type as the input right-hand side `b`.
+    x : *(N,)* or *(N, K)* :obj:`ndarray` or sparse array
+        The solution vector or matrix of the same type and shape as the input
+        right-hand side `b`.
 
     Warns
     -----
