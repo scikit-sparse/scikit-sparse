@@ -81,6 +81,21 @@ import warnings
 from .utils import validate_csc_input
 
 
+__all__ = [
+    "KLUWarning",
+    "KLUSingularMatrixWarning",
+    "KLUError",
+    "KLUOutOfMemoryError",
+    "KLUInvalidError",
+    "KLUOverflowError",
+    "KLUInfo",
+    "KLUControl",
+    "KLUFactor",
+    "klu_factor",
+    "klu_solve",
+]
+
+
 # -----------------------------------------------------------------------------
 #         Define types
 # -----------------------------------------------------------------------------
@@ -220,11 +235,11 @@ cdef class KLUInfo:
         Number of off-diagonal entries in the matrix.
     nrealloc : int
         Number of memory reallocations during factorization.
-    rcond : double
+    rcond : float
         Estimate of the reciprocal of the condition number.
     singular_col : int
         Index of the first singular column, if any.
-    rgrowth : double
+    rgrowth : float
         The reciprocal pivot growth factor.
     flops : int
         Estimated number of floating-point operations.
@@ -240,7 +255,7 @@ cdef class KLUInfo:
         Number of nonzeros in the U factor.
     nzoff : int
         Number of nonzeros in the F factor ("offset").
-    tol : double
+    tol : float
         The pivot tolerance used.
     memory : int
         Memory usage in bytes.
@@ -346,7 +361,7 @@ cdef class KLUControl:
 
     Attributes
     ----------
-    tol : float in [0, 1]
+    tol : float
         The pivot tolerance. Default is ``None``, which uses the ``KLU`` default of
         ``0.001``.
     memgrow : float
@@ -376,10 +391,10 @@ cdef class KLUControl:
     scale : str
         The row-scaling method. Accepted values are:
 
-        * ``none_no_check`` 
-        * ``none`` 
-        * ``sum`` 
-        * ``max`` 
+        * ``none_no_check``
+        * ``none``
+        * ``sum``
+        * ``max``
 
         Default is ``None``, which uses the ``KLU`` default setting of ``max``.
     """
@@ -708,7 +723,7 @@ cdef int _copy_l_numeric(
 #         KLU Class Interface
 # -------------------------------------------------------------------------------------
 cdef class KLUFactor:
-    """Class to compute and store the KLU factorization of a sparse matrix.
+    r"""Class to compute and store the KLU factorization of a sparse matrix.
 
     The constructor computes the symbolic analysis of a sparse matrix :math:`A`
     and determines a fill-reducing ordering such that:
@@ -720,12 +735,13 @@ cdef class KLUFactor:
 
     .. note::
 
-        From the ``klu.m`` documentation:
+        Note that the use of the scale factor ``R`` differs between KLU and UMFPACK:
 
-            Note that the use of the scale factor R differs between KLU and UMFPACK
-            (and the LU function, which is based on UMFPACK).  In LU, the factorization
-            is ``L*U = P*(R1\A)*Q;`` in KLU it is ``L*U+F = R2\(P*A*Q)``.  ``R1`` and
-            ``R2`` are related via ``R2 = P*R1*P'``, or equivalently ``R2 = R1(p,p)``.
+        .. math::
+                L U &= P R_{\mathrm{umf}} A Q \quad &&\text{(UMFPACK)}, \\
+            L U + F &= R_{\mathrm{klu}} P A Q \quad &&\text{(KLU)}.
+
+        They are related by :math:`R_{\mathrm{klu}} = P R_{\mathrm{umf}} P^{\top}`.
 
     Attributes
     ----------
@@ -1080,13 +1096,13 @@ cdef class KLUFactor:
         return klu
 
     def factorize(self, object A):
-        """Compute the numeric factorization of the matrix.
+        r"""Compute the numeric factorization of the matrix.
 
         Computes the numeric factorization of a sparse matrix :math:`A`
         and determines a fill-reducing ordering such that:
 
         .. math::
-            L U + F = R P A Q.
+            L U + F = R^{-1} P A Q.
 
         If given, the matrix :math:`A` must have the same shape and nonzero pattern as
         the one used to create this :class:`KLUFactor` object, but need not have the
@@ -1266,19 +1282,21 @@ cdef class KLUFactor:
     def solve(self, object b, *, bint transpose=False):
         r"""Solve a linear system using the KLU factorization.
 
-        This method solves the linear system for :math:`x` given the right-hand side
-        :math:`b` as either a vector or a matrix with multiple right-hand sides,
+        This method solves a linear system for :math:`x` given the right-hand side
+        :math:`b` as either a vector or a matrix with multiple right-hand sides.
+
+        If ``transpose=False``, solve
 
         .. math::
             A x = b
 
-        if ``transpose=False``, or
+        or, if ``transpose=True``, solve
 
         .. math::
-            x A = b \Longleftrightarrow A^H x^H = b^H
+            x A = b \Longleftrightarrow A^{\top} x^{\top} = b^{\top}.
 
-        if ``transpose=True``, using the LU factorization of :math:`A` previously
-        computed by :meth:`.factorize`.
+        The method uses the LU factorization of :math:`A` previously computed by
+        :meth:`.factorize`.
 
         Parameters
         ----------
@@ -1804,10 +1822,24 @@ def klu_factor(A, *, KLUControl control=None, **kwargs):
 
 
 def klu_solve(A, b, *, KLUControl control=None, bint transpose=False, **kwargs):
-    """Solve a linear system using KLU.
+    r"""Solve a linear system using KLU.
 
-    This is a convenience function that creates a :class:`KLUFactor` object,
-    computes the numeric factorization, and solves the linear system.
+    This function solves a linear system for :math:`x` given the right-hand side
+    :math:`b` as either a vector or a matrix with multiple right-hand sides. 
+
+    If ``transpose=False``, solve
+
+    .. math::
+        A x = b
+
+    or, if ``transpose=True``, solve
+
+    .. math::
+        x A = b \Longleftrightarrow A^{\top} x^{\top} = b^{\top}.
+
+    This is a convenience function that creates a :class:`KLUFactor` object, computes
+    the numeric factorization, and solves the linear system with
+    :meth:`KLUFactor.solve`.
 
     Parameters
     ----------
