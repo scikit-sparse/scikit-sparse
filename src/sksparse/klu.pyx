@@ -267,8 +267,8 @@ cdef class KLUInfo:
         Number of nonzeros in the F factor ("offset").
     tol : float
         The pivot tolerance used.
-    memory : int
-        Memory usage in bytes.
+    mempeak : int
+        Peak memory usage in bytes.
     """
     noffdiag : int | None = None
     nrealloc : int | None = None
@@ -283,7 +283,7 @@ cdef class KLUInfo:
     unz : int | None = None
     nzoff : int | None = None
     tol : double | None = None
-    memory : int | None = None
+    mempeak : int | None = None
 
     cdef KLUInfo update_from_klu(
         self, klu_symbolic* symbolic, klu_numeric* numeric, klu_common* cm
@@ -299,15 +299,15 @@ cdef class KLUInfo:
             self.ordering = _get_ordering_string(cm.ordering)
             self.scale = _get_scale_string(cm.scale)
             self.tol = cm.tol
-            self.memory = <int>cm.memusage
+            self.mempeak = cm.mempeak
 
         if symbolic is not NULL:
             self.nblocks = symbolic.nblocks
 
         if numeric is not NULL:
-            self.lnz = <int>numeric.lnz
-            self.unz = <int>numeric.unz
-            self.nzoff = <int>numeric.nzoff
+            self.lnz = numeric.lnz
+            self.unz = numeric.unz
+            self.nzoff = numeric.nzoff
 
         return self
 
@@ -325,15 +325,15 @@ cdef class KLUInfo:
             self.ordering = _get_ordering_string(cm.ordering)
             self.scale = _get_scale_string(cm.scale)
             self.tol = cm.tol
-            self.memory = <int>cm.memusage
+            self.mempeak = cm.mempeak
 
         if symbolic is not NULL:
             self.nblocks = symbolic.nblocks
 
         if numeric is not NULL:
-            self.lnz = <int>numeric.lnz
-            self.unz = <int>numeric.unz
-            self.nzoff = <int>numeric.nzoff
+            self.lnz = numeric.lnz
+            self.unz = numeric.unz
+            self.nzoff = numeric.nzoff
 
         return self
 
