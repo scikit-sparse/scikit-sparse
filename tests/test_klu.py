@@ -259,12 +259,12 @@ class TestBadBShape:
 
     def test_b_KD_dense(self, f, A, N):
         b = np.empty((N - 1, N))
-        with pytest.raises(ValueError, match="same number of rows as A"):
+        with pytest.raises(ValueError, match="compatible shape with A"):
             f.solve(b)
 
     def test_b_KD_sparse(self, f, A, N):
         b = sparse.csc_array((N - 1, N))
-        with pytest.raises(ValueError, match="same number of rows as A"):
+        with pytest.raises(ValueError, match="compatible shape with A"):
             f.solve(b)
 
 
@@ -366,6 +366,7 @@ def test_nearly_singular(davis_example_qr):
 @pytest.mark.parametrize("is_sparse", [False, True], ids=["dense", "sparse"])
 def test_solve(A, K, is_sparse):
     atol = 1e-12
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
 
     # Build RHS
     N = A.shape[0]
@@ -384,12 +385,15 @@ def test_solve(A, K, is_sparse):
     # Solve the system
     b = A @ expect_x
     x = klu_solve(A, b)
+    xt = klu_solve(A.T.tocsc(), b.T, transpose=True)
 
     # Compare
     if is_sparse:
         assert_allclose(x.toarray(), expect_x.toarray(), atol=atol)
+        assert_allclose(xt.toarray(), expect_x.T.toarray(), atol=atol)
     else:
         assert_allclose(x, expect_x, atol=atol)
+        assert_allclose(xt, expect_x.T, atol=atol)
 
 
 # Test solve on "real-world" matrices
