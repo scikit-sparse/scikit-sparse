@@ -1073,11 +1073,6 @@ cdef void _cleanup_factor(CholeskyFactor cf):
             cholmod_l_finish(cf._cm)
 
 
-# Define a special internal class for copying CholeskyFactor only
-cdef class _CopySentinel:
-    pass
-
-
 cdef class CholeskyFactor:
     """The main object used for creating and manipulating a Cholesky factor.
 
@@ -1189,6 +1184,13 @@ cdef class CholeskyFactor:
     The symbolic analysis follows that of the SuiteSparse CHOLMOD ``analyze``
     MATLAB function [#analyze_c]_.
 
+    .. warning::
+    
+        Calling ``CholeskyFactor.__new__(CholeskyFactor)`` will leave the object in an
+        "unsafe" state, since the internal CHOLMOD structures will not be initialized.
+        Always use the constructor ``CholeskyFactor(...)`` to create a new object.
+
+
     References
     ----------
     .. [#analyze_c] ``analyze.c`` - CHOLMOD MATLAB analyze function
@@ -1202,7 +1204,7 @@ cdef class CholeskyFactor:
     cdef bint _is_lower
     cdef int _stype
 
-    def __cinit__(
+    def __init__(
         self,
         object A,
         *,
@@ -1211,12 +1213,6 @@ cdef class CholeskyFactor:
         object sym_kind=None,
         object supernodal_mode=None,
     ):
-        # Internal value to create an empty class during a copy
-        if A is _CopySentinel:
-            self._cm = NULL
-            self._factor = NULL
-            return
-
         A, self._use_int32, _ = validate_csc_input(A, require_square=True)
 
         if sym_kind is None:
@@ -1433,7 +1429,7 @@ cdef class CholeskyFactor:
         CholeskyFactor
             A deep copy of the CholeskyFactor object.
         """
-        cdef CholeskyFactor cf = CholeskyFactor.__new__(CholeskyFactor, _CopySentinel)
+        cdef CholeskyFactor cf = CholeskyFactor.__new__(CholeskyFactor)
 
         cf._cm = &cf._Common
 
