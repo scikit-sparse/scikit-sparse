@@ -729,7 +729,7 @@ cdef class KLUFactor:
     and determines a fill-reducing ordering such that:
 
     .. math::
-        L U + F = R^{-1} P A Q.
+        L U + F = R P A Q.
 
     The numeric factorization is not computed until :meth:`.factorize` is called.
 
@@ -1102,7 +1102,7 @@ cdef class KLUFactor:
         and determines a fill-reducing ordering such that:
 
         .. math::
-            L U + F = R^{-1} P A Q.
+            L U + F = R P A Q.
 
         If given, the matrix :math:`A` must have the same shape and nonzero pattern as
         the one used to create this :class:`KLUFactor` object, but need not have the
@@ -1654,6 +1654,9 @@ cdef class KLUFactor:
             self._L = csc_array((Lx + 1j * Lz, Li, Lp), shape=self.shape)
             self._U = csc_array((Ux + 1j * Uz, Ui, Up), shape=self.shape)
             self._F = csc_array((Fx + 1j * Fz, Fi, Fp), shape=self.shape)
+
+        # Return R as reciprocal so user doesn't have to invert it
+        np.reciprocal(self._Rs, out=self._Rs)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
