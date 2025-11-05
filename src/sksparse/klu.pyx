@@ -719,7 +719,11 @@ cdef int _copy_numeric(
     print("[_copy_numeric]: Copying Work blocks", flush=True)
     dest.Work = _malloc_copy(src.Work, src.worksize, sizeof(value_t), cm)
     dest.Xwork = dest.Work
-    dest.Iwork = <int32_t*>(<value_t*>dest.Xwork + n)
+    if dest.Xwork is NULL:
+        dest.Iwork = NULL
+    else:
+        print("[_copy_numeric]: Assigning Iwork", flush=True)
+        dest.Iwork = <int32_t*>(<value_t*>dest.Xwork + n)
 
     return 0
 
@@ -773,7 +777,10 @@ cdef int _copy_l_numeric(
     # Workspace encompasses Xwork and Iwork, so just copy Work
     dest.Work = _malloc_copy(src.Work, src.worksize, sizeof(value_t), cm)
     dest.Xwork = dest.Work
-    dest.Iwork = <int64_t*>(<value_t*>dest.Xwork + n)
+    if dest.Xwork is NULL:
+        dest.Iwork = NULL
+    else:
+        dest.Iwork = <int64_t*>(<value_t*>dest.Xwork + n)
 
     return 0
 
