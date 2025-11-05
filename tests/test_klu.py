@@ -35,10 +35,10 @@ DTYPES = [np.float64, np.complex128]
 
 
 def assert_LU_equals_A(f, A, atol=1e-15):
-    """Check that L U = P R A Q."""
+    r"""Check that L U + F = R P A Q."""
     L, U, F, p, q, r = f.L, f.U, f.F, f.perm_r, f.perm_c, f.rscale
     LUF = (L @ U + F).toarray()
-    PRinvAQ = ((1 / r)[:, np.newaxis] * A[p][:, q]).toarray()
+    PRinvAQ = (r[:, np.newaxis] * A[p][:, q]).toarray()
     assert_allclose(LUF, PRinvAQ, atol=atol, strict=True)
 
 
@@ -177,7 +177,7 @@ def test_iter(davis_example_qr):
     A = davis_example_qr
     L, U, p, q, r, F, _rblocks = klu_factor(A)
     LUF = (L @ U + F).toarray()
-    PRinvAQ = ((1 / r)[:, np.newaxis] * A[p][:, q]).toarray()
+    PRinvAQ = (r[:, np.newaxis] * A[p][:, q]).toarray()
     assert_allclose(LUF, PRinvAQ, atol=1e-15, strict=True)
 
 
