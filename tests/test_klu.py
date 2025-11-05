@@ -489,5 +489,12 @@ def test_ordering(davis_example_qr, ordering):
         assert f.info.ordering == ordering
 
 
+@pytest.mark.parametrize("ordering", ["user_perm", "user_func"])
+def test_bad_ordering(davis_example_qr, ordering):
+    A = davis_example_qr
+    with pytest.raises(NotImplementedError, match="not yet supported"):
+        klu_factor(A, ordering=ordering)
+
+
 # =============================================================================
 # =============================================================================
