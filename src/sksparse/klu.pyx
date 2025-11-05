@@ -346,7 +346,7 @@ cdef class KLUControl:
 
     Attributes
     ----------
-    tol : float
+    tol : float in [0, 1]
         The pivot tolerance. Default is ``None``, which uses the ``KLU`` default of
         ``0.001``.
     memgrow : float
@@ -391,7 +391,7 @@ cdef class KLUControl:
         double _initmem_amd
         double _initmem
         double _maxwork
-        int _btf
+        bint _btf
         int _ordering
         int _scale
 
@@ -1327,7 +1327,6 @@ cdef class KLUFactor:
         # Ensure columns are contiguous for multiple RHS
         b = np.asfortranarray(b)
 
-        # TODO allow overwrite_b=True
         # The klu_solve function overwrites the input with the output
         x = b.copy()
 
