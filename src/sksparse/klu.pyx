@@ -554,7 +554,8 @@ cdef inline void* _malloc_copy(
     const common_t* cm
 ) except NULL:
     """Allocate memory and copy data from src to the new memory."""
-    if cm is NULL:
+    assert cm is not NULL
+    if src is NULL:
         return NULL
 
     cdef void* dest
