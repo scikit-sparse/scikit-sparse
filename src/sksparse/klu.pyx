@@ -71,9 +71,7 @@ References
 """
 
 cimport cython
-cimport numpy as cnp
 
-from copy import deepcopy
 import numpy as np
 from scipy.sparse import issparse, csc_array
 import warnings
@@ -112,6 +110,16 @@ ctypedef fused value_t:
 ctypedef fused common_t:
     klu_common
     klu_l_common
+
+
+ctypedef fused symbolic_t:
+    klu_symbolic
+    klu_l_symbolic
+
+
+ctypedef fused numeric_t:
+    klu_numeric
+    klu_l_numeric
 
 
 # -------------------------------------------------------------------------------------
@@ -257,8 +265,8 @@ cdef class KLUInfo:
         Number of nonzeros in the F factor ("offset").
     tol : float
         The pivot tolerance used.
-    memory : int
-        Memory usage in bytes.
+    mempeak : int
+        Peak memory usage in bytes.
     """
     noffdiag : int | None = None
     nrealloc : int | None = None
@@ -273,7 +281,7 @@ cdef class KLUInfo:
     unz : int | None = None
     nzoff : int | None = None
     tol : double | None = None
-    memory : int | None = None
+    mempeak : int | None = None
 
     cdef KLUInfo update_from_klu(
         self, klu_symbolic* symbolic, klu_numeric* numeric, klu_common* cm
@@ -289,15 +297,15 @@ cdef class KLUInfo:
             self.ordering = _get_ordering_string(cm.ordering)
             self.scale = _get_scale_string(cm.scale)
             self.tol = cm.tol
-            self.memory = <int>cm.memusage
+            self.mempeak = cm.mempeak
 
         if symbolic is not NULL:
             self.nblocks = symbolic.nblocks
 
         if numeric is not NULL:
-            self.lnz = <int>numeric.lnz
-            self.unz = <int>numeric.unz
-            self.nzoff = <int>numeric.nzoff
+            self.lnz = numeric.lnz
+            self.unz = numeric.unz
+            self.nzoff = numeric.nzoff
 
         return self
 
@@ -315,15 +323,15 @@ cdef class KLUInfo:
             self.ordering = _get_ordering_string(cm.ordering)
             self.scale = _get_scale_string(cm.scale)
             self.tol = cm.tol
-            self.memory = <int>cm.memusage
+            self.mempeak = cm.mempeak
 
         if symbolic is not NULL:
             self.nblocks = symbolic.nblocks
 
         if numeric is not NULL:
-            self.lnz = <int>numeric.lnz
-            self.unz = <int>numeric.unz
-            self.nzoff = <int>numeric.nzoff
+            self.lnz = numeric.lnz
+            self.unz = numeric.unz
+            self.nzoff = numeric.nzoff
 
         return self
 
@@ -544,9 +552,10 @@ cdef inline void* _malloc_copy(
     size_t n,
     size_t size,
     const common_t* cm
-) except NULL:
+):
     """Allocate memory and copy data from src to the new memory."""
-    if cm is NULL:
+    assert cm is not NULL
+    if src is NULL:
         return NULL
 
     cdef void* dest
@@ -567,17 +576,37 @@ cdef inline void* _malloc_copy(
     return dest
 
 
+cdef inline void _copy_symbolic_values(
+    symbolic_t* dest,
+    const symbolic_t* src,
+) noexcept:
+    """Copy the top-level values of a KLU symbolic struct, excluding pointers."""
+    dest.symmetry = src.symmetry
+    dest.est_flops = src.est_flops
+    dest.lnz = src.lnz
+    dest.unz = src.unz
+    dest.n = src.n
+    dest.nz = src.nz
+    dest.nzoff = src.nzoff
+    dest.nblocks = src.nblocks
+    dest.maxblock = src.maxblock
+    dest.ordering = src.ordering
+    dest.do_btf = src.do_btf
+    dest.structural_rank = src.structural_rank
+
+
 cdef int _copy_symbolic(
     klu_symbolic* dest,
     const klu_symbolic* src,
     const klu_common* cm
 ) except -1:
     """Deep copy a KLU symbolic struct."""
-    if src is NULL or dest is NULL:
-        raise ValueError("Source and destination pointers must not be NULL.")
+    assert dest is not NULL
+    assert src is not NULL
+    assert cm is not NULL
 
-    # Copy the top-level data and pointers
-    memcpy(dest, src, sizeof(klu_symbolic))
+    # Copy the top-level data, but *not* pointers
+    _copy_symbolic_values(dest, src)
 
     cdef size_t n = src.n
 
@@ -596,11 +625,12 @@ cdef int _copy_l_symbolic(
     const klu_l_common* cm,
 ) except -1:
     """Deep copy a KLU symbolic struct."""
-    if src is NULL or dest is NULL:
-        raise ValueError("Source and destination pointers must not be NULL.")
+    assert dest is not NULL
+    assert src is not NULL
+    assert cm is not NULL
 
     # Copy the top-level data and pointers
-    memcpy(dest, src, sizeof(klu_l_symbolic))
+    _copy_symbolic_values(dest, src)
 
     cdef size_t n = src.n
 
@@ -613,6 +643,21 @@ cdef int _copy_l_symbolic(
     return 0
 
 
+cdef inline void _copy_numeric_values(
+    numeric_t* dest,
+    const numeric_t* src,
+) noexcept:
+    """Copy the top-level values of a KLU numeric struct, excluding pointers."""
+    dest.n = src.n
+    dest.nblocks = src.nblocks
+    dest.lnz = src.lnz
+    dest.unz = src.unz
+    dest.max_lnz_block = src.max_lnz_block
+    dest.max_unz_block = src.max_unz_block
+    dest.worksize = src.worksize
+    dest.nzoff = src.nzoff
+
+
 cdef int _copy_numeric(
     klu_numeric* dest,
     const klu_numeric* src,
@@ -620,11 +665,12 @@ cdef int _copy_numeric(
     value_t _dummy=0
 ) except -1:
     """Deep copy a KLU numeric struct."""
-    if src is NULL or dest is NULL:
-        raise ValueError("Source and destination pointers must not be NULL.")
+    assert dest is not NULL
+    assert src is not NULL
+    assert cm is not NULL
 
     # Copy the top-level data and pointers
-    memcpy(dest, src, sizeof(klu_numeric))
+    _copy_numeric_values(dest, src)
 
     cdef size_t n = src.n
     cdef size_t nblocks = src.nblocks
@@ -641,13 +687,13 @@ cdef int _copy_numeric(
 
     cdef size_t k
 
-    if src.LUbx is not NULL and nblocks > 0:
-        dest.LUbx = <void**>klu_malloc(nblocks, sizeof(value_t*), cm)
-        if dest.LUbx is not NULL:
-            for k in range(nblocks):
-                dest.LUbx[k] = <value_t*>_malloc_copy(
-                    src.LUbx[k], src.LUsize[k], sizeof(value_t), cm
-                )
+    dest.LUbx = <void**>klu_malloc(nblocks, sizeof(value_t*), cm)
+    _handle_errors(cm.status)
+    if dest.LUbx is not NULL and src.LUbx is not NULL and src.LUsize is not NULL:
+        for k in range(nblocks):
+            dest.LUbx[k] = <value_t*>_malloc_copy(
+                src.LUbx[k], src.LUsize[k], sizeof(value_t), cm
+            )
 
     cdef size_t np1 = n + 1
     cdef size_t nzoffp1 = <size_t>src.nzoff + 1
@@ -659,9 +705,10 @@ cdef int _copy_numeric(
     dest.Rs = <double*>_malloc_copy(src.Rs, n, sizeof(double), cm)
 
     # Workspace encompasses Xwork and Iwork, so just copy Work
-    dest.Work = _malloc_copy(src.Work, src.worksize, sizeof(value_t), cm)
+    dest.Work = _malloc_copy(src.Work, src.worksize, 1, cm)
     dest.Xwork = dest.Work
-    dest.Iwork = <int32_t*>(<value_t*>dest.Xwork + n)
+    if dest.Xwork is not NULL:
+        dest.Iwork = <int32_t*>(<value_t*>dest.Xwork + n)
 
     return 0
 
@@ -673,11 +720,12 @@ cdef int _copy_l_numeric(
     value_t _dummy=0
 ) except -1:
     """Deep copy a KLU numeric struct."""
-    if src is NULL or dest is NULL:
-        raise ValueError("Source and destination pointers must not be NULL.")
+    assert dest is not NULL
+    assert src is not NULL
+    assert cm is not NULL
 
     # Copy the top-level data and pointers
-    memcpy(dest, src, sizeof(klu_l_numeric))
+    _copy_numeric_values(dest, src)
 
     cdef size_t n = src.n
     cdef size_t nblocks = src.nblocks
@@ -694,13 +742,13 @@ cdef int _copy_l_numeric(
 
     cdef size_t k
 
-    if src.LUbx is not NULL and nblocks > 0:
-        dest.LUbx = <void**>klu_l_malloc(nblocks, sizeof(value_t*), cm)
-        if dest.LUbx is not NULL:
-            for k in range(nblocks):
-                dest.LUbx[k] = <value_t*>_malloc_copy(
-                    src.LUbx[k], src.LUsize[k], sizeof(value_t), cm
-                )
+    dest.LUbx = <void**>klu_l_malloc(nblocks, sizeof(value_t*), cm)
+    _handle_errors(cm.status)
+    if dest.LUbx is not NULL and src.LUbx is not NULL and src.LUsize is not NULL:
+        for k in range(nblocks):
+            dest.LUbx[k] = <value_t*>_malloc_copy(
+                src.LUbx[k], src.LUsize[k], sizeof(value_t), cm
+            )
 
     cdef size_t np1 = n + 1
     cdef size_t nzoffp1 = <size_t>src.nzoff + 1
@@ -712,9 +760,10 @@ cdef int _copy_l_numeric(
     dest.Rs = <double*>_malloc_copy(src.Rs, n, sizeof(double), cm)
 
     # Workspace encompasses Xwork and Iwork, so just copy Work
-    dest.Work = _malloc_copy(src.Work, src.worksize, sizeof(value_t), cm)
+    dest.Work = _malloc_copy(src.Work, src.worksize, 1, cm)
     dest.Xwork = dest.Work
-    dest.Iwork = <int64_t*>(<value_t*>dest.Xwork + n)
+    if dest.Xwork is not NULL:
+        dest.Iwork = <int64_t*>(<value_t*>dest.Xwork + n)
 
     return 0
 
@@ -1056,42 +1105,55 @@ cdef class KLUFactor:
         klu.dtype = self.dtype
         klu._use_int32 = self._use_int32
         klu._is_real = self._is_real
-        klu._info = deepcopy(self._info)
+        klu._info = None  # recompute info on demand TODO KLUInfo.copy()?
 
         # settings + output info
         if self._use_int32:
+            assert self._cm is not NULL
+            assert self._symbolic is not NULL
+
             klu._cm = &klu._common
             memcpy(klu._cm, self._cm, sizeof(klu_common))
 
             klu._symbolic = <klu_symbolic*>klu_malloc(1, sizeof(klu_symbolic), klu._cm)
+            _handle_errors(klu._cm.status)
             _copy_symbolic(klu._symbolic, self._symbolic, klu._cm)
 
-            klu._numeric = <klu_numeric*>klu_malloc(1, sizeof(klu_numeric), klu._cm)
-            if self._is_real:
-                _copy_numeric[double](klu._numeric, self._numeric, klu._cm)
-            else:
-                _copy_numeric[cython.doublecomplex](klu._numeric, self._numeric, klu._cm)
+            if self._numeric is not NULL:
+                klu._numeric = <klu_numeric*>klu_malloc(1, sizeof(klu_numeric), klu._cm)
+                _handle_errors(klu._cm.status)
+                if self._is_real:
+                    _copy_numeric[double](klu._numeric, self._numeric, klu._cm)
+                else:
+                    _copy_numeric[cython.doublecomplex](klu._numeric, self._numeric, klu._cm)
+
         else:
+            assert self._l_cm is not NULL
+            assert self._l_symbolic is not NULL
+
             klu._l_cm = &klu._l_common
             memcpy(klu._l_cm, self._l_cm, sizeof(klu_l_common))
 
             klu._l_symbolic = <klu_l_symbolic*>klu_l_malloc(1, sizeof(klu_l_symbolic), klu._l_cm)
+            _handle_errors(klu._l_cm.status)
             _copy_l_symbolic(klu._l_symbolic, self._l_symbolic, klu._l_cm)
 
-            klu._l_numeric = <klu_l_numeric*>klu_l_malloc(1, sizeof(klu_l_numeric), klu._l_cm)
-            if self._is_real:
-                _copy_l_numeric[double](klu._l_numeric, self._l_numeric, klu._l_cm)
-            else:
-                _copy_l_numeric[cython.doublecomplex](klu._l_numeric, self._l_numeric, klu._l_cm)
+            if self._l_numeric is not NULL:
+                klu._l_numeric = <klu_l_numeric*>klu_l_malloc(1, sizeof(klu_l_numeric), klu._l_cm)
+                _handle_errors(klu._l_cm.status)
+                if self._is_real:
+                    _copy_l_numeric[double](klu._l_numeric, self._l_numeric, klu._l_cm)
+                else:
+                    _copy_l_numeric[cython.doublecomplex](klu._l_numeric, self._l_numeric, klu._l_cm)
 
         # Cached factor objects
-        klu._L = None if self._L is None else self._L.copy()
-        klu._U = None if self._U is None else self._U.copy()
-        klu._F = None if self._F is None else self._F.copy()
-        klu._P = None if self._P is None else self._P.copy()
-        klu._Q = None if self._Q is None else self._Q.copy()
-        klu._Rs = None if self._Rs is None else self._Rs.copy()
-        klu._R = None if self._R is None else self._R.copy()
+        klu._L = self._L.copy() if self._L is not None else None
+        klu._U = self._U.copy() if self._U is not None else None
+        klu._F = self._F.copy() if self._F is not None else None
+        klu._P = self._P.copy() if self._P is not None else None
+        klu._Q = self._Q.copy() if self._Q is not None else None
+        klu._Rs = self._Rs.copy() if self._Rs is not None else None
+        klu._R = self._R.copy() if self._R is not None else None
 
         return klu
 
@@ -1216,7 +1278,6 @@ cdef class KLUFactor:
                     self._l_cm
                 )
             _handle_errors(self._l_cm.status)
-
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -1385,7 +1446,8 @@ cdef class KLUFactor:
         K : int
             The number of right-hand sides to solve.
         x : (N * K,) array_like
-            The right-hand side matrix on input, in column-oriented form, solution on output.
+            The right-hand side matrix on input, in column-oriented form, solution on
+            output.
         """
         cdef double *x_ptr = <double*>&x[0]
 
@@ -1406,7 +1468,6 @@ cdef class KLUFactor:
                 )
             _handle_errors(self._l_cm.status)
 
-
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def _tsolve(self, size_t K, value_t[::1] x):
@@ -1417,7 +1478,8 @@ cdef class KLUFactor:
         K : int
             The number of right-hand sides to solve.
         x : (N * K,) array_like
-            The right-hand side matrix on input, in column-oriented form, solution on output.
+            The right-hand side matrix on input, in column-oriented form, solution on
+            output.
         """
         cdef double *x_ptr = <double*>&x[0]
         cdef int conj_solve = True
@@ -1435,23 +1497,23 @@ cdef class KLUFactor:
             else:
                 klu_z_tsolve(
                     self._symbolic,
-				    self._numeric,
-				    self._N,
-				    K,
-				    x_ptr,
+                    self._numeric,
+                    self._N,
+                    K,
+                    x_ptr,
                     conj_solve,
-				    self._cm
+                    self._cm
                 )
             _handle_errors(self._cm.status)
         else:
             if self._is_real:
                 klu_l_tsolve(
                     self._l_symbolic,
-				    self._l_numeric,
-				    self._N,
-				    K,
-				    x_ptr,
-				    self._l_cm
+                    self._l_numeric,
+                    self._N,
+                    K,
+                    x_ptr,
+                    self._l_cm
                 )
             else:
                 klu_zl_tsolve(
@@ -1750,8 +1812,6 @@ cdef class KLUFactor:
         R : array of index_t
             The output block boundaries.
         """
-        cdef int status
-
         # Extract the numeric factorization
         if self._use_int32:
             klu_z_extract(
@@ -1828,7 +1888,7 @@ def klu_solve(A, b, *, KLUControl control=None, bint transpose=False, **kwargs):
     r"""Solve a linear system using KLU.
 
     This function solves a linear system for :math:`x` given the right-hand side
-    :math:`b` as either a vector or a matrix with multiple right-hand sides. 
+    :math:`b` as either a vector or a matrix with multiple right-hand sides.
 
     If ``transpose=False``, solve
 

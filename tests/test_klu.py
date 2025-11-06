@@ -190,6 +190,26 @@ test_As = [
 ]
 
 
+@pytest.mark.parametrize("itype", ITYPES)
+@pytest.mark.parametrize("A", test_As)
+def test_copy_symbolic(A, itype):
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+    A.indptr = A.indptr.astype(itype)
+    A.indices = A.indices.astype(itype)
+    f = KLUFactor(A)
+    g = f.copy()
+    assert g is not f
+    assert g.shape == f.shape
+    assert g.itype == f.itype
+    assert g.dtype == f.dtype
+    assert g.info == f.info
+    # Test that numeric factorization can be done on the copy
+    f.factorize(A)
+    g.factorize(A)
+    assert_LU_equals_A(f, A, atol=1e-12)
+    assert_LU_equals_A(g, A, atol=1e-12)
+
+
 @pytest.mark.parametrize("copy", [False, True])
 @pytest.mark.parametrize("itype", ITYPES)
 @pytest.mark.parametrize("A", test_As)
@@ -452,7 +472,7 @@ def test_info(davis_example_qr):
     assert info.unz == 17
     assert info.nzoff == 0
     assert info.tol == 0.001
-    assert info.memory != 0  # number varies with system
+    assert info.mempeak != 0  # number varies with system
 
 
 @pytest.mark.parametrize("scale", [None, "none_no_check", "none", "sum", "max"])
