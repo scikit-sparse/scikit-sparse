@@ -20,6 +20,7 @@ from scipy import sparse
 from scipy.io import mmread
 
 from sksparse.klu import (
+    KLUControl,
     KLUError,
     KLUFactor,
     KLUInvalidError,
@@ -514,6 +515,48 @@ def test_bad_ordering(davis_example_qr, ordering):
     A = davis_example_qr
     with pytest.raises(NotImplementedError, match="not yet supported"):
         klu_factor(A, ordering=ordering)
+
+
+def test_bad_control_tol():
+    c = KLUControl()
+    match_str = r"tol must be a float in the range \[0, 1\]"
+    with pytest.raises(ValueError, match=match_str):
+        c.tol = -0.1
+    with pytest.raises(ValueError, match=match_str):
+        c.tol = 10
+    with pytest.raises(ValueError, match=match_str):
+        c.tol = "invalid"
+
+
+def test_bad_control_memgrow():
+    c = KLUControl()
+    match_str = "memgrow must be a float greater than 1.0"
+    with pytest.raises(ValueError, match=match_str):
+        c.memgrow = -1
+    with pytest.raises(ValueError, match=match_str):
+        c.memgrow = 0.5
+    with pytest.raises(ValueError, match=match_str):
+        c.memgrow = "invalid"
+
+
+def test_bad_control_initmem_amd():
+    c = KLUControl()
+    match_str = "initmem_amd must be a float greater than 1.0"
+    with pytest.raises(ValueError, match=match_str):
+        c.initmem_amd = -1
+    with pytest.raises(ValueError, match=match_str):
+        c.initmem_amd = 0.5
+    with pytest.raises(ValueError, match=match_str):
+        c.initmem_amd = "invalid"
+
+
+def test_bad_control_initmem():
+    c = KLUControl()
+    match_str = "initmem must be a float greater than 0.0"
+    with pytest.raises(ValueError, match=match_str):
+        c.initmem = -1
+    with pytest.raises(ValueError, match=match_str):
+        c.initmem = "invalid"
 
 
 # =============================================================================
