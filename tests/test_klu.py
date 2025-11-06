@@ -226,12 +226,9 @@ def test_refactor(A, itype, copy):
     B.data = rng.random(len(B.data)).astype(dtype=B.dtype)
     # Factor the new matrix with the same sparsity pattern
     if copy:
-        print("[test_refactor]: Copying factorization", flush=True)
         g = f.copy()
         assert g is not f
-        print("[test_refactor]: Refactorizing copied factorization", flush=True)
         g.factorize(B)
-        print("[test_refactor]: Testing L U equals A for copied factorization", flush=True)
         assert_LU_equals_A(g, B, atol=atol)
     else:
         f.factorize(B)
