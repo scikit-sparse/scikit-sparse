@@ -696,14 +696,14 @@ cdef int _copy_numeric(
         print(f"[_copy_numeric]: LUsize[{k}] = {dest.LUsize[k]}", flush=True)
 
     print("[_copy_numeric]: Copying LUbx blocks", flush=True)
-    if src.LUbx is not NULL:
-        dest.LUbx = <void**>klu_malloc(nblocks, sizeof(value_t*), cm)
-        if dest.LUbx is not NULL:
-            for k in range(nblocks):
-                print(f"[_copy_numeric]: Copying LUbx block[{k}] of size {dest.LUsize[k]}", flush=True)
-                dest.LUbx[k] = <value_t*>_malloc_copy(
-                    src.LUbx[k], src.LUsize[k], sizeof(value_t), cm
-                )
+    dest.LUbx = <void**>klu_malloc(nblocks, sizeof(value_t*), cm)
+    _handle_errors(cm.status)
+    if dest.LUbx is not NULL and src.LUbx is not NULL:
+        for k in range(nblocks):
+            print(f"[_copy_numeric]: Copying LUbx block[{k}] of size {dest.LUsize[k]}", flush=True)
+            dest.LUbx[k] = <value_t*>_malloc_copy(
+                src.LUbx[k], src.LUsize[k], sizeof(value_t), cm
+            )
 
     cdef size_t np1 = n + 1
     cdef size_t nzoffp1 = <size_t>src.nzoff + 1
@@ -757,13 +757,13 @@ cdef int _copy_l_numeric(
 
     cdef size_t k
 
-    if src.LUbx is not NULL:
-        dest.LUbx = <void**>klu_l_malloc(nblocks, sizeof(value_t*), cm)
-        if dest.LUbx is not NULL:
-            for k in range(nblocks):
-                dest.LUbx[k] = <value_t*>_malloc_copy(
-                    src.LUbx[k], src.LUsize[k], sizeof(value_t), cm
-                )
+    dest.LUbx = <void**>klu_l_malloc(nblocks, sizeof(value_t*), cm)
+    _handle_errors(cm.status)
+    if dest.LUbx is not NULL and src.LUbx is not NULL:
+        for k in range(nblocks):
+            dest.LUbx[k] = <value_t*>_malloc_copy(
+                src.LUbx[k], src.LUsize[k], sizeof(value_t), cm
+            )
 
     cdef size_t np1 = n + 1
     cdef size_t nzoffp1 = <size_t>src.nzoff + 1
@@ -1135,10 +1135,12 @@ cdef class KLUFactor:
 
             print("[KLUFactor.copy]: Copying symbolic struct", flush=True)
             klu._symbolic = <klu_symbolic*>klu_malloc(1, sizeof(klu_symbolic), klu._cm)
+            _handle_errors(klu._cm.status)
             _copy_symbolic(klu._symbolic, self._symbolic, klu._cm)
 
             if self._numeric is not NULL:
                 klu._numeric = <klu_numeric*>klu_malloc(1, sizeof(klu_numeric), klu._cm)
+                _handle_errors(klu._cm.status)
                 if self._is_real:
                     print("[KLUFactor.copy]: Copying real numeric struct", flush=True)
                     _copy_numeric[double](klu._numeric, self._numeric, klu._cm)
@@ -1154,10 +1156,12 @@ cdef class KLUFactor:
             memcpy(klu._l_cm, self._l_cm, sizeof(klu_l_common))
 
             klu._l_symbolic = <klu_l_symbolic*>klu_l_malloc(1, sizeof(klu_l_symbolic), klu._l_cm)
+            _handle_errors(klu._l_cm.status)
             _copy_l_symbolic(klu._l_symbolic, self._l_symbolic, klu._l_cm)
 
             if self._l_numeric is not NULL:
                 klu._l_numeric = <klu_l_numeric*>klu_l_malloc(1, sizeof(klu_l_numeric), klu._l_cm)
+                _handle_errors(klu._l_cm.status)
                 if self._is_real:
                     _copy_l_numeric[double](klu._l_numeric, self._l_numeric, klu._l_cm)
                 else:
