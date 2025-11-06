@@ -123,6 +123,11 @@ ctypedef fused numeric_t:
     klu_l_numeric
 
 
+ctypedef fused ctrl_t:
+    int
+    double
+
+
 # -------------------------------------------------------------------------------------
 #         Warnings and Errors
 # -------------------------------------------------------------------------------------
@@ -545,6 +550,10 @@ cdef class KLUControl:
         return self.__repr__()
 
 
+cdef inline void _set_if_not_none(ctrl_t *dest, ctrl_t src, ctrl_t none_value) noexcept:
+    """Set a pointer if the source is not equal to none_value."""
+    dest[0] = dest[0] if src == none_value else src
+
 # -------------------------------------------------------------------------------------
 #         Copy Functions
 # -------------------------------------------------------------------------------------
@@ -862,23 +871,23 @@ cdef class KLUFactor:
         cdef int _INONE = control._INT_NONE
 
         if self._use_int32:
-            self._cm.tol         = self._cm.tol if control._tol is _FNONE else control._tol
-            self._cm.memgrow     = self._cm.memgrow if control._memgrow is _FNONE else control._memgrow
-            self._cm.initmem_amd = self._cm.initmem_amd if control._initmem_amd is _FNONE else control._initmem_amd
-            self._cm.initmem     = self._cm.initmem if control._initmem is _FNONE else control._initmem
-            self._cm.maxwork     = self._cm.maxwork if control._maxwork is _FNONE else control._maxwork
-            self._cm.btf         = self._cm.btf if control._btf is _INONE else control._btf
-            self._cm.ordering    = self._cm.ordering if control._ordering is _INONE else control._ordering
-            self._cm.scale       = self._cm.scale if control._scale is _INONE else control._scale
+            _set_if_not_none(&self._cm.tol, control._tol, _FNONE)
+            _set_if_not_none(&self._cm.memgrow, control._memgrow, _FNONE)
+            _set_if_not_none(&self._cm.initmem_amd, control._initmem_amd, _FNONE)
+            _set_if_not_none(&self._cm.initmem, control._initmem, _FNONE)
+            _set_if_not_none(&self._cm.maxwork, control._maxwork, _FNONE)
+            _set_if_not_none(&self._cm.btf, control._btf, _INONE)
+            _set_if_not_none(&self._cm.ordering, control._ordering, _INONE)
+            _set_if_not_none(&self._cm.scale, control._scale, _INONE)
         else:
-            self._l_cm.tol         = self._l_cm.tol if control._tol is _FNONE else control._tol
-            self._l_cm.memgrow     = self._l_cm.memgrow if control._memgrow is _FNONE else control._memgrow
-            self._l_cm.initmem_amd = self._l_cm.initmem_amd if control._initmem_amd is _FNONE else control._initmem_amd
-            self._l_cm.initmem     = self._l_cm.initmem if control._initmem is _FNONE else control._initmem
-            self._l_cm.maxwork     = self._l_cm.maxwork if control._maxwork is _FNONE else control._maxwork
-            self._l_cm.btf         = self._l_cm.btf if control._btf is _INONE else control._btf
-            self._l_cm.ordering    = self._l_cm.ordering if control._ordering is _INONE else control._ordering
-            self._l_cm.scale       = self._l_cm.scale if control._scale is _INONE else control._scale
+            _set_if_not_none(&self._l_cm.tol, control._tol, _FNONE)
+            _set_if_not_none(&self._l_cm.memgrow, control._memgrow, _FNONE)
+            _set_if_not_none(&self._l_cm.initmem_amd, control._initmem_amd, _FNONE)
+            _set_if_not_none(&self._l_cm.initmem, control._initmem, _FNONE)
+            _set_if_not_none(&self._l_cm.maxwork, control._maxwork, _FNONE)
+            _set_if_not_none(&self._l_cm.btf, control._btf, _INONE)
+            _set_if_not_none(&self._l_cm.ordering, control._ordering, _INONE)
+            _set_if_not_none(&self._l_cm.scale, control._scale, _INONE)
 
         return 0
 
