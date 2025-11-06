@@ -556,6 +556,7 @@ cdef inline void* _malloc_copy(
     """Allocate memory and copy data from src to the new memory."""
     assert cm is not NULL
     if src is NULL:
+        print("    [_malloc_copy]: Source is NULL, returning NULL", flush=True)
         return NULL
 
     cdef void* dest
@@ -571,6 +572,7 @@ cdef inline void* _malloc_copy(
         return NULL
 
     if n > 0:
+        print(f"    [_malloc_copy]: Copying data of size {n=}", flush=True)
         memcpy(dest, src, n * size)
 
     return dest
