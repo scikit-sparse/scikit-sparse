@@ -52,7 +52,7 @@ jobs:
         run:  ruff check
 
       - name: Test with pytest
-        run: PYTHONFAULTHANDLER=1 pytest -v -s
+        run: pytest -v -s
 
       - name: Build Docs
         run: |
