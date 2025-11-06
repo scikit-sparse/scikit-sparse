@@ -447,14 +447,20 @@ cdef class KLUControl:
                     f"Expected one of {self.__dict__.keys()}"
                 )
 
-    # TODO add validation in setters (like 0 <= tol <= 1)
     @property
     def tol(self):
         return None if self._tol == self._FLOAT_NONE else self._tol
 
     @tol.setter
     def tol(self, value):
-        self._tol = value if value is not None else self._FLOAT_NONE
+        if value is None:
+            self._tol = self._FLOAT_NONE
+        else:
+            try:
+                assert 0.0 <= value <= 1.0
+            except (AssertionError, TypeError):
+                raise ValueError("tol must be a float in the range [0, 1].")
+            self._tol = value
 
     @property
     def memgrow(self):
@@ -462,7 +468,14 @@ cdef class KLUControl:
 
     @memgrow.setter
     def memgrow(self, value):
-        self._memgrow = value if value is not None else self._FLOAT_NONE
+        if value is None:
+            self._memgrow = self._FLOAT_NONE
+        else:
+            try:
+                assert value > 1.0
+            except (AssertionError, TypeError):
+                raise ValueError("memgrow must be a float greater than 1.0.")
+            self._memgrow = value
 
     @property
     def initmem_amd(self):
@@ -470,7 +483,14 @@ cdef class KLUControl:
 
     @initmem_amd.setter
     def initmem_amd(self, value):
-        self._initmem_amd = value if value is not None else self._FLOAT_NONE
+        if value is None:
+            self._initmem_amd = self._FLOAT_NONE
+        else:
+            try:
+                assert value > 1.0
+            except (AssertionError, TypeError):
+                raise ValueError("initmem_amd must be a float greater than 1.0.")
+            self._initmem_amd = value
 
     @property
     def initmem(self):
@@ -478,7 +498,14 @@ cdef class KLUControl:
 
     @initmem.setter
     def initmem(self, value):
-        self._initmem = value if value is not None else self._FLOAT_NONE
+        if value is None:
+            self._initmem = self._FLOAT_NONE
+        else:
+            try:
+                assert value > 0.0
+            except (AssertionError, TypeError):
+                raise ValueError("initmem must be a float greater than 0.0.")
+            self._initmem = value
 
     @property
     def maxwork(self):
