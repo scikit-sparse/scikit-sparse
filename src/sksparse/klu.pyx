@@ -72,6 +72,7 @@ References
 
 cimport cython
 
+from copy import deepcopy
 import numpy as np
 from scipy.sparse import issparse, csc_array
 import warnings
@@ -1093,7 +1094,7 @@ cdef class KLUFactor:
         klu.dtype = self.dtype
         klu._use_int32 = self._use_int32
         klu._is_real = self._is_real
-        klu._info = None  # recompute info on demand TODO KLUInfo.copy()?
+        klu._info = deepcopy(self._info)
 
         # settings + output info
         if self._use_int32:
