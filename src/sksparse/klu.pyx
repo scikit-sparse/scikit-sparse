@@ -602,8 +602,9 @@ cdef int _copy_symbolic(
     const klu_common* cm
 ) except -1:
     """Deep copy a KLU symbolic struct."""
-    if src is NULL or dest is NULL:
-        raise ValueError("Source and destination pointers must not be NULL.")
+    assert dest is not NULL
+    assert src is not NULL
+    assert cm is not NULL
 
     # Copy the top-level data, but *not* pointers
     print("[_copy_symbolic]: Copying symbolic struct", flush=True)
@@ -627,8 +628,9 @@ cdef int _copy_l_symbolic(
     const klu_l_common* cm,
 ) except -1:
     """Deep copy a KLU symbolic struct."""
-    if src is NULL or dest is NULL:
-        raise ValueError("Source and destination pointers must not be NULL.")
+    assert dest is not NULL
+    assert src is not NULL
+    assert cm is not NULL
 
     # Copy the top-level data and pointers
     _copy_symbolic_values(dest, src)
@@ -666,8 +668,9 @@ cdef int _copy_numeric(
     value_t _dummy=0
 ) except -1:
     """Deep copy a KLU numeric struct."""
-    if src is NULL or dest is NULL:
-        raise ValueError("Source and destination pointers must not be NULL.")
+    assert dest is not NULL
+    assert src is not NULL
+    assert cm is not NULL
 
     # Copy the top-level data and pointers
     print("[_copy_numeric]: Copying numeric struct", flush=True)
@@ -730,8 +733,9 @@ cdef int _copy_l_numeric(
     value_t _dummy=0
 ) except -1:
     """Deep copy a KLU numeric struct."""
-    if src is NULL or dest is NULL:
-        raise ValueError("Source and destination pointers must not be NULL.")
+    assert dest is not NULL
+    assert src is not NULL
+    assert cm is not NULL
 
     # Copy the top-level data and pointers
     _copy_numeric_values(dest, src)
@@ -1113,10 +1117,13 @@ cdef class KLUFactor:
         klu.dtype = self.dtype
         klu._use_int32 = self._use_int32
         klu._is_real = self._is_real
-        klu._info = deepcopy(self._info)
+        klu._info = None  # recompute info on demand
 
         # settings + output info
         if self._use_int32:
+            assert self._cm is not NULL
+            assert self._symbolic is not NULL
+
             print("[KLUFactor.copy]: Copying common struct", flush=True)
             klu._cm = &klu._common
             memcpy(klu._cm, self._cm, sizeof(klu_common))
@@ -1125,25 +1132,31 @@ cdef class KLUFactor:
             klu._symbolic = <klu_symbolic*>klu_malloc(1, sizeof(klu_symbolic), klu._cm)
             _copy_symbolic(klu._symbolic, self._symbolic, klu._cm)
 
-            klu._numeric = <klu_numeric*>klu_malloc(1, sizeof(klu_numeric), klu._cm)
-            if self._is_real:
-                print("[KLUFactor.copy]: Copying real numeric struct", flush=True)
-                _copy_numeric[double](klu._numeric, self._numeric, klu._cm)
-            else:
-                print("[KLUFactor.copy]: Copying complex numeric struct", flush=True)
-                _copy_numeric[cython.doublecomplex](klu._numeric, self._numeric, klu._cm)
+            if self._numeric is not NULL:
+                klu._numeric = <klu_numeric*>klu_malloc(1, sizeof(klu_numeric), klu._cm)
+                if self._is_real:
+                    print("[KLUFactor.copy]: Copying real numeric struct", flush=True)
+                    _copy_numeric[double](klu._numeric, self._numeric, klu._cm)
+                else:
+                    print("[KLUFactor.copy]: Copying complex numeric struct", flush=True)
+                    _copy_numeric[cython.doublecomplex](klu._numeric, self._numeric, klu._cm)
+
         else:
+            assert self._l_cm is not NULL
+            assert self._l_symbolic is not NULL
+
             klu._l_cm = &klu._l_common
             memcpy(klu._l_cm, self._l_cm, sizeof(klu_l_common))
 
             klu._l_symbolic = <klu_l_symbolic*>klu_l_malloc(1, sizeof(klu_l_symbolic), klu._l_cm)
             _copy_l_symbolic(klu._l_symbolic, self._l_symbolic, klu._l_cm)
 
-            klu._l_numeric = <klu_l_numeric*>klu_l_malloc(1, sizeof(klu_l_numeric), klu._l_cm)
-            if self._is_real:
-                _copy_l_numeric[double](klu._l_numeric, self._l_numeric, klu._l_cm)
-            else:
-                _copy_l_numeric[cython.doublecomplex](klu._l_numeric, self._l_numeric, klu._l_cm)
+            if self._l_numeric is not NULL:
+                klu._l_numeric = <klu_l_numeric*>klu_l_malloc(1, sizeof(klu_l_numeric), klu._l_cm)
+                if self._is_real:
+                    _copy_l_numeric[double](klu._l_numeric, self._l_numeric, klu._l_cm)
+                else:
+                    _copy_l_numeric[cython.doublecomplex](klu._l_numeric, self._l_numeric, klu._l_cm)
 
         # Cached factor objects
         klu._L = None if self._L is None else self._L.copy()

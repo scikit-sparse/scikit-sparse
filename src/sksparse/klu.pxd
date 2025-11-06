@@ -34,7 +34,7 @@ cdef extern from "klu.h":
         int ordering
         int scale
         # user_order_func* user_order  # TODO
-        void *user_data
+        # void *user_data
         int halt_if_singular
         int status
         int nrealloc
@@ -60,7 +60,7 @@ cdef extern from "klu.h":
         int ordering
         int scale
         # user_order_func* user_order  # TODO
-        void *user_data
+        # void *user_data
         int halt_if_singular
         int status
         int nrealloc
