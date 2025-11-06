@@ -203,6 +203,11 @@ def test_copy_symbolic(A, itype):
     assert g.itype == f.itype
     assert g.dtype == f.dtype
     assert g.info == f.info
+    # Test that numeric factorization can be done on the copy
+    f.factorize(A)
+    g.factorize(A)
+    assert_LU_equals_A(f, A, atol=1e-12)
+    assert_LU_equals_A(g, A, atol=1e-12)
 
 
 @pytest.mark.parametrize("copy", [False, True])
