@@ -552,7 +552,7 @@ cdef inline void* _malloc_copy(
     size_t n,
     size_t size,
     const common_t* cm
-) except NULL:
+):
     """Allocate memory and copy data from src to the new memory."""
     assert cm is not NULL
     if src is NULL:
@@ -699,7 +699,7 @@ cdef int _copy_numeric(
     print("[_copy_numeric]: Copying LUbx blocks", flush=True)
     dest.LUbx = <void**>klu_malloc(nblocks, sizeof(value_t*), cm)
     _handle_errors(cm.status)
-    if dest.LUbx is not NULL and src.LUbx is not NULL:
+    if dest.LUbx is not NULL and src.LUbx is not NULL and src.LUsize is not NULL:
         for k in range(nblocks):
             print(f"[_copy_numeric]: Copying LUbx block[{k}] of size {dest.LUsize[k]}", flush=True)
             dest.LUbx[k] = <value_t*>_malloc_copy(
@@ -758,7 +758,7 @@ cdef int _copy_l_numeric(
 
     dest.LUbx = <void**>klu_l_malloc(nblocks, sizeof(value_t*), cm)
     _handle_errors(cm.status)
-    if dest.LUbx is not NULL and src.LUbx is not NULL:
+    if dest.LUbx is not NULL and src.LUbx is not NULL and src.LUsize is not NULL:
         for k in range(nblocks):
             dest.LUbx[k] = <value_t*>_malloc_copy(
                 src.LUbx[k], src.LUsize[k], sizeof(value_t), cm
