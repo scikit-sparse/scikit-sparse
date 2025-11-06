@@ -621,9 +621,13 @@ cdef int _copy_symbolic_base(
     # only some are valid, so this statement will create unreachable code that then
     # gets pruned away.
     if not (
-        (symbolic_t is klu_symbolic and common_t is klu_common and index_t is int32_t)
+        (symbolic_t is klu_symbolic and
+         common_t is klu_common and
+         index_t is int32_t)
         or
-        (symbolic_t is klu_l_symbolic and common_t is klu_l_common and index_t is int64_t)
+        (symbolic_t is klu_l_symbolic and
+         common_t is klu_l_common and
+         index_t is int64_t)
     ):
         assert False
         return 0
@@ -686,9 +690,13 @@ cdef int _copy_numeric_base(
     # only some are valid, so this statement will create unreachable code that then
     # gets pruned away.
     if not (
-        (numeric_t is klu_numeric and common_t is klu_common and index_t is int32_t)
+        (numeric_t is klu_numeric and
+         common_t is klu_common and
+         index_t is int32_t)
         or
-        (numeric_t is klu_l_numeric and common_t is klu_l_common and index_t is int64_t)
+        (numeric_t is klu_l_numeric and
+         common_t is klu_l_common and
+         index_t is int64_t)
     ):
         assert False
         return 0
@@ -1128,12 +1136,16 @@ cdef class KLUFactor:
             klu._l_cm = &klu._l_common
             memcpy(klu._l_cm, self._l_cm, sizeof(klu_l_common))
 
-            klu._l_symbolic = <klu_l_symbolic*>klu_l_malloc(1, sizeof(klu_l_symbolic), klu._l_cm)
+            klu._l_symbolic = <klu_l_symbolic*>klu_l_malloc(
+                1, sizeof(klu_l_symbolic), klu._l_cm
+            )
             _handle_errors(klu._l_cm.status)
             _copy_symbolic(klu._l_symbolic, self._l_symbolic, klu._l_cm)
 
             if self._l_numeric is not NULL:
-                klu._l_numeric = <klu_l_numeric*>klu_l_malloc(1, sizeof(klu_l_numeric), klu._l_cm)
+                klu._l_numeric = <klu_l_numeric*>klu_l_malloc(
+                    1, sizeof(klu_l_numeric), klu._l_cm
+                )
                 _handle_errors(klu._l_cm.status)
                 _copy_numeric(klu._l_numeric, self._l_numeric, klu._l_cm, self._is_real)
 
@@ -1375,7 +1387,7 @@ cdef class KLUFactor:
             raise ValueError("b must be a 1D or 2D array.")
 
         cdef bint return_1D = b.ndim == 1
-        cdef size_t N = b.shape[0] if b.ndim == 1 else (b.shape[1] if transpose else b.shape[0])
+        cdef size_t N = b.shape[0] if (b.ndim == 1 or not transpose) else b.shape[1]
         cdef size_t K = 1 if b.ndim == 1 else (b.shape[0] if transpose else b.shape[1])
 
         if N != self._N:
