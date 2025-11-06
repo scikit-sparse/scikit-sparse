@@ -581,7 +581,7 @@ cdef inline void* _malloc_copy(
 cdef inline void _copy_symbolic_values(
     symbolic_t* dest,
     const symbolic_t* src,
-):
+) noexcept:
     """Copy the top-level values of a KLU symbolic struct, excluding pointers."""
     dest.symmetry = src.symmetry
     dest.est_flops = src.est_flops
@@ -650,7 +650,7 @@ cdef int _copy_l_symbolic(
 cdef inline void _copy_numeric_values(
     numeric_t* dest,
     const numeric_t* src,
-):
+) noexcept:
     """Copy the top-level values of a KLU numeric struct, excluding pointers."""
     dest.n = src.n
     dest.nblocks = src.nblocks
