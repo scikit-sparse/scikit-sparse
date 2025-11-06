@@ -595,15 +595,28 @@ cdef inline void _copy_symbolic_values(
     dest.structural_rank = src.structural_rank
 
 
-cdef int _copy_symbolic(
-    klu_symbolic* dest,
-    const klu_symbolic* src,
-    const klu_common* cm
+cdef int _copy_symbolic_base(
+    symbolic_t* dest,
+    const symbolic_t* src,
+    const common_t* cm,
+    index_t _dummy=0
 ) except -1:
     """Deep copy a KLU symbolic struct."""
     assert dest is not NULL
     assert src is not NULL
     assert cm is not NULL
+
+    # Check for bad type combos to prune the fused types before compilation
+    # The compiler will generate *all* combinations of the fused type arguments, but
+    # only some are valid, so this statement will create unreachable code that then
+    # gets pruned away.
+    if not (
+        (symbolic_t is klu_symbolic and common_t is klu_common and index_t is int32_t)
+        or
+        (symbolic_t is klu_l_symbolic and common_t is klu_l_common and index_t is int64_t)
+    ):
+        assert False
+        return 0
 
     # Copy the top-level data, but *not* pointers
     _copy_symbolic_values(dest, src)
@@ -612,35 +625,23 @@ cdef int _copy_symbolic(
 
     # Deep copy internal arrays
     dest.Lnz = <double*>_malloc_copy(src.Lnz, n, sizeof(double), cm)
-    dest.P = <int32_t*>_malloc_copy(src.P, n, sizeof(int32_t), cm)
-    dest.Q = <int32_t*>_malloc_copy(src.Q, n, sizeof(int32_t), cm)
-    dest.R = <int32_t*>_malloc_copy(src.R, n + 1, sizeof(int32_t), cm)
+    dest.P = <index_t*>_malloc_copy(src.P, n, sizeof(index_t), cm)
+    dest.Q = <index_t*>_malloc_copy(src.Q, n, sizeof(index_t), cm)
+    dest.R = <index_t*>_malloc_copy(src.R, n + 1, sizeof(index_t), cm)
 
     return 0
 
 
-cdef int _copy_l_symbolic(
-    klu_l_symbolic* dest,
-    const klu_l_symbolic* src,
-    const klu_l_common* cm,
+cdef int _copy_symbolic(
+    symbolic_t* dest,
+    const symbolic_t* src,
+    const common_t* cm
 ) except -1:
     """Deep copy a KLU symbolic struct."""
-    assert dest is not NULL
-    assert src is not NULL
-    assert cm is not NULL
-
-    # Copy the top-level data and pointers
-    _copy_symbolic_values(dest, src)
-
-    cdef size_t n = src.n
-
-    # Deep copy internal arrays
-    dest.Lnz = <double*>_malloc_copy(src.Lnz, n, sizeof(double), cm)
-    dest.P = <int64_t*>_malloc_copy(src.P, n, sizeof(int64_t), cm)
-    dest.Q = <int64_t*>_malloc_copy(src.Q, n, sizeof(int64_t), cm)
-    dest.R = <int64_t*>_malloc_copy(src.R, n + 1, sizeof(int64_t), cm)
-
-    return 0
+    if symbolic_t is klu_symbolic:
+        return _copy_symbolic_base(dest, src, cm, <int32_t>0)
+    else:
+        return _copy_symbolic_base(dest, src, cm, <int64_t>0)
 
 
 cdef inline void _copy_numeric_values(
@@ -658,114 +659,101 @@ cdef inline void _copy_numeric_values(
     dest.nzoff = src.nzoff
 
 
+cdef int _copy_numeric_base(
+    numeric_t* dest,
+    const numeric_t* src,
+    const common_t* cm,
+    index_t _dummy_int=0,
+    value_t _dummy_val=0
+) except -1:
+    """Deep copy a KLU numeric struct."""
+    assert dest is not NULL
+    assert src is not NULL
+    assert cm is not NULL
+
+    # Check for bad type combos to prune the fused types before compilation
+    # The compiler will generate *all* combinations of the fused type arguments, but
+    # only some are valid, so this statement will create unreachable code that then
+    # gets pruned away.
+    if not (
+        (numeric_t is klu_numeric and common_t is klu_common and index_t is int32_t)
+        or
+        (numeric_t is klu_l_numeric and common_t is klu_l_common and index_t is int64_t)
+    ):
+        assert False
+        return 0
+
+    # Copy the top-level data and pointers
+    _copy_numeric_values(dest, src)
+
+    cdef size_t n = src.n
+    cdef size_t nblocks = src.nblocks
+
+    # Deep copy internal arrays
+    dest.Pnum = <index_t*>_malloc_copy(src.Pnum, n, sizeof(index_t), cm)
+    dest.Pinv = <index_t*>_malloc_copy(src.Pinv, n, sizeof(index_t), cm)
+    dest.Lip = <index_t*>_malloc_copy(src.Lip, n, sizeof(index_t), cm)
+    dest.Uip = <index_t*>_malloc_copy(src.Uip, n, sizeof(index_t), cm)
+    dest.Llen = <index_t*>_malloc_copy(src.Llen, n, sizeof(index_t), cm)
+    dest.Ulen = <index_t*>_malloc_copy(src.Ulen, n, sizeof(index_t), cm)
+    dest.Udiag = <value_t*>_malloc_copy(src.Udiag, n, sizeof(value_t), cm)
+    dest.LUsize = <size_t*>_malloc_copy(src.LUsize, nblocks, sizeof(size_t), cm)
+
+    if numeric_t is klu_numeric:
+        dest.LUbx = <void**>klu_malloc(nblocks, sizeof(value_t*), cm)
+    else:
+        dest.LUbx = <void**>klu_l_malloc(nblocks, sizeof(value_t*), cm)
+
+    _handle_errors(cm.status)
+
+    cdef size_t k
+
+    if dest.LUbx is not NULL and src.LUbx is not NULL and src.LUsize is not NULL:
+        for k in range(nblocks):
+            dest.LUbx[k] = <value_t*>_malloc_copy(
+                src.LUbx[k], src.LUsize[k], sizeof(value_t), cm
+            )
+
+    cdef size_t np1 = n + 1
+    cdef size_t nzoffp1 = <size_t>src.nzoff + 1
+
+    dest.Offp = <index_t*>_malloc_copy(src.Offp, np1, sizeof(index_t), cm)
+    dest.Offi = <index_t*>_malloc_copy(src.Offi, nzoffp1, sizeof(index_t), cm)
+    dest.Offx = <value_t*>_malloc_copy(src.Offx, nzoffp1, sizeof(value_t), cm)
+
+    dest.Rs = <double*>_malloc_copy(src.Rs, n, sizeof(double), cm)
+
+    # Workspace encompasses Xwork and Iwork, so just copy Work
+    dest.Work = _malloc_copy(src.Work, src.worksize, 1, cm)
+    dest.Xwork = dest.Work
+    if dest.Xwork is not NULL:
+        dest.Iwork = <index_t*>(<value_t*>dest.Xwork + n)
+
+    return 0
+
+
 cdef int _copy_numeric(
-    klu_numeric* dest,
-    const klu_numeric* src,
-    const klu_common* cm,
-    value_t _dummy=0
+    numeric_t* dest,
+    const numeric_t* src,
+    const common_t* cm,
+    bint is_real
 ) except -1:
     """Deep copy a KLU numeric struct."""
-    assert dest is not NULL
-    assert src is not NULL
-    assert cm is not NULL
+    cdef int32_t idx = 0
+    cdef int64_t l_idx = 0
+    cdef double val = 0
+    cdef double complex c_val = 0
 
-    # Copy the top-level data and pointers
-    _copy_numeric_values(dest, src)
-
-    cdef size_t n = src.n
-    cdef size_t nblocks = src.nblocks
-
-    # Deep copy internal arrays
-    dest.Pnum = <int32_t*>_malloc_copy(src.Pnum, n, sizeof(int32_t), cm)
-    dest.Pinv = <int32_t*>_malloc_copy(src.Pinv, n, sizeof(int32_t), cm)
-    dest.Lip = <int32_t*>_malloc_copy(src.Lip, n, sizeof(int32_t), cm)
-    dest.Uip = <int32_t*>_malloc_copy(src.Uip, n, sizeof(int32_t), cm)
-    dest.Llen = <int32_t*>_malloc_copy(src.Llen, n, sizeof(int32_t), cm)
-    dest.Ulen = <int32_t*>_malloc_copy(src.Ulen, n, sizeof(int32_t), cm)
-    dest.Udiag = <value_t*>_malloc_copy(src.Udiag, n, sizeof(value_t), cm)
-    dest.LUsize = <size_t*>_malloc_copy(src.LUsize, nblocks, sizeof(size_t), cm)
-
-    cdef size_t k
-
-    dest.LUbx = <void**>klu_malloc(nblocks, sizeof(value_t*), cm)
-    _handle_errors(cm.status)
-    if dest.LUbx is not NULL and src.LUbx is not NULL and src.LUsize is not NULL:
-        for k in range(nblocks):
-            dest.LUbx[k] = <value_t*>_malloc_copy(
-                src.LUbx[k], src.LUsize[k], sizeof(value_t), cm
-            )
-
-    cdef size_t np1 = n + 1
-    cdef size_t nzoffp1 = <size_t>src.nzoff + 1
-
-    dest.Offp = <int32_t*>_malloc_copy(src.Offp, np1, sizeof(int32_t), cm)
-    dest.Offi = <int32_t*>_malloc_copy(src.Offi, nzoffp1, sizeof(int32_t), cm)
-    dest.Offx = <value_t*>_malloc_copy(src.Offx, nzoffp1, sizeof(value_t), cm)
-
-    dest.Rs = <double*>_malloc_copy(src.Rs, n, sizeof(double), cm)
-
-    # Workspace encompasses Xwork and Iwork, so just copy Work
-    dest.Work = _malloc_copy(src.Work, src.worksize, 1, cm)
-    dest.Xwork = dest.Work
-    if dest.Xwork is not NULL:
-        dest.Iwork = <int32_t*>(<value_t*>dest.Xwork + n)
-
-    return 0
-
-
-cdef int _copy_l_numeric(
-    klu_l_numeric* dest,
-    const klu_l_numeric* src,
-    const klu_l_common* cm,
-    value_t _dummy=0
-) except -1:
-    """Deep copy a KLU numeric struct."""
-    assert dest is not NULL
-    assert src is not NULL
-    assert cm is not NULL
-
-    # Copy the top-level data and pointers
-    _copy_numeric_values(dest, src)
-
-    cdef size_t n = src.n
-    cdef size_t nblocks = src.nblocks
-
-    # Deep copy internal arrays
-    dest.Pnum = <int64_t*>_malloc_copy(src.Pnum, n, sizeof(int64_t), cm)
-    dest.Pinv = <int64_t*>_malloc_copy(src.Pinv, n, sizeof(int64_t), cm)
-    dest.Lip = <int64_t*>_malloc_copy(src.Lip, n, sizeof(int64_t), cm)
-    dest.Uip = <int64_t*>_malloc_copy(src.Uip, n, sizeof(int64_t), cm)
-    dest.Llen = <int64_t*>_malloc_copy(src.Llen, n, sizeof(int64_t), cm)
-    dest.Ulen = <int64_t*>_malloc_copy(src.Ulen, n, sizeof(int64_t), cm)
-    dest.Udiag = <value_t*>_malloc_copy(src.Udiag, n, sizeof(value_t), cm)
-    dest.LUsize = <size_t*>_malloc_copy(src.LUsize, nblocks, sizeof(size_t), cm)
-
-    cdef size_t k
-
-    dest.LUbx = <void**>klu_l_malloc(nblocks, sizeof(value_t*), cm)
-    _handle_errors(cm.status)
-    if dest.LUbx is not NULL and src.LUbx is not NULL and src.LUsize is not NULL:
-        for k in range(nblocks):
-            dest.LUbx[k] = <value_t*>_malloc_copy(
-                src.LUbx[k], src.LUsize[k], sizeof(value_t), cm
-            )
-
-    cdef size_t np1 = n + 1
-    cdef size_t nzoffp1 = <size_t>src.nzoff + 1
-
-    dest.Offp = <int64_t*>_malloc_copy(src.Offp, np1, sizeof(int64_t), cm)
-    dest.Offi = <int64_t*>_malloc_copy(src.Offi, nzoffp1, sizeof(int64_t), cm)
-    dest.Offx = <value_t*>_malloc_copy(src.Offx, nzoffp1, sizeof(value_t), cm)
-
-    dest.Rs = <double*>_malloc_copy(src.Rs, n, sizeof(double), cm)
-
-    # Workspace encompasses Xwork and Iwork, so just copy Work
-    dest.Work = _malloc_copy(src.Work, src.worksize, 1, cm)
-    dest.Xwork = dest.Work
-    if dest.Xwork is not NULL:
-        dest.Iwork = <int64_t*>(<value_t*>dest.Xwork + n)
-
-    return 0
+    if numeric_t is klu_numeric:
+        if is_real:
+            return _copy_numeric_base(dest, src, cm, idx, val)
+        else:
+            return _copy_numeric_base(dest, src, cm, idx, c_val)
+    else:
+        if is_real:
+            return _copy_numeric_base(dest, src, cm, l_idx, val)
+        else:
+            return _copy_numeric_base(dest, src, cm, l_idx, c_val)
 
 
 # -------------------------------------------------------------------------------------
@@ -1122,11 +1110,7 @@ cdef class KLUFactor:
             if self._numeric is not NULL:
                 klu._numeric = <klu_numeric*>klu_malloc(1, sizeof(klu_numeric), klu._cm)
                 _handle_errors(klu._cm.status)
-                if self._is_real:
-                    _copy_numeric[double](klu._numeric, self._numeric, klu._cm)
-                else:
-                    _copy_numeric[cython.doublecomplex](klu._numeric, self._numeric, klu._cm)
-
+                _copy_numeric(klu._numeric, self._numeric, klu._cm, self._is_real)
         else:
             assert self._l_cm is not NULL
             assert self._l_symbolic is not NULL
@@ -1136,15 +1120,12 @@ cdef class KLUFactor:
 
             klu._l_symbolic = <klu_l_symbolic*>klu_l_malloc(1, sizeof(klu_l_symbolic), klu._l_cm)
             _handle_errors(klu._l_cm.status)
-            _copy_l_symbolic(klu._l_symbolic, self._l_symbolic, klu._l_cm)
+            _copy_symbolic(klu._l_symbolic, self._l_symbolic, klu._l_cm)
 
             if self._l_numeric is not NULL:
                 klu._l_numeric = <klu_l_numeric*>klu_l_malloc(1, sizeof(klu_l_numeric), klu._l_cm)
                 _handle_errors(klu._l_cm.status)
-                if self._is_real:
-                    _copy_l_numeric[double](klu._l_numeric, self._l_numeric, klu._l_cm)
-                else:
-                    _copy_l_numeric[cython.doublecomplex](klu._l_numeric, self._l_numeric, klu._l_cm)
+                _copy_numeric(klu._l_numeric, self._l_numeric, klu._l_cm, self._is_real)
 
         # Cached factor objects
         klu._L = self._L.copy() if self._L is not None else None
