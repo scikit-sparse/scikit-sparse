@@ -143,11 +143,21 @@ cdef extern from "SuiteSparseQR.hpp":
         int allow_tol
 
     # "Expert" Functions
-    SuiteSparseQR_factorization[Entry, Int]* SuiteSparseQR_factorize[Entry, Int](
+    SuiteSparseQR_factorization[Entry, Int] *SuiteSparseQR_factorize[Entry, Int](
         int ordering,
         double tol,
         cholmod_sparse *A,
         cholmod_common *cc
     )
 
+    SuiteSparseQR_factorization[Entry, Int] *SuiteSparseQR_symbolic[Entry, Int](
+        int ordering,
+        int allow_tol,
+        cholmod_sparse *A,
+        cholmod_common *cc
+    )
 
+    int SuiteSparseQR_free[Entry, Int](
+        SuiteSparseQR_factorization[Entry, Int] **QR,
+        cholmod_common *cc
+    )

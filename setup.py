@@ -92,6 +92,7 @@ extension_names = [
     "colamd",
     "ccolamd",
     "klu",
+    "spqr",
     "umfpack",
 ]
 
