@@ -31,6 +31,7 @@ Scikit Sparse API (:mod:`sksparse`)
    sksparse.cholmod <cholmod>
    sksparse.colamd <colamd>
    sksparse.klu <klu>
+   sksparse.spqr <spqr>
    sksparse.umfpack <umfpack>
 
 Provides sparse matrix algorithms not found in SciPy, for use with SciPy's
@@ -49,6 +50,7 @@ Submodules
    cholmod
    colamd
    klu
+   spqr
    umfpack
 
 
@@ -72,6 +74,18 @@ from . import camd
 from . import ccolamd
 from . import cholmod
 from . import colamd
+from . import klu
+from . import spqr
 from . import umfpack
 
-__all__ = ["amd", "btf", "camd", "ccolamd", "cholmod", "colamd", "klu", "umfpack"]
+__all__ = [
+    "amd",
+    "btf",
+    "camd",
+    "ccolamd",
+    "cholmod",
+    "colamd",
+    "klu",
+    "spqr",
+    "umfpack",
+]
