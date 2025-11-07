@@ -1,14 +1,16 @@
 # Project specific files #
 ##########################
 
-scikits/sparse/cholmod.c
 .coverage
 htmlcov/
 .tox
 .cache
-sksparse/umfpack.c
-doc/generated/
 _dev_scripts/
+
+# Cython-generated files
+*.c
+*.cpp
+*.html
 
 # Cribbed from numpy's .gitignore:
 
