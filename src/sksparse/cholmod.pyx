@@ -137,19 +137,6 @@ __all__ = [
 ]
 
 
-# Define types
-ctypedef fused index_t:
-    int32_t
-    int64_t
-
-
-ctypedef fused floating_t:
-    float
-    double
-    float complex
-    double complex
-
-
 # Define constants for the mode of cholmod_transpose (see cholmod.h)
 cdef int CHOLMOD_TRANS_PATTERN = 0    # transpose only the pattern
 cdef int CHOLMOD_TRANS_NOCONJ = 1  # numeric (no conjugate)

@@ -13,6 +13,8 @@ from libc.stdlib cimport malloc
 from libc.stdint cimport int32_t, int64_t, uintptr_t
 from libc.string cimport memcpy, memset
 
+cimport numpy as cnp
+
 
 cdef extern from "cholmod.h":
     # xtypes
@@ -512,3 +514,44 @@ cdef extern from "cholmod.h":
 
     int cholmod_free_factor(cholmod_factor **L, cholmod_common *Common)
     int cholmod_l_free_factor(cholmod_factor **L, cholmod_common *Common)
+
+
+# -------------------------------------------------------------------------------------
+#         Interface Declarations
+# -------------------------------------------------------------------------------------
+ctypedef fused index_t:
+    int32_t
+    int64_t
+
+ctypedef fused floating_t:
+    float
+    double
+    float complex
+    double complex
+
+#---------- cholmod_sparse <=> csc_array
+# cdef inline int _single_or_double(floating_t _=0) noexcept
+# cdef inline int _real_or_complex(floating_t _=0) noexcept
+# cdef class _CholmodSparseDestructor
+# cdef inline int _np_itypenum_from_cholmod(int itype) noexcept
+# cdef inline int _np_dtypenum_from_cholmod(int xtype, int dtype) noexcept
+
+cdef object _csc_from_cholmod_sparse(cholmod_sparse* A, cholmod_common* common)
+
+# cdef object _csc_view_from_cholmod_factor(CholeskyFactor py_factor, object ldl=None)
+
+#---------- cholmod_dense <=> ndarray
+cdef void _cholmod_dense_from_ndarray(floating_t[::1, :] Xd, cholmod_dense *X_static)
+
+# cdef class _CholmodDenseDestructor
+
+cdef cnp.ndarray _ndarray_from_cholmod_dense(
+    cholmod_dense* X, bint use_int32, cholmod_common* common
+)
+cdef cnp.ndarray _ndarray_copy_from_intptr(void* ptr, size_t N, bint use_int32)
+
+# cdef cnp.ndarray _ndarray_int_view_from_factor(
+#     void* ptr, size_t N, CholeskyFactor py_factor
+# )
+
+cdef void _copy_cholmod_common(cholmod_common* dest, cholmod_common* src)
