@@ -669,7 +669,7 @@ cdef class SPQRFactor:
             else:
                 b = b.reshape((self._N, 1))
 
-        # NOTE The SuiteSparseQR_solve "sparse" routine just converts b to
+        # The SuiteSparseQR_solve "sparse" routine just converts b to
         # cholmod_dense internally.
         if issparse(b):
             b = b.toarray()
@@ -706,32 +706,20 @@ cdef class SPQRFactor:
             if self._is_real:
                 if self._use_int32:
                     Bd = SuiteSparseQR_qmult[double, int32_t](
-                        SPQR_QTX,
-                        self._fact_di,
-                        Bd,
-                        self._cm
+                        SPQR_QTX, self._fact_di, Bd, self._cm
                     )
                 else:
                     Bd = SuiteSparseQR_qmult[double, int64_t](
-                        SPQR_QTX,
-                        self._fact_dl,
-                        Bd,
-                        self._cm
+                        SPQR_QTX, self._fact_dl, Bd, self._cm
                     )
             else:
                 if self._use_int32:
                     Bd = SuiteSparseQR_qmult[doublecomplex, int32_t](
-                        SPQR_QTX,
-                        self._fact_zi,
-                        Bd,
-                        self._cm
+                        SPQR_QTX, self._fact_zi, Bd, self._cm
                     )
                 else:
                     Bd = SuiteSparseQR_qmult[doublecomplex, int64_t](
-                        SPQR_QTX,
-                        self._fact_zl,
-                        Bd,
-                        self._cm
+                        SPQR_QTX, self._fact_zl, Bd, self._cm
                     )
 
         # TODO handle errors
@@ -745,32 +733,20 @@ cdef class SPQRFactor:
         if self._is_real:
             if self._use_int32:
                 Xd = SuiteSparseQR_solve[double, int32_t](
-                    system,
-                    self._fact_di,
-                    Bd,
-                    self._cm
+                    system, self._fact_di, Bd, self._cm
                 )
             else:
                 Xd = SuiteSparseQR_solve[double, int64_t](
-                    system,
-                    self._fact_dl,
-                    Bd,
-                    self._cm
+                    system, self._fact_dl, Bd, self._cm
                 )
         else:
             if self._use_int32:
                 Xd = SuiteSparseQR_solve[doublecomplex, int32_t](
-                    system,
-                    self._fact_zi,
-                    Bd,
-                    self._cm
+                    system, self._fact_zi, Bd, self._cm
                 )
             else:
                 Xd = SuiteSparseQR_solve[doublecomplex, int64_t](
-                    system,
-                    self._fact_zl,
-                    Bd,
-                    self._cm
+                    system, self._fact_zl, Bd, self._cm
                 )
 
         # TODO handle errors
@@ -784,32 +760,20 @@ cdef class SPQRFactor:
             if self._is_real:
                 if self._use_int32:
                     Xd = SuiteSparseQR_qmult[double, int32_t](
-                        SPQR_QX,
-                        self._fact_di,
-                        Xd,
-                        self._cm
+                        SPQR_QX, self._fact_di, Xd, self._cm
                     )
                 else:
                     Xd = SuiteSparseQR_qmult[double, int64_t](
-                        SPQR_QX,
-                        self._fact_dl,
-                        Xd,
-                        self._cm
+                        SPQR_QX, self._fact_dl, Xd, self._cm
                     )
             else:
                 if self._use_int32:
                     Xd = SuiteSparseQR_qmult[doublecomplex, int32_t](
-                        SPQR_QX,
-                        self._fact_zi,
-                        Xd,
-                        self._cm
+                        SPQR_QX, self._fact_zi, Xd, self._cm
                     )
                 else:
                     Xd = SuiteSparseQR_qmult[doublecomplex, int64_t](
-                        SPQR_QX,
-                        self._fact_zl,
-                        Xd,
-                        self._cm
+                        SPQR_QX, self._fact_zl, Xd, self._cm
                     )
 
         # TODO handle errors
