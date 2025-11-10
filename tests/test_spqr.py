@@ -330,8 +330,7 @@ def test_nearly_singular(davis_example_qr):
 # TODO non-square matrices
 square_As = [
     A
-    # for dtype in DTYPES  # TODO
-    for dtype in [np.float64]
+    for dtype in DTYPES
     for A in generate_random_matrices(
         N_trials=10, N_max=200, d_scale=0.05, square_only=True, dtype=dtype
     )
@@ -362,16 +361,21 @@ def test_solve(A, K, is_sparse):
 
     # Solve the system
     b = A @ expect_x
+    bt = A.T.conj() @ expect_x
+
     f = spqr_factor(A)
     assert f.rank == N
 
     x = f.solve(b)
+    xt = f.solve(bt, transpose=True)
 
     # Compare
     if is_sparse:
-        assert_allclose(x.toarray(), expect_x.toarray(), atol=atol)
+        assert_allclose(x.toarray(), expect_x.toarray(), atol=atol, strict=True)
+        assert_allclose(xt.toarray(), expect_x.toarray(), atol=atol, strict=True)
     else:
-        assert_allclose(x, expect_x, atol=atol)
+        assert_allclose(x, expect_x, atol=atol, strict=True)
+        assert_allclose(xt, expect_x, atol=atol, strict=True)
 
 
 # Test solve on "real-world" matrices
