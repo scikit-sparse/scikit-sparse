@@ -31,6 +31,14 @@ ITYPES = [np.int32, np.int64]
 DTYPES = [np.float64, np.complex128]
 
 
+def assert_solve_dense(A, f, atol=1e-15):
+    N = f.shape[0]
+    expect_x = np.arange(1, N + 1, dtype=f.dtype)
+    b = A @ expect_x
+    x = f.solve(b)
+    assert_allclose(x, expect_x, atol=atol, strict=True)
+
+
 # -----------------------------------------------------------------------------
 #         Simple Tests
 # -----------------------------------------------------------------------------
@@ -118,34 +126,38 @@ def test_bad_factorize_shape(davis_example_qr):
         f.factorize(A[:-1, :])  # remove last row
 
 
-# # TODO unclear what happens here, but no error is raised
-# def test_bad_factorize_structure(davis_example_qr):
-#     A = davis_example_qr
-#     f = SPQRFactor(A)
-#     B = A.copy().todok()
-#     # Change the structure of the matrix by adding a new non-zero
-#     B[0, 1] = 2.3
-#     B = B.tocsc()
-#     B.indptr = B.indptr.astype(A.indptr.dtype)
-#     B.indices = B.indices.astype(A.indices.dtype)
-#     f.factorize(B)
-#     # with pytest.raises(UMFPACKDifferentPatternError, match="different nonzero pattern"):
-#     #     f.factorize(B)
+@pytest.mark.xfail(reason="No pattern check is done in SPQRFactor")
+def test_bad_factorize_structure(davis_example_qr):
+    A = davis_example_qr
+    f = SPQRFactor(A)
+    assert_solve_dense(A, f)
+    B = A.copy().todok()
+    # Change the structure of the matrix by adding a new non-zero
+    B[0, 1] = 2.3
+    B = B.tocsc()
+    B.indptr = B.indptr.astype(A.indptr.dtype)
+    B.indices = B.indices.astype(A.indices.dtype)
+    # No error is raised since there is no pattern check
+    f.factorize(B)
+    # Try solving a system to ensure factorization was successful
+    assert_solve_dense(B, f)
 
 
-# # TODO unclear what happens here, but no error is raised
-# def test_bad_refactorize_structure(davis_example_qr):
-#     A = davis_example_qr
-#     f = spqr_factor(A)
-#     B = A.copy().todok()
-#     # Change the structure of the matrix by adding a new non-zero
-#     B[0, 1] = 2.3
-#     B = B.tocsc()
-#     B.indptr = B.indptr.astype(A.indptr.dtype)
-#     B.indices = B.indices.astype(A.indices.dtype)
-#     f.factorize(B)
-#     # with pytest.raises(UMFPACKDifferentPatternError, match="different nonzero pattern"):
-#     #     f.factorize(B)
+@pytest.mark.xfail(reason="No pattern check is done in SPQRFactor")
+def test_bad_refactorize_structure(davis_example_qr):
+    A = davis_example_qr
+    f = spqr_factor(A)
+    assert_solve_dense(A, f)
+    B = A.copy().todok()
+    # Change the structure of the matrix by adding a new non-zero
+    B[0, 1] = 2.3
+    B = B.tocsc()
+    B.indptr = B.indptr.astype(A.indptr.dtype)
+    B.indices = B.indices.astype(A.indices.dtype)
+    # No error is raised since there is no pattern check
+    f.factorize(B)
+    # Try solving a system to ensure factorization was successful
+    assert_solve_dense(B, f)
 
 
 @pytest.mark.parametrize("itype", ITYPES)
@@ -168,7 +180,42 @@ def test_davis_example_qr(davis_example_qr, itype, dtype):
     expect_p = np.array([0, 3, 2, 1, 7, 4, 5, 6], dtype=itype)
 
     assert_array_equal(p, expect_p)
-    # assert_QR_equals_A(f, A) # TODO
+    assert_solve_dense(A, f)
+
+
+test_As = [
+    A
+    for dtype in DTYPES
+    for A in generate_random_matrices(
+        N_trials=10, N_max=200, d_scale=0.05, dtype=dtype
+    )
+]
+
+
+@pytest.mark.parametrize("copy", [False])  # TODO copy=True
+@pytest.mark.parametrize("itype", ITYPES)
+@pytest.mark.parametrize("A", test_As)
+def test_refactor(A, itype, copy):
+    # atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-6
+    A = A.copy()
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+    A.indptr = A.indptr.astype(itype)
+    A.indices = A.indices.astype(itype)
+    f = spqr_factor(A)
+    assert_solve_dense(A, f)
+    # Create a new matrix with the same sparsity pattern but different values
+    B = A.copy()
+    rng = np.random.default_rng(56)
+    B.data = rng.random(len(B.data)).astype(dtype=B.dtype)
+    # Factor the new matrix with the same sparsity pattern
+    # if copy:
+    #     g = f.copy()
+    #     assert g is not f
+    #     g.factorize(B)
+    #     assert_solve_dense(B, f)
+    # else:
+    f.factorize(B)
+    assert_solve_dense(B, f)
 
 
 # -----------------------------------------------------------------------------
