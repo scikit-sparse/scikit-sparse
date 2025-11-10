@@ -157,6 +157,13 @@ cdef extern from "SuiteSparseQR.hpp":
         cholmod_common *cc
     )
 
+    int SuiteSparseQR_numeric[Entry, Int](
+        double tol,
+        cholmod_sparse *A,
+        SuiteSparseQR_factorization[Entry, Int] *QR,
+        cholmod_common *cc
+    )
+
     int SuiteSparseQR_free[Entry, Int](
         SuiteSparseQR_factorization[Entry, Int] **QR,
         cholmod_common *cc
