@@ -658,8 +658,44 @@ cdef class SPQRFactor:
         if self._cm.status != CHOLMOD_OK:
             raise SPQRError(f"solve error {self._cm.status}")
 
-        # TODO 
-        # if transpose: post-multiply by Q (X = Q @ X)
+        # System is A.T x = b -> (QRE.T).Tx = b -> (E R.T Q.T) x = b
+        # But "solve" does not touch Q, so -> (E R.T) (Q.T x) = b
+        if transpose:
+            # post-multiply by Q.T
+            if self._is_real:
+                if self._use_int32:
+                    Xd = SuiteSparseQR_qmult[double, int32_t](
+                        SPQR_QX,
+                        self._fact_di,
+                        Xd,
+                        self._cm
+                    )
+                else:
+                    Xd = SuiteSparseQR_qmult[double, int64_t](
+                        SPQR_QX,
+                        self._fact_dl,
+                        Xd,
+                        self._cm
+                    )
+            else:
+                if self._use_int32:
+                    Xd = SuiteSparseQR_qmult[doublecomplex, int32_t](
+                        SPQR_QX,
+                        self._fact_zi,
+                        Xd,
+                        self._cm
+                    )
+                else:
+                    Xd = SuiteSparseQR_qmult[doublecomplex, int64_t](
+                        SPQR_QX,
+                        self._fact_zl,
+                        Xd,
+                        self._cm
+                    )
+
+        # TODO handle errors
+        if self._cm.status != CHOLMOD_OK:
+            raise SPQRError(f"qmult QX error {self._cm.status}")
 
         return _ndarray_from_cholmod_dense(Xd, self._use_int32, self._cm)
 
