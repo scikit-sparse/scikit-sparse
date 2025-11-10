@@ -171,11 +171,88 @@ def test_davis_example_qr(davis_example_qr, itype, dtype):
     # assert_QR_equals_A(f, A) # TODO
 
 
+# -----------------------------------------------------------------------------
+#         Qmult
+# -----------------------------------------------------------------------------
+class TestBadQmultShape:
+    @pytest.fixture(scope="class")
+    def N(self):
+        return 5
+
+    @pytest.fixture(scope="class")
+    def A(self, N):
+        return sparse.eye_array(N).tocsc()
+
+    @pytest.fixture(scope="class")
+    def f(self, A):
+        return spqr_factor(A)
+
+    def test_X_0D_dense(self, f, A):
+        X = np.empty([])
+        with pytest.raises(ValueError, match="must be a 1D or 2D array"):
+            f.qmult(X)
+
+    def test_X_3D_dense(self, f, A):
+        X = np.empty((2, 3, 4))
+        with pytest.raises(ValueError, match="must be a 1D or 2D array"):
+            f.qmult(X)
+
+    def test_X_3D_sparse(self, f, A):
+        X = sparse.coo_array((2, 3, 4))
+        with pytest.raises(ValueError, match="must be a 1D or 2D array"):
+            f.qmult(X)
+
+    def test_X_KD_dense(self, f, A, N):
+        X = np.empty((N - 1, N))
+        with pytest.raises(ValueError, match="compatible shape with Q"):
+            f.qmult(X)
+
+    def test_X_KD_sparse(self, f, A, N):
+        X = sparse.csc_array((N - 1, N))
+        with pytest.raises(ValueError, match="compatible shape with Q"):
+            f.qmult(X)
+
+
+@pytest.mark.parametrize("itype", ITYPES)
+@pytest.mark.parametrize("dtype", DTYPES)
+@pytest.mark.parametrize("is_sparse", [False, True], ids=["dense", "sparse"])
+def test_qmult(davis_example_qr, is_sparse, itype, dtype):
+    A = davis_example_qr.astype(dtype)
+    A.indptr = A.indptr.astype(itype)
+    A.indices = A.indices.astype(itype)
+    f = spqr_factor(A)
+
+    if is_sparse:
+        I = sparse.eye_array(A.shape[0], dtype=dtype).tocsc()
+        I.indptr = I.indptr.astype(itype)
+        I.indices = I.indices.astype(itype)
+    else:
+        I = np.eye(A.shape[0], dtype=dtype)
+
+    Q = f.qmult(I, "QX")
+    QTQ = f.qmult(Q, "QTX")
+    QQT = f.qmult(Q, "XQT")
+
+    if is_sparse:
+        assert_allclose(QTQ.toarray(), I.toarray(), atol=1e-15, strict=True)
+        assert_allclose(QQT.toarray(), I.toarray(), atol=1e-15, strict=True)
+    else:
+        assert_allclose(QTQ, I, atol=1e-15, strict=True)
+        assert_allclose(QQT, I, atol=1e-15, strict=True)
+
+    QT = f.qmult(I, "QTX")
+    QTQ = f.qmult(QT, "XQ")
+
+    if is_sparse:
+        assert_allclose(QTQ.toarray(), I.toarray(), atol=1e-15, strict=True)
+    else:
+        assert_allclose(QTQ, I, atol=1e-15, strict=True)
+
 
 # -----------------------------------------------------------------------------
 #         Solve
 # -----------------------------------------------------------------------------
-class TestBadBShape:
+class TestBadSolveShape:
     @pytest.fixture(scope="class")
     def N(self):
         return 5
