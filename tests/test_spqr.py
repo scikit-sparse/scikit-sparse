@@ -10,15 +10,22 @@
 
 """Unit tests for the scikit-sparse.spqr module."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
-from numpy.testing import assert_array_equal
+from numpy.testing import assert_allclose, assert_array_equal
+from scipy import linalg as la
 from scipy import sparse
+from scipy.io import mmread
 
 from sksparse.spqr import (
     SPQRFactor,
     spqr_factor,
+    spqr_solve,
 )
+
+from .helpers import generate_random_matrices
 
 ITYPES = [np.int32, np.int64]
 DTYPES = [np.float64, np.complex128]
@@ -141,7 +148,6 @@ def test_bad_factorize_shape(davis_example_qr):
 #     #     f.factorize(B)
 
 
-# TODO
 @pytest.mark.parametrize("itype", ITYPES)
 @pytest.mark.parametrize("dtype", DTYPES)
 def test_davis_example_qr(davis_example_qr, itype, dtype):
@@ -164,3 +170,242 @@ def test_davis_example_qr(davis_example_qr, itype, dtype):
     assert_array_equal(p, expect_p)
     # assert_QR_equals_A(f, A) # TODO
 
+
+
+# -----------------------------------------------------------------------------
+#         Solve
+# -----------------------------------------------------------------------------
+class TestBadBShape:
+    @pytest.fixture(scope="class")
+    def N(self):
+        return 5
+
+    @pytest.fixture(scope="class")
+    def A(self, N):
+        return sparse.eye_array(N).tocsc()
+
+    @pytest.fixture(scope="class")
+    def f(self, A):
+        return spqr_factor(A)
+
+    def test_b_0D_dense(self, f, A):
+        b = np.empty([])
+        with pytest.raises(ValueError, match="must be a 1D or 2D array"):
+            f.solve(b)
+
+    def test_b_3D_dense(self, f, A):
+        b = np.empty((2, 3, 4))
+        with pytest.raises(ValueError, match="must be a 1D or 2D array"):
+            f.solve(b)
+
+    def test_b_3D_sparse(self, f, A):
+        b = sparse.coo_array((2, 3, 4))
+        with pytest.raises(ValueError, match="must be a 1D or 2D array"):
+            f.solve(b)
+
+    def test_b_KD_dense(self, f, A, N):
+        b = np.empty((N - 1, N))
+        with pytest.raises(ValueError, match="compatible shape with A"):
+            f.solve(b)
+
+    def test_b_KD_sparse(self, f, A, N):
+        b = sparse.csc_array((N - 1, N))
+        with pytest.raises(ValueError, match="compatible shape with A"):
+            f.solve(b)
+
+
+@pytest.mark.parametrize("dtype", DTYPES)
+def test_singleton_dense(dtype):
+    singleton_A = sparse.csc_array([[1]], dtype=dtype)
+    b = np.array([1], dtype=dtype)
+    x = SPQRFactor(singleton_A).factorize(singleton_A).solve(b)
+    assert_allclose(x, b)
+
+
+@pytest.mark.parametrize("dtype", DTYPES)
+def test_singleton_sparse(dtype):
+    singleton_A = sparse.csc_array([[1]], dtype=dtype)
+    b = sparse.coo_array([1], dtype=dtype)
+    x = SPQRFactor(singleton_A).factorize(singleton_A).solve(b)
+    assert_allclose(x.toarray(), b.toarray())
+
+
+@pytest.mark.parametrize("itype", ITYPES)
+def test_itype_1D(davis_example_qr, itype):
+    A = davis_example_qr
+    A.indptr = A.indptr.astype(itype)
+    A.indices = A.indices.astype(itype)
+    N = A.shape[0]
+    expect_x = sparse.coo_array(np.arange(1, N + 1, dtype=A.dtype))
+    b = A @ expect_x
+    x = spqr_solve(A, b)
+    assert isinstance(x, sparse.coo_array)
+    assert x.coords[0].dtype == itype
+
+
+@pytest.mark.parametrize("itype", ITYPES)
+def test_itype_2D(davis_example_qr, itype):
+    A = davis_example_qr
+    A.indptr = A.indptr.astype(itype)
+    A.indices = A.indices.astype(itype)
+    N = A.shape[0]
+    K = 3  # arbitrary number of rhs
+    s = np.arange(1, N + 1, dtype=A.dtype)
+    data = np.array([i * s for i in range(1, K + 1)]).T
+    expect_x = sparse.csc_array(data, dtype=A.dtype)
+    b = A @ expect_x
+    x = spqr_solve(A, b)
+    assert isinstance(x, sparse.csc_array)
+    assert x.indptr.dtype == itype
+    assert x.indices.dtype == itype
+
+
+def test_exactly_singular(davis_example_qr):
+    A = davis_example_qr.todok()
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+
+    N = A.shape[0]
+    lam0 = la.eigvalsh(A.toarray()).min()
+
+    # Make A exactly singular
+    s = 7
+    A[:, s] = 0.0
+    A[s, :] = 0.0
+    A = A.tocsc()
+
+    lam1 = la.eigvalsh(A.toarray()).min()
+    print(f"\nMin eigenvalue: {lam0:.2e} -> {lam1:.2e}\n")
+
+    expect_x = sparse.coo_array(np.arange(1, N + 1, dtype=A.dtype))
+    b = A @ expect_x
+    f = spqr_factor(A)
+    assert f.rank == N - 1
+
+    # FIXME this should probably raise an error? we just get a "0" in the
+    # singular position of the solution
+    # with pytest.raises(KLUError, match="indefinite or singular to working precision"):
+    x = f.solve(b)
+
+    x = x.toarray()
+    assert x[s] == 0.0
+    idx = np.arange(N) != s
+    assert_allclose(x[idx], expect_x.toarray()[idx], atol=1e-15, strict=True)
+    # assert_allclose(x.toarray(), expect_x.toarray(), atol=1e-15, strict=True)
+
+
+def test_nearly_singular(davis_example_qr):
+    A = davis_example_qr.todok()
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+
+    N = A.shape[0]
+    lam0 = la.eigvalsh(A.toarray()).min()
+
+    # Make A nearly singular
+    s = 5  # arbitrary singular row/column
+    A[:, s] = 0.0
+    A[s, :] = 0.0
+    A[s, s] = 0.5 * np.finfo(A.dtype).eps
+    A = A.tocsc()
+
+    lam1 = la.eigvalsh(A.toarray()).min()
+    print(f"\nMin eigenvalue: {lam0:.2e} -> {lam1:.2e}\n")
+
+    expect_x = sparse.coo_array(np.arange(1, N + 1, dtype=A.dtype))
+    b = A @ expect_x
+    f = spqr_factor(A)
+    assert f.rank == N - 1
+
+    # FIXME this should probably raise an error? we just get a "0" in the
+    # singular position of the solution
+    # with pytest.warns(SPQRSingularMatrixWarning, match="nearly singular"):
+    x = f.solve(b)
+
+    x = x.toarray()
+    assert x[s] == 0.0
+    idx = np.arange(N) != s
+    assert_allclose(x[idx], expect_x.toarray()[idx], atol=1e-15, strict=True)
+    # assert_allclose(x.toarray(), expect_x.toarray(), atol=1e-15, strict=True)
+
+
+# TODO non-square matrices
+square_As = [
+    A
+    # for dtype in DTYPES  # TODO
+    for dtype in [np.float64]
+    for A in generate_random_matrices(
+        N_trials=10, N_max=200, d_scale=0.05, square_only=True, dtype=dtype
+    )
+]
+
+
+@pytest.mark.parametrize("A", square_As)
+@pytest.mark.parametrize("K", [0, 1, 3], ids=lambda k: f"K={k}")
+@pytest.mark.parametrize("is_sparse", [False, True], ids=["dense", "sparse"])
+def test_solve(A, K, is_sparse):
+    atol = 1e-12
+    A = A.copy()
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+
+    # Build RHS
+    N = A.shape[0]
+    s = np.arange(1, N + 1, dtype=A.dtype)
+
+    if K == 0:
+        data = s  # (N,)
+    else:
+        data = np.array([i * s for i in range(1, K + 1)], dtype=A.dtype).T  # (N, K)
+
+    if is_sparse:
+        expect_x = sparse.coo_array(data, dtype=A.dtype)
+    else:
+        expect_x = np.asarray(data, dtype=A.dtype)
+
+    # Solve the system
+    b = A @ expect_x
+    f = spqr_factor(A)
+    assert f.rank == N
+
+    x = f.solve(b)
+
+    # Compare
+    if is_sparse:
+        assert_allclose(x.toarray(), expect_x.toarray(), atol=atol)
+    else:
+        assert_allclose(x, expect_x, atol=atol)
+
+
+# Test solve on "real-world" matrices
+def _load_problem(name):
+    """Load a matrix and RHS from a Matrix Market file."""
+    data_path = Path(__file__).parent / "data"
+    matrix_file = data_path / f"{name}.mtx.gz"
+
+    if not matrix_file.exists():
+        raise FileNotFoundError(f"Matrix Market file {matrix_file} not found.")
+
+    A = mmread(matrix_file, spmatrix=False).tocsc()
+
+    # Possibly load RHS
+    rhs_file = data_path / f"{name}_rhs1.mtx.gz"
+
+    if not rhs_file.exists():
+        raise FileNotFoundError(f"Matrix Market file {rhs_file} not found.")
+
+    b = mmread(rhs_file)
+
+    return A, b
+
+
+@pytest.mark.parametrize("problem", ["well1033", "illc1033", "well1850", "illc1850"])
+def test_solve_real(problem):
+    A, b = _load_problem(problem)
+    # Solve the normal equations A^T A x = A^T b
+    ATA = (A.T @ A).tocsc()
+    ATb = A.T @ b
+    expect_x = np.linalg.lstsq(A.toarray(), b)[0]
+    x = spqr_solve(ATA, ATb)
+    assert_allclose(x, expect_x, atol=1e-7)
+
+
+# =============================================================================
+# =============================================================================
