@@ -478,6 +478,125 @@ cdef class SPQRFactor:
 
         return self
 
+    def qmult(self, object X, method='QX'):
+        """Multiply by ``Q`` or ``Q.T`` using the SPQR factorization.
+
+        Parameters
+        ----------
+        X : (M, N) numpy.ndarray or sparse array
+            The matrix to be multiplied. Must have compatible shape with ``Q``.
+        method : str , optional
+            The multiplication method. Options are:
+
+            * ``QX`` : compute :math:`Q X`
+            * ``QTX`` : compute :math:`Q^{\top} X`
+            * ``XQ`` : compute :math:`X Q`
+            * ``XQT`` : compute :math:`X Q^{\top}`
+
+            Default is ``QX``.
+
+        Returns
+        -------
+        Y : (M, N) numpy.ndarray or sparse array
+            The result of the multiplication. If ``X`` is a sparse array, then ``Y`` is
+            also returned as a sparse array.
+        """
+        self._require_numeric()
+
+        if not (isinstance(X, np.ndarray) or issparse(X)):
+            raise ValueError("X must be an ndarray or sparse matrix.")
+
+        if X.dtype != self.dtype:
+            raise ValueError(
+                f"Input and factor dtypes do not match. {self.dtype=} and {X.dtype=}"
+            )
+
+        if X.ndim not in (1, 2):
+            raise ValueError("X must be a 1D or 2D array.")
+
+        cdef int c_method
+        if method == 'QX':
+            c_method = SPQR_QX
+        elif method == 'QTX':
+            c_method = SPQR_QTX
+        elif method == 'XQ':
+            c_method = SPQR_XQ
+        elif method == 'XQT':
+            c_method = SPQR_XQT
+        else:
+            raise ValueError(
+                f"Invalid method '{method}'. "
+                "Expected one of ['QX', 'QTX', 'XQ', 'XQT']."
+            )
+
+        # Check shape compatibility with Q
+        cdef Py_ssize_t X_dim = (
+            X.shape[0]
+            if method == 'QTX' or method == 'QX'
+            else X.shape[1]
+        )
+
+        if self._M != X_dim:
+            raise ValueError(
+                "Input X must have compatible shape with Q. "
+                f"Expected {self._M}, got {X_dim}."
+            )
+
+        cdef bint return_1D = X.ndim == 1
+        cdef bint return_sparse = issparse(X)
+
+        if return_sparse:
+            X = X.toarray()
+
+        # cholmod_dense expects column-oriented
+        X = np.asfortranarray(X)
+        
+        Y = self._qmult(c_method, X)
+
+        if return_sparse:
+            Y = csc_array(Y, dtype=X.dtype)
+            Y.indptr = Y.indptr.astype(self.itype)
+            Y.indices = Y.indices.astype(self.itype)
+
+        if return_1D:
+            Y = Y[:, 0]
+
+        return Y
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def _qmult(self, int method, value_t[::1, :] X):
+        cdef cholmod_dense Xdense
+        cdef cholmod_dense *Xd = &Xdense
+        _cholmod_dense_from_ndarray(X, Xd)
+
+        cdef cholmod_dense *Yd
+
+        if self._is_real:
+            if self._use_int32:
+                Yd = SuiteSparseQR_qmult[double, int32_t](
+                    method, self._fact_di, Xd, self._cm
+                )
+            else:
+                Yd = SuiteSparseQR_qmult[double, int64_t](
+                    method, self._fact_dl, Xd, self._cm
+                )
+        else:
+            if self._use_int32:
+                Yd = SuiteSparseQR_qmult[doublecomplex, int32_t](
+                    method, self._fact_zi, Xd, self._cm
+                )
+            else:
+                Yd = SuiteSparseQR_qmult[doublecomplex, int64_t](
+                    method, self._fact_zl, Xd, self._cm
+                )
+
+        # TODO handle errors
+        if self._cm.status != CHOLMOD_OK:
+            raise SPQRError(f"qmult error {self._cm.status}")
+
+        return _ndarray_from_cholmod_dense(Yd, self._use_int32, self._cm)
+
     def solve(self, object b, *, bint transpose=False):
         """Solve a linear system using the SPQR factorization.
 
