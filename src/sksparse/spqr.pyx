@@ -82,9 +82,12 @@ from sksparse.cholmod cimport (
     cholmod_finish,
     cholmod_l_finish,
     _ndarray_copy_from_intptr,
+    _cholmod_dense_from_ndarray,
+    _ndarray_from_cholmod_dense,
 )
 
 import numpy as np
+from scipy.sparse import csc_array, issparse
 import warnings
 
 from sksparse.cholmod import _cholmod_sparse_from_csc
@@ -95,7 +98,13 @@ from .utils import validate_csc_input
 __all = [
     "SPQRFactor",
     "spqr_factor",
+    "spqr_solve",
 ]
+
+
+ctypedef fused value_t:
+    double
+    double complex
 
 
 # Define specific instantiations
@@ -469,6 +478,190 @@ cdef class SPQRFactor:
 
         return self
 
+    def solve(self, object b, *, bint transpose=False):
+        """Solve a linear system using the SPQR factorization.
+
+        This method solves a linear system for :math:`x` given the right-hand side
+        :math:`b` as either a vector or a matrix with multiple right-hand sides.
+
+        If ``transpose=False``, solve
+
+        .. math::
+            A x = b
+
+        or, if ``transpose=True``, solve
+
+        .. math::
+            A^{\top} x = b
+
+        The method uses the QR factorization of :math:`A` previously computed by
+        :meth:`.factorize`.
+
+        Parameters
+        ----------
+        b : (M,) or (M, K) numpy.ndarray
+            The right-hand side vector or matrix. ``M`` should be the number of rows in
+            ``A`` if ``transpose=False``, otherwise the number of columns.
+        transpose : bool, optional
+            Whether to solve the transposed system. Default is False.
+
+        Returns
+        -------
+        x : (N,) or (N, K) numpy.ndarray or sparse array
+            The solution vector or matrix. If ``b`` is a 1D array, then ``x`` is
+            returned as a 1D array. If ``b`` is a 2D array with ``K`` columns,
+            then ``x`` is returned as a 2D array with ``K`` columns. If ``b``
+            is a sparse array, then ``x`` is also returned as a sparse array.
+            ``N`` is the number of columns in ``A`` if ``transpose=False``,
+            otherwise the number of rows.
+        """
+        self._require_numeric()
+
+        if not (isinstance(b, np.ndarray) or issparse(b)):
+            raise ValueError("b must be an ndarray or sparse matrix.")
+
+        if b.dtype != self.dtype:
+            raise ValueError(
+                f"LHS and RHS dtypes do not match. {self.dtype=} and {b.dtype=}"
+            )
+
+        if b.ndim not in (1, 2):
+            raise ValueError("b must be a 1D or 2D array.")
+
+        if (
+            (not transpose and b.shape[0] != self._M)
+            or (transpose and b.shape[0] != self._N)
+        ):
+            raise ValueError(
+                "Right-hand side b must have compatible shape with A. "
+                f"Got {b.shape=}, but A.shape={self.shape} ({transpose=})."
+            )
+
+        # TODO Check the rank of A and warn if rank deficient
+        # self._check_rank()
+
+        cdef bint return_1D = b.ndim == 1
+        cdef bint return_sparse = issparse(b)
+
+        # CHOLMOD routines require a 2D array
+        if b.ndim == 1:
+            if not transpose:
+                b = b.reshape((self._M, 1))
+            else:
+                b = b.reshape((self._N, 1))
+
+        # NOTE The SuiteSparseQR_solve "sparse" routine just converts b to
+        # cholmod_dense internally.
+        if issparse(b):
+            b = b.toarray()
+
+        # Ensure columns are contiguous for multiple RHS
+        b = np.asfortranarray(b)
+
+        x = self._solve(b, transpose)
+
+        if return_sparse:
+            x = csc_array(x, dtype=b.dtype)
+            x.indptr = x.indptr.astype(self.itype)
+            x.indices = x.indices.astype(self.itype)
+
+        if return_1D:
+            x = x[:, 0]
+
+        return x
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def _solve(self, value_t[::1, :] b, bint transpose):
+        """Solve a linear system with a dense right-hand side."""
+        # Get the b vector or matrix into CHOLMOD format
+        cdef cholmod_dense Bmatrix
+        cdef cholmod_dense *Bd = &Bmatrix
+
+        _cholmod_dense_from_ndarray(b, Bd)
+
+        # System is Ax = b -> (QRE.T)x = b
+        # But "solve" does not touch Q, so -> (RE.T)x = (Q.T)b
+        if not transpose:
+            # pre-multiply by Q.T
+            if self._is_real:
+                if self._use_int32:
+                    Bd = SuiteSparseQR_qmult[double, int32_t](
+                        SPQR_QTX,
+                        self._fact_di,
+                        Bd,
+                        self._cm
+                    )
+                else:
+                    Bd = SuiteSparseQR_qmult[double, int64_t](
+                        SPQR_QTX,
+                        self._fact_dl,
+                        Bd,
+                        self._cm
+                    )
+            else:
+                if self._use_int32:
+                    Bd = SuiteSparseQR_qmult[doublecomplex, int32_t](
+                        SPQR_QTX,
+                        self._fact_zi,
+                        Bd,
+                        self._cm
+                    )
+                else:
+                    Bd = SuiteSparseQR_qmult[doublecomplex, int64_t](
+                        SPQR_QTX,
+                        self._fact_zl,
+                        Bd,
+                        self._cm
+                    )
+
+        # TODO handle errors
+        if self._cm.status != CHOLMOD_OK:
+            raise SPQRError(f"qmult error {self._cm.status}")
+
+        # Solve the system
+        cdef int system = SPQR_RETX_EQUALS_B if not transpose else SPQR_RTX_EQUALS_ETB
+        cdef cholmod_dense *Xd
+
+        if self._is_real:
+            if self._use_int32:
+                Xd = SuiteSparseQR_solve[double, int32_t](
+                    system,
+                    self._fact_di,
+                    Bd,
+                    self._cm
+                )
+            else:
+                Xd = SuiteSparseQR_solve[double, int64_t](
+                    system,
+                    self._fact_dl,
+                    Bd,
+                    self._cm
+                )
+        else:
+            if self._use_int32:
+                Xd = SuiteSparseQR_solve[doublecomplex, int32_t](
+                    system,
+                    self._fact_zi,
+                    Bd,
+                    self._cm
+                )
+            else:
+                Xd = SuiteSparseQR_solve[doublecomplex, int64_t](
+                    system,
+                    self._fact_zl,
+                    Bd,
+                    self._cm
+                )
+
+        # TODO handle errors
+        if self._cm.status != CHOLMOD_OK:
+            raise SPQRError(f"solve error {self._cm.status}")
+
+        # TODO 
+        # if transpose: post-multiply by Q (X = Q @ X)
+
+        return _ndarray_from_cholmod_dense(Xd, self._use_int32, self._cm)
 
     # ---------------------------------------------------------------------------------
     #         Private API
@@ -555,3 +748,44 @@ def spqr_factor(A, *, use_singletons=False, order=None, tol=None):
         return SPQRFactor(A, use_singletons=False, order=order, tol=tol).factorize(A)
 
 
+# TODO rewrite using the simple SPQR interface?
+def spqr_solve(A, b, *, transpose=False):
+    """Solve a linear system using the SPQR factorization.
+
+    This function solves a linear system for :math:`x` given the right-hand side
+    :math:`b` as either a vector or a matrix with multiple right-hand sides.
+
+    If ``transpose=False``, solve
+
+    .. math::
+        A x = b
+
+    or, if ``transpose=True``, solve
+
+    .. math::
+        A^{\top} x = b
+
+    The function uses the QR factorization of :math:`A` previously computed by
+    :meth:`.factorize`.
+
+    Parameters
+    ----------
+    A : (M, N) array_like or sparse array
+        An array convertible to a sparse matrix.
+    b : (M,) or (M, K) numpy.ndarray
+        The right-hand side vector or matrix. ``M`` should be the number of rows in
+        ``A`` if ``transpose=False``, otherwise the number of columns.
+    transpose : bool, optional
+        Whether to solve the transposed system. Default is False.
+
+    Returns
+    -------
+    x : (N,) or (N, K) numpy.ndarray or sparse array
+        The solution vector or matrix. If ``b`` is a 1D array, then ``x`` is
+        returned as a 1D array. If ``b`` is a 2D array with ``K`` columns,
+        then ``x`` is returned as a 2D array with ``K`` columns. If ``b``
+        is a sparse array, then ``x`` is also returned as a sparse array.
+        ``N`` is the number of columns in ``A`` if ``transpose=False``,
+        otherwise the number of rows.
+    """
+    return SPQRFactor(A, use_singletons=True).solve(b, transpose=transpose)

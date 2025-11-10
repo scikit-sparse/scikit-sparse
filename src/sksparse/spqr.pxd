@@ -11,7 +11,7 @@
 
 from libc.stdint cimport int32_t, int64_t, uintptr_t
 
-from sksparse.cholmod cimport cholmod_common, cholmod_sparse
+from sksparse.cholmod cimport cholmod_common, cholmod_dense, cholmod_sparse
 
 
 cdef extern from "SuiteSparseQR_definitions.h":
@@ -161,6 +161,20 @@ cdef extern from "SuiteSparseQR.hpp":
         double tol,
         cholmod_sparse *A,
         SuiteSparseQR_factorization[Entry, Int] *QR,
+        cholmod_common *cc
+    )
+
+    cholmod_dense *SuiteSparseQR_qmult[Entry, Int](
+        int method,
+        SuiteSparseQR_factorization[Entry, Int] *QR,
+        cholmod_dense *Xdense,
+        cholmod_common *cc
+    )
+
+    cholmod_dense *SuiteSparseQR_solve[Entry, Int](
+        int system,
+        SuiteSparseQR_factorization[Entry, Int] *QR,
+        cholmod_dense *B,
         cholmod_common *cc
     )
 
