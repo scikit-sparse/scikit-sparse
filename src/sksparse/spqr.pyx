@@ -172,6 +172,16 @@ cdef:
 # -------------------------------------------------------------------------------------
 #         Error Handling
 # -------------------------------------------------------------------------------------
+class SPQRWarning(Warning):
+    """Base class for SPQR warnings."""
+    pass
+
+
+class SPQRRankDeficiencyWarning(SPQRWarning):
+    """Raised when SPQR detects a rank-deficient matrix."""
+    pass
+
+
 class SPQRError(Exception):
     """Base class for SPQR exceptions."""
     pass
@@ -1257,8 +1267,13 @@ cdef class SPQRFactor:
                 f"Got {b.shape=}, but A.shape={self.shape} ({transpose=})."
             )
 
-        # TODO Check the rank of A and warn if rank deficient
-        # self._check_rank()
+        # Check the rank of A and warn if rank deficient
+        if self.rank < min(self._M, self._N):
+            warnings.warn(
+                f"Matrix is rank deficient: rank={self.rank}, A.shape={self.shape}. "
+                "The solution may not be unique.",
+                SPQRRankDeficiencyWarning,
+            )
 
         cdef bint return_1D = b.ndim == 1
         cdef bint return_sparse = issparse(b)
