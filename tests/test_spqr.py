@@ -498,7 +498,7 @@ def _test_solve(A, K, is_sparse, transpose, underdetermined):
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
 
     # Build RHS
-    N = A.shape[1]
+    M, N = A.shape
     s = np.arange(1, N + 1, dtype=A.dtype)
 
     if K == 0:
@@ -518,14 +518,27 @@ def _test_solve(A, K, is_sparse, transpose, underdetermined):
         b = A.T.conj() @ expect_x
 
     f = spqr_factor(A)
-    assert f.rank == N
+    assert f.rank == (N if not underdetermined else M)
 
     x = f.solve(b, transpose=transpose)
 
-    if is_sparse:
-        assert_allclose(x.toarray(), expect_x.toarray(), atol=atol, strict=True)
+    # Check residuals in all cases
+    if not transpose:
+        resid = A @ x - b
     else:
-        assert_allclose(x, expect_x, atol=atol, strict=True)
+        resid = A.T.conj() @ x - b
+
+    if is_sparse:
+        resid = resid.toarray()
+
+    assert_allclose(resid, np.zeros_like(resid), atol=1e-10, strict=True)
+
+    # In underdetermined case, the solution is not unique
+    if not underdetermined:
+        if is_sparse:
+            assert_allclose(x.toarray(), expect_x.toarray(), atol=atol, strict=True)
+        else:
+            assert_allclose(x, expect_x, atol=atol, strict=True)
 
 
 square_As = [
@@ -547,9 +560,7 @@ def test_solve_square(A, K, is_sparse, transpose):
 
 @pytest.mark.parametrize("A", test_As)
 @pytest.mark.parametrize(
-    # TODO re-enable underdetermined tests when supported
-    # "underdetermined", [False, True], ids=["overdetermined", "underdetermined"]
-    "underdetermined", [False], ids=["overdetermined"],
+    "underdetermined", [False, True], ids=["overdetermined", "underdetermined"]
 )
 @pytest.mark.parametrize("K", [0, 1, 3], ids=lambda k: f"K={k}")
 @pytest.mark.parametrize("is_sparse", [False, True], ids=["dense", "sparse"])
