@@ -32,7 +32,7 @@ DTYPES = [np.float64, np.complex128]
 
 
 def assert_solve_dense(A, f, atol=1e-15):
-    N = f.shape[0]
+    N = f.shape[1]
     expect_x = np.arange(1, N + 1, dtype=f.dtype)
     b = A @ expect_x
     x = f.solve(b)
@@ -186,7 +186,9 @@ def test_davis_example_qr(davis_example_qr, itype, dtype):
 test_As = [
     A
     for dtype in DTYPES
-    for A in generate_random_matrices(N_trials=10, N_max=200, d_scale=0.05, dtype=dtype)
+    for A in generate_random_matrices(
+        N_trials=10, N_max=200, d_scale=0.05, shape_kind="M >= N", dtype=dtype
+    )
 ]
 
 
@@ -487,16 +489,16 @@ def test_nearly_singular(davis_example_qr):
     # assert_allclose(x.toarray(), expect_x.toarray(), atol=1e-15, strict=True)
 
 
-@pytest.mark.parametrize("A", test_As)
-@pytest.mark.parametrize("K", [0, 1, 3], ids=lambda k: f"K={k}")
-@pytest.mark.parametrize("is_sparse", [False, True], ids=["dense", "sparse"])
-def test_solve(A, K, is_sparse):
+# Base test function for solving systems
+def _test_solve(A, K, is_sparse, transpose, underdetermined):
     atol = 1e-12
     A = A.copy()
+    if underdetermined:
+        A = A.T.conj().tocsc()
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
 
     # Build RHS
-    N = A.shape[0]
+    N = A.shape[1]
     s = np.arange(1, N + 1, dtype=A.dtype)
 
     if K == 0:
@@ -510,22 +512,49 @@ def test_solve(A, K, is_sparse):
         expect_x = np.asarray(data, dtype=A.dtype)
 
     # Solve the system
-    b = A @ expect_x
-    bt = A.T.conj() @ expect_x
+    if not transpose:
+        b = A @ expect_x
+    else:
+        b = A.T.conj() @ expect_x
 
     f = spqr_factor(A)
     assert f.rank == N
 
-    x = f.solve(b)
-    xt = f.solve(bt, transpose=True)
+    x = f.solve(b, transpose=transpose)
 
-    # Compare
     if is_sparse:
         assert_allclose(x.toarray(), expect_x.toarray(), atol=atol, strict=True)
-        assert_allclose(xt.toarray(), expect_x.toarray(), atol=atol, strict=True)
     else:
         assert_allclose(x, expect_x, atol=atol, strict=True)
-        assert_allclose(xt, expect_x, atol=atol, strict=True)
+
+
+square_As = [
+    A
+    for dtype in DTYPES
+    for A in generate_random_matrices(
+        N_trials=10, N_max=200, d_scale=0.05, shape_kind="square", dtype=dtype
+    )
+]
+
+
+@pytest.mark.parametrize("A", square_As)
+@pytest.mark.parametrize("transpose", [False, True], ids=["A", "A^T"])
+@pytest.mark.parametrize("K", [0, 1, 3], ids=lambda k: f"K={k}")
+@pytest.mark.parametrize("is_sparse", [False, True], ids=["dense", "sparse"])
+def test_solve_square(A, K, is_sparse, transpose):
+    _test_solve(A, K, is_sparse, transpose, underdetermined=False)
+
+
+@pytest.mark.parametrize("A", test_As)
+@pytest.mark.parametrize(
+    # TODO re-enable underdetermined tests when supported
+    # "underdetermined", [False, True], ids=["overdetermined", "underdetermined"]
+    "underdetermined", [False], ids=["overdetermined"],
+)
+@pytest.mark.parametrize("K", [0, 1, 3], ids=lambda k: f"K={k}")
+@pytest.mark.parametrize("is_sparse", [False, True], ids=["dense", "sparse"])
+def test_solve_overunder(A, K, is_sparse, underdetermined):
+    _test_solve(A, K, is_sparse, transpose=False, underdetermined=underdetermined)
 
 
 # Test solve on "real-world" matrices
@@ -583,9 +612,9 @@ def test_info(davis_example_qr):
     assert info.flops_upper_bound == 303  # == 847
     assert_allclose(info.tol, 5.1728e-13, rtol=1e-4)
     assert info.norm_E_fro == 0
-    assert info.analyze_time > 0    # == 6.4135e-05
+    assert info.analyze_time > 0  # == 6.4135e-05
     assert info.factorize_time > 0  # == 3.0994e-05
-    assert info.solve_time == 0     # == 1.1683e-05
+    assert info.solve_time == 0  # == 1.1683e-05
     assert_allclose(
         info.total_time,  # == 1.7700e-04
         info.analyze_time + info.factorize_time + info.solve_time,
