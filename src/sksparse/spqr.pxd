@@ -19,7 +19,7 @@ from sksparse.cholmod cimport cholmod_common, cholmod_dense, cholmod_sparse
 cdef extern from "SuiteSparseQR_definitions.h":
     # Get the #define'd constants
     enum:
-        # Orering methods
+        # Ordering methods
         SPQR_ORDERING_FIXED
         SPQR_ORDERING_NATURAL
         SPQR_ORDERING_COLAMD

@@ -242,6 +242,25 @@ cdef int _handle_errors(int status) except -1 with gil:
 
 
 # -------------------------------------------------------------------------------------
+#         Info and Control
+# -------------------------------------------------------------------------------------
+cdef dict _ordering_methods = {
+    "default": SPQR_ORDERING_DEFAULT,
+    "fixed": SPQR_ORDERING_FIXED,
+    "natural": SPQR_ORDERING_NATURAL,
+    "colamd": SPQR_ORDERING_COLAMD,
+    "cholmod": SPQR_ORDERING_CHOLMOD,
+    "amd": SPQR_ORDERING_AMD,
+    "metis": SPQR_ORDERING_METIS,
+    "best": SPQR_ORDERING_BEST,
+    "bestamd": SPQR_ORDERING_BESTAMD,
+}
+
+
+cdef dict _ordering_methods_inv = {v: k for k, v in _ordering_methods.items()}
+
+
+# -------------------------------------------------------------------------------------
 #         Copy Functions
 # -------------------------------------------------------------------------------------
 cdef inline void* _malloc_copy(
@@ -558,7 +577,7 @@ cdef inline int _copy_spqr_factor(
 #         SPQR Factor Class
 # -------------------------------------------------------------------------------------
 cdef class SPQRFactor:
-    """The main object used for creating and manipulating SPQR factorizations.
+    r"""The main object used for creating and manipulating SPQR factorizations.
 
     The constructor computes the sybolic analysis of the matrix and determines
     a fill-reducing ordering such that:
@@ -591,7 +610,19 @@ cdef class SPQRFactor:
         If True, directly compute the numeric factorization to exploit singleton rows.
         Otherwise, only perform symbolic analysis. Default is False.
     order : int, optional
-        The ordering strategy to use.
+        The column ordering strategy to use. Let :math:`S` be the matrix :math:`A` with
+        singleton rows/columns removed, the ordering options are:
+
+        * ``default``: COLAMD(S),
+        * ``fixed``: identity permutation (*i.e.* no singletons removed),
+        * ``natural``: singletons removed, but no fill-reducing ordering applied,
+        * ``colamd``: COLAMD(S),
+        * ``amd``: AMD(:math:`S^{\top} S`),
+        * ``metis``: METIS(:math:`S^{\top} S`),
+        * ``best``: try all of ``amd``, ``colamd``, ``metis`` and pick the best,
+        * ``cholmod``: Same as ``best``,
+        * ``bestamd``: try ``amd`` and ``colamd`` and pick the best.
+
     tol : float, optional
         If the 2-norm of a column in ``A`` is less than ``tol``, that column is
         considered to be a zero column. If ``None``, the default tolerance is used.
@@ -674,8 +705,13 @@ cdef class SPQRFactor:
         if order is None:
             ordering = SPQR_ORDERING_DEFAULT
         else:
-            # TODO validate order input
-            raise NotImplementedError("ordering methods not yet implemented")
+            try:
+                ordering = _ordering_methods[order]
+            except KeyError:
+                raise ValueError(
+                    "Unknown ordering method: {ordering}. "
+                    f"Must be one of {set(_ordering_methods.keys())}."
+                )
 
         self._tol = <double>tol if tol is not None else SPQR_DEFAULT_TOL
 
