@@ -487,17 +487,7 @@ def test_nearly_singular(davis_example_qr):
     # assert_allclose(x.toarray(), expect_x.toarray(), atol=1e-15, strict=True)
 
 
-# TODO non-square matrices
-square_As = [
-    A
-    for dtype in DTYPES
-    for A in generate_random_matrices(
-        N_trials=10, N_max=200, d_scale=0.05, square_only=True, dtype=dtype
-    )
-]
-
-
-@pytest.mark.parametrize("A", square_As)
+@pytest.mark.parametrize("A", test_As)
 @pytest.mark.parametrize("K", [0, 1, 3], ids=lambda k: f"K={k}")
 @pytest.mark.parametrize("is_sparse", [False, True], ids=["dense", "sparse"])
 def test_solve(A, K, is_sparse):
@@ -589,7 +579,7 @@ def test_info(davis_example_qr):
     assert info.n1cols == 0
     assert info.n1rows == 0
     assert info.ordering == "colamd"
-    assert info.memory > 0 # == 6184
+    assert info.memory > 0  # == 6184
     assert info.flops_upper_bound == 303  # == 847
     assert_allclose(info.tol, 5.1728e-13, rtol=1e-4)
     assert info.norm_E_fro == 0
