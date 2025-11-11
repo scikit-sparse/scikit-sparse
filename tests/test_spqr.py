@@ -210,6 +210,19 @@ def test_copy_symbolic(A, itype):
     assert_solve_dense(A, g)
 
 
+@pytest.mark.parametrize("itype", ITYPES)
+@pytest.mark.parametrize("A", test_As)
+def test_copy_numeric(A, itype):
+    A = A.copy()
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+    A.indptr = A.indptr.astype(itype)
+    A.indices = A.indices.astype(itype)
+    f = spqr_factor(A)
+    g = f.copy()
+    assert g is not f
+    assert_solve_dense(A, f)
+    del f  # ensure no shared state
+    assert_solve_dense(A, g)
 
 @pytest.mark.parametrize("copy", [False])
 @pytest.mark.parametrize("itype", ITYPES)
