@@ -21,6 +21,7 @@ from scipy.io import mmread
 
 from sksparse.spqr import (
     SPQRFactor,
+    SPQRRankDeficiencyWarning,
     spqr_factor,
     spqr_solve,
 )
@@ -443,16 +444,15 @@ def test_exactly_singular(davis_example_qr):
     f = spqr_factor(A)
     assert f.rank == N - 1
 
-    # FIXME this should probably raise an error? we just get a "0" in the
-    # singular position of the solution
-    # with pytest.raises(KLUError, match="indefinite or singular to working precision"):
-    x = f.solve(b)
+    # We just get a "0" in the singular position of the solution
+    with pytest.warns(SPQRRankDeficiencyWarning, match="rank deficient"):
+        x = f.solve(b)
 
     x = x.toarray()
     assert x[s] == 0.0
     idx = np.arange(N) != s
     assert_allclose(x[idx], expect_x.toarray()[idx], atol=1e-15, strict=True)
-    # assert_allclose(x.toarray(), expect_x.toarray(), atol=1e-15, strict=True)
+    assert_allclose(A @ x, b.toarray(), atol=1e-15, strict=True)
 
 
 def test_nearly_singular(davis_example_qr):
@@ -477,16 +477,15 @@ def test_nearly_singular(davis_example_qr):
     f = spqr_factor(A)
     assert f.rank == N - 1
 
-    # FIXME this should probably raise an error? we just get a "0" in the
-    # singular position of the solution
-    # with pytest.warns(SPQRSingularMatrixWarning, match="nearly singular"):
-    x = f.solve(b)
+    # We just get a "0" in the singular position of the solution
+    with pytest.warns(SPQRRankDeficiencyWarning, match="rank deficient"):
+        x = f.solve(b)
 
     x = x.toarray()
     assert x[s] == 0.0
     idx = np.arange(N) != s
     assert_allclose(x[idx], expect_x.toarray()[idx], atol=1e-15, strict=True)
-    # assert_allclose(x.toarray(), expect_x.toarray(), atol=1e-15, strict=True)
+    assert_allclose(A @ x, b.toarray(), atol=1e-15, strict=True)
 
 
 # Base test function for solving systems
@@ -588,7 +587,7 @@ def test_min2norm(davis_example_qr):
     print()
     print(f"||x||_2  = {la.norm(x):.6e}")
     print(f"||xf||_2 = {la.norm(xf):.6e}")
-    assert(la.norm(x) <= la.norm(xf))
+    assert la.norm(x) <= la.norm(xf)
 
 
 # Test solve on "real-world" matrices
