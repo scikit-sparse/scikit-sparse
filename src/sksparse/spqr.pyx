@@ -84,6 +84,7 @@ from sksparse.cholmod cimport (
     _ndarray_copy_from_intptr,
     _cholmod_dense_from_ndarray,
     _ndarray_from_cholmod_dense,
+    _copy_cholmod_common,
 )
 
 import numpy as np
@@ -102,16 +103,48 @@ __all = [
 ]
 
 
+ctypedef fused index_t:
+    int32_t
+    int64_t
+
+
 ctypedef fused value_t:
     double
     double complex
 
 
 # Define specific instantiations
+ctypedef spqr_symbolic[int32_t] spqr_symb_i
+ctypedef spqr_symbolic[int64_t] spqr_symb_l
+
+ctypedef fused symbolic_t:
+    spqr_symb_i
+    spqr_symb_l
+
+
+ctypedef spqr_numeric[double, int32_t] spqr_num_di
+ctypedef spqr_numeric[double, int64_t] spqr_num_dl
+ctypedef spqr_numeric[doublecomplex, int32_t] spqr_num_zi
+ctypedef spqr_numeric[doublecomplex, int64_t] spqr_num_zl
+
+ctypedef fused numeric_t:
+    spqr_num_di
+    spqr_num_dl
+    spqr_num_zi
+    spqr_num_zl
+
+
 ctypedef SuiteSparseQR_factorization[double, int32_t] spqr_fact_di
 ctypedef SuiteSparseQR_factorization[double, int64_t] spqr_fact_dl
 ctypedef SuiteSparseQR_factorization[doublecomplex, int32_t] spqr_fact_zi
 ctypedef SuiteSparseQR_factorization[doublecomplex, int64_t] spqr_fact_zl
+
+ctypedef fused factor_t:
+    spqr_fact_di
+    spqr_fact_dl
+    spqr_fact_zi
+    spqr_fact_zl
+
 
 
 # -------------------------------------------------------------------------------------
@@ -120,6 +153,283 @@ ctypedef SuiteSparseQR_factorization[doublecomplex, int64_t] spqr_fact_zl
 class SPQRError(Exception):
     """Base class for SPQR exceptions."""
     pass
+
+
+# -------------------------------------------------------------------------------------
+#         Copy Functions
+# -------------------------------------------------------------------------------------
+cdef inline void* _malloc_copy(
+    const void* src,
+    size_t n,
+    size_t size,
+    const cholmod_common* cm
+):
+    """Allocate memory and copy data from src to the new memory."""
+    assert cm is not NULL
+    if src is NULL:
+        return NULL
+
+    cdef void* dest = malloc(n * size)
+
+    if dest is NULL:
+        return NULL
+
+    if n > 0:
+        memcpy(dest, src, n * size)
+
+    return dest
+
+
+cdef int _copy_spqr_symbolic_base(
+    symbolic_t* dest,
+    const symbolic_t* src,
+    const cholmod_common* cm,
+    index_t _dummy_idx=0,
+) except -1:
+    """Deep copy a SuiteSparseQR_symbolic object."""
+    assert dest is not NULL
+    assert src is not NULL
+    assert cm is not NULL
+
+    # Prune invalid type combinations
+    if not (
+        (symbolic_t is spqr_symb_i and index_t is int32_t)
+        or (symbolic_t is spqr_symb_l and index_t is int64_t)
+    ):
+        assert False
+        return 0
+
+    dest.m = src.m
+    dest.n = src.n
+    dest.anz = src.anz
+
+    dest.Sp = <index_t*>_malloc_copy(src.Sp, src.m + 1, sizeof(index_t), cm)
+    dest.Sj = <index_t*>_malloc_copy(src.Sj, src.anz, sizeof(index_t), cm)
+
+    dest.Qfill = <index_t*>_malloc_copy(src.Qfill, src.n, sizeof(index_t), cm)
+    dest.PLinv = <index_t*>_malloc_copy(src.PLinv, src.m, sizeof(index_t), cm)
+    dest.Sleft = <index_t*>_malloc_copy(src.Sleft, src.n + 2, sizeof(index_t), cm)
+
+    dest.nf = src.nf
+    dest.maxfn = src.maxfn
+
+    dest.Parent = <index_t*>_malloc_copy(src.Parent, src.nf + 1, sizeof(index_t), cm)
+    dest.Child = <index_t*>_malloc_copy(src.Child, src.nf + 1, sizeof(index_t), cm)
+    dest.Childp = <index_t*>_malloc_copy(src.Childp, src.nf + 2, sizeof(index_t), cm)
+
+    dest.Super = <index_t*>_malloc_copy(src.Super, src.nf + 1, sizeof(index_t), cm)
+
+    dest.Rp = <index_t*>_malloc_copy(src.Rp, src.nf + 1, sizeof(index_t), cm)
+    dest.Rj = <index_t*>_malloc_copy(src.Rj, src.rjsize, sizeof(index_t), cm)
+    dest.Post = <index_t*>_malloc_copy(src.Post, src.nf + 1, sizeof(index_t), cm)
+
+    dest.rjsize = src.rjsize
+    dest.do_rank_detection = src.do_rank_detection
+    dest.maxstack = src.maxstack
+    dest.hisize = src.hisize
+    dest.keepH = src.keepH
+
+    dest.Hip = <index_t*>_malloc_copy(src.Hip, src.nf + 1, sizeof(index_t), cm)
+
+    dest.ntasks = src.ntasks
+    dest.ns = src.ns
+
+    if dest.ntasks > 1:
+        raise NotImplementedError("SPQR task parallelism not yet supported.")
+
+    return 0
+
+
+cdef inline int _copy_spqr_symbolic(
+    symbolic_t* dest,
+    const symbolic_t* src,
+    const cholmod_common* cm,
+) except -1:
+    """Deep copy a spqr_symbolic struct."""
+    if symbolic_t is spqr_symb_i:
+        return _copy_spqr_symbolic_base[spqr_symb_i, int32_t](dest, src, cm)
+    else:  # symbolic_t is spqr_symb_l
+        return _copy_spqr_symbolic_base[spqr_symb_l, int64_t](dest, src, cm)
+
+
+cdef int _copy_spqr_numeric_base(
+    numeric_t* dest,
+    const numeric_t* src,
+    const cholmod_common* cm,
+    value_t _dummy_val=0,
+    index_t _dummy_idx=0,
+) except -1:
+    """Deep copy a SuiteSparseQR_numeric object."""
+    assert dest is not NULL
+    assert src is not NULL
+    assert cm is not NULL
+
+    # Prune invalid type combinations
+    if not (
+        (numeric_t is spqr_num_di and index_t is int32_t and value_t is double)
+        or (numeric_t is spqr_num_dl and index_t is int64_t and value_t is double)
+        or (numeric_t is spqr_num_zi and index_t is int32_t and value_t is doublecomplex)
+        or (numeric_t is spqr_num_zl and index_t is int64_t and value_t is doublecomplex)
+    ):
+        assert False
+        return 0
+
+    dest.Rblock = <value_t**>malloc(src.nf * sizeof(value_t*))
+    dest.Stacks = <value_t**>malloc(src.ns * sizeof(value_t*))
+
+    # Deep copy each Rblock
+    cdef size_t k
+
+    if dest.Rblock is not NULL:
+        for k in range(src.nf):
+            # FIXME what is the *size* of each Rblock?
+            dest.Rblock[k] = <value_t*>_malloc_copy(
+                src.Rblock[k], 1, sizeof(value_t), cm
+            )
+
+    dest.Stack_size = <index_t*>_malloc_copy(
+        src.Stack_size, src.ns, sizeof(index_t), cm
+    )
+
+    # Deep copy each stack
+    if dest.Stacks is not NULL:
+        for k in range(src.ns):
+            dest.Stacks[k] = <value_t*>_malloc_copy(
+                src.Stacks[k], src.Stack_size[k], sizeof(value_t), cm
+            )
+
+    dest.hisize = src.hisize
+    dest.m = src.m
+    dest.n = src.n
+    dest.nf = src.nf
+    dest.ntasks = src.ntasks
+    dest.ns = src.ns
+    dest.maxstack = src.maxstack
+
+    dest.Rdead = <char*>_malloc_copy(src.Rdead, src.n, sizeof(char), cm)
+
+    dest.rank = src.rank
+    dest.rank1 = src.rank1
+    dest.maxfrank = src.maxfrank
+    dest.norm_E_fro = src.norm_E_fro
+
+    dest.keepH = src.keepH
+    dest.rjsize = src.rjsize
+
+    dest.HStair = <index_t*>_malloc_copy(src.HStair, src.rjsize, sizeof(index_t), cm)
+    dest.HTau = <value_t*>_malloc_copy(src.HTau, src.rjsize, sizeof(value_t), cm)
+
+    dest.Hii = <index_t*>_malloc_copy(src.Hii, src.hisize, sizeof(index_t), cm)
+    dest.HPinv = <index_t*>_malloc_copy(src.HPinv, src.m, sizeof(index_t), cm)
+
+    dest.Hm = <index_t*>_malloc_copy(src.Hm, src.nf, sizeof(index_t), cm)
+    dest.Hr = <index_t*>_malloc_copy(src.Hr, src.nf, sizeof(index_t), cm)
+
+    dest.maxfm = src.maxfm
+
+    return 0
+
+
+cdef inline int _copy_spqr_numeric(
+    numeric_t* dest,
+    const numeric_t* src,
+    const cholmod_common* cm,
+) except -1:
+    """Deep copy a spqr_numeric struct."""
+    if numeric_t is spqr_num_di:
+        return _copy_spqr_numeric_base[spqr_num_di, double, int32_t](dest, src, cm)
+    elif numeric_t is spqr_num_dl:
+        return _copy_spqr_numeric_base[spqr_num_dl, double, int64_t](dest, src, cm)
+    elif numeric_t is spqr_num_zi:
+        return _copy_spqr_numeric_base[spqr_num_zi, doublecomplex, int32_t](dest, src, cm)
+    else:  # numeric_t is spqr_num_zl
+        return _copy_spqr_numeric_base[spqr_num_zl, doublecomplex, int64_t](dest, src, cm)
+
+
+cdef int _copy_spqr_factor_base(
+    factor_t* dest,
+    const factor_t* src,
+    const cholmod_common* cm,
+    value_t _dummy_val=0,
+    index_t _dummy_idx=0,
+) except -1:
+    """Deep copy a SuiteSparseQR_factorization object."""
+    assert dest is not NULL
+    assert src is not NULL
+    assert cm is not NULL
+
+    # Validate types to ensure correct instantiation. Invalid combos will be pruned.
+    if not (
+        (factor_t is spqr_fact_di and index_t is int32_t and value_t is double)
+        or (factor_t is spqr_fact_dl and index_t is int64_t and value_t is double)
+        or (factor_t is spqr_fact_zi and index_t is int32_t and value_t is doublecomplex)
+        or (factor_t is spqr_fact_zl and index_t is int64_t and value_t is doublecomplex)
+    ):
+        assert False
+        return 0
+
+    dest.tol = src.tol
+
+    # Deep copy symbolic factorization
+    if factor_t is spqr_fact_di or factor_t is spqr_fact_zi:
+        dest.QRsym = <spqr_symb_i*>malloc(sizeof(spqr_symb_i))
+    else:
+        dest.QRsym = <spqr_symb_l*>malloc(sizeof(spqr_symb_l))
+
+    print("[copy_spqr_factor]: Copying symbolic factorization", flush=True)
+    _copy_spqr_symbolic(dest.QRsym, src.QRsym, cm)
+
+    # Deep copy numeric factorization
+    if factor_t is spqr_fact_di:
+        dest.QRnum = <spqr_num_di*>malloc(sizeof(spqr_num_di))
+    elif factor_t is spqr_fact_dl:
+        dest.QRnum = <spqr_num_dl*>malloc(sizeof(spqr_num_dl))
+    elif factor_t is spqr_fact_zi:
+        dest.QRnum = <spqr_num_zi*>malloc(sizeof(spqr_num_zi))
+    else:  # factor_t is spqr_fact_zl
+        dest.QRnum = <spqr_num_zl*>malloc(sizeof(spqr_num_zl))
+
+    if src.QRnum is not NULL:
+        print("[copy_spqr_factor]: Copying numeric factorization", flush=True)
+        _copy_spqr_numeric(dest.QRnum, src.QRnum, cm)
+
+    dest.R1p = <index_t*>_malloc_copy(src.R1p, src.n1rows + 1, sizeof(index_t), cm)
+    dest.R1j = <index_t*>_malloc_copy(src.R1j, src.n1rows, sizeof(index_t), cm)
+    dest.R1x = <value_t*>_malloc_copy(src.R1x, src.r1nz, sizeof(value_t), cm)
+    dest.r1nz = src.r1nz
+
+    dest.Q1fill = <index_t*>_malloc_copy(src.Q1fill, src.nacols, sizeof(index_t), cm)
+    dest.P1inv = <index_t*>_malloc_copy(src.P1inv, src.narows, sizeof(index_t), cm)
+    dest.HP1inv = <index_t*>_malloc_copy(src.HP1inv, src.narows, sizeof(index_t), cm)
+
+    dest.Rmap = <index_t*>_malloc_copy(src.Rmap, src.nacols, sizeof(index_t), cm)
+    dest.RmapInv = <index_t*>_malloc_copy(src.RmapInv, src.nacols, sizeof(index_t), cm)
+
+    dest.n1rows = src.n1rows
+    dest.n1cols = src.n1cols
+    dest.narows = src.narows
+    dest.nacols = src.nacols
+    dest.bncols = src.bncols
+    dest.rank = src.rank
+    dest.allow_tol = src.allow_tol
+
+    return 0
+
+
+cdef inline int _copy_spqr_factor(
+    factor_t* dest,
+    const factor_t* src,
+    const cholmod_common* cm,
+) except -1:
+    """Deep copy a SuiteSparseQR_factorization struct."""
+    if factor_t is spqr_fact_di:
+        return _copy_spqr_factor_base[spqr_fact_di, double, int32_t](dest, src, cm)
+    elif factor_t is spqr_fact_dl:
+        return _copy_spqr_factor_base[spqr_fact_dl, double, int64_t](dest, src, cm)
+    elif factor_t is spqr_fact_zi:
+        return _copy_spqr_factor_base[spqr_fact_zi, doublecomplex, int32_t](dest, src, cm)
+    else:  # factor_t is spqr_fact_zl
+        return _copy_spqr_factor_base[spqr_fact_zl, doublecomplex, int64_t](dest, src, cm)
 
 
 # -------------------------------------------------------------------------------------
@@ -411,6 +721,47 @@ cdef class SPQRFactor:
     # ---------------------------------------------------------------------------------
     #         Public API
     # ---------------------------------------------------------------------------------
+    def copy(self):
+        """Return a deep copy of the SPQRFactor object."""
+        cdef SPQRFactor dest = SPQRFactor.__new__(SPQRFactor)
+
+        dest._cm = &dest._common
+
+        if self._use_int32:
+            cholmod_start(dest._cm)
+        else:
+            cholmod_l_start(dest._cm)
+
+        _copy_cholmod_common(dest._cm, self._cm)
+
+        dest._use_int32 = self._use_int32
+        dest._is_real = self._is_real
+        dest._econ = self._econ
+        dest._M = self._M
+        dest._N = self._N
+        dest.itype = self.itype
+        dest.dtype = self.dtype
+        dest._tol = self._tol
+
+        # Deep copy the factorization
+        if self._is_real:
+            if self._use_int32:
+                print("[copy]: Copying real int32 factor", flush=True)
+                dest._fact_di = <spqr_fact_di*>malloc(sizeof(spqr_fact_di))
+                _copy_spqr_factor(dest._fact_di, self._fact_di, dest._cm)
+            else:
+                dest._fact_dl = <spqr_fact_dl*>malloc(sizeof(spqr_fact_dl))
+                _copy_spqr_factor(dest._fact_dl, self._fact_dl, dest._cm)
+        else:
+            if self._use_int32:
+                dest._fact_zi = <spqr_fact_zi*>malloc(sizeof(spqr_fact_zi))
+                _copy_spqr_factor(dest._fact_zi, self._fact_zi, dest._cm)
+            else:
+                dest._fact_zl = <spqr_fact_zl*>malloc(sizeof(spqr_fact_zl))
+                _copy_spqr_factor(dest._fact_zl, self._fact_zl, dest._cm)
+
+        return dest
+
     def factorize(self, object A, *, object tol=None):
         """Compute the numeric factorization of the matrix.
 
@@ -550,7 +901,7 @@ cdef class SPQRFactor:
 
         # cholmod_dense expects column-oriented
         X = np.asfortranarray(X)
-        
+
         Y = self._qmult(c_method, X)
 
         if return_sparse:

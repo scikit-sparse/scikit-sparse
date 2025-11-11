@@ -10,6 +10,8 @@
 # distutils: language = c++
 
 from libc.stdint cimport int32_t, int64_t, uintptr_t
+from libc.stdlib cimport malloc
+from libc.string cimport memcpy
 
 from sksparse.cholmod cimport cholmod_common, cholmod_dense, cholmod_sparse
 
