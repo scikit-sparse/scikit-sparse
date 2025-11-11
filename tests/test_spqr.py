@@ -574,6 +574,35 @@ def test_solve_real(problem):
 # -----------------------------------------------------------------------------
 #         Test Control and Info
 # -----------------------------------------------------------------------------
+def test_info(davis_example_qr):
+    A = davis_example_qr
+    f = spqr_factor(A)
+    info = f.info
+    print()
+    print(info)
+    # Values from MATLAB spqr
+    # >> [Q, R, E, info] = spqr(A);
+    assert info.nnzR_upper_bound == 36  # == 100
+    assert info.nnzH_upper_bound == 9
+    assert info.nf == 1
+    assert info.rank_A_estimate == 8
+    assert info.n1cols == 0
+    assert info.n1rows == 0
+    assert info.ordering == "colamd"
+    assert info.memory > 0 # == 6184
+    assert info.flops_upper_bound == 303  # == 847
+    assert_allclose(info.tol, 5.1728e-13, rtol=1e-4)
+    assert info.norm_E_fro == 0
+    assert info.analyze_time > 0    # == 6.4135e-05
+    assert info.factorize_time > 0  # == 3.0994e-05
+    assert info.solve_time == 0     # == 1.1683e-05
+    assert_allclose(
+        info.total_time,  # == 1.7700e-04
+        info.analyze_time + info.factorize_time + info.solve_time,
+    )
+    assert info.flops == 303  # == 847
+
+
 ORDERS = [
     None,
     "default",
