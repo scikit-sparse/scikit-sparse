@@ -205,8 +205,9 @@ def test_copy_symbolic(A, itype):
     assert g.dtype == f.dtype
     # Test that numeric factorization + solve can be done on the copy
     f.factorize(A)
-    g.factorize(A)
     assert_solve_dense(A, f)
+    del f  # ensure no shared state
+    g.factorize(A)
     assert_solve_dense(A, g)
 
 
@@ -224,30 +225,33 @@ def test_copy_numeric(A, itype):
     del f  # ensure no shared state
     assert_solve_dense(A, g)
 
-@pytest.mark.parametrize("copy", [False])
+
+@pytest.mark.parametrize("copy", [False, True])
 @pytest.mark.parametrize("itype", ITYPES)
 @pytest.mark.parametrize("A", test_As)
 def test_refactor(A, itype, copy):
-    # atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-6
     A = A.copy()
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
     A.indptr = A.indptr.astype(itype)
     A.indices = A.indices.astype(itype)
     f = spqr_factor(A)
-    assert_solve_dense(A, f)
     # Create a new matrix with the same sparsity pattern but different values
     B = A.copy()
     rng = np.random.default_rng(56)
     B.data = rng.random(len(B.data)).astype(dtype=B.dtype)
     # Factor the new matrix with the same sparsity pattern
-    # if copy:
-    #     g = f.copy()
-    #     assert g is not f
-    #     g.factorize(B)
-    #     assert_solve_dense(B, f)
-    # else:
-    f.factorize(B)
-    assert_solve_dense(B, f)
+    if copy:
+        g = f.copy()
+        assert g is not f
+        assert_solve_dense(A, f)  # make sure copy didn't affect f
+        del f  # ensure no shared state
+        # NOTE this test *does not* check that the numeric copy is correct,
+        # because it entirely recomputes it with the factorize call.
+        g.factorize(B)
+        assert_solve_dense(B, g)
+    else:
+        f.factorize(B)
+        assert_solve_dense(B, f)
 
 
 # -----------------------------------------------------------------------------
