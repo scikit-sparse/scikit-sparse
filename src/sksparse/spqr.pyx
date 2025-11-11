@@ -75,6 +75,11 @@ from cython cimport doublecomplex
 
 from sksparse.cholmod cimport (
     CHOLMOD_OK,
+    CHOLMOD_GPU_PROBLEM,
+    CHOLMOD_INVALID,
+    CHOLMOD_NOT_INSTALLED,
+    CHOLMOD_OUT_OF_MEMORY,
+    CHOLMOD_TOO_LARGE,
     CHOLMOD_INT,
     CHOLMOD_REAL,
     cholmod_start,
@@ -97,6 +102,12 @@ from .utils import validate_csc_input
 
 
 __all = [
+    "SPQRError",
+    "SPQRNotInstalledError",
+    "SPQROutOfMemoryError",
+    "SPQROverflowError",
+    "SPQRInvalidInputError",
+    "SPQRGpuProblemError",
     "SPQRFactor",
     "spqr_factor",
     "spqr_solve",
@@ -153,6 +164,81 @@ ctypedef fused factor_t:
 class SPQRError(Exception):
     """Base class for SPQR exceptions."""
     pass
+
+
+class SPQRNotInstalledError(SPQRError):
+    """Raised when the SPQR library is not installed."""
+    pass
+
+
+class SPQROutOfMemoryError(MemoryError, SPQRError):
+    """Raised when SPQR runs out of memory."""
+    pass
+
+
+class SPQROverflowError(SPQRError):
+    """Raised when SPQR encounters an integer overflow."""
+    pass
+
+
+class SPQRInvalidInputError(SPQRError):
+    """Raised when SPQR receives invalid input."""
+    pass
+
+
+class SPQRGpuProblemError(SPQRError):
+    """Raised when SPQR encounters a problem with CUDA."""
+    pass
+
+
+# Known Errors -- SPQR uses CHOLMOD error codes
+cdef dict _ERROR_INDEX = {
+    CHOLMOD_NOT_INSTALLED: (
+        SPQRNotInstalledError, "SPQR library is not installed or not found."
+    ),
+    CHOLMOD_OUT_OF_MEMORY: (SPQROutOfMemoryError, "SPQR ran out of memory."),
+    CHOLMOD_TOO_LARGE: (SPQROverflowError, "SPQR encountered an integer overflow."),
+    CHOLMOD_INVALID: (SPQRInvalidInputError, "SPQR received invalid input."),
+    CHOLMOD_GPU_PROBLEM: (SPQRGpuProblemError, "SPQR encountered a problem with CUDA."),
+}
+
+
+cdef int _handle_errors(int status) except -1 with gil:
+    """Handle SPQR errors by raising Python exceptions or warnings.
+
+    This function should be called with the return ``status`` after any SPQR
+    C function that may fail.
+
+    Parameters
+    ----------
+    status : int
+        The SPQR exit status code.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    :exc:`SPQRWarning` or subclass
+        Raises a warning for non-critical issues.
+    :exc:`SPQRError` or subclass
+        Raises an appropriate Python exception based on the SPQR status code.
+    """
+    if status == CHOLMOD_OK:
+        return 0
+
+    # Fallback to generic error for unknown codes
+    exc_class, msg = _ERROR_INDEX.get(
+        status,
+        (SPQRError, "An unknown SPQR error occurred.")
+    )
+    full_msg = f"{msg} (code {status:d})"
+
+    if issubclass(exc_class, Warning):
+        warnings.warn(full_msg, exc_class, stacklevel=2)
+    else:
+        raise exc_class(full_msg)
 
 
 # -------------------------------------------------------------------------------------
@@ -656,9 +742,7 @@ cdef class SPQRFactor:
                         ordering, allow_tol, Ac, self._cm
                     )
 
-        # TODO proper error handling
-        if self._cm.status != CHOLMOD_OK:
-            raise SPQRError(f"Error {self._cm.status}")
+        _handle_errors(self._cm.status)
 
         self.itype = np.dtype(np.int32 if self._use_int32 else np.int64)
         self.dtype = np.dtype(np.float64 if self._is_real else np.complex128)
@@ -858,9 +942,7 @@ cdef class SPQRFactor:
                     self._tol, Ac, self._fact_zl, self._cm
                 )
 
-        # TODO proper error handling
-        if self._cm.status != CHOLMOD_OK:
-            raise SPQRError(f"Error {self._cm.status}")
+        _handle_errors(self._cm.status)
 
         return self
 
@@ -977,9 +1059,7 @@ cdef class SPQRFactor:
                     method, self._fact_zl, Xd, self._cm
                 )
 
-        # TODO handle errors
-        if self._cm.status != CHOLMOD_OK:
-            raise SPQRError(f"qmult error {self._cm.status}")
+        _handle_errors(self._cm.status)
 
         return _ndarray_from_cholmod_dense(Yd, self._use_int32, self._cm)
 
@@ -1108,9 +1188,7 @@ cdef class SPQRFactor:
                         SPQR_QTX, self._fact_zl, Bd, self._cm
                     )
 
-        # TODO handle errors
-        if self._cm.status != CHOLMOD_OK:
-            raise SPQRError(f"qmult error {self._cm.status}")
+        _handle_errors(self._cm.status)
 
         # Solve the system
         cdef int system = SPQR_RETX_EQUALS_B if not transpose else SPQR_RTX_EQUALS_ETB
@@ -1135,9 +1213,7 @@ cdef class SPQRFactor:
                     system, self._fact_zl, Bd, self._cm
                 )
 
-        # TODO handle errors
-        if self._cm.status != CHOLMOD_OK:
-            raise SPQRError(f"solve error {self._cm.status}")
+        _handle_errors(self._cm.status)
 
         # System is A.T x = b -> (QRE.T).Tx = b -> (E R.T Q.T) x = b
         # But "solve" does not touch Q, so -> (E R.T) (Q.T x) = b
@@ -1162,9 +1238,7 @@ cdef class SPQRFactor:
                         SPQR_QX, self._fact_zl, Xd, self._cm
                     )
 
-        # TODO handle errors
-        if self._cm.status != CHOLMOD_OK:
-            raise SPQRError(f"qmult QX error {self._cm.status}")
+        _handle_errors(self._cm.status)
 
         return _ndarray_from_cholmod_dense(Xd, self._use_int32, self._cm)
 
