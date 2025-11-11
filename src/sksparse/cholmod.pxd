@@ -113,6 +113,20 @@ cdef extern from "cholmod.h":
         int called_nd
         int blas_ok
 
+        double SPQR_grain
+        double SPQR_small
+        int SPQR_shrink
+        int SPQR_nthreads
+
+        double SPQR_flopcount
+        double SPQR_analyze_time
+        double SPQR_factorize_time
+        double SPQR_solve_time
+        double SPQR_flopcount_bound
+        double SPQR_tol_used
+        double SPQR_norm_E_fro
+        int64_t SPQR_istat[8]
+
     ctypedef struct cholmod_factor:
         size_t n
         size_t minor

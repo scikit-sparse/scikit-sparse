@@ -157,6 +157,17 @@ ctypedef fused factor_t:
     spqr_fact_zl
 
 
+# NOTE These are not defined in the header files, so we define them here
+cdef:
+    int SPQR_ISTAT_NNZR_UPPER = 0
+    int SPQR_ISTAT_NNZH_UPPER = 1
+    int SPQR_ISTAT_NFRONTAL = 2
+    int SPQR_ISTAT_NTASKS = 3
+    int SPQR_ISTAT_EST_RANKA = 4
+    int SPQR_ISTAT_COL_SINGLETONS = 5
+    int SPQR_ISTAT_ROW_SINGLETONS = 6
+    int SPQR_ISTAT_ORDERING = 7
+
 
 # -------------------------------------------------------------------------------------
 #         Error Handling
@@ -258,6 +269,85 @@ cdef dict _ordering_methods = {
 
 
 cdef dict _ordering_methods_inv = {v: k for k, v in _ordering_methods.items()}
+
+
+@cython.dataclasses.dataclass(frozen=True)
+cdef class SPQRInfo:
+    """A dataclass to hold SPQR info statistics.
+
+    Attributes
+    ----------
+    nnzR_upper_bound : int
+        Bound on the number of nonzeros in ``R``.
+    nnzH_upper_bound : int
+        Bound on the number of nonzeros in ``H``.
+    nf : int
+        Number of frontal matrices.
+    rank_A_estimate : int
+        Estimated rank of ``A``.
+    n1cols : int
+        Number of singleton columns.
+    n1rows : int
+        Number of singleton rows.
+    ordering : str
+        Ordering method used.
+    memory : int
+        Memory usage in bytes.
+    flops_upper_bound : int
+        Upper bound on flop count (excluding backsolve).
+    tol : float
+        Column norm tolerance used.
+    norm_E_fro : float
+        Norm of dropped diagonal of R.
+    analyze_time : float
+        Time taken for the symbolic analysis in seconds.
+    factorize_time : int
+        Time take for the numeric factorization (including applying ``Q.T``)
+    solve_time : int
+        Time taken for the backsolve only :math:`R x = Q^T b` in seconds.
+    total_time : int
+        Total time in seconds.
+    flops : int
+        Actual flops for the factorization and solve (including backsolve).
+    """
+    nnzR_upper_bound : int | None = None
+    nnzH_upper_bound : int | None = None
+    nf : int | None = None
+    rank_A_estimate : int | None = None
+    n1cols : int | None = None
+    n1rows : int | None = None
+    ordering : str | None = None
+    memory : int | None = None
+    flops_upper_bound : int | None = None
+    tol : float | None = None
+    norm_E_fro : float | None = None
+    analyze_time : float | None = None
+    factorize_time : float | None = None
+    solve_time : float | None = None
+    total_time : float | None = None
+    flops : int | None = None
+
+    # __init__ can't take a C pointer, so we use a separate method
+    cdef int _init_from_common(self, cholmod_common* cm) except -1:
+        """Initialize SPQRInfo from a cholmod_common object."""
+        assert cm is not NULL
+        self.nnzR_upper_bound = cm.SPQR_istat[SPQR_ISTAT_NNZR_UPPER]
+        self.nnzH_upper_bound = cm.SPQR_istat[SPQR_ISTAT_NNZH_UPPER]
+        self.nf = cm.SPQR_istat[SPQR_ISTAT_NFRONTAL]
+        self.rank_A_estimate = cm.SPQR_istat[SPQR_ISTAT_EST_RANKA]
+        self.n1cols = cm.SPQR_istat[SPQR_ISTAT_COL_SINGLETONS]
+        self.n1rows = cm.SPQR_istat[SPQR_ISTAT_ROW_SINGLETONS]
+        cdef int order = cm.SPQR_istat[SPQR_ISTAT_ORDERING]
+        self.ordering = _ordering_methods_inv.get(order, f"unknown {order}")
+        self.memory = cm.memory_usage
+        self.flops_upper_bound = cm.SPQR_flopcount_bound
+        self.tol = cm.SPQR_tol_used
+        self.norm_E_fro = cm.SPQR_norm_E_fro
+        self.analyze_time = cm.SPQR_analyze_time
+        self.factorize_time = cm.SPQR_factorize_time
+        self.solve_time = cm.SPQR_solve_time
+        self.total_time = self.analyze_time + self.factorize_time + self.solve_time
+        self.flops = cm.SPQR_flopcount
 
 
 # -------------------------------------------------------------------------------------
@@ -876,6 +966,12 @@ cdef class SPQRFactor:
                 ptr = <void*>self._fact_zl.Q1fill
 
         return _ndarray_copy_from_intptr(ptr, self._N, self._use_int32)
+
+    @property
+    def info(self):
+        cdef SPQRInfo info = SPQRInfo()
+        info._init_from_common(self._cm)
+        return info
 
     # ---------------------------------------------------------------------------------
     #         Public API

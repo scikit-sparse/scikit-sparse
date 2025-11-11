@@ -1079,6 +1079,7 @@ cdef void _copy_cholmod_common(cholmod_common* dest, cholmod_common* src):
     dest.current = src.current
     dest.selected = src.selected
 
+    cdef int i
     if src.method is not NULL:
         for i in range(src.nmethods):
             dest.method[i].lnz = src.method[i].lnz
@@ -1115,7 +1116,24 @@ cdef void _copy_cholmod_common(cholmod_common* dest, cholmod_common* src):
     dest.called_nd = src.called_nd
     dest.blas_ok = src.blas_ok
 
-    # Skip SPQR related fields and GPU related fields
+    dest.SPQR_grain = src.SPQR_grain
+    dest.SPQR_small = src.SPQR_small
+    dest.SPQR_shrink = src.SPQR_shrink
+    dest.SPQR_nthreads = src.SPQR_nthreads
+
+    dest.SPQR_flopcount = src.SPQR_flopcount
+    dest.SPQR_analyze_time = src.SPQR_analyze_time
+    dest.SPQR_factorize_time = src.SPQR_factorize_time
+    dest.SPQR_solve_time = src.SPQR_solve_time
+    dest.SPQR_flopcount_bound = src.SPQR_flopcount_bound
+    dest.SPQR_tol_used = src.SPQR_tol_used
+    dest.SPQR_norm_E_fro = src.SPQR_norm_E_fro
+
+    if src.SPQR_istat is not NULL:
+        for i in range(8):
+            dest.SPQR_istat[i] = src.SPQR_istat[i]
+
+    # Skip GPU related fields
 
 
 cdef class CholeskyFactor:
