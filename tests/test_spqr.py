@@ -186,13 +186,32 @@ def test_davis_example_qr(davis_example_qr, itype, dtype):
 test_As = [
     A
     for dtype in DTYPES
-    for A in generate_random_matrices(
-        N_trials=10, N_max=200, d_scale=0.05, dtype=dtype
-    )
+    for A in generate_random_matrices(N_trials=10, N_max=200, d_scale=0.05, dtype=dtype)
 ]
 
 
-@pytest.mark.parametrize("copy", [False])  # TODO copy=True
+@pytest.mark.parametrize("itype", ITYPES)
+@pytest.mark.parametrize("A", test_As)
+def test_copy_symbolic(A, itype):
+    A = A.copy()
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+    A.indptr = A.indptr.astype(itype)
+    A.indices = A.indices.astype(itype)
+    f = SPQRFactor(A)
+    g = f.copy()
+    assert g is not f
+    assert g.shape == f.shape
+    assert g.itype == f.itype
+    assert g.dtype == f.dtype
+    # Test that numeric factorization + solve can be done on the copy
+    f.factorize(A)
+    g.factorize(A)
+    assert_solve_dense(A, f)
+    assert_solve_dense(A, g)
+
+
+
+@pytest.mark.parametrize("copy", [False])
 @pytest.mark.parametrize("itype", ITYPES)
 @pytest.mark.parametrize("A", test_As)
 def test_refactor(A, itype, copy):
