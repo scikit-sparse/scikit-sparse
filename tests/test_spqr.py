@@ -571,5 +571,36 @@ def test_solve_real(problem):
     assert_allclose(x, expect_x, atol=1e-7)
 
 
+# -----------------------------------------------------------------------------
+#         Test Control and Info
+# -----------------------------------------------------------------------------
+ORDERS = [
+    None,
+    "default",
+    "fixed",
+    "natural",
+    "colamd",
+    "cholmod",
+    "amd",
+    "metis",
+    "best",
+    "bestamd",
+]
+
+
+def test_bad_ordering(davis_example_qr):
+    A = davis_example_qr
+    with pytest.raises(ValueError, match="Unknown ordering"):
+        SPQRFactor(A, order="invalid")
+
+
+@pytest.mark.parametrize("order", ORDERS)
+def test_ordering(davis_example_qr, order):
+    A = davis_example_qr
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+    f = spqr_factor(A, order=order)
+    assert_solve_dense(A, f)
+
+
 # =============================================================================
 # =============================================================================
