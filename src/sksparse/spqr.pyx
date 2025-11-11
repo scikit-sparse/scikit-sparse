@@ -625,7 +625,10 @@ cdef class SPQRFactor:
 
     tol : float, optional
         If the 2-norm of a column in ``A`` is less than ``tol``, that column is
-        considered to be a zero column. If ``None``, the default tolerance is used.
+        considered to be a zero column. If ``tol = 0``, no columns are treated as zero.
+        If ``None``, the default tolerance is used. The default is ``tol = ``
+        :math:`20 (M + N) \epsilon \sqrt{\max{\mathrm{diag}(A^{\top} A)}}`,
+        where :math:`\epsilon` is the machine precision.
 
     Properties
     ----------
