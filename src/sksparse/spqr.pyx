@@ -1462,8 +1462,7 @@ def spqr_factor(A, *, use_singletons=False, order=None, tol=None):
         return SPQRFactor(A, use_singletons=False, order=order, tol=tol).factorize(A)
 
 
-# TODO rewrite using the simple SPQR interface?
-def spqr_solve(A, b, *, transpose=False):
+def spqr_solve(A, b, *, transpose=False, min2norm=True):
     """Solve a linear system using the SPQR factorization.
 
     This function solves a linear system for :math:`x` given the right-hand side
@@ -1491,6 +1490,11 @@ def spqr_solve(A, b, *, transpose=False):
         ``A`` if ``transpose=False``, otherwise the number of columns.
     transpose : bool, optional
         Whether to solve the transposed system. Default is False.
+    min2norm : bool, optional
+        If True, compute the minimum 2-norm solution when ``A`` is underdetermined.
+        ``transpose`` is ignored in this case. Default is True. If False, the
+        solution of an underdetermined system is not guaranteed to be the minimum
+        2-norm solution.
 
     Returns
     -------
@@ -1502,4 +1506,10 @@ def spqr_solve(A, b, *, transpose=False):
         ``N`` is the number of columns in ``A`` if ``transpose=False``,
         otherwise the number of rows.
     """
-    return SPQRFactor(A, use_singletons=True).solve(b, transpose=transpose)
+    A, _, _ = validate_csc_input(A)
+    M, N = A.shape
+
+    if M < N and min2norm:
+        return SPQRFactor(A.T.tocsc(), use_singletons=True).solve(b, transpose=True)
+    else:
+        return SPQRFactor(A, use_singletons=True).solve(b, transpose=transpose)
