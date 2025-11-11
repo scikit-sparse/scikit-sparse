@@ -274,29 +274,67 @@ cdef int _copy_spqr_numeric_base(
         assert False
         return 0
 
-    dest.Rblock = <value_t**>malloc(src.nf * sizeof(value_t*))
     dest.Stacks = <value_t**>malloc(src.ns * sizeof(value_t*))
-
-    # Deep copy each Rblock
-    cdef size_t k
-
-    if dest.Rblock is not NULL:
-        for k in range(src.nf):
-            # FIXME what is the *size* of each Rblock?
-            dest.Rblock[k] = <value_t*>_malloc_copy(
-                src.Rblock[k], 1, sizeof(value_t), cm
-            )
-
     dest.Stack_size = <index_t*>_malloc_copy(
         src.Stack_size, src.ns, sizeof(index_t), cm
     )
 
     # Deep copy each stack
-    if dest.Stacks is not NULL:
+    cdef size_t k
+
+    if (
+        dest.Stacks is not NULL
+        and src.Stacks is not NULL
+        and src.Stack_size is not NULL
+    ):
         for k in range(src.ns):
             dest.Stacks[k] = <value_t*>_malloc_copy(
                 src.Stacks[k], src.Stack_size[k], sizeof(value_t), cm
             )
+
+    # Point each Rblock to the copied stacks
+    # See: SPQR/Source/spqr_kernel.cpp:186 for Rblock assignment logic
+    dest.Rblock = <value_t**>malloc(src.nf * sizeof(value_t*))
+
+    cdef:
+        size_t s              # index for stacks
+        size_t stack_size     # size of stack in bytes
+        size_t offset         # byte offset within stack
+        int f                 # stack index that Rblock points to
+        value_t *stack_start  # pointer to start of stack
+        value_t *rblock_ptr   # pointer to Rblock[k]
+
+    if dest.Rblock is not NULL and src.Rblock is not NULL:
+        for k in range(src.nf):
+            rblock_ptr = src.Rblock[k]
+            if rblock_ptr is NULL:
+                continue
+
+            # Find which stack this Rblock points to
+            f = -1
+            for s in range(src.ns):
+                # Check if the pointer is in this stack
+                stack_start = src.Stacks[s]
+                if stack_start is NULL:
+                    continue
+
+                stack_size = src.Stack_size[s] * sizeof(value_t)
+
+                # Check if the Rblock poitner falls within the memory range of stack s
+                if (<char*>rblock_ptr >= <char*>stack_start) and (
+                    <char*>rblock_ptr < <char*>stack_start + stack_size
+                ):
+                    f = s
+                    break
+
+            # Compute the offset within the stack
+            if f == -1:
+                raise SPQRError("Failed to copy Rblock pointers.")
+            else:
+                # Compute the byte offset to Rblock[k] within the stack
+                offset = <char*>rblock_ptr - <char*>src.Stacks[f]
+                # Apply the same offset to the copied stack
+                dest.Rblock[k] = <value_t*>(<char*>dest.Stacks[f] + offset)
 
     dest.hisize = src.hisize
     dest.m = src.m
