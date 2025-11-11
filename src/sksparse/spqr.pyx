@@ -790,14 +790,14 @@ cdef class SPQRFactor:
         """Free the SPQR factorization and common objects."""
         if self._is_real:
             if self._use_int32:
-                assert SuiteSparseQR_free[double, int32_t](&self._fact_di, self._cm)
+                SuiteSparseQR_free[double, int32_t](&self._fact_di, self._cm)
             else:
-                assert SuiteSparseQR_free[double, int64_t](&self._fact_dl, self._cm)
+                SuiteSparseQR_free[double, int64_t](&self._fact_dl, self._cm)
         else:
             if self._use_int32:
-                assert SuiteSparseQR_free[doublecomplex, int32_t](&self._fact_zi, self._cm)
+                SuiteSparseQR_free[doublecomplex, int32_t](&self._fact_zi, self._cm)
             else:
-                assert SuiteSparseQR_free[doublecomplex, int64_t](&self._fact_zl, self._cm)
+                SuiteSparseQR_free[doublecomplex, int64_t](&self._fact_zl, self._cm)
 
         if self._use_int32:
             cholmod_finish(self._cm)
