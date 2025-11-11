@@ -568,6 +568,29 @@ def test_solve_overunder(A, K, is_sparse, underdetermined):
     _test_solve(A, K, is_sparse, transpose=False, underdetermined=underdetermined)
 
 
+def test_min2norm(davis_example_qr):
+    A = davis_example_qr.todok()
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+    A = A[:-2, :].tocsc()  # make underdetermined
+    M, N = A.shape
+
+    expect_x = np.arange(1, N + 1, dtype=A.dtype)
+    b = A @ expect_x
+
+    # Solve with min 2-norm solver
+    x = spqr_solve(A, b, min2norm=True)
+
+    assert_allclose(A @ x, b, atol=1e-15, strict=True)
+
+    # Solve with normal solver and check norm
+    xf = spqr_solve(A, b, min2norm=False)
+
+    print()
+    print(f"||x||_2  = {la.norm(x):.6e}")
+    print(f"||xf||_2 = {la.norm(xf):.6e}")
+    assert(la.norm(x) <= la.norm(xf))
+
+
 # Test solve on "real-world" matrices
 def _load_problem(name):
     """Load a matrix and RHS from a Matrix Market file."""
