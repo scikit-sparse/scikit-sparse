@@ -182,6 +182,24 @@ cdef extern from "SuiteSparseQR.hpp":
         cholmod_common *cc
     )
 
+    cholmod_dense *SuiteSparseQR_qmult_Hd "SuiteSparseQR_qmult"[Entry, Int](
+        int method,
+        cholmod_sparse *H,
+        cholmod_dense *HTau,
+        Int *HPinv,
+        cholmod_dense *Xdense,
+        cholmod_common *cc
+    )
+
+    cholmod_sparse *SuiteSparseQR_qmult_Hs "SuiteSparseQR_qmult"[Entry, Int](
+        int method,
+        cholmod_sparse *H,
+        cholmod_dense *HTau,
+        Int *HPinv,
+        cholmod_sparse *X,
+        cholmod_common *cc
+    )
+
     # "Expert" Functions
     SuiteSparseQR_factorization[Entry, Int] *SuiteSparseQR_factorize[Entry, Int](
         int ordering,

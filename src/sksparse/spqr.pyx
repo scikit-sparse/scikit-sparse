@@ -1837,3 +1837,241 @@ def spqr(A, *, mode="full", order=None, tol=None):
         return Q, R, E
     else:  # mode == "householder"
         return (H, tau, v), R, E
+
+
+# -------------------------------------------------------------------------------------
+#         Qmult
+# -------------------------------------------------------------------------------------
+cdef object _qmult_sparse(
+    int method,
+    cholmod_sparse *H,
+    cholmod_dense *HTau,
+    index_t[::1] HPinv,
+    object X,
+    cholmod_common *cm,
+):
+    """Multiply a sparse matrix by Q."""
+    cdef cholmod_sparse Xsparse
+    cdef cholmod_sparse *Xs = &Xsparse
+    cdef int stype = 0  # assume unsymmetric
+    _cholmod_sparse_from_csc(
+        X.shape, X.indptr, X.indices, X.data, stype, <uintptr_t>Xs
+    )
+
+    cdef bint is_real = (Xs.xtype == CHOLMOD_REAL)
+    cdef bint use_int32 = (Xs.itype == CHOLMOD_INT)
+
+    cdef cholmod_sparse *Ys
+
+    if is_real:
+        if use_int32:
+            Ys = SuiteSparseQR_qmult_Hs[double, int32_t](
+                method, H, HTau, <int32_t*>&HPinv[0], Xs, cm
+            )
+        else:
+            Ys = SuiteSparseQR_qmult_Hs[double, int64_t](
+                method, H, HTau, <int64_t*>&HPinv[0], Xs, cm
+            )
+    else:
+        if use_int32:
+            Ys = SuiteSparseQR_qmult_Hs[doublecomplex, int32_t](
+                method, H, HTau, <int32_t*>&HPinv[0], Xs, cm
+            )
+        else:
+            Ys = SuiteSparseQR_qmult_Hs[doublecomplex, int64_t](
+                method, H, HTau, <int64_t*>&HPinv[0], Xs, cm
+            )
+
+    _handle_errors(cm.status)
+
+    return _csc_from_cholmod_sparse(Ys, cm)
+
+
+cdef object _qmult_dense(
+    int method,
+    cholmod_sparse *H,
+    cholmod_dense *HTau,
+    index_t[::1] HPinv,
+    value_t[::1, :] X,
+    cholmod_common *cm,
+):
+    """Multiply a dense matrix by Q."""
+    cdef cholmod_dense Xdense
+    cdef cholmod_dense *Xd = &Xdense
+    _cholmod_dense_from_ndarray(X, Xd)
+
+    cdef bint is_real = (H.xtype == CHOLMOD_REAL)
+    cdef bint use_int32 = (H.itype == CHOLMOD_INT)
+
+    cdef cholmod_dense *Yd
+
+    if is_real:
+        if use_int32:
+            Yd = SuiteSparseQR_qmult_Hd[double, int32_t](
+                method, H, HTau, <int32_t*>&HPinv[0], Xd, cm
+            )
+        else:
+            Yd = SuiteSparseQR_qmult_Hd[double, int64_t](
+                method, H, HTau, <int64_t*>&HPinv[0], Xd, cm
+            )
+    else:
+        if use_int32:
+            Yd = SuiteSparseQR_qmult_Hd[doublecomplex, int32_t](
+                method, H, HTau, <int32_t*>&HPinv[0], Xd, cm
+            )
+        else:
+            Yd = SuiteSparseQR_qmult_Hd[doublecomplex, int64_t](
+                method, H, HTau, <int64_t*>&HPinv[0], Xd, cm
+            )
+
+    _handle_errors(cm.status)
+
+    return _ndarray_from_cholmod_dense(Yd, use_int32, cm)
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def _qmult(
+    int method,
+    object H,
+    value_t[::1, :] tau,
+    index_t[::1] v,
+    object X,
+):
+    """Dispatch the correct typed qmult function."""
+    cdef bint use_int32 = (index_t is int32_t)
+
+    # Initialize the common object
+    cdef cholmod_common common
+    cdef cholmod_common *cm = &common
+
+    if use_int32:
+        cholmod_start(cm)
+    else:
+        cholmod_l_start(cm)
+
+    # Make cholmod objects from H, tau, v
+    cdef cholmod_sparse Hsparse
+    cdef cholmod_sparse *Hs = &Hsparse
+    cdef int stype = 0  # not symmetric
+    _cholmod_sparse_from_csc(
+        H.shape, H.indptr, H.indices, H.data, stype, <uintptr_t>Hs
+    )
+
+    cdef cholmod_dense HTau_dense
+    cdef cholmod_dense *HTau = &HTau_dense
+    _cholmod_dense_from_ndarray(tau, HTau)
+
+    # If X is dense, get a memoryview of the same type as tau
+    cdef value_t[::1, :] X_view
+
+    # Compute the multiplication
+    if issparse(X):
+        Y = _qmult_sparse(method, Hs, HTau, v, X, cm)
+    else:
+        X_view = X  # assign the view onto X
+        Y = _qmult_dense(method, Hs, HTau, v, X_view, cm)
+
+    if use_int32:
+        cholmod_finish(cm)
+    else:
+        cholmod_l_finish(cm)
+
+    return Y
+
+
+def spqr_qmult(house, X, method='QX'):
+    """Multiply by ``Q`` or ``Q.T`` using the Householder representation.
+
+    Parameters
+    ----------
+    house : tuple
+        A tuple ``(H, tau, v)`` representing the Householder vectors ``H``,
+        coefficients ``tau``, and the column permutation vector ``v``. Typically,
+        these are created from ``H, R, p = spqr(A, mode='householder')``.
+    X : (M, N) numpy.ndarray or sparse array
+        The matrix to be multiplied. Must have compatible shape with ``Q``.
+    method : str , optional
+        The multiplication method. Options are:
+
+        * ``QX`` : compute :math:`Q X`
+        * ``QTX`` : compute :math:`Q^{\top} X`
+        * ``XQ`` : compute :math:`X Q`
+        * ``XQT`` : compute :math:`X Q^{\top}`
+
+        Default is ``QX``.
+
+    Returns
+    -------
+    Y : (M, N) numpy.ndarray or sparse array
+        The result of the multiplication. If ``X`` is a sparse array, then ``Y`` is
+        also returned as a sparse array.
+    """
+    try:
+        H, tau, v = house
+        H, _, itype = validate_csc_input(H)
+        tau = np.asfortranarray(tau).reshape((1, -1))  # for cholmod_dense
+        assert tau.shape == (1, H.shape[1])
+        assert tau.dtype == H.dtype
+        v = np.asfortranarray(v)
+        assert v.shape == (H.shape[0],)
+        assert v.dtype == itype
+    except Exception:
+        raise ValueError(
+            "house must be a tuple of (H, tau, v) representing the "
+            "Householder vectors, coefficients, and permutation. "
+            f"Got {house}."
+        )
+
+    if not issparse(X):
+        try:
+            X = np.asfortranarray(X)
+        except Exception:
+            raise ValueError("X must be an ndarray or sparse matrix.")
+
+    if X.ndim not in (1, 2):
+        raise ValueError("X must be a 1D or 2D array.")
+
+    # TODO refactor
+    cdef int c_method
+    if method == 'QX':
+        c_method = SPQR_QX
+    elif method == 'QTX':
+        c_method = SPQR_QTX
+    elif method == 'XQ':
+        c_method = SPQR_XQ
+    elif method == 'XQT':
+        c_method = SPQR_XQT
+    else:
+        raise ValueError(
+            f"Invalid method '{method}'. "
+            "Expected one of ['QX', 'QTX', 'XQ', 'XQT']."
+        )
+
+    # Check shape compatibility with Q
+    cdef Py_ssize_t X_dim = (
+        X.shape[0]
+        if method == 'QTX' or method == 'QX'
+        else X.shape[1]
+    )
+
+    M = H.shape[0]
+    if M != X_dim:
+        raise ValueError(
+            "Input X must have compatible shape with Q. "
+            f"Expected {M}, got {X_dim}."
+        )
+
+    cdef bint return_1D = X.ndim == 1
+
+    # cholmod_sparse/dense expects a 2D array
+    if X.ndim == 1:
+        X = X.reshape((-1, 1))
+
+    # Perform the multiplication
+    Y = _qmult(c_method, H, tau, v, X)
+
+    if return_1D:
+        Y = Y[:, 0]
+
+    return Y
