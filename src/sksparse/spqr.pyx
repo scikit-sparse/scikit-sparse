@@ -1636,12 +1636,13 @@ def spqr(A, *, mode='full', order=None, tol=None):
     # }}}
 
     # Perform the factorization
+    cdef bint use_econ = mode == "economic"
     cdef object out = None
 
     if mode == "r":
         out = _spqr_noQ(is_real, use_int32, ordering, _tol, Ac, cm)
-    elif mode == "full":
-        out = _spqr_full(is_real, use_int32, ordering, _tol, Ac, cm)
+    elif mode in ["full", "economic"]:
+        out = _spqr_full(is_real, use_int32, use_econ, ordering, _tol, Ac, cm)
     elif mode == "raw":
         out = _spqr_householder(is_real, use_int32, ordering, _tol, Ac, cm)
     else:
@@ -1705,6 +1706,7 @@ cdef object _spqr_noQ(
 cdef object _spqr_full(
     bint is_real,
     bint use_int32,
+    bint use_econ,
     int ordering,
     double tol,
     cholmod_sparse *Ac,
@@ -1715,7 +1717,7 @@ cdef object _spqr_full(
         cholmod_sparse *Qs
         cholmod_sparse *Rs
         void *Es
-        size_t econ = Ac.nrow
+        size_t econ = Ac.nrow if not use_econ else Ac.ncol
         size_t N = Ac.ncol
 
     if is_real:
