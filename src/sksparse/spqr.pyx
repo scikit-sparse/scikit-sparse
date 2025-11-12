@@ -1534,159 +1534,9 @@ def spqr_solve(A, b, *, transpose=False, min2norm=True):
         return SPQRFactor(A, use_singletons=True).solve(b, transpose=transpose)
 
 
-def spqr(A, *, mode='full', order=None, tol=None):
-    """Compute the QR factorization.
-
-    This function computes the QR factorization of a sparse matrix :math:`A` such that
-
-    .. math::
-        Q R = A E
-
-    where :math:`Q` is an orthogonal matrix and :math:`R` is an upper-triangular
-    matrix. :math:`E` is a column permutation matrix that reduces fill-in during
-    the factorization.
-
-    Parameters
-    ----------
-    A : (M, N) array_like or sparse array
-        An array convertible to a sparse matrix.
-    mode : {'full', 'r', 'economic', 'raw'}, optional
-        The mode of the returned Q and R matrices. Options are:
-
-        * ``full``: ``Q`` is size ``(M, M)``, ``R`` is size ``(M, N)``.
-        * ``economic``: ``Q`` is size ``(M, K)``, ``R`` is size ``(K, N)``, where
-            ``K = min(M, N)``.
-        * ``r``: Only return the upper-triangular matrix ``R``.
-        * ``raw``: Return the Householder vectors and coefficients used to build ``Q``.
-
-    order : str, optional
-        The ordering strategy to use.
-    tol : float, optional
-        If the 2-norm of a column in ``A`` is less than ``tol``, that column is
-        considered to be a zero column. If ``None``, the default tolerance is used.
-
-    Returns
-    -------
-    Q : csc_array
-        The orthogonal matrix :math:`Q`. Shape (M, M) or (M, K) if ``mode='economic'``.
-        Not returned if ``mode='r'``. Replaced by ``(Q, tau)`` if ``mode='raw'``.
-    R : csc_array
-        The upper-triangular matrix :math:`R`. Shape (M, N) or (K, N) if ``mode in
-        ['economic', 'raw']``, where K = min(M, N).
-    P : ndarray of int
-        The permutation vector of shape (N,).
-    """
-    # TODO REFACTOR THIS CHUNK from __init__ {{{
-    A, _, _ = validate_csc_input(A)
-
-    cdef Py_ssize_t M = A.shape[0]
-    cdef Py_ssize_t N = A.shape[1]
-
-    allowed_modes = ("full", "economic", "r", "raw")
-    if mode not in allowed_modes:
-        raise ValueError(
-            f"Invalid mode '{mode}'. Expected one of {allowed_modes}."
-        )
-
-    # Promote single to double precision
-    if not (
-        np.issubdtype(A.dtype, np.float64) or np.issubdtype(A.dtype, np.complex128)
-    ):
-        if np.issubdtype(A.dtype, np.floating):
-            A = A.astype(np.promote_types(A.dtype, np.float64))
-        elif np.issubdtype(A.dtype, np.complexfloating):
-            A = A.astype(np.promote_types(A.dtype, np.complex128))
-
-    # Validate inputs
-    cdef int ordering
-
-    if order is None:
-        ordering = SPQR_ORDERING_DEFAULT
-    else:
-        try:
-            ordering = _ordering_methods[order]
-        except KeyError:
-            raise ValueError(
-                f"Unknown ordering method: {ordering}. "
-                f"Must be one of {set(_ordering_methods.keys())}."
-            )
-
-    cdef double _tol = <double>tol if tol is not None else SPQR_DEFAULT_TOL
-
-    # Get the input matrix into CHOLMOD format
-    cdef cholmod_sparse Amatrix
-    cdef cholmod_sparse *Ac = &Amatrix
-    cdef int stype = 0  # assume matrix is not symmetric
-
-    _cholmod_sparse_from_csc(
-        A.shape, A.indptr, A.indices, A.data, stype, <uintptr_t>Ac
-    )
-
-    cdef bint use_int32 = (Ac.itype == CHOLMOD_INT)
-    cdef bint is_real = (Ac.xtype == CHOLMOD_REAL)
-
-    # Initialize the common object
-    cdef cholmod_common common
-    cdef cholmod_common *cm = &common
-
-    if use_int32:
-        cholmod_start(cm)
-    else:
-        cholmod_l_start(cm)
-    # }}}
-
-    # Define pointers to matrices
-    cdef:
-        cholmod_sparse *Qs = NULL
-        cholmod_sparse *Rs = NULL
-        void *Es = NULL
-        cholmod_sparse *Hs = NULL
-        void *HPinv = NULL
-        cholmod_dense *HTau = NULL
-        size_t econ = Ac.nrow if mode != "economic" else Ac.ncol
-
-    # Perform the factorization
-    if mode == "r":
-        _spqr_noQ(is_real, use_int32, ordering, _tol, econ, Ac, &Rs, &Es, cm)
-    elif mode in ["full", "economic"]:
-        _spqr_full(is_real, use_int32, ordering, _tol, econ, Ac, &Qs, &Rs, &Es, cm)
-    elif mode == "raw":
-        _spqr_householder(
-            is_real, use_int32, ordering, _tol, econ, Ac,
-            &Rs, &Es, &Hs, &HPinv, &HTau, cm
-        )
-    else:
-        raise NotImplementedError(f"{mode=} is not supported.")
-
-    # Get Python objects from the cholmod structs
-    Q = _csc_from_cholmod_sparse(Qs, cm) if Qs is not NULL else None
-
-    R = _csc_from_cholmod_sparse(Rs, cm)
-    E = _ndarray_copy_from_intptr(Es, N, use_int32)
-
-    H = _csc_from_cholmod_sparse(Hs, cm) if Hs is not NULL else None
-    p = _ndarray_copy_from_intptr(HPinv, M, use_int32) if HPinv is not NULL else None
-    tau = _ndarray_from_cholmod_dense(HTau, use_int32, cm) if HTau is not NULL else None
-
-    if use_int32:
-        cholmod_free(N, sizeof(int32_t), Es, cm)
-        if p is not None:
-            cholmod_free(M, sizeof(int32_t), HPinv, cm)
-        cholmod_finish(cm)
-    else:
-        cholmod_l_free(N, sizeof(int64_t), Es, cm)
-        if p is not None:
-            cholmod_l_free(M, sizeof(int64_t), HPinv, cm)
-        cholmod_l_finish(cm)
-
-    if mode == "r":
-        return R, E
-    elif mode in ["full", "economic"]:
-        return Q, R, E
-    else:  # mode == "raw"
-        return (H, tau, p), R, E
-
-
+# -------------------------------------------------------------------------------------
+#         SPQR
+# -------------------------------------------------------------------------------------
 cdef inline int _spqr_noQ(
     bint is_real,
     bint use_int32,
@@ -1795,3 +1645,154 @@ cdef inline int _spqr_householder(
 
     _handle_errors(cm.status)
     return 0
+
+
+def spqr(A, *, mode='full', order=None, tol=None):
+    """Compute the QR factorization.
+
+    This function computes the QR factorization of a sparse matrix :math:`A` such that
+
+    .. math::
+        Q R = A E
+
+    where :math:`Q` is an orthogonal matrix and :math:`R` is an upper-triangular
+    matrix. :math:`E` is a column permutation matrix that reduces fill-in during
+    the factorization.
+
+    Parameters
+    ----------
+    A : (M, N) array_like or sparse array
+        An array convertible to a sparse matrix.
+    mode : {'full', 'r', 'economic', 'raw'}, optional
+        The mode of the returned Q and R matrices. Options are:
+
+        * ``full``: ``Q`` is size ``(M, M)``, ``R`` is size ``(M, N)``.
+        * ``economic``: ``Q`` is size ``(M, K)``, ``R`` is size ``(K, N)``, where
+            ``K = min(M, N)``.
+        * ``r``: Only return the upper-triangular matrix ``R``.
+        * ``raw``: Return the Householder vectors and coefficients used to build ``Q``.
+
+    order : str, optional
+        The ordering strategy to use.
+    tol : float, optional
+        If the 2-norm of a column in ``A`` is less than ``tol``, that column is
+        considered to be a zero column. If ``None``, the default tolerance is used.
+
+    Returns
+    -------
+    Q : csc_array
+        The orthogonal matrix :math:`Q`. Shape (M, M) or (M, K) if ``mode='economic'``.
+        Not returned if ``mode='r'``. Replaced by ``(Q, tau)`` if ``mode='raw'``.
+    R : csc_array
+        The upper-triangular matrix :math:`R`. Shape (M, N) or (K, N) if ``mode in
+        ['economic', 'raw']``, where K = min(M, N).
+    P : ndarray of int
+        The permutation vector of shape (N,).
+    """
+    A, _, _ = validate_csc_input(A)
+
+    cdef Py_ssize_t M = A.shape[0]
+    cdef Py_ssize_t N = A.shape[1]
+
+    allowed_modes = ("full", "economic", "r", "raw")
+    if mode not in allowed_modes:
+        raise ValueError(
+            f"Invalid mode '{mode}'. Expected one of {allowed_modes}."
+        )
+
+    # Promote single to double precision
+    if not (
+        np.issubdtype(A.dtype, np.float64) or np.issubdtype(A.dtype, np.complex128)
+    ):
+        if np.issubdtype(A.dtype, np.floating):
+            A = A.astype(np.promote_types(A.dtype, np.float64))
+        elif np.issubdtype(A.dtype, np.complexfloating):
+            A = A.astype(np.promote_types(A.dtype, np.complex128))
+
+    cdef int ordering
+
+    if order is None:
+        ordering = SPQR_ORDERING_DEFAULT
+    else:
+        try:
+            ordering = _ordering_methods[order]
+        except KeyError:
+            raise ValueError(
+                f"Unknown ordering method: {ordering}. "
+                f"Must be one of {set(_ordering_methods.keys())}."
+            )
+
+    cdef double _tol = <double>tol if tol is not None else SPQR_DEFAULT_TOL
+
+    # Get the input matrix into CHOLMOD format
+    cdef cholmod_sparse Amatrix
+    cdef cholmod_sparse *Ac = &Amatrix
+    cdef int stype = 0  # assume matrix is not symmetric
+
+    _cholmod_sparse_from_csc(
+        A.shape, A.indptr, A.indices, A.data, stype, <uintptr_t>Ac
+    )
+
+    cdef bint use_int32 = (Ac.itype == CHOLMOD_INT)
+    cdef bint is_real = (Ac.xtype == CHOLMOD_REAL)
+
+    # Initialize the common object
+    cdef cholmod_common common
+    cdef cholmod_common *cm = &common
+
+    if use_int32:
+        cholmod_start(cm)
+    else:
+        cholmod_l_start(cm)
+
+    # ---------------------------------------------------------------------------------
+    #         Perform the factorization
+    # ---------------------------------------------------------------------------------
+    cdef:
+        cholmod_sparse *Qs = NULL
+        cholmod_sparse *Rs = NULL
+        void *Es = NULL
+        cholmod_sparse *Hs = NULL
+        void *HPinv = NULL
+        cholmod_dense *HTau = NULL
+        size_t econ = Ac.nrow if mode != "economic" else Ac.ncol
+
+    if mode == "r":
+        _spqr_noQ(is_real, use_int32, ordering, _tol, econ, Ac, &Rs, &Es, cm)
+    elif mode in ["full", "economic"]:
+        _spqr_full(is_real, use_int32, ordering, _tol, econ, Ac, &Qs, &Rs, &Es, cm)
+    elif mode == "raw":
+        _spqr_householder(
+            is_real, use_int32, ordering, _tol, econ, Ac,
+            &Rs, &Es, &Hs, &HPinv, &HTau, cm
+        )
+    else:
+        raise NotImplementedError(f"{mode=} is not supported.")
+
+    # Get Python objects from the cholmod structs
+    Q = _csc_from_cholmod_sparse(Qs, cm) if Qs is not NULL else None
+
+    R = _csc_from_cholmod_sparse(Rs, cm)
+    E = _ndarray_copy_from_intptr(Es, N, use_int32)
+
+    H = _csc_from_cholmod_sparse(Hs, cm) if Hs is not NULL else None
+    p = _ndarray_copy_from_intptr(HPinv, M, use_int32) if HPinv is not NULL else None
+    tau = _ndarray_from_cholmod_dense(HTau, use_int32, cm) if HTau is not NULL else None
+
+    if use_int32:
+        cholmod_free(N, sizeof(int32_t), Es, cm)
+        if p is not None:
+            cholmod_free(M, sizeof(int32_t), HPinv, cm)
+        cholmod_finish(cm)
+    else:
+        cholmod_l_free(N, sizeof(int64_t), Es, cm)
+        if p is not None:
+            cholmod_l_free(M, sizeof(int64_t), HPinv, cm)
+        cholmod_l_finish(cm)
+
+    if mode == "r":
+        return R, E
+    elif mode in ["full", "economic"]:
+        return Q, R, E
+    else:  # mode == "raw"
+        return (H, tau, p), R, E
