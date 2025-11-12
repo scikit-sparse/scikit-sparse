@@ -145,6 +145,18 @@ cdef extern from "SuiteSparseQR.hpp":
         int allow_tol
 
     # "Simple" Functions
+    # [Q,R,E] = qr(A), returning Q as a sparse matrix
+    Int SuiteSparseQR_full "SuiteSparseQR"[Entry, Int](
+        int ordering,
+        double tol,
+        Int econ,
+        cholmod_sparse *A,
+        cholmod_sparse **Q,
+        cholmod_sparse **R,
+        Int **E,
+        cholmod_common *cc
+    )
+
     # [Q,R,E] = qr(A), discarding Q
     Int SuiteSparseQR_noQ "SuiteSparseQR"[Entry, Int](
         int ordering,
