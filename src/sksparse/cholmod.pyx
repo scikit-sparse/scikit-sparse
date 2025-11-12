@@ -779,7 +779,10 @@ cdef cholmod_sparse* _cholesky_l_pattern(
 # -----------------------------------------------------------------------------
 #         CSC <==> CHOLMOD Dense
 # -----------------------------------------------------------------------------
-cdef void _cholmod_dense_from_ndarray(floating_t[::1, :] Xd, cholmod_dense *X_static):
+cdef void _cholmod_dense_from_ndarray(
+    floating_t[::1, :] Xd,
+    cholmod_dense *X_static
+) noexcept:
     """Create a CHOLMOD dense matrix from a numpy.ndarray.
 
     See the CHOLMOD MATLAB interface for details [#sputil_get_dense]_.
@@ -817,8 +820,9 @@ cdef void _cholmod_dense_from_ndarray(floating_t[::1, :] Xd, cholmod_dense *X_st
     X.z = NULL
 
     # Get the numerical values of X
+    cdef floating_t dummy_value
     X.xtype = _real_or_complex[floating_t]()
-    X.x = &Xd[0, 0]  # guaranteed Xd.size > 0 from internal use
+    X.x = &Xd[0, 0] if Xd.size > 0 else &dummy_value
 
 
 cdef class _CholmodDenseDestructor:
