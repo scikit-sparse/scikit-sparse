@@ -1163,26 +1163,55 @@ cdef class SPQRFactor:
         cdef bint return_sparse = issparse(X)
 
         if return_sparse:
-            X = X.toarray()
-
-        # cholmod_dense expects column-oriented
-        X = np.asfortranarray(X)
-
-        Y = self._qmult(c_method, X)
-
-        if return_sparse:
-            Y = csc_array(Y, dtype=X.dtype)
-            Y.indptr = Y.indptr.astype(self.itype)
-            Y.indices = Y.indices.astype(self.itype)
+            Y = self._qmult_sparse(c_method, X)
+        else:
+            # cholmod_dense expects column-oriented
+            X = np.asfortranarray(X)
+            Y = self._qmult_dense(c_method, X)
 
         if return_1D:
             Y = Y[:, 0]
 
         return Y
 
+    cdef object _qmult_sparse(self, int method, object X):
+        """Multiply a sparse matrix by Q."""
+        cdef cholmod_sparse Xsparse
+        cdef cholmod_sparse *Xs = &Xsparse
+        cdef int stype = 0  # assume unsymmetric
+        _cholmod_sparse_from_csc(
+            X.shape, X.indptr, X.indices, X.data, stype, <uintptr_t>Xs
+        )
+
+        cdef cholmod_sparse *Ys
+
+        if self._is_real:
+            if self._use_int32:
+                Ys = SuiteSparseQR_qmult_fs[double, int32_t](
+                    method, self._fact_di, Xs, self._cm
+                )
+            else:
+                Ys = SuiteSparseQR_qmult_fs[double, int64_t](
+                    method, self._fact_dl, Xs, self._cm
+                )
+        else:
+            if self._use_int32:
+                Ys = SuiteSparseQR_qmult_fs[doublecomplex, int32_t](
+                    method, self._fact_zi, Xs, self._cm
+                )
+            else:
+                Ys = SuiteSparseQR_qmult_fs[doublecomplex, int64_t](
+                    method, self._fact_zl, Xs, self._cm
+                )
+
+        _handle_errors(self._cm.status)
+
+        return _csc_from_cholmod_sparse(Ys, self._cm)
+
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def _qmult(self, int method, value_t[::1, :] X):
+    def _qmult_dense(self, int method, value_t[::1, :] X):
+        """Multiply a dense matrix by Q."""
         cdef cholmod_dense Xdense
         cdef cholmod_dense *Xd = &Xdense
         _cholmod_dense_from_ndarray(X, Xd)
@@ -1191,20 +1220,20 @@ cdef class SPQRFactor:
 
         if self._is_real:
             if self._use_int32:
-                Yd = SuiteSparseQR_qmult[double, int32_t](
+                Yd = SuiteSparseQR_qmult_fd[double, int32_t](
                     method, self._fact_di, Xd, self._cm
                 )
             else:
-                Yd = SuiteSparseQR_qmult[double, int64_t](
+                Yd = SuiteSparseQR_qmult_fd[double, int64_t](
                     method, self._fact_dl, Xd, self._cm
                 )
         else:
             if self._use_int32:
-                Yd = SuiteSparseQR_qmult[doublecomplex, int32_t](
+                Yd = SuiteSparseQR_qmult_fd[doublecomplex, int32_t](
                     method, self._fact_zi, Xd, self._cm
                 )
             else:
-                Yd = SuiteSparseQR_qmult[doublecomplex, int64_t](
+                Yd = SuiteSparseQR_qmult_fd[doublecomplex, int64_t](
                     method, self._fact_zl, Xd, self._cm
                 )
 
@@ -1325,20 +1354,20 @@ cdef class SPQRFactor:
             # pre-multiply by Q.T
             if self._is_real:
                 if self._use_int32:
-                    Bd = SuiteSparseQR_qmult[double, int32_t](
+                    Bd = SuiteSparseQR_qmult_fd[double, int32_t](
                         SPQR_QTX, self._fact_di, Bd, self._cm
                     )
                 else:
-                    Bd = SuiteSparseQR_qmult[double, int64_t](
+                    Bd = SuiteSparseQR_qmult_fd[double, int64_t](
                         SPQR_QTX, self._fact_dl, Bd, self._cm
                     )
             else:
                 if self._use_int32:
-                    Bd = SuiteSparseQR_qmult[doublecomplex, int32_t](
+                    Bd = SuiteSparseQR_qmult_fd[doublecomplex, int32_t](
                         SPQR_QTX, self._fact_zi, Bd, self._cm
                     )
                 else:
-                    Bd = SuiteSparseQR_qmult[doublecomplex, int64_t](
+                    Bd = SuiteSparseQR_qmult_fd[doublecomplex, int64_t](
                         SPQR_QTX, self._fact_zl, Bd, self._cm
                     )
 
@@ -1375,20 +1404,20 @@ cdef class SPQRFactor:
             # post-multiply by Q.T
             if self._is_real:
                 if self._use_int32:
-                    Xd = SuiteSparseQR_qmult[double, int32_t](
+                    Xd = SuiteSparseQR_qmult_fd[double, int32_t](
                         SPQR_QX, self._fact_di, Xd, self._cm
                     )
                 else:
-                    Xd = SuiteSparseQR_qmult[double, int64_t](
+                    Xd = SuiteSparseQR_qmult_fd[double, int64_t](
                         SPQR_QX, self._fact_dl, Xd, self._cm
                     )
             else:
                 if self._use_int32:
-                    Xd = SuiteSparseQR_qmult[doublecomplex, int32_t](
+                    Xd = SuiteSparseQR_qmult_fd[doublecomplex, int32_t](
                         SPQR_QX, self._fact_zi, Xd, self._cm
                     )
                 else:
-                    Xd = SuiteSparseQR_qmult[doublecomplex, int64_t](
+                    Xd = SuiteSparseQR_qmult_fd[doublecomplex, int64_t](
                         SPQR_QX, self._fact_zl, Xd, self._cm
                     )
 
