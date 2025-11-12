@@ -168,6 +168,20 @@ cdef extern from "SuiteSparseQR.hpp":
         cholmod_common *cc
     )
 
+    # [Q,R,E] = qr(A) where Q is returned in Householder form
+    Int SuiteSparseQR_householder "SuiteSparseQR"[Entry, Int](
+        int ordering,
+        double tol,
+        Int econ,
+        cholmod_sparse *A,
+        cholmod_sparse **R,
+        Int **E,
+        cholmod_sparse **H,
+        Int **HPinv,
+        cholmod_dense **HTau,
+        cholmod_common *cc
+    )
+
     # "Expert" Functions
     SuiteSparseQR_factorization[Entry, Int] *SuiteSparseQR_factorize[Entry, Int](
         int ordering,

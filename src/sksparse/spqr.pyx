@@ -1642,11 +1642,10 @@ def spqr(A, *, mode='full', order=None, tol=None):
         out = _spqr_noQ(is_real, use_int32, ordering, _tol, Ac, cm)
     elif mode == "full":
         out = _spqr_full(is_real, use_int32, ordering, _tol, Ac, cm)
+    elif mode == "raw":
+        out = _spqr_householder(is_real, use_int32, ordering, _tol, Ac, cm)
     else:
         raise NotImplementedError()
-
-    # elif mode == "Householder":
-    #     out = _spqr_householder(ordering, tol, econ, Ac, cm)
 
     if use_int32:
         cholmod_finish(cm)
@@ -1750,3 +1749,96 @@ cdef object _spqr_full(
         cholmod_l_free(N, sizeof(int64_t), Es, cm)
 
     return Q, R, E
+
+
+cdef object _spqr_householder(
+    bint is_real,
+    bint use_int32,
+    int ordering,
+    double tol,
+    cholmod_sparse *Ac,
+    cholmod_common *cm
+):
+    # Define pointers to matrices
+    cdef:
+        cholmod_sparse *Rs
+        void *Es
+        cholmod_sparse *Hs
+        void *HPinv
+        cholmod_dense *HTau
+        size_t econ = Ac.nrow
+        size_t M = Ac.nrow
+        size_t N = Ac.ncol
+
+    if is_real:
+        if use_int32:
+            SuiteSparseQR_householder[double, int32_t](
+                ordering,
+                tol,
+                econ,
+                Ac,
+                &Rs,
+                <int32_t**>&Es,
+                &Hs,
+                <int32_t**>&HPinv,
+                &HTau,
+                cm
+            )
+        else:
+            SuiteSparseQR_householder[double, int64_t](
+                ordering,
+                tol,
+                econ,
+                Ac,
+                &Rs,
+                <int64_t**>&Es,
+                &Hs,
+                <int64_t**>&HPinv,
+                &HTau,
+                cm
+            )
+    else:
+        if use_int32:
+            SuiteSparseQR_householder[doublecomplex, int32_t](
+                ordering,
+                tol,
+                econ,
+                Ac,
+                &Rs,
+                <int32_t**>&Es,
+                &Hs,
+                <int32_t**>&HPinv,
+                &HTau,
+                cm
+            )
+        else:
+            SuiteSparseQR_householder[doublecomplex, int64_t](
+                ordering,
+                tol,
+                econ,
+                Ac,
+                &Rs,
+                <int64_t**>&Es,
+                &Hs,
+                <int64_t**>&HPinv,
+                &HTau,
+                cm
+            )
+
+    _handle_errors(cm.status)
+
+    H = _csc_from_cholmod_sparse(Hs, cm)
+    p = _ndarray_copy_from_intptr(HPinv, M, use_int32)
+    tau = _ndarray_from_cholmod_dense(HTau, use_int32, cm)
+
+    R = _csc_from_cholmod_sparse(Rs, cm)
+    E = _ndarray_copy_from_intptr(Es, N, use_int32)
+
+    if use_int32:
+        cholmod_free(M, sizeof(int32_t), HPinv, cm)
+        cholmod_free(N, sizeof(int32_t), Es, cm)
+    else:
+        cholmod_l_free(M, sizeof(int64_t), HPinv, cm)
+        cholmod_l_free(N, sizeof(int64_t), Es, cm)
+
+    return (H, tau, p), R, E
