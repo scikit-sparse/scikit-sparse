@@ -1676,7 +1676,7 @@ cdef inline int _spqr_householder(
     return 0
 
 
-def spqr(A, *, mode='full', order=None, tol=None):
+def spqr(A, *, mode="full", order=None, tol=None):
     """Compute the QR factorization.
 
     This function computes the QR factorization of a sparse matrix :math:`A` such that
@@ -1751,7 +1751,7 @@ def spqr(A, *, mode='full', order=None, tol=None):
                 f"Must be one of {set(_ordering_methods.keys())}."
             )
 
-    cdef double _tol = <double>tol if tol is not None else SPQR_DEFAULT_TOL
+    cdef double c_tol = <double>tol if tol is not None else SPQR_DEFAULT_TOL
 
     # Get the input matrix into CHOLMOD format
     cdef cholmod_sparse Amatrix
@@ -1762,8 +1762,8 @@ def spqr(A, *, mode='full', order=None, tol=None):
         A.shape, A.indptr, A.indices, A.data, stype, <uintptr_t>Ac
     )
 
-    cdef bint use_int32 = (Ac.itype == CHOLMOD_INT)
     cdef bint is_real = (Ac.xtype == CHOLMOD_REAL)
+    cdef bint use_int32 = (Ac.itype == CHOLMOD_INT)
 
     # Initialize the common object
     cdef cholmod_common common
@@ -1787,36 +1787,47 @@ def spqr(A, *, mode='full', order=None, tol=None):
         size_t econ = Ac.nrow if mode != "economic" else Ac.ncol
 
     if mode == "r":
-        _spqr_noQ(is_real, use_int32, ordering, _tol, econ, Ac, &Rs, &Es, cm)
+        _spqr_noQ(is_real, use_int32, ordering, c_tol, econ, Ac, &Rs, &Es, cm)
     elif mode in ["full", "economic"]:
-        _spqr_full(is_real, use_int32, ordering, _tol, econ, Ac, &Qs, &Rs, &Es, cm)
+        _spqr_full(is_real, use_int32, ordering, c_tol, econ, Ac, &Qs, &Rs, &Es, cm)
     elif mode == "raw":
         _spqr_householder(
-            is_real, use_int32, ordering, _tol, econ, Ac,
+            is_real, use_int32, ordering, c_tol, econ, Ac,
             &Rs, &Es, &Hs, &HPinv, &HTau, cm
         )
     else:
         raise NotImplementedError(f"{mode=} is not supported.")
 
     # Get Python objects from the cholmod structs
-    Q = _csc_from_cholmod_sparse(Qs, cm) if Qs is not NULL else None
+    Q = R = E = H = tau = v = None
+    cdef Py_ssize_t Mh
 
-    R = _csc_from_cholmod_sparse(Rs, cm)
-    E = _ndarray_copy_from_intptr(Es, N, use_int32)
+    if Qs is not NULL:
+        Q = _csc_from_cholmod_sparse(Qs, cm)
 
-    H = _csc_from_cholmod_sparse(Hs, cm) if Hs is not NULL else None
-    p = _ndarray_copy_from_intptr(HPinv, M, use_int32) if HPinv is not NULL else None
-    tau = _ndarray_from_cholmod_dense(HTau, use_int32, cm) if HTau is not NULL else None
+    if Rs is not NULL:
+        R = _csc_from_cholmod_sparse(Rs, cm)
+
+    if Es is not NULL:
+        E = _ndarray_copy_from_intptr(Es, N, use_int32)
+
+    if Hs is not NULL:
+        H = _csc_from_cholmod_sparse(Hs, cm)
+
+    if HPinv is not NULL and H is not None:
+        Mh = H.shape[0]
+        v = _ndarray_copy_from_intptr(HPinv, Mh, use_int32)
+
+    if HTau is not NULL:
+        tau = _ndarray_from_cholmod_dense(HTau, use_int32, cm).squeeze()
 
     if use_int32:
         cholmod_free(N, sizeof(int32_t), Es, cm)
-        if p is not None:
-            cholmod_free(M, sizeof(int32_t), HPinv, cm)
+        cholmod_free(Mh, sizeof(int32_t), HPinv, cm)
         cholmod_finish(cm)
     else:
         cholmod_l_free(N, sizeof(int64_t), Es, cm)
-        if p is not None:
-            cholmod_l_free(M, sizeof(int64_t), HPinv, cm)
+        cholmod_l_free(Mh, sizeof(int64_t), HPinv, cm)
         cholmod_l_finish(cm)
 
     if mode == "r":
@@ -1824,4 +1835,4 @@ def spqr(A, *, mode='full', order=None, tol=None):
     elif mode in ["full", "economic"]:
         return Q, R, E
     else:  # mode == "raw"
-        return (H, tau, p), R, E
+        return (H, tau, v), R, E
