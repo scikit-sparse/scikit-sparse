@@ -796,7 +796,6 @@ cdef class SPQRFactor:
         spqr_fact_zl *_fact_zl
         bint _use_int32
         bint _is_real
-        bint _econ
         int _M
         int _N
         readonly object itype
@@ -908,7 +907,6 @@ cdef class SPQRFactor:
         self.dtype = np.dtype(np.float64 if self._is_real else np.complex128)
         self._M = Ac.nrow
         self._N = Ac.ncol
-        self._econ = False  # TODO econ mode (default to full Q and R shapes)
 
     def __dealloc__(self):
         """Free the SPQR factorization and common objects."""
@@ -959,11 +957,11 @@ cdef class SPQRFactor:
 
     @property
     def Qshape(self):
-        return (self._M, self._N) if self._econ else (self._M, self._M)
+        return (self._M, self._M)
 
     @property
     def Rshape(self):
-        return (self._N, self._N) if self._econ else (self._M, self._N)
+        return (self._M, self._N)
 
     @property
     def rank(self):
@@ -1022,7 +1020,6 @@ cdef class SPQRFactor:
 
         dest._use_int32 = self._use_int32
         dest._is_real = self._is_real
-        dest._econ = self._econ
         dest._M = self._M
         dest._N = self._N
         dest.itype = self.itype
