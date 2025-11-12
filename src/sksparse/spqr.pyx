@@ -285,6 +285,23 @@ cdef dict _ordering_methods = {
 cdef dict _ordering_methods_inv = {v: k for k, v in _ordering_methods.items()}
 
 
+cdef inline int _qmult_int_from_str(str method) except -1:
+    """Return the SPQR qmult method constant from string."""
+    if method == 'QX':
+        return SPQR_QX
+    elif method == 'QTX':
+        return SPQR_QTX
+    elif method == 'XQ':
+        return SPQR_XQ
+    elif method == 'XQT':
+        return SPQR_XQT
+    else:
+        raise ValueError(
+            f"Invalid method '{method}'. "
+            "Expected one of ['QX', 'QTX', 'XQ', 'XQT']."
+        )
+
+
 @cython.dataclasses.dataclass(frozen=True)
 cdef class SPQRInfo:
     """A dataclass to hold SPQR info statistics.
@@ -1131,20 +1148,7 @@ cdef class SPQRFactor:
         if X.ndim not in (1, 2):
             raise ValueError("X must be a 1D or 2D array.")
 
-        cdef int c_method
-        if method == 'QX':
-            c_method = SPQR_QX
-        elif method == 'QTX':
-            c_method = SPQR_QTX
-        elif method == 'XQ':
-            c_method = SPQR_XQ
-        elif method == 'XQT':
-            c_method = SPQR_XQT
-        else:
-            raise ValueError(
-                f"Invalid method '{method}'. "
-                "Expected one of ['QX', 'QTX', 'XQ', 'XQT']."
-            )
+        cdef int c_method = _qmult_int_from_str(method)
 
         # Check shape compatibility with Q
         cdef Py_ssize_t X_dim = (
@@ -2032,21 +2036,7 @@ def spqr_qmult(house, X, method='QX'):
     if X.ndim not in (1, 2):
         raise ValueError("X must be a 1D or 2D array.")
 
-    # TODO refactor
-    cdef int c_method
-    if method == 'QX':
-        c_method = SPQR_QX
-    elif method == 'QTX':
-        c_method = SPQR_QTX
-    elif method == 'XQ':
-        c_method = SPQR_XQ
-    elif method == 'XQT':
-        c_method = SPQR_XQT
-    else:
-        raise ValueError(
-            f"Invalid method '{method}'. "
-            "Expected one of ['QX', 'QTX', 'XQ', 'XQT']."
-        )
+    cdef int c_method = _qmult_int_from_str(method)
 
     # Check shape compatibility with Q
     cdef Py_ssize_t X_dim = (
