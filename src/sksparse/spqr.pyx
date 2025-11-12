@@ -929,12 +929,10 @@ cdef class SPQRFactor:
     def __repr__(self):
         cls_name = self.__class__.__name__
         factor_type = 'numeric' if self.is_numeric else 'symbolic'
-        # TODO nnz of Q and R
         return (
             f"<{cls_name} {factor_type} factor of dtype '{self.dtype}' "
-            f"with '{self.itype}' indices:\n"
-            f"    Q: {self.Qshape} with XXX stored elements\n"
-            f"    R: {self.Rshape} with XXX stored elements>"
+            f"with '{self.itype}' indices\n"
+            f"    A: shape={self.shape}, rank={self.rank}>"
         )
 
     def __str__(self):
@@ -956,17 +954,10 @@ cdef class SPQRFactor:
         return (self._M, self._N)
 
     @property
-    def Qshape(self):
-        return (self._M, self._M)
-
-    @property
-    def Rshape(self):
-        return (self._M, self._N)
-
-    @property
     def rank(self):
-        cdef int rank
-        self._require_symbolic()
+        if not self.is_numeric:
+            return None
+
         if self._is_real:
             if self._use_int32:
                 return self._fact_di.rank

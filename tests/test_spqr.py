@@ -51,7 +51,7 @@ def test_empty_input(itype):
     empty_A.indptr = empty_A.indptr.astype(itype)
     empty_A.indices = empty_A.indices.astype(itype)
     f = SPQRFactor(empty_A)
-    assert f.rank == 0
+    assert f.rank is None  # no numeric factorization yet
     # assert_allclose(f.Q.toarray(), empty_A.toarray(), strict=True)
     # assert_allclose(f.R.toarray(), empty_A.toarray(), strict=True)
     assert_array_equal(f.perm, np.array([], dtype=itype), strict=True)
