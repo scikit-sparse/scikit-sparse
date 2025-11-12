@@ -144,6 +144,18 @@ cdef extern from "SuiteSparseQR.hpp":
         Int rank
         int allow_tol
 
+    # "Simple" Functions
+    # [Q,R,E] = qr(A), discarding Q
+    Int SuiteSparseQR_noQ "SuiteSparseQR"[Entry, Int](
+        int ordering,
+        double tol,
+        Int econ,
+        cholmod_sparse *A,
+        cholmod_sparse **R,
+        Int **E,
+        cholmod_common *cc
+    )
+
     # "Expert" Functions
     SuiteSparseQR_factorization[Entry, Int] *SuiteSparseQR_factorize[Entry, Int](
         int ordering,

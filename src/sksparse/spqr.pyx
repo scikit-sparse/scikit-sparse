@@ -90,6 +90,10 @@ from sksparse.cholmod cimport (
     _cholmod_dense_from_ndarray,
     _ndarray_from_cholmod_dense,
     _copy_cholmod_common,
+    _ndarray_copy_from_intptr,
+    _csc_from_cholmod_sparse,
+    cholmod_free,
+    cholmod_l_free,
 )
 
 import numpy as np
@@ -709,7 +713,7 @@ cdef class SPQRFactor:
     use_singletons : bool, optional
         If True, directly compute the numeric factorization to exploit singleton rows.
         Otherwise, only perform symbolic analysis. Default is False.
-    order : int, optional
+    order : str, optional
         The column ordering strategy to use. Let :math:`S` be the matrix :math:`A` with
         singleton rows/columns removed, the ordering options are:
 
@@ -1460,7 +1464,7 @@ def spqr_factor(A, *, use_singletons=False, order=None, tol=None):
         If True, directly compute the numeric factorization to exploit singleton rows.
         Otherwise, only perform symbolic analysis. Default is False, so that the factor
         can be reused efficiently for multiple numeric factorizations.
-    order : int, optional
+    order : str, optional
         The ordering strategy to use.
     tol : float, optional
         If the 2-norm of a column in ``A`` is less than ``tol``, that column is
@@ -1528,3 +1532,172 @@ def spqr_solve(A, b, *, transpose=False, min2norm=True):
         return SPQRFactor(A.T.tocsc(), use_singletons=True).solve(b, transpose=True)
     else:
         return SPQRFactor(A, use_singletons=True).solve(b, transpose=transpose)
+
+
+def spqr(A, *, mode='full', order=None, tol=None):
+    """Compute the QR factorization.
+
+    This function computes the QR factorization of a sparse matrix :math:`A` such that
+
+    .. math::
+        Q R = A E
+
+    where :math:`Q` is an orthogonal matrix and :math:`R` is an upper-triangular
+    matrix. :math:`E` is a column permutation matrix that reduces fill-in during
+    the factorization.
+
+    Parameters
+    ----------
+    A : (M, N) array_like or sparse array
+        An array convertible to a sparse matrix.
+    mode : {'full', 'r', 'economic', 'raw'}, optional
+        The mode of the returned Q and R matrices. Options are:
+
+        * ``full``: ``Q`` is size ``(M, M)``, ``R`` is size ``(M, N)``.
+        * ``economic``: ``Q`` is size ``(M, K)``, ``R`` is size ``(K, N)``, where
+            ``K = min(M, N)``.
+        * ``r``: Only return the upper-triangular matrix ``R``.
+        * ``raw``: Return the Householder vectors and coefficients used to build ``Q``.
+
+    order : str, optional
+        The ordering strategy to use.
+    tol : float, optional
+        If the 2-norm of a column in ``A`` is less than ``tol``, that column is
+        considered to be a zero column. If ``None``, the default tolerance is used.
+
+    Returns
+    -------
+    Q : csc_array
+        The orthogonal matrix :math:`Q`. Shape (M, M) or (M, K) if ``mode='economic'``.
+        Not returned if ``mode='r'``. Replaced by ``(Q, tau)`` if ``mode='raw'``.
+    R : csc_array
+        The upper-triangular matrix :math:`R`. Shape (M, N) or (K, N) if ``mode in
+        ['economic', 'raw']``, where K = min(M, N).
+    P : ndarray of int
+        The permutation vector of shape (N,).
+    """
+    # TODO REFACTOR THIS CHUNK from __init__ {{{
+    A, _, _ = validate_csc_input(A)
+
+    cdef Py_ssize_t M = A.shape[0]
+    cdef Py_ssize_t N = A.shape[1]
+
+    allowed_modes = ("full", "economic", "r", "raw")
+    if mode not in allowed_modes:
+        raise ValueError(
+            f"Invalid mode '{mode}'. Expected one of {allowed_modes}."
+        )
+
+    # Promote single to double precision
+    if not (
+        np.issubdtype(A.dtype, np.float64) or np.issubdtype(A.dtype, np.complex128)
+    ):
+        if np.issubdtype(A.dtype, np.floating):
+            A = A.astype(np.promote_types(A.dtype, np.float64))
+        elif np.issubdtype(A.dtype, np.complexfloating):
+            A = A.astype(np.promote_types(A.dtype, np.complex128))
+
+    # Validate inputs
+    cdef int ordering
+
+    if order is None:
+        ordering = SPQR_ORDERING_DEFAULT
+    else:
+        try:
+            ordering = _ordering_methods[order]
+        except KeyError:
+            raise ValueError(
+                "Unknown ordering method: {ordering}. "
+                f"Must be one of {set(_ordering_methods.keys())}."
+            )
+
+    cdef double _tol = <double>tol if tol is not None else SPQR_DEFAULT_TOL
+
+    # Get the input matrix into CHOLMOD format
+    cdef cholmod_sparse Amatrix
+    cdef cholmod_sparse *Ac = &Amatrix
+    cdef int stype = 0  # assume matrix is not symmetric
+
+    _cholmod_sparse_from_csc(
+        A.shape, A.indptr, A.indices, A.data, stype, <uintptr_t>Ac
+    )
+
+    cdef bint use_int32 = (Ac.itype == CHOLMOD_INT)
+    cdef bint is_real = (Ac.xtype == CHOLMOD_REAL)
+
+    # Initialize the common object
+    cdef cholmod_common common
+    cdef cholmod_common *cm = &common
+
+    if use_int32:
+        cholmod_start(cm)
+    else:
+        cholmod_l_start(cm)
+    # }}}
+
+    # Perform the factorization
+    cdef object out = None
+
+    if mode == "r":
+        out = _spqr_noQ(is_real, use_int32, ordering, _tol, Ac, cm)
+    else:
+        raise NotImplementedError()
+
+    # elif mode == "full":
+    #     out = _spqr_full(ordering, tol, econ, Ac, cm)
+    # elif mode == "Householder":
+    #     out = _spqr_householder(ordering, tol, econ, Ac, cm)
+
+    if use_int32:
+        cholmod_finish(cm)
+    else:
+        cholmod_l_finish(cm)
+
+    return out
+
+
+cdef object _spqr_noQ(
+    bint is_real,
+    bint use_int32,
+    int ordering,
+    double tol,
+    cholmod_sparse *Ac,
+    cholmod_common *cm
+):
+    # Define pointers to matrices
+    cdef:
+        cholmod_sparse *Rs
+        void *Es
+        size_t econ = Ac.nrow
+        size_t N = Ac.ncol
+
+    if is_real:
+        if use_int32:
+            SuiteSparseQR_noQ[double, int32_t](
+                ordering, tol, econ, Ac, &Rs, <int32_t**>&Es, cm
+            )
+        else:
+            SuiteSparseQR_noQ[double, int64_t](
+                ordering, tol, econ, Ac, &Rs, <int64_t**>&Es, cm
+            )
+    else:
+        if use_int32:
+            SuiteSparseQR_noQ[doublecomplex, int32_t](
+                ordering, tol, econ, Ac, &Rs, <int32_t**>&Es, cm
+            )
+        else:
+            SuiteSparseQR_noQ[doublecomplex, int64_t](
+                ordering, tol, econ, Ac, &Rs, <int64_t**>&Es, cm
+            )
+
+    _handle_errors(cm.status)
+
+    R = _csc_from_cholmod_sparse(Rs, cm)
+    E = _ndarray_copy_from_intptr(Es, N, use_int32)
+
+    if use_int32:
+        cholmod_free(N, sizeof(int32_t), Es, cm)
+    else:
+        cholmod_l_free(N, sizeof(int64_t), Es, cm)
+
+    return R, E
