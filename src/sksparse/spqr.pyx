@@ -1607,7 +1607,7 @@ def spqr(A, *, mode='full', order=None, tol=None):
             ordering = _ordering_methods[order]
         except KeyError:
             raise ValueError(
-                "Unknown ordering method: {ordering}. "
+                f"Unknown ordering method: {ordering}. "
                 f"Must be one of {set(_ordering_methods.keys())}."
             )
 
@@ -1635,212 +1635,163 @@ def spqr(A, *, mode='full', order=None, tol=None):
         cholmod_l_start(cm)
     # }}}
 
-    # Perform the factorization
-    cdef bint use_econ = mode == "economic"
-    cdef object out = None
+    # Define pointers to matrices
+    cdef:
+        cholmod_sparse *Qs = NULL
+        cholmod_sparse *Rs = NULL
+        void *Es = NULL
+        cholmod_sparse *Hs = NULL
+        void *HPinv = NULL
+        cholmod_dense *HTau = NULL
+        size_t econ = Ac.nrow if mode != "economic" else Ac.ncol
 
+    # Perform the factorization
     if mode == "r":
-        out = _spqr_noQ(is_real, use_int32, ordering, _tol, Ac, cm)
+        _spqr_noQ(is_real, use_int32, ordering, _tol, econ, Ac, &Rs, &Es, cm)
     elif mode in ["full", "economic"]:
-        out = _spqr_full(is_real, use_int32, use_econ, ordering, _tol, Ac, cm)
+        _spqr_full(is_real, use_int32, ordering, _tol, econ, Ac, &Qs, &Rs, &Es, cm)
     elif mode == "raw":
-        out = _spqr_householder(is_real, use_int32, ordering, _tol, Ac, cm)
+        _spqr_householder(
+            is_real, use_int32, ordering, _tol, econ, Ac,
+            &Rs, &Es, &Hs, &HPinv, &HTau, cm
+        )
     else:
-        raise NotImplementedError()
+        raise NotImplementedError(f"{mode=} is not supported.")
+
+    # Get Python objects from the cholmod structs
+    Q = _csc_from_cholmod_sparse(Qs, cm) if Qs is not NULL else None
+
+    R = _csc_from_cholmod_sparse(Rs, cm)
+    E = _ndarray_copy_from_intptr(Es, N, use_int32)
+
+    H = _csc_from_cholmod_sparse(Hs, cm) if Hs is not NULL else None
+    p = _ndarray_copy_from_intptr(HPinv, M, use_int32) if HPinv is not NULL else None
+    tau = _ndarray_from_cholmod_dense(HTau, use_int32, cm) if HTau is not NULL else None
 
     if use_int32:
+        cholmod_free(N, sizeof(int32_t), Es, cm)
+        if p is not None:
+            cholmod_free(M, sizeof(int32_t), HPinv, cm)
         cholmod_finish(cm)
     else:
+        cholmod_l_free(N, sizeof(int64_t), Es, cm)
+        if p is not None:
+            cholmod_l_free(M, sizeof(int64_t), HPinv, cm)
         cholmod_l_finish(cm)
 
-    return out
+    if mode == "r":
+        return R, E
+    elif mode in ["full", "economic"]:
+        return Q, R, E
+    else:  # mode == "raw"
+        return (H, tau, p), R, E
 
 
-cdef object _spqr_noQ(
+cdef inline int _spqr_noQ(
     bint is_real,
     bint use_int32,
     int ordering,
     double tol,
+    size_t econ,
     cholmod_sparse *Ac,
+    cholmod_sparse **Rs,
+    void **Es,
     cholmod_common *cm
-):
-    # Define pointers to matrices
-    cdef:
-        cholmod_sparse *Rs
-        void *Es
-        size_t econ = Ac.nrow
-        size_t N = Ac.ncol
-
+) except -1:
     if is_real:
         if use_int32:
             SuiteSparseQR_noQ[double, int32_t](
-                ordering, tol, econ, Ac, &Rs, <int32_t**>&Es, cm
+                ordering, tol, econ, Ac, Rs, <int32_t**>Es, cm
             )
         else:
             SuiteSparseQR_noQ[double, int64_t](
-                ordering, tol, econ, Ac, &Rs, <int64_t**>&Es, cm
+                ordering, tol, econ, Ac, Rs, <int64_t**>Es, cm
             )
     else:
         if use_int32:
             SuiteSparseQR_noQ[doublecomplex, int32_t](
-                ordering, tol, econ, Ac, &Rs, <int32_t**>&Es, cm
+                ordering, tol, econ, Ac, Rs, <int32_t**>Es, cm
             )
         else:
             SuiteSparseQR_noQ[doublecomplex, int64_t](
-                ordering, tol, econ, Ac, &Rs, <int64_t**>&Es, cm
+                ordering, tol, econ, Ac, Rs, <int64_t**>Es, cm
             )
 
     _handle_errors(cm.status)
-
-    R = _csc_from_cholmod_sparse(Rs, cm)
-    E = _ndarray_copy_from_intptr(Es, N, use_int32)
-
-    if use_int32:
-        cholmod_free(N, sizeof(int32_t), Es, cm)
-    else:
-        cholmod_l_free(N, sizeof(int64_t), Es, cm)
-
-    return R, E
+    return 0
 
 
-cdef object _spqr_full(
+cdef inline int _spqr_full(
     bint is_real,
     bint use_int32,
-    bint use_econ,
     int ordering,
     double tol,
+    size_t econ,
     cholmod_sparse *Ac,
+    cholmod_sparse **Qs,
+    cholmod_sparse **Rs,
+    void **Es,
     cholmod_common *cm
-):
-    # Define pointers to matrices
-    cdef:
-        cholmod_sparse *Qs
-        cholmod_sparse *Rs
-        void *Es
-        size_t econ = Ac.nrow if not use_econ else Ac.ncol
-        size_t N = Ac.ncol
-
+) except -1:
     if is_real:
         if use_int32:
             SuiteSparseQR_full[double, int32_t](
-                ordering, tol, econ, Ac, &Qs, &Rs, <int32_t**>&Es, cm
+                ordering, tol, econ, Ac, Qs, Rs, <int32_t**>Es, cm
             )
         else:
             SuiteSparseQR_full[double, int64_t](
-                ordering, tol, econ, Ac, &Qs, &Rs, <int64_t**>&Es, cm
+                ordering, tol, econ, Ac, Qs, Rs, <int64_t**>Es, cm
             )
     else:
         if use_int32:
             SuiteSparseQR_full[doublecomplex, int32_t](
-                ordering, tol, econ, Ac, &Qs, &Rs, <int32_t**>&Es, cm
+                ordering, tol, econ, Ac, Qs, Rs, <int32_t**>Es, cm
             )
         else:
             SuiteSparseQR_full[doublecomplex, int64_t](
-                ordering, tol, econ, Ac, &Qs, &Rs, <int64_t**>&Es, cm
+                ordering, tol, econ, Ac, Qs, Rs, <int64_t**>Es, cm
             )
 
     _handle_errors(cm.status)
-
-    Q = _csc_from_cholmod_sparse(Qs, cm)
-    R = _csc_from_cholmod_sparse(Rs, cm)
-    E = _ndarray_copy_from_intptr(Es, N, use_int32)
-
-    if use_int32:
-        cholmod_free(N, sizeof(int32_t), Es, cm)
-    else:
-        cholmod_l_free(N, sizeof(int64_t), Es, cm)
-
-    return Q, R, E
+    return 0
 
 
-cdef object _spqr_householder(
+cdef inline int _spqr_householder(
     bint is_real,
     bint use_int32,
     int ordering,
     double tol,
+    size_t econ,
     cholmod_sparse *Ac,
+    cholmod_sparse **Rs,
+    void **Es,
+    cholmod_sparse **Hs,
+    void **HPinv,
+    cholmod_dense **HTau,
     cholmod_common *cm
-):
-    # Define pointers to matrices
-    cdef:
-        cholmod_sparse *Rs
-        void *Es
-        cholmod_sparse *Hs
-        void *HPinv
-        cholmod_dense *HTau
-        size_t econ = Ac.nrow
-        size_t M = Ac.nrow
-        size_t N = Ac.ncol
-
+) except -1:
     if is_real:
         if use_int32:
             SuiteSparseQR_householder[double, int32_t](
-                ordering,
-                tol,
-                econ,
-                Ac,
-                &Rs,
-                <int32_t**>&Es,
-                &Hs,
-                <int32_t**>&HPinv,
-                &HTau,
-                cm
+                ordering, tol, econ, Ac,
+                Rs, <int32_t**>Es, Hs, <int32_t**>HPinv, HTau, cm
             )
         else:
             SuiteSparseQR_householder[double, int64_t](
-                ordering,
-                tol,
-                econ,
-                Ac,
-                &Rs,
-                <int64_t**>&Es,
-                &Hs,
-                <int64_t**>&HPinv,
-                &HTau,
-                cm
+                ordering, tol, econ, Ac,
+                Rs, <int64_t**>Es, Hs, <int64_t**>HPinv, HTau, cm
             )
     else:
         if use_int32:
             SuiteSparseQR_householder[doublecomplex, int32_t](
-                ordering,
-                tol,
-                econ,
-                Ac,
-                &Rs,
-                <int32_t**>&Es,
-                &Hs,
-                <int32_t**>&HPinv,
-                &HTau,
-                cm
+                ordering, tol, econ, Ac,
+                Rs, <int32_t**>Es, Hs, <int32_t**>HPinv, HTau, cm
             )
         else:
             SuiteSparseQR_householder[doublecomplex, int64_t](
-                ordering,
-                tol,
-                econ,
-                Ac,
-                &Rs,
-                <int64_t**>&Es,
-                &Hs,
-                <int64_t**>&HPinv,
-                &HTau,
-                cm
+                ordering, tol, econ, Ac,
+                Rs, <int64_t**>Es, Hs, <int64_t**>HPinv, HTau, cm
             )
 
     _handle_errors(cm.status)
-
-    H = _csc_from_cholmod_sparse(Hs, cm)
-    p = _ndarray_copy_from_intptr(HPinv, M, use_int32)
-    tau = _ndarray_from_cholmod_dense(HTau, use_int32, cm)
-
-    R = _csc_from_cholmod_sparse(Rs, cm)
-    E = _ndarray_copy_from_intptr(Es, N, use_int32)
-
-    if use_int32:
-        cholmod_free(M, sizeof(int32_t), HPinv, cm)
-        cholmod_free(N, sizeof(int32_t), Es, cm)
-    else:
-        cholmod_l_free(M, sizeof(int64_t), HPinv, cm)
-        cholmod_l_free(N, sizeof(int64_t), Es, cm)
-
-    return (H, tau, p), R, E
+    return 0
