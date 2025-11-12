@@ -709,5 +709,30 @@ def test_spqr_full(A, itype):
     assert_allclose((Q @ R).toarray(), A[:, p].toarray(), atol=1e-14, strict=True)
 
 
+@pytest.mark.parametrize("A", test_As)
+@pytest.mark.parametrize("itype", ITYPES)
+def test_spqr_householder(A, itype):
+    A = A.copy()
+    A.indptr = A.indptr.astype(itype)
+    A.indices = A.indices.astype(itype)
+    Ht, R, p = spqr(A, mode="raw")
+
+    M, N = A.shape
+    H, tau, v = Ht
+
+    assert H.shape[0] == M
+    # number of columns of H is not known exactly
+    assert v.shape == (H.shape[0],)    # row permutation of H
+    assert tau.shape == (H.shape[1],)  # column coefficients of H
+
+    assert H.dtype == A.dtype
+    assert tau.dtype == A.dtype
+    assert v.dtype == itype
+
+    # TODO
+    # Q = spqr_qmult(Ht, np.eye(A.shape[0], dtype=A.dtype))
+    # assert_allclose((Q @ R).toarray(), A[:, p].toarray(), atol=1e-14, strict=True)
+
+
 # =============================================================================
 # =============================================================================
