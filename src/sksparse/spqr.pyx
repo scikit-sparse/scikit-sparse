@@ -71,7 +71,7 @@ References
 """
 
 cimport cython
-from cython cimport doublecomplex
+from cython cimport doublecomplex as cdouble
 
 from sksparse.cholmod cimport (
     CHOLMOD_OK,
@@ -139,8 +139,8 @@ ctypedef fused symbolic_t:
 
 ctypedef spqr_numeric[double, int32_t] spqr_num_di
 ctypedef spqr_numeric[double, int64_t] spqr_num_dl
-ctypedef spqr_numeric[doublecomplex, int32_t] spqr_num_zi
-ctypedef spqr_numeric[doublecomplex, int64_t] spqr_num_zl
+ctypedef spqr_numeric[cdouble, int32_t] spqr_num_zi
+ctypedef spqr_numeric[cdouble, int64_t] spqr_num_zl
 
 ctypedef fused numeric_t:
     spqr_num_di
@@ -151,8 +151,8 @@ ctypedef fused numeric_t:
 
 ctypedef SuiteSparseQR_factorization[double, int32_t] spqr_fact_di
 ctypedef SuiteSparseQR_factorization[double, int64_t] spqr_fact_dl
-ctypedef SuiteSparseQR_factorization[doublecomplex, int32_t] spqr_fact_zi
-ctypedef SuiteSparseQR_factorization[doublecomplex, int64_t] spqr_fact_zl
+ctypedef SuiteSparseQR_factorization[cdouble, int32_t] spqr_fact_zi
+ctypedef SuiteSparseQR_factorization[cdouble, int64_t] spqr_fact_zl
 
 ctypedef fused factor_t:
     spqr_fact_di
@@ -494,8 +494,8 @@ cdef int _copy_spqr_numeric_base(
     if not (
         (numeric_t is spqr_num_di and index_t is int32_t and value_t is double)
         or (numeric_t is spqr_num_dl and index_t is int64_t and value_t is double)
-        or (numeric_t is spqr_num_zi and index_t is int32_t and value_t is doublecomplex)
-        or (numeric_t is spqr_num_zl and index_t is int64_t and value_t is doublecomplex)
+        or (numeric_t is spqr_num_zi and index_t is int32_t and value_t is cdouble)
+        or (numeric_t is spqr_num_zl and index_t is int64_t and value_t is cdouble)
     ):
         assert False
         return 0
@@ -605,9 +605,9 @@ cdef inline int _copy_spqr_numeric(
     elif numeric_t is spqr_num_dl:
         return _copy_spqr_numeric_base[spqr_num_dl, double, int64_t](dest, src, cm)
     elif numeric_t is spqr_num_zi:
-        return _copy_spqr_numeric_base[spqr_num_zi, doublecomplex, int32_t](dest, src, cm)
+        return _copy_spqr_numeric_base[spqr_num_zi, cdouble, int32_t](dest, src, cm)
     else:  # numeric_t is spqr_num_zl
-        return _copy_spqr_numeric_base[spqr_num_zl, doublecomplex, int64_t](dest, src, cm)
+        return _copy_spqr_numeric_base[spqr_num_zl, cdouble, int64_t](dest, src, cm)
 
 
 cdef int _copy_spqr_factor_base(
@@ -626,8 +626,8 @@ cdef int _copy_spqr_factor_base(
     if not (
         (factor_t is spqr_fact_di and index_t is int32_t and value_t is double)
         or (factor_t is spqr_fact_dl and index_t is int64_t and value_t is double)
-        or (factor_t is spqr_fact_zi and index_t is int32_t and value_t is doublecomplex)
-        or (factor_t is spqr_fact_zl and index_t is int64_t and value_t is doublecomplex)
+        or (factor_t is spqr_fact_zi and index_t is int32_t and value_t is cdouble)
+        or (factor_t is spqr_fact_zl and index_t is int64_t and value_t is cdouble)
     ):
         assert False
         return 0
@@ -689,9 +689,9 @@ cdef inline int _copy_spqr_factor(
     elif factor_t is spqr_fact_dl:
         return _copy_spqr_factor_base[spqr_fact_dl, double, int64_t](dest, src, cm)
     elif factor_t is spqr_fact_zi:
-        return _copy_spqr_factor_base[spqr_fact_zi, doublecomplex, int32_t](dest, src, cm)
+        return _copy_spqr_factor_base[spqr_fact_zi, cdouble, int32_t](dest, src, cm)
     else:  # factor_t is spqr_fact_zl
-        return _copy_spqr_factor_base[spqr_fact_zl, doublecomplex, int64_t](dest, src, cm)
+        return _copy_spqr_factor_base[spqr_fact_zl, cdouble, int64_t](dest, src, cm)
 
 
 # -------------------------------------------------------------------------------------
@@ -873,11 +873,11 @@ cdef class SPQRFactor:
                     )
             else:
                 if self._use_int32:
-                    self._fact_zi = SuiteSparseQR_factorize[doublecomplex, int32_t](
+                    self._fact_zi = SuiteSparseQR_factorize[cdouble, int32_t](
                         ordering, self._tol, Ac, self._cm
                     )
                 else:
-                    self._fact_zl = SuiteSparseQR_factorize[doublecomplex, int64_t](
+                    self._fact_zl = SuiteSparseQR_factorize[cdouble, int64_t](
                         ordering, self._tol, Ac, self._cm
                     )
         else:
@@ -893,11 +893,11 @@ cdef class SPQRFactor:
                     )
             else:
                 if self._use_int32:
-                    self._fact_zi = SuiteSparseQR_symbolic[doublecomplex, int32_t](
+                    self._fact_zi = SuiteSparseQR_symbolic[cdouble, int32_t](
                         ordering, allow_tol, Ac, self._cm
                     )
                 else:
-                    self._fact_zl = SuiteSparseQR_symbolic[doublecomplex, int64_t](
+                    self._fact_zl = SuiteSparseQR_symbolic[cdouble, int64_t](
                         ordering, allow_tol, Ac, self._cm
                     )
 
@@ -917,9 +917,9 @@ cdef class SPQRFactor:
                 SuiteSparseQR_free[double, int64_t](&self._fact_dl, self._cm)
         else:
             if self._use_int32:
-                SuiteSparseQR_free[doublecomplex, int32_t](&self._fact_zi, self._cm)
+                SuiteSparseQR_free[cdouble, int32_t](&self._fact_zi, self._cm)
             else:
-                SuiteSparseQR_free[doublecomplex, int64_t](&self._fact_zl, self._cm)
+                SuiteSparseQR_free[cdouble, int64_t](&self._fact_zl, self._cm)
 
         if self._use_int32:
             cholmod_finish(self._cm)
@@ -1088,11 +1088,11 @@ cdef class SPQRFactor:
                 )
         else:
             if self._use_int32:
-                SuiteSparseQR_numeric[doublecomplex, int32_t](
+                SuiteSparseQR_numeric[cdouble, int32_t](
                     self._tol, Ac, self._fact_zi, self._cm
                 )
             else:
-                SuiteSparseQR_numeric[doublecomplex, int64_t](
+                SuiteSparseQR_numeric[cdouble, int64_t](
                     self._tol, Ac, self._fact_zl, self._cm
                 )
 
@@ -1188,11 +1188,11 @@ cdef class SPQRFactor:
                 )
         else:
             if self._use_int32:
-                Ys = SuiteSparseQR_qmult_fs[doublecomplex, int32_t](
+                Ys = SuiteSparseQR_qmult_fs[cdouble, int32_t](
                     method, self._fact_zi, Xs, self._cm
                 )
             else:
-                Ys = SuiteSparseQR_qmult_fs[doublecomplex, int64_t](
+                Ys = SuiteSparseQR_qmult_fs[cdouble, int64_t](
                     method, self._fact_zl, Xs, self._cm
                 )
 
@@ -1221,11 +1221,11 @@ cdef class SPQRFactor:
                 )
         else:
             if self._use_int32:
-                Yd = SuiteSparseQR_qmult_fd[doublecomplex, int32_t](
+                Yd = SuiteSparseQR_qmult_fd[cdouble, int32_t](
                     method, self._fact_zi, Xd, self._cm
                 )
             else:
-                Yd = SuiteSparseQR_qmult_fd[doublecomplex, int64_t](
+                Yd = SuiteSparseQR_qmult_fd[cdouble, int64_t](
                     method, self._fact_zl, Xd, self._cm
                 )
 
@@ -1355,11 +1355,11 @@ cdef class SPQRFactor:
                     )
             else:
                 if self._use_int32:
-                    Bd = SuiteSparseQR_qmult_fd[doublecomplex, int32_t](
+                    Bd = SuiteSparseQR_qmult_fd[cdouble, int32_t](
                         SPQR_QTX, self._fact_zi, Bd, self._cm
                     )
                 else:
-                    Bd = SuiteSparseQR_qmult_fd[doublecomplex, int64_t](
+                    Bd = SuiteSparseQR_qmult_fd[cdouble, int64_t](
                         SPQR_QTX, self._fact_zl, Bd, self._cm
                     )
 
@@ -1380,11 +1380,11 @@ cdef class SPQRFactor:
                 )
         else:
             if self._use_int32:
-                Xd = SuiteSparseQR_solve[doublecomplex, int32_t](
+                Xd = SuiteSparseQR_solve[cdouble, int32_t](
                     system, self._fact_zi, Bd, self._cm
                 )
             else:
-                Xd = SuiteSparseQR_solve[doublecomplex, int64_t](
+                Xd = SuiteSparseQR_solve[cdouble, int64_t](
                     system, self._fact_zl, Bd, self._cm
                 )
 
@@ -1405,11 +1405,11 @@ cdef class SPQRFactor:
                     )
             else:
                 if self._use_int32:
-                    Xd = SuiteSparseQR_qmult_fd[doublecomplex, int32_t](
+                    Xd = SuiteSparseQR_qmult_fd[cdouble, int32_t](
                         SPQR_QX, self._fact_zi, Xd, self._cm
                     )
                 else:
-                    Xd = SuiteSparseQR_qmult_fd[doublecomplex, int64_t](
+                    Xd = SuiteSparseQR_qmult_fd[cdouble, int64_t](
                         SPQR_QX, self._fact_zl, Xd, self._cm
                     )
 
@@ -1580,11 +1580,11 @@ cdef inline int _spqr_noQ(
             )
     else:
         if use_int32:
-            SuiteSparseQR_noQ[doublecomplex, int32_t](
+            SuiteSparseQR_noQ[cdouble, int32_t](
                 ordering, tol, econ, Ac, Rs, <int32_t**>Es, cm
             )
         else:
-            SuiteSparseQR_noQ[doublecomplex, int64_t](
+            SuiteSparseQR_noQ[cdouble, int64_t](
                 ordering, tol, econ, Ac, Rs, <int64_t**>Es, cm
             )
 
@@ -1615,11 +1615,11 @@ cdef inline int _spqr_full(
             )
     else:
         if use_int32:
-            SuiteSparseQR_full[doublecomplex, int32_t](
+            SuiteSparseQR_full[cdouble, int32_t](
                 ordering, tol, econ, Ac, Qs, Rs, <int32_t**>Es, cm
             )
         else:
-            SuiteSparseQR_full[doublecomplex, int64_t](
+            SuiteSparseQR_full[cdouble, int64_t](
                 ordering, tol, econ, Ac, Qs, Rs, <int64_t**>Es, cm
             )
 
@@ -1654,12 +1654,12 @@ cdef inline int _spqr_householder(
             )
     else:
         if use_int32:
-            SuiteSparseQR_householder[doublecomplex, int32_t](
+            SuiteSparseQR_householder[cdouble, int32_t](
                 ordering, tol, econ, Ac,
                 Rs, <int32_t**>Es, Hs, <int32_t**>HPinv, HTau, cm
             )
         else:
-            SuiteSparseQR_householder[doublecomplex, int64_t](
+            SuiteSparseQR_householder[cdouble, int64_t](
                 ordering, tol, econ, Ac,
                 Rs, <int64_t**>Es, Hs, <int64_t**>HPinv, HTau, cm
             )
@@ -1866,11 +1866,11 @@ cdef object _qmult_sparse(
             )
     else:
         if use_int32:
-            Ys = SuiteSparseQR_qmult_Hs[doublecomplex, int32_t](
+            Ys = SuiteSparseQR_qmult_Hs[cdouble, int32_t](
                 method, H, HTau, <int32_t*>&HPinv[0], Xs, cm
             )
         else:
-            Ys = SuiteSparseQR_qmult_Hs[doublecomplex, int64_t](
+            Ys = SuiteSparseQR_qmult_Hs[cdouble, int64_t](
                 method, H, HTau, <int64_t*>&HPinv[0], Xs, cm
             )
 
@@ -1908,11 +1908,11 @@ cdef object _qmult_dense(
             )
     else:
         if use_int32:
-            Yd = SuiteSparseQR_qmult_Hd[doublecomplex, int32_t](
+            Yd = SuiteSparseQR_qmult_Hd[cdouble, int32_t](
                 method, H, HTau, <int32_t*>&HPinv[0], Xd, cm
             )
         else:
-            Yd = SuiteSparseQR_qmult_Hd[doublecomplex, int64_t](
+            Yd = SuiteSparseQR_qmult_Hd[cdouble, int64_t](
                 method, H, HTau, <int64_t*>&HPinv[0], Xd, cm
             )
 
