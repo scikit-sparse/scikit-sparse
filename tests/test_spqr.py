@@ -24,6 +24,7 @@ from sksparse.spqr import (
     SPQRRankDeficiencyWarning,
     spqr,
     spqr_factor,
+    spqr_qmult,
     spqr_solve,
 )
 
@@ -720,8 +721,7 @@ def test_spqr_householder(A, itype):
     M, N = A.shape
     H, tau, v = Ht
 
-    assert H.shape[0] == M
-    # number of columns of H is not known exactly
+    assert H.shape[0] == M             # number of columns not known exactly
     assert v.shape == (H.shape[0],)    # row permutation of H
     assert tau.shape == (H.shape[1],)  # column coefficients of H
 
@@ -729,10 +729,44 @@ def test_spqr_householder(A, itype):
     assert tau.dtype == A.dtype
     assert v.dtype == itype
 
-    # TODO
-    # Q = spqr_qmult(Ht, np.eye(A.shape[0], dtype=A.dtype))
-    # assert_allclose((Q @ R).toarray(), A[:, p].toarray(), atol=1e-14, strict=True)
+    Q = spqr_qmult(Ht, np.eye(A.shape[0], dtype=A.dtype))
+    assert_allclose(Q @ R, A[:, p].toarray(), atol=1e-14, strict=True)
 
+
+@pytest.mark.parametrize("itype", ITYPES)
+@pytest.mark.parametrize("dtype", DTYPES)
+@pytest.mark.parametrize("is_sparse", [False, True], ids=["dense", "sparse"])
+def test_spqr_qmult(davis_example_qr, is_sparse, itype, dtype):
+    A = davis_example_qr.astype(dtype)
+    A.indptr = A.indptr.astype(itype)
+    A.indices = A.indices.astype(itype)
+    Ht, R, p = spqr(A, mode="householder")
+
+    if is_sparse:
+        I = sparse.eye_array(A.shape[0], dtype=dtype).tocsc()
+        I.indptr = I.indptr.astype(itype)
+        I.indices = I.indices.astype(itype)
+    else:
+        I = np.eye(A.shape[0], dtype=dtype)
+
+    Q = spqr_qmult(Ht, I, "QX")
+    QTQ = spqr_qmult(Ht, Q, "QTX")
+    QQT = spqr_qmult(Ht, Q, "XQT")
+
+    if is_sparse:
+        assert_allclose(QTQ.toarray(), I.toarray(), atol=1e-15, strict=True)
+        assert_allclose(QQT.toarray(), I.toarray(), atol=1e-15, strict=True)
+    else:
+        assert_allclose(QTQ, I, atol=1e-15, strict=True)
+        assert_allclose(QQT, I, atol=1e-15, strict=True)
+
+    QT = spqr_qmult(Ht, I, "QTX")
+    QTQ = spqr_qmult(Ht, QT, "XQ")
+
+    if is_sparse:
+        assert_allclose(QTQ.toarray(), I.toarray(), atol=1e-15, strict=True)
+    else:
+        assert_allclose(QTQ, I, atol=1e-15, strict=True)
 
 # =============================================================================
 # =============================================================================
