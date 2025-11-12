@@ -1692,14 +1692,16 @@ def spqr(A, *, mode="full", order=None, tol=None):
     ----------
     A : (M, N) array_like or sparse array
         An array convertible to a sparse matrix.
-    mode : {'full', 'r', 'economic', 'raw'}, optional
+    mode : {'full', 'r', 'economic', 'householder'}, optional
         The mode of the returned Q and R matrices. Options are:
 
         * ``full``: ``Q`` is size ``(M, M)``, ``R`` is size ``(M, N)``.
         * ``economic``: ``Q`` is size ``(M, K)``, ``R`` is size ``(K, N)``, where
-            ``K = min(M, N)``.
+          ``K = min(M, N)``.
         * ``r``: Only return the upper-triangular matrix ``R``.
-        * ``raw``: Return the Householder vectors and coefficients used to build ``Q``.
+        * ``householder``: Return the Householder vectors and coefficients used to
+          build ``Q``. This option is similar to ``mode='raw'`` in
+          :func:`scipy.linalg.qr`.
 
     order : str, optional
         The ordering strategy to use.
@@ -1711,19 +1713,18 @@ def spqr(A, *, mode="full", order=None, tol=None):
     -------
     Q : csc_array
         The orthogonal matrix :math:`Q`. Shape (M, M) or (M, K) if ``mode='economic'``.
-        Not returned if ``mode='r'``. Replaced by ``(Q, tau)`` if ``mode='raw'``.
+        Not returned if ``mode='r'``. Replaced by ``(Q, tau)`` if ``mode='householder'``.
     R : csc_array
         The upper-triangular matrix :math:`R`. Shape (M, N) or (K, N) if ``mode in
-        ['economic', 'raw']``, where K = min(M, N).
+        ['economic', 'householder']``, where K = min(M, N).
     P : ndarray of int
         The permutation vector of shape (N,).
     """
     A, _, _ = validate_csc_input(A)
 
-    cdef Py_ssize_t M = A.shape[0]
     cdef Py_ssize_t N = A.shape[1]
 
-    allowed_modes = ("full", "economic", "r", "raw")
+    allowed_modes = ("full", "economic", "r", "householder")
     if mode not in allowed_modes:
         raise ValueError(
             f"Invalid mode '{mode}'. Expected one of {allowed_modes}."
@@ -1790,7 +1791,7 @@ def spqr(A, *, mode="full", order=None, tol=None):
         _spqr_noQ(is_real, use_int32, ordering, c_tol, econ, Ac, &Rs, &Es, cm)
     elif mode in ["full", "economic"]:
         _spqr_full(is_real, use_int32, ordering, c_tol, econ, Ac, &Qs, &Rs, &Es, cm)
-    elif mode == "raw":
+    elif mode == "householder":
         _spqr_householder(
             is_real, use_int32, ordering, c_tol, econ, Ac,
             &Rs, &Es, &Hs, &HPinv, &HTau, cm
@@ -1834,5 +1835,5 @@ def spqr(A, *, mode="full", order=None, tol=None):
         return R, E
     elif mode in ["full", "economic"]:
         return Q, R, E
-    else:  # mode == "raw"
+    else:  # mode == "householder"
         return (H, tau, v), R, E

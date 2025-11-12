@@ -715,7 +715,7 @@ def test_spqr_householder(A, itype):
     A = A.copy()
     A.indptr = A.indptr.astype(itype)
     A.indices = A.indices.astype(itype)
-    Ht, R, p = spqr(A, mode="raw")
+    Ht, R, p = spqr(A, mode="householder")
 
     M, N = A.shape
     H, tau, v = Ht
