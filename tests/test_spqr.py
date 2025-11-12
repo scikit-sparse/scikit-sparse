@@ -22,6 +22,7 @@ from scipy.io import mmread
 from sksparse.spqr import (
     SPQRFactor,
     SPQRRankDeficiencyWarning,
+    spqr,
     spqr_factor,
     spqr_solve,
 )
@@ -681,6 +682,31 @@ def test_ordering(davis_example_qr, order):
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
     f = spqr_factor(A, order=order)
     assert_solve_dense(A, f)
+
+
+# -----------------------------------------------------------------------------
+#         Test spqr
+# -----------------------------------------------------------------------------
+@pytest.mark.parametrize("A", test_As)
+@pytest.mark.parametrize("itype", ITYPES)
+def test_spqr_r(A, itype):
+    A = A.copy()
+    A.indptr = A.indptr.astype(itype)
+    A.indices = A.indices.astype(itype)
+    R, p = spqr(A, mode="r")
+    RTR = (R.T.conj() @ R).toarray()
+    ATA = (A.T.conj() @ A)[p[:, np.newaxis], p].toarray()
+    assert_allclose(RTR, ATA, atol=1e-14, strict=True)
+
+
+@pytest.mark.parametrize("A", test_As)
+@pytest.mark.parametrize("itype", ITYPES)
+def test_spqr_full(A, itype):
+    A = A.copy()
+    A.indptr = A.indptr.astype(itype)
+    A.indices = A.indices.astype(itype)
+    Q, R, p = spqr(A, mode="full")
+    assert_allclose((Q @ R).toarray(), A[:, p].toarray(), atol=1e-14, strict=True)
 
 
 # =============================================================================
