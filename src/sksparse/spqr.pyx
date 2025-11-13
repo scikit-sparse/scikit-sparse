@@ -31,6 +31,8 @@ Function Interface
     :toctree: generated/
     :nosignatures:
 
+    spqr - Compute the SPQR factorization of a sparse matrix.
+    spqr_qmult - Multiply by Q from the SPQR factorization.
     spqr_solve - Solve a linear system using the SPQR factorization.
 
 
@@ -44,7 +46,6 @@ Object Interface
     spqr_factor - Compute the QR factorization of a sparse matrix.
     SPQRFactor - An object-oriented interface to SPQR.
     SPQRInfo - A dataclass to return SPQR info.
-    SPQRControl - A dataclass to set SPQR control parameters.
 
 
 .. spqr-exceptions:
@@ -56,12 +57,14 @@ Warnings and Exceptions
     :toctree: generated/
 
     SPQRWarning
-    SPQRSingularMatrixWarning
+    SPQRRankDeficiencyWarning
 
     SPQRError
+    SPQRNotInstalledError
     SPQROutOfMemoryError
-    SPQRInvalidError
     SPQROverflowError
+    SPQRInvalidInputError
+    SPQRGpuProblemError
 
 
 References
@@ -714,8 +717,8 @@ cdef class SPQRFactor:
 
     1. by setting ``use_singletons=True`` in the constructor, which computes
         both the symbolic and numeric factorizations at once, or
-    2. by calling :meth:`.factorize(A)`, which computes the numeric factorization
-        after symbolic analysis has been performed.
+    2. by calling :meth:`SPQRFactor.factorize`, which computes the numeric
+        factorization after symbolic analysis has been performed.
 
     The first method is useful when factoring a single matrix, but solving multiple
     right-hand sides.
@@ -747,32 +750,29 @@ cdef class SPQRFactor:
     tol : float, optional
         If the 2-norm of a column in ``A`` is less than ``tol``, that column is
         considered to be a zero column. If ``tol = 0``, no columns are treated as zero.
-        If ``None``, the default tolerance is used. The default is ``tol = ``
-        :math:`20 (M + N) \epsilon \sqrt{\max{\mathrm{diag}(A^{\top} A)}}`,
+        If ``None``, the default tolerance is used. The default is
+        ``tol =`` :math:`20 \epsilon (M + N) \sqrt{\max{\mathrm{diag}(A^{\top} A)}}`,
         where :math:`\epsilon` is the machine precision.
 
-    Properties
+
+    Attributes
     ----------
     is_numeric : bool
         Whether the numeric factorization has been computed.
     shape : tuple
         The shape of the input matrix (M, N).
-    itype : dtype
+    itype : ~numpy.dtype
         The integer type used for indices (``int32`` or ``int64``).
-    dtype : dtype
+    dtype : ~numpy.dtype
         The data type of the matrix (``float64`` or ``complex128``).
-    Qshape : tuple
-        The shape of the orthogonal matrix Q.
-    Rshape : tuple
-        The shape of the upper-triangular matrix R.
     rank : int
         The rank of the matrix as determined by SPQR.
-    perm : ndarray of int
+    perm : ~numpy.ndarray of int
         The combined singleton and fill-reducing column permutation vector.
 
     See Also
     --------
-    spqr_factor, spqr_solve
+    spqr_factor, spqr, spqr_qmult, spqr_solve
 
     Notes
     -----
@@ -1036,7 +1036,7 @@ cdef class SPQRFactor:
         return dest
 
     def factorize(self, object A, *, object tol=None):
-        """Compute the numeric factorization of the matrix.
+        r"""Compute the numeric factorization of the matrix.
 
         Parameters
         ----------
@@ -1047,12 +1047,15 @@ cdef class SPQRFactor:
             constructor.
         tol : float, optional
             If the 2-norm of a column in ``A`` is less than ``tol``, that column is
-            considered to be a zero column. If ``None``, tolerance used in the
-            constructor is used.
+            considered to be a zero column. If ``tol = 0``, no columns are treated as
+            zero. If ``None``, the default tolerance is used. The default is
+            ``tol =``
+            :math:`20 \epsilon (M + N) \sqrt{\max{\mathrm{diag}(A^{\top} A)}}`,
+            where :math:`\epsilon` is the machine precision.
 
         Returns
         -------
-        SPQRFactor
+        :class:`SPQRFactor`
             The current object with the numeric factorization computed.
         """
         A, _, itype = validate_csc_input(A)
@@ -1100,29 +1103,7 @@ cdef class SPQRFactor:
 
         return self
 
-    def qmult(self, object X, method='QX'):
-        """Multiply by ``Q`` or ``Q.T`` using the SPQR factorization.
-
-        Parameters
-        ----------
-        X : (M, N) numpy.ndarray or sparse array
-            The matrix to be multiplied. Must have compatible shape with ``Q``.
-        method : str , optional
-            The multiplication method. Options are:
-
-            * ``QX`` : compute :math:`Q X`
-            * ``QTX`` : compute :math:`Q^{\top} X`
-            * ``XQ`` : compute :math:`X Q`
-            * ``XQT`` : compute :math:`X Q^{\top}`
-
-            Default is ``QX``.
-
-        Returns
-        -------
-        Y : (M, N) numpy.ndarray or sparse array
-            The result of the multiplication. If ``X`` is a sparse array, then ``Y`` is
-            also returned as a sparse array.
-        """
+    def qmult(self, object X, method="QX"):
         self._require_numeric()
 
         if not (isinstance(X, np.ndarray) or issparse(X)):
@@ -1141,7 +1122,7 @@ cdef class SPQRFactor:
         # Check shape compatibility with Q
         cdef Py_ssize_t X_dim = (
             X.shape[0]
-            if method == 'QTX' or method == 'QX'
+            if method == "QTX" or method == "QX"
             else X.shape[1]
         )
 
@@ -1234,42 +1215,6 @@ cdef class SPQRFactor:
         return _ndarray_from_cholmod_dense(Yd, self._use_int32, self._cm)
 
     def solve(self, object b, *, bint transpose=False):
-        """Solve a linear system using the SPQR factorization.
-
-        This method solves a linear system for :math:`x` given the right-hand side
-        :math:`b` as either a vector or a matrix with multiple right-hand sides.
-
-        If ``transpose=False``, solve
-
-        .. math::
-            A x = b
-
-        or, if ``transpose=True``, solve
-
-        .. math::
-            A^{\top} x = b
-
-        The method uses the QR factorization of :math:`A` previously computed by
-        :meth:`.factorize`.
-
-        Parameters
-        ----------
-        b : (M,) or (M, K) numpy.ndarray
-            The right-hand side vector or matrix. ``M`` should be the number of rows in
-            ``A`` if ``transpose=False``, otherwise the number of columns.
-        transpose : bool, optional
-            Whether to solve the transposed system. Default is False.
-
-        Returns
-        -------
-        x : (N,) or (N, K) numpy.ndarray or sparse array
-            The solution vector or matrix. If ``b`` is a 1D array, then ``x`` is
-            returned as a 1D array. If ``b`` is a 2D array with ``K`` columns,
-            then ``x`` is returned as a 2D array with ``K`` columns. If ``b``
-            is a sparse array, then ``x`` is also returned as a sparse array.
-            ``N`` is the number of columns in ``A`` if ``transpose=False``,
-            otherwise the number of rows.
-        """
         self._require_numeric()
 
         if not (isinstance(b, np.ndarray) or issparse(b)):
@@ -1475,7 +1420,23 @@ cdef class SPQRFactor:
 #         Convenience Functions
 # -------------------------------------------------------------------------------------
 def spqr_factor(A, *, use_singletons=False, order=None, tol=None):
-    """Compute the SPQR factorization of a sparse matrix.
+    r"""Compute the SPQR factorization of a sparse matrix.
+
+    Compute the numeric factorization of the matrix and determine a fill-reducing
+    ordering such that:
+
+    .. math::
+
+        Q R = A E
+
+    where :math:`E` is a column permutation matrix, :math:`Q` is an orthogonal
+    matrix, and :math:`R` is an upper-triangular matrix.
+
+    This function returns a :class:`SPQRFactor` object that contains the SPQR
+    factorization of the input matrix. It is not currently possible to extract the
+    individual factors :math:`Q` and :math:`R` explicitly, but the object provides
+    methods to reuse the factorization to solve linear systems or multiply by
+    :math:`Q`.
 
     Parameters
     ----------
@@ -1486,15 +1447,46 @@ def spqr_factor(A, *, use_singletons=False, order=None, tol=None):
         Otherwise, only perform symbolic analysis. Default is False, so that the factor
         can be reused efficiently for multiple numeric factorizations.
     order : str, optional
-        The ordering strategy to use.
+        The column ordering strategy to use. Let :math:`S` be the matrix :math:`A` with
+        singleton rows/columns removed, the ordering options are:
+
+        * ``default``: COLAMD(S),
+        * ``fixed``: identity permutation (*i.e.* no singletons removed),
+        * ``natural``: singletons removed, but no fill-reducing ordering applied,
+        * ``colamd``: COLAMD(S),
+        * ``amd``: AMD(:math:`S^{\top} S`),
+        * ``metis``: METIS(:math:`S^{\top} S`),
+        * ``best``: try all of ``amd``, ``colamd``, ``metis`` and pick the best,
+        * ``cholmod``: Same as ``best``,
+        * ``bestamd``: try ``amd`` and ``colamd`` and pick the best.
+
     tol : float, optional
         If the 2-norm of a column in ``A`` is less than ``tol``, that column is
-        considered to be a zero column. If ``None``, the default tolerance is used.
+        considered to be a zero column. If ``tol = 0``, no columns are treated as zero.
+        If ``None``, the default tolerance is used. The default is
+        ``tol =`` :math:`20 \epsilon (M + N) \sqrt{\max{\mathrm{diag}(A^{\top} A)}}`,
+        where :math:`\epsilon` is the machine precision.
 
     Returns
     -------
-    SPQRFactor
+    :class:`SPQRFactor`
         The SPQR factorization of the input matrix.
+
+    See Also
+    --------
+    SPQRFactor, spqr, spqr_qmult, spqr_solve
+
+    Notes
+    -----
+    This function is part of an interface to the SuiteSparse SPQR library [#spqr_url]_.
+
+
+    .. versionadded:: 0.5.0
+
+    References
+    ----------
+    .. [#spqr_url] SuiteSparse SPQR
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/tree/dev/SPQR
     """
     if use_singletons:
         return SPQRFactor(A, use_singletons=True, order=order, tol=tol)
@@ -1503,49 +1495,6 @@ def spqr_factor(A, *, use_singletons=False, order=None, tol=None):
 
 
 def spqr_solve(A, b, *, transpose=False, min2norm=True):
-    """Solve a linear system using the SPQR factorization.
-
-    This function solves a linear system for :math:`x` given the right-hand side
-    :math:`b` as either a vector or a matrix with multiple right-hand sides.
-
-    If ``transpose=False``, solve
-
-    .. math::
-        A x = b
-
-    or, if ``transpose=True``, solve
-
-    .. math::
-        A^{\top} x = b
-
-    The function uses the QR factorization of :math:`A` previously computed by
-    :meth:`.factorize`.
-
-    Parameters
-    ----------
-    A : (M, N) array_like or sparse array
-        An array convertible to a sparse matrix.
-    b : (M,) or (M, K) numpy.ndarray
-        The right-hand side vector or matrix. ``M`` should be the number of rows in
-        ``A`` if ``transpose=False``, otherwise the number of columns.
-    transpose : bool, optional
-        Whether to solve the transposed system. Default is False.
-    min2norm : bool, optional
-        If True, compute the minimum 2-norm solution when ``A`` is underdetermined.
-        ``transpose`` is ignored in this case. Default is True. If False, the
-        solution of an underdetermined system is not guaranteed to be the minimum
-        2-norm solution.
-
-    Returns
-    -------
-    x : (N,) or (N, K) numpy.ndarray or sparse array
-        The solution vector or matrix. If ``b`` is a 1D array, then ``x`` is
-        returned as a 1D array. If ``b`` is a 2D array with ``K`` columns,
-        then ``x`` is returned as a 2D array with ``K`` columns. If ``b``
-        is a sparse array, then ``x`` is also returned as a sparse array.
-        ``N`` is the number of columns in ``A`` if ``transpose=False``,
-        otherwise the number of rows.
-    """
     A, _, _ = validate_csc_input(A)
     M, N = A.shape
 
@@ -1669,7 +1618,7 @@ cdef inline int _spqr_householder(
 
 
 def spqr(A, *, mode="full", order=None, tol=None):
-    """Compute the QR factorization.
+    r"""Compute the QR factorization.
 
     This function computes the QR factorization of a sparse matrix :math:`A` such that
 
@@ -1705,12 +1654,29 @@ def spqr(A, *, mode="full", order=None, tol=None):
     -------
     Q : csc_array
         The orthogonal matrix :math:`Q`. Shape (M, M) or (M, K) if ``mode='economic'``.
-        Not returned if ``mode='r'``. Replaced by ``(Q, tau)`` if ``mode='householder'``.
+        Not returned if ``mode='r'``.
+        Replaced by ``(Q, tau)`` if ``mode='householder'``.
     R : csc_array
         The upper-triangular matrix :math:`R`. Shape (M, N) or (K, N) if ``mode in
         ['economic', 'householder']``, where K = min(M, N).
     P : ndarray of int
         The permutation vector of shape (N,).
+
+    See Also
+    --------
+    SPQRFactor, spqr_factor, spqr_qmult, spqr_solve
+
+    Notes
+    -----
+    This function is part of an interface to the SuiteSparse SPQR library [#spqr_url]_.
+
+
+    .. versionadded:: 0.5.0
+
+    References
+    ----------
+    .. [#spqr_url] SuiteSparse SPQR
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/tree/dev/SPQR
     """
     A, _, _ = validate_csc_input(A)
 
@@ -1972,33 +1938,7 @@ def _qmult(
     return Y
 
 
-def spqr_qmult(house, X, method='QX'):
-    """Multiply by ``Q`` or ``Q.T`` using the Householder representation.
-
-    Parameters
-    ----------
-    house : tuple
-        A tuple ``(H, tau, v)`` representing the Householder vectors ``H``,
-        coefficients ``tau``, and the column permutation vector ``v``. Typically,
-        these are created from ``H, R, p = spqr(A, mode='householder')``.
-    X : (M, N) numpy.ndarray or sparse array
-        The matrix to be multiplied. Must have compatible shape with ``Q``.
-    method : str , optional
-        The multiplication method. Options are:
-
-        * ``QX`` : compute :math:`Q X`
-        * ``QTX`` : compute :math:`Q^{\top} X`
-        * ``XQ`` : compute :math:`X Q`
-        * ``XQT`` : compute :math:`X Q^{\top}`
-
-        Default is ``QX``.
-
-    Returns
-    -------
-    Y : (M, N) numpy.ndarray or sparse array
-        The result of the multiplication. If ``X`` is a sparse array, then ``Y`` is
-        also returned as a sparse array.
-    """
+def spqr_qmult(house, X, method="QX"):
     try:
         H, tau, v = house
         H, _, itype = validate_csc_input(H)
@@ -2029,7 +1969,7 @@ def spqr_qmult(house, X, method='QX'):
     # Check shape compatibility with Q
     cdef Py_ssize_t X_dim = (
         X.shape[0]
-        if method == 'QTX' or method == 'QX'
+        if method == "QTX" or method == "QX"
         else X.shape[1]
     )
 
@@ -2053,3 +1993,135 @@ def spqr_qmult(house, X, method='QX'):
         Y = Y[:, 0]
 
     return Y
+
+
+# -------------------------------------------------------------------------------------
+#         Docstrings
+# -------------------------------------------------------------------------------------
+_SOLVE_DOC_TEMPLATE = r"""
+Solve a linear system using the SPQR factorization.
+
+Solve a linear system for :math:`x` given the right-hand side
+:math:`b` as either a vector or a matrix with multiple right-hand sides.
+
+If ``transpose=False``, solve
+
+.. math::
+    A x = b
+
+or, if ``transpose=True``, solve
+
+.. math::
+    A^{{\top}} x = b.
+
+Parameters
+----------
+{A_doc}
+b : (M,) or (M, K) numpy.ndarray
+    The right-hand side vector or matrix. ``M`` should be the number of rows in
+    ``A`` if ``transpose=False``, otherwise the number of columns.
+transpose : bool, optional
+    Whether to solve the transposed system. Default is False.
+{min2norm}
+
+Returns
+-------
+x : (N,) or (N, K) numpy.ndarray or sparse array
+    The solution vector or matrix. If ``b`` is a 1D array, then ``x`` is
+    returned as a 1D array. If ``b`` is a 2D array with ``K`` columns,
+    then ``x`` is returned as a 2D array with ``K`` columns. If ``b``
+    is a sparse array, then ``x`` is also returned as a sparse array.
+    ``N`` is the number of columns in ``A`` if ``transpose=False``,
+    otherwise the number of rows.
+
+See Also
+--------
+SPQRFactor, spqr_factor, spqr, spqr_qmult
+
+Notes
+-----
+Part of an interface to the SuiteSparse SPQR library [#spqr_url]_.
+
+
+.. versionadded:: 0.5.0
+
+References
+----------
+.. [#spqr_url] SuiteSparse SPQR
+    https://github.com/DrTimothyAldenDavis/SuiteSparse/tree/dev/SPQR
+"""
+
+
+_A_doc= """A : (M, N) array_like or sparse array
+    An array convertible to a sparse matrix."""
+
+_min2norm_doc = """min2norm : bool, optional
+    If True, compute the minimum 2-norm solution when ``A`` is underdetermined.
+    ``transpose`` is ignored in this case. Default is True. If False, the
+    solution of an underdetermined system is not guaranteed to be the minimum
+    2-norm solution."""
+
+# Format the docstrings
+SPQRFactor.solve.__doc__ = _SOLVE_DOC_TEMPLATE.format(A_doc="", min2norm="")
+spqr_solve.__doc__ = _SOLVE_DOC_TEMPLATE.format(
+    A_doc=_A_doc,
+    min2norm=_min2norm_doc
+)
+
+
+_QMULT_DOC_TEMPLATE = r"""
+Multiply by `Q` using the Householder representation.
+
+Parameters
+----------
+{house_doc}
+X : (M, N) numpy.ndarray or sparse array
+    The matrix to be multiplied. Must have compatible shape with ``Q``.
+method : str , optional
+    The multiplication method. Options are:
+
+    * ``QX`` : compute :math:`Q X`
+    * ``QTX`` : compute :math:`Q^{{\top}} X`
+    * ``XQ`` : compute :math:`X Q`
+    * ``XQT`` : compute :math:`X Q^{{\top}}`
+
+    Default is ``QX``. The transpose is the conjugate transpose for complex data.
+
+Returns
+-------
+Y : (M, N) numpy.ndarray or sparse array
+    The result of the multiplication. If ``X`` is a sparse array, then ``Y`` is
+    also returned as a sparse array.
+
+See Also
+--------
+SPQRFactor, spqr_factor, spqr, spqr_solve{see_also}
+
+Notes
+-----
+This function is part of an interface to the SuiteSparse SPQR library [#spqr_url]_.
+
+
+.. versionadded:: 0.5.0
+
+References
+----------
+.. [#spqr_url] SuiteSparse SPQR
+    https://github.com/DrTimothyAldenDavis/SuiteSparse/tree/dev/SPQR
+"""
+
+
+_qmult_house_doc = """house : tuple
+    A tuple ``(H, tau, v)`` representing the Householder vectors ``H``,
+    coefficients ``tau``, and the column permutation vector ``v``. Typically,
+    these are created from ``H, R, p = spqr(A, mode='householder')``."""
+
+SPQRFactor.qmult.__doc__ = _QMULT_DOC_TEMPLATE.format(
+    house_doc="",
+    see_also=", spqr_qmult"
+)
+
+spqr_qmult.__doc__ = _QMULT_DOC_TEMPLATE.format(
+    house_doc=_qmult_house_doc,
+    see_also=""
+)
