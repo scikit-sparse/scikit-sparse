@@ -121,22 +121,23 @@ def generate_random_matrices(
         "!=": operator.ne,
     }
 
+    try:
+        op_str = _valid_op_strs[shape_kind]
+    except KeyError as e:
+        raise ValueError(f"Invalid shape_kind: {shape_kind}") from e
+
+    if pos_def_only and op_str != "==":
+        raise ValueError(
+            "Positive definite matrices must be square. "
+            "Set shape_kind to 'square' or 'M == N'."
+        )
+
+    op = _ops.get(op_str, None)
+
     for trial in range(N_trials):
-        try:
-            op_str = _valid_op_strs[shape_kind]
-        except KeyError as e:
-            raise ValueError(f"Invalid shape_kind: {shape_kind}") from e
-
-        if pos_def_only and op_str != "==":
-            raise ValueError(
-                "Positive definite matrices must be square. "
-                "Set shape_kind to 'square' or 'M == N'."
-            )
-
         if op_str == "any":
             M, N = _get_dims(op_str, N_max, rng)
         else:
-            op = _ops[op_str]
             # Keep generating until the condition is met
             MAX_TRIES = 10
             for _ in range(MAX_TRIES):
