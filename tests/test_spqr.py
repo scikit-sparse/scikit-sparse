@@ -203,17 +203,23 @@ def test_copy_symbolic(A, itype):
     A.indptr = A.indptr.astype(itype)
     A.indices = A.indices.astype(itype)
     f = SPQRFactor(A)
+    print("[test_copy_symbolic]: Copying SPQRFactor", flush=True)
     g = f.copy()
+    print("[test_copy_symbolic]: asserting...", flush=True)
     assert g is not f
     assert g.shape == f.shape
     assert g.itype == f.itype
     assert g.dtype == f.dtype
     # Test that numeric factorization + solve can be done on the copy
+    print("[test_copy_symbolic]: factorizing f", flush=True)
     f.factorize(A)
     assert_solve_dense(A, f)
     del f  # ensure no shared state
+    print("[test_copy_symbolic]: factorizing g", flush=True)
     g.factorize(A)
+    print("[test_copy_symbolic]: asserting solve...", flush=True)
     assert_solve_dense(A, g)
+    print("[test_copy_symbolic]: done", flush=True)
 
 
 @pytest.mark.parametrize("itype", ITYPES)

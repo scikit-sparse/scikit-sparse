@@ -428,6 +428,7 @@ cdef int _copy_spqr_symbolic_base(
         assert False
         return 0
 
+    print("[copy_spqr_symbolic]: Copying symbolic struct...", flush=True)
     dest.m = src.m
     dest.n = src.n
     dest.anz = src.anz
@@ -463,6 +464,7 @@ cdef int _copy_spqr_symbolic_base(
     dest.ntasks = src.ntasks
     dest.ns = src.ns
 
+    print("[copy_spqr_symbolic]: setting Task pointers to NULL...", flush=True)
     if dest.ntasks > 1:
         raise NotImplementedError("SPQR task parallelism and GPU not yet supported.")
 
@@ -665,6 +667,7 @@ cdef int _copy_spqr_factor_base(
     else:
         dest.QRsym = <spqr_symb_l*>malloc(sizeof(spqr_symb_l))
 
+    print("[copy_spqr_factor]: Copying symbolic factorization...", flush=True)
     _copy_spqr_symbolic(dest.QRsym, src.QRsym, cm)
 
     # Deep copy numeric factorization
@@ -678,8 +681,10 @@ cdef int _copy_spqr_factor_base(
         dest.QRnum = <spqr_num_zl*>malloc(sizeof(spqr_num_zl))
 
     if src.QRnum is not NULL:
+        print("[copy_spqr_factor]: Copying numeric factorization...", flush=True)
         _copy_spqr_numeric(dest.QRnum, src.QRnum, cm)
 
+    print("[copy_spqr_factor]: Copying rest of pointers...", flush=True)
     dest.R1p = <index_t*>_malloc_copy(src.R1p, src.n1rows + 1, sizeof(index_t), cm)
     dest.R1j = <index_t*>_malloc_copy(src.R1j, src.n1rows, sizeof(index_t), cm)
     dest.R1x = <value_t*>_malloc_copy(src.R1x, src.r1nz, sizeof(value_t), cm)
@@ -1043,6 +1048,7 @@ cdef class SPQRFactor:
         if self._is_real:
             if self._use_int32:
                 dest._fact_di = <spqr_fact_di*>malloc(sizeof(spqr_fact_di))
+                print("[copy]: copying spqr_fact_di", flush=True)
                 _copy_spqr_factor(dest._fact_di, self._fact_di, dest._cm)
             else:
                 dest._fact_dl = <spqr_fact_dl*>malloc(sizeof(spqr_fact_dl))
@@ -1055,6 +1061,7 @@ cdef class SPQRFactor:
                 dest._fact_zl = <spqr_fact_zl*>malloc(sizeof(spqr_fact_zl))
                 _copy_spqr_factor(dest._fact_zl, self._fact_zl, dest._cm)
 
+        print("[copy]: done", flush=True)
         return dest
 
     def factorize(self, object A, *, object tol=None):
