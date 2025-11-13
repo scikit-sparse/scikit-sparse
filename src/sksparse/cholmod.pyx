@@ -161,7 +161,7 @@ class CholmodNotInstalledError(CholmodError):
     pass
 
 
-class CholmodOutOfMemoryError(CholmodError):
+class CholmodOutOfMemoryError(MemoryError, CholmodError):
     """Raised when CHOLMOD runs out of memory."""
     pass
 
