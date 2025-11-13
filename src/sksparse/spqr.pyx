@@ -464,7 +464,29 @@ cdef int _copy_spqr_symbolic_base(
     dest.ns = src.ns
 
     if dest.ntasks > 1:
-        raise NotImplementedError("SPQR task parallelism not yet supported.")
+        raise NotImplementedError("SPQR task parallelism and GPU not yet supported.")
+
+    dest.TaskChildp = NULL
+    dest.TaskChild = NULL
+
+    dest.TaskStack = NULL
+
+    dest.TaskFront = NULL
+    dest.TaskFrontp = NULL
+
+    dest.On_stack = NULL
+
+    dest.Stack_maxstack = NULL
+    dest.Fm = NULL
+    dest.Cm = NULL
+
+    # Values used in GPU factorization
+    dest.maxcsize = src.maxcsize
+    dest.maxesize = src.maxesize
+    dest.ColCount = NULL
+
+    # Not yet supported
+    # dest.QRgpu = NULL
 
     return 0
 
