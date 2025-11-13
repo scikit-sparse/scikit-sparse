@@ -1499,7 +1499,7 @@ cdef class CholeskyFactor:
         else:
             cholmod_l_start(cf._cm)
 
-        _copy_cholmod_common(self._cm, cf._cm)
+        _copy_cholmod_common(cf._cm, self._cm)
 
         # Copy the factor
         if self._use_int32:
