@@ -137,19 +137,6 @@ __all__ = [
 ]
 
 
-# Define types
-ctypedef fused index_t:
-    int32_t
-    int64_t
-
-
-ctypedef fused floating_t:
-    float
-    double
-    float complex
-    double complex
-
-
 # Define constants for the mode of cholmod_transpose (see cholmod.h)
 cdef int CHOLMOD_TRANS_PATTERN = 0    # transpose only the pattern
 cdef int CHOLMOD_TRANS_NOCONJ = 1  # numeric (no conjugate)
@@ -792,7 +779,10 @@ cdef cholmod_sparse* _cholesky_l_pattern(
 # -----------------------------------------------------------------------------
 #         CSC <==> CHOLMOD Dense
 # -----------------------------------------------------------------------------
-cdef void _cholmod_dense_from_ndarray(floating_t[::1, :] Xd, cholmod_dense *X_static):
+cdef void _cholmod_dense_from_ndarray(
+    floating_t[::1, :] Xd,
+    cholmod_dense *X_static
+) noexcept:
     """Create a CHOLMOD dense matrix from a numpy.ndarray.
 
     See the CHOLMOD MATLAB interface for details [#sputil_get_dense]_.
@@ -830,8 +820,9 @@ cdef void _cholmod_dense_from_ndarray(floating_t[::1, :] Xd, cholmod_dense *X_st
     X.z = NULL
 
     # Get the numerical values of X
+    cdef floating_t dummy_value
     X.xtype = _real_or_complex[floating_t]()
-    X.x = &Xd[0, 0]  # guaranteed Xd.size > 0 from internal use
+    X.x = &Xd[0, 0] if Xd.size > 0 else &dummy_value
 
 
 cdef class _CholmodDenseDestructor:
@@ -1092,6 +1083,7 @@ cdef void _copy_cholmod_common(cholmod_common* dest, cholmod_common* src):
     dest.current = src.current
     dest.selected = src.selected
 
+    cdef int i
     if src.method is not NULL:
         for i in range(src.nmethods):
             dest.method[i].lnz = src.method[i].lnz
@@ -1128,7 +1120,24 @@ cdef void _copy_cholmod_common(cholmod_common* dest, cholmod_common* src):
     dest.called_nd = src.called_nd
     dest.blas_ok = src.blas_ok
 
-    # Skip SPQR related fields and GPU related fields
+    dest.SPQR_grain = src.SPQR_grain
+    dest.SPQR_small = src.SPQR_small
+    dest.SPQR_shrink = src.SPQR_shrink
+    dest.SPQR_nthreads = src.SPQR_nthreads
+
+    dest.SPQR_flopcount = src.SPQR_flopcount
+    dest.SPQR_analyze_time = src.SPQR_analyze_time
+    dest.SPQR_factorize_time = src.SPQR_factorize_time
+    dest.SPQR_solve_time = src.SPQR_solve_time
+    dest.SPQR_flopcount_bound = src.SPQR_flopcount_bound
+    dest.SPQR_tol_used = src.SPQR_tol_used
+    dest.SPQR_norm_E_fro = src.SPQR_norm_E_fro
+
+    if src.SPQR_istat is not NULL:
+        for i in range(8):
+            dest.SPQR_istat[i] = src.SPQR_istat[i]
+
+    # Skip GPU related fields
 
 
 cdef class CholeskyFactor:

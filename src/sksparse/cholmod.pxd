@@ -13,6 +13,8 @@ from libc.stdlib cimport malloc
 from libc.stdint cimport int32_t, int64_t, uintptr_t
 from libc.string cimport memcpy, memset
 
+cimport numpy as cnp
+
 
 cdef extern from "cholmod.h":
     # xtypes
@@ -110,6 +112,20 @@ cdef extern from "cholmod.h":
         double aatfl
         int called_nd
         int blas_ok
+
+        double SPQR_grain
+        double SPQR_small
+        int SPQR_shrink
+        int SPQR_nthreads
+
+        double SPQR_flopcount
+        double SPQR_analyze_time
+        double SPQR_factorize_time
+        double SPQR_solve_time
+        double SPQR_flopcount_bound
+        double SPQR_tol_used
+        double SPQR_norm_E_fro
+        int64_t SPQR_istat[8]
 
     ctypedef struct cholmod_factor:
         size_t n
@@ -512,3 +528,25 @@ cdef extern from "cholmod.h":
 
     int cholmod_free_factor(cholmod_factor **L, cholmod_common *Common)
     int cholmod_l_free_factor(cholmod_factor **L, cholmod_common *Common)
+
+
+# -------------------------------------------------------------------------------------
+#         Interface Declarations
+# -------------------------------------------------------------------------------------
+ctypedef fused index_t:
+    int32_t
+    int64_t
+
+ctypedef fused floating_t:
+    float
+    double
+    float complex
+    double complex
+
+cdef object _csc_from_cholmod_sparse(cholmod_sparse* A, cholmod_common* common)
+cdef void _cholmod_dense_from_ndarray(floating_t[::1, :] Xd, cholmod_dense *X_static)
+cdef cnp.ndarray _ndarray_from_cholmod_dense(
+    cholmod_dense* X, bint use_int32, cholmod_common* common
+)
+cdef cnp.ndarray _ndarray_copy_from_intptr(void* ptr, size_t N, bint use_int32)
+cdef void _copy_cholmod_common(cholmod_common* dest, cholmod_common* src)

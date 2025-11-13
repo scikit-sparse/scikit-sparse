@@ -94,6 +94,8 @@ v0.5.0
   COLAMD ordering method.
 * Create the :mod:`~sksparse.klu` submodule, which provides an interface to
   the KLU sparse LU solver.
+* Create the :mod:`~sksparse.spqr` submodule, which provides an interface to
+  the SPQR sparse QR solver.
 * Create the :mod:`~sksparse.umfpack` submodule, which provides an interface to
   the UMFPACK sparse LU solver.
 * Remove support for the following versions:
