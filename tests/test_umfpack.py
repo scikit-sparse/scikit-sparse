@@ -252,6 +252,7 @@ test_As = [
 @pytest.mark.parametrize("A", test_As)
 def test_refactor(A, copy):
     atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-6
+    A = A.copy()
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
     f = umf_factor(A)
     assert_LU_equals_A(f, A, atol=atol)
@@ -263,6 +264,7 @@ def test_refactor(A, copy):
     if copy:
         g = f.copy()
         assert g is not f
+        del f  # ensure no shared state
         g.factorize(B)
         assert_LU_equals_A(g, B, atol=atol)
     else:
@@ -420,6 +422,8 @@ def test_nearly_singular(davis_example_qr):
 @pytest.mark.parametrize("is_sparse", [False, True], ids=["dense", "sparse"])
 def test_solve(A, K, is_sparse):
     atol = 1e-12
+    A = A.copy()
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
 
     # Build RHS
     N = A.shape[0]

@@ -194,6 +194,7 @@ test_As = [
 @pytest.mark.parametrize("itype", ITYPES)
 @pytest.mark.parametrize("A", test_As)
 def test_copy_symbolic(A, itype):
+    A = A.copy()
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
     A.indptr = A.indptr.astype(itype)
     A.indices = A.indices.astype(itype)
@@ -206,8 +207,9 @@ def test_copy_symbolic(A, itype):
     assert g.info == f.info
     # Test that numeric factorization can be done on the copy
     f.factorize(A)
-    g.factorize(A)
     assert_LU_equals_A(f, A, atol=1e-12)
+    del f  # ensure no shared state
+    g.factorize(A)
     assert_LU_equals_A(g, A, atol=1e-12)
 
 
@@ -216,6 +218,7 @@ def test_copy_symbolic(A, itype):
 @pytest.mark.parametrize("A", test_As)
 def test_refactor(A, itype, copy):
     atol = 1e-8
+    A = A.copy()
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
     A.indptr = A.indptr.astype(itype)
     A.indices = A.indices.astype(itype)
@@ -229,6 +232,7 @@ def test_refactor(A, itype, copy):
     if copy:
         g = f.copy()
         assert g is not f
+        del f  # ensure no shared state
         g.factorize(B)
         assert_LU_equals_A(g, B, atol=atol)
     else:
@@ -238,6 +242,7 @@ def test_refactor(A, itype, copy):
 
 @pytest.mark.parametrize("A", test_As[:1])
 def test_sorted(A):
+    A = A.copy()
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
     f = klu_factor(A)
     L, U = f.L, f.U
@@ -387,6 +392,7 @@ def test_nearly_singular(davis_example_qr):
 @pytest.mark.parametrize("is_sparse", [False, True], ids=["dense", "sparse"])
 def test_solve(A, K, is_sparse):
     atol = 1e-12
+    A = A.copy()
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
 
     # Build RHS
