@@ -387,7 +387,16 @@ def test_nearly_singular(davis_example_qr):
         f.solve(b)
 
 
-@pytest.mark.parametrize("A", test_As)
+square_As = [
+    A
+    for dtype in DTYPES
+    for A in generate_random_matrices(
+        N_trials=10, N_max=200, d_scale=0.05, shape_kind="square", dtype=dtype
+    )
+]
+
+
+@pytest.mark.parametrize("A", square_As)
 @pytest.mark.parametrize("K", [0, 1, 3], ids=lambda k: f"K={k}")
 @pytest.mark.parametrize("is_sparse", [False, True], ids=["dense", "sparse"])
 def test_solve(A, K, is_sparse):
