@@ -56,7 +56,7 @@ def test_singleton_matrix():
     "A",
     list(
         generate_random_matrices(
-            N_trials=100, N_max=200, d_scale=0.05, square_only=True
+            N_trials=100, N_max=200, d_scale=0.05, shape_kind="square"
         )
     ),
 )
