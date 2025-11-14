@@ -46,6 +46,9 @@ cdef extern from "SuiteSparseQR_definitions.h":
 
 
 cdef extern from "SuiteSparseQR.hpp":
+    cdef cppclass spqr_gpu_impl[Int]:
+        pass
+
     cdef cppclass spqr_symbolic[Int]:
         Int m
         Int n
@@ -93,7 +96,7 @@ cdef extern from "SuiteSparseQR.hpp":
         size_t maxesize
         Int *ColCount
 
-        # spqr_gpu_impl[Int] *QRgpu
+        spqr_gpu_impl[Int] *QRgpu
 
     cdef cppclass spqr_numeric[Entry, Int]:
         Entry **Rblock

@@ -484,7 +484,7 @@ cdef int _copy_spqr_symbolic_base(
     dest.ColCount = NULL
 
     # Not yet supported
-    # dest.QRgpu = NULL
+    dest.QRgpu = NULL
 
     return 0
 
