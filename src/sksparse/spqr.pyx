@@ -132,36 +132,36 @@ ctypedef fused value_t:
 
 
 # Define specific instantiations
-ctypedef spqr_symbolic[int32_t] spqr_symb_i
-ctypedef spqr_symbolic[int64_t] spqr_symb_l
+ctypedef spqr_symbolic[int32_t] spqr_symbolic_i
+ctypedef spqr_symbolic[int64_t] spqr_symbolic_l
 
 ctypedef fused symbolic_t:
-    spqr_symb_i
-    spqr_symb_l
+    spqr_symbolic_i
+    spqr_symbolic_l
 
 
-ctypedef spqr_numeric[double, int32_t] spqr_num_di
-ctypedef spqr_numeric[double, int64_t] spqr_num_dl
-ctypedef spqr_numeric[cdouble, int32_t] spqr_num_zi
-ctypedef spqr_numeric[cdouble, int64_t] spqr_num_zl
+ctypedef spqr_numeric[double, int32_t] spqr_numeric_di
+ctypedef spqr_numeric[double, int64_t] spqr_numeric_dl
+ctypedef spqr_numeric[cdouble, int32_t] spqr_numeric_zi
+ctypedef spqr_numeric[cdouble, int64_t] spqr_numeric_zl
 
 ctypedef fused numeric_t:
-    spqr_num_di
-    spqr_num_dl
-    spqr_num_zi
-    spqr_num_zl
+    spqr_numeric_di
+    spqr_numeric_dl
+    spqr_numeric_zi
+    spqr_numeric_zl
 
 
-ctypedef SuiteSparseQR_factorization[double, int32_t] spqr_fact_di
-ctypedef SuiteSparseQR_factorization[double, int64_t] spqr_fact_dl
-ctypedef SuiteSparseQR_factorization[cdouble, int32_t] spqr_fact_zi
-ctypedef SuiteSparseQR_factorization[cdouble, int64_t] spqr_fact_zl
+ctypedef SuiteSparseQR_factorization[double, int32_t] spqr_factor_di
+ctypedef SuiteSparseQR_factorization[double, int64_t] spqr_factor_dl
+ctypedef SuiteSparseQR_factorization[cdouble, int32_t] spqr_factor_zi
+ctypedef SuiteSparseQR_factorization[cdouble, int64_t] spqr_factor_zl
 
 ctypedef fused factor_t:
-    spqr_fact_di
-    spqr_fact_dl
-    spqr_fact_zi
-    spqr_fact_zl
+    spqr_factor_di
+    spqr_factor_dl
+    spqr_factor_zi
+    spqr_factor_zl
 
 
 # NOTE These are not defined in the header files, so we define them here
@@ -418,8 +418,8 @@ cdef int _copy_spqr_symbolic_base(
 
     # Prune invalid type combinations
     if not (
-        (symbolic_t is spqr_symb_i and index_t is int32_t)
-        or (symbolic_t is spqr_symb_l and index_t is int64_t)
+        (symbolic_t is spqr_symbolic_i and index_t is int32_t)
+        or (symbolic_t is spqr_symbolic_l and index_t is int64_t)
     ):
         assert False
         return 0
@@ -492,10 +492,10 @@ cdef inline int _copy_spqr_symbolic(
     const symbolic_t* src
 ) except -1:
     """Deep copy a spqr_symbolic struct."""
-    if symbolic_t is spqr_symb_i:
-        return _copy_spqr_symbolic_base[spqr_symb_i, int32_t](dest, src)
-    else:  # symbolic_t is spqr_symb_l
-        return _copy_spqr_symbolic_base[spqr_symb_l, int64_t](dest, src)
+    if symbolic_t is spqr_symbolic_i:
+        return _copy_spqr_symbolic_base[spqr_symbolic_i, int32_t](dest, src)
+    else:  # symbolic_t is spqr_symbolic_l
+        return _copy_spqr_symbolic_base[spqr_symbolic_l, int64_t](dest, src)
 
 
 cdef int _copy_spqr_numeric_base(
@@ -510,10 +510,10 @@ cdef int _copy_spqr_numeric_base(
 
     # Prune invalid type combinations
     if not (
-        (numeric_t is spqr_num_di and index_t is int32_t and value_t is double)
-        or (numeric_t is spqr_num_dl and index_t is int64_t and value_t is double)
-        or (numeric_t is spqr_num_zi and index_t is int32_t and value_t is cdouble)
-        or (numeric_t is spqr_num_zl and index_t is int64_t and value_t is cdouble)
+        (numeric_t is spqr_numeric_di and index_t is int32_t and value_t is double)
+        or (numeric_t is spqr_numeric_dl and index_t is int64_t and value_t is double)
+        or (numeric_t is spqr_numeric_zi and index_t is int32_t and value_t is cdouble)
+        or (numeric_t is spqr_numeric_zl and index_t is int64_t and value_t is cdouble)
     ):
         assert False
         return 0
@@ -617,14 +617,14 @@ cdef inline int _copy_spqr_numeric(
     const numeric_t* src,
 ) except -1:
     """Deep copy a spqr_numeric struct."""
-    if numeric_t is spqr_num_di:
-        return _copy_spqr_numeric_base[spqr_num_di, double, int32_t](dest, src)
-    elif numeric_t is spqr_num_dl:
-        return _copy_spqr_numeric_base[spqr_num_dl, double, int64_t](dest, src)
-    elif numeric_t is spqr_num_zi:
-        return _copy_spqr_numeric_base[spqr_num_zi, cdouble, int32_t](dest, src)
-    else:  # numeric_t is spqr_num_zl
-        return _copy_spqr_numeric_base[spqr_num_zl, cdouble, int64_t](dest, src)
+    if numeric_t is spqr_numeric_di:
+        return _copy_spqr_numeric_base[spqr_numeric_di, double, int32_t](dest, src)
+    elif numeric_t is spqr_numeric_dl:
+        return _copy_spqr_numeric_base[spqr_numeric_dl, double, int64_t](dest, src)
+    elif numeric_t is spqr_numeric_zi:
+        return _copy_spqr_numeric_base[spqr_numeric_zi, cdouble, int32_t](dest, src)
+    else:  # numeric_t is spqr_numeric_zl
+        return _copy_spqr_numeric_base[spqr_numeric_zl, cdouble, int64_t](dest, src)
 
 
 cdef int _copy_spqr_factor_base(
@@ -639,10 +639,10 @@ cdef int _copy_spqr_factor_base(
 
     # Validate types to ensure correct instantiation. Invalid combos will be pruned.
     if not (
-        (factor_t is spqr_fact_di and index_t is int32_t and value_t is double)
-        or (factor_t is spqr_fact_dl and index_t is int64_t and value_t is double)
-        or (factor_t is spqr_fact_zi and index_t is int32_t and value_t is cdouble)
-        or (factor_t is spqr_fact_zl and index_t is int64_t and value_t is cdouble)
+        (factor_t is spqr_factor_di and index_t is int32_t and value_t is double)
+        or (factor_t is spqr_factor_dl and index_t is int64_t and value_t is double)
+        or (factor_t is spqr_factor_zi and index_t is int32_t and value_t is cdouble)
+        or (factor_t is spqr_factor_zl and index_t is int64_t and value_t is cdouble)
     ):
         assert False
         return 0
@@ -654,9 +654,9 @@ cdef int _copy_spqr_factor_base(
 
     if src.QRsym is not NULL:
         if index_t is int32_t:
-            dest.QRsym = <spqr_symb_i*>malloc(sizeof(spqr_symb_i))
+            dest.QRsym = <spqr_symbolic_i*>malloc(sizeof(spqr_symbolic_i))
         else:
-            dest.QRsym = <spqr_symb_l*>malloc(sizeof(spqr_symb_l))
+            dest.QRsym = <spqr_symbolic_l*>malloc(sizeof(spqr_symbolic_l))
 
         _copy_spqr_symbolic(dest.QRsym, src.QRsym)
 
@@ -664,14 +664,14 @@ cdef int _copy_spqr_factor_base(
     dest.QRnum = NULL
 
     if src.QRnum is not NULL:
-        if factor_t is spqr_fact_di:
-            dest.QRnum = <spqr_num_di*>malloc(sizeof(spqr_num_di))
-        elif factor_t is spqr_fact_dl:
-            dest.QRnum = <spqr_num_dl*>malloc(sizeof(spqr_num_dl))
-        elif factor_t is spqr_fact_zi:
-            dest.QRnum = <spqr_num_zi*>malloc(sizeof(spqr_num_zi))
-        else:  # factor_t is spqr_fact_zl
-            dest.QRnum = <spqr_num_zl*>malloc(sizeof(spqr_num_zl))
+        if factor_t is spqr_factor_di:
+            dest.QRnum = <spqr_numeric_di*>malloc(sizeof(spqr_numeric_di))
+        elif factor_t is spqr_factor_dl:
+            dest.QRnum = <spqr_numeric_dl*>malloc(sizeof(spqr_numeric_dl))
+        elif factor_t is spqr_factor_zi:
+            dest.QRnum = <spqr_numeric_zi*>malloc(sizeof(spqr_numeric_zi))
+        else:  # factor_t is spqr_factor_zl
+            dest.QRnum = <spqr_numeric_zl*>malloc(sizeof(spqr_numeric_zl))
 
         _copy_spqr_numeric(dest.QRnum, src.QRnum)
 
@@ -706,14 +706,14 @@ cdef inline int _copy_spqr_factor(
     const factor_t* src,
 ) except -1:
     """Deep copy a SuiteSparseQR_factorization struct."""
-    if factor_t is spqr_fact_di:
-        return _copy_spqr_factor_base[spqr_fact_di, double, int32_t](dest, src)
-    elif factor_t is spqr_fact_dl:
-        return _copy_spqr_factor_base[spqr_fact_dl, double, int64_t](dest, src)
-    elif factor_t is spqr_fact_zi:
-        return _copy_spqr_factor_base[spqr_fact_zi, cdouble, int32_t](dest, src)
-    else:  # factor_t is spqr_fact_zl
-        return _copy_spqr_factor_base[spqr_fact_zl, cdouble, int64_t](dest, src)
+    if factor_t is spqr_factor_di:
+        return _copy_spqr_factor_base[spqr_factor_di, double, int32_t](dest, src)
+    elif factor_t is spqr_factor_dl:
+        return _copy_spqr_factor_base[spqr_factor_dl, double, int64_t](dest, src)
+    elif factor_t is spqr_factor_zi:
+        return _copy_spqr_factor_base[spqr_factor_zi, cdouble, int32_t](dest, src)
+    else:  # factor_t is spqr_factor_zl
+        return _copy_spqr_factor_base[spqr_factor_zl, cdouble, int64_t](dest, src)
 
 
 # -------------------------------------------------------------------------------------
@@ -809,10 +809,10 @@ cdef class SPQRFactor:
     cdef:
         cholmod_common _common
         cholmod_common *_cm
-        spqr_fact_di *_fact_di
-        spqr_fact_dl *_fact_dl
-        spqr_fact_zi *_fact_zi
-        spqr_fact_zl *_fact_zl
+        spqr_factor_di *_factor_di
+        spqr_factor_dl *_factor_dl
+        spqr_factor_zi *_factor_zi
+        spqr_factor_zl *_factor_zl
         bint _use_int32
         bint _is_real
         int _M
@@ -883,40 +883,40 @@ cdef class SPQRFactor:
             # Perform both symbolic and numeric factorization
             if self._is_real:
                 if self._use_int32:
-                    self._fact_di = SuiteSparseQR_factorize[double, int32_t](
+                    self._factor_di = SuiteSparseQR_factorize[double, int32_t](
                         ordering, self._tol, Ac, self._cm
                     )
                 else:
-                    self._fact_dl = SuiteSparseQR_factorize[double, int64_t](
+                    self._factor_dl = SuiteSparseQR_factorize[double, int64_t](
                         ordering, self._tol, Ac, self._cm
                     )
             else:
                 if self._use_int32:
-                    self._fact_zi = SuiteSparseQR_factorize[cdouble, int32_t](
+                    self._factor_zi = SuiteSparseQR_factorize[cdouble, int32_t](
                         ordering, self._tol, Ac, self._cm
                     )
                 else:
-                    self._fact_zl = SuiteSparseQR_factorize[cdouble, int64_t](
+                    self._factor_zl = SuiteSparseQR_factorize[cdouble, int64_t](
                         ordering, self._tol, Ac, self._cm
                     )
         else:
             # Perform symbolic analysis only
             if self._is_real:
                 if self._use_int32:
-                    self._fact_di = SuiteSparseQR_symbolic[double, int32_t](
+                    self._factor_di = SuiteSparseQR_symbolic[double, int32_t](
                         ordering, allow_tol, Ac, self._cm
                     )
                 else:
-                    self._fact_dl = SuiteSparseQR_symbolic[double, int64_t](
+                    self._factor_dl = SuiteSparseQR_symbolic[double, int64_t](
                         ordering, allow_tol, Ac, self._cm
                     )
             else:
                 if self._use_int32:
-                    self._fact_zi = SuiteSparseQR_symbolic[cdouble, int32_t](
+                    self._factor_zi = SuiteSparseQR_symbolic[cdouble, int32_t](
                         ordering, allow_tol, Ac, self._cm
                     )
                 else:
-                    self._fact_zl = SuiteSparseQR_symbolic[cdouble, int64_t](
+                    self._factor_zl = SuiteSparseQR_symbolic[cdouble, int64_t](
                         ordering, allow_tol, Ac, self._cm
                     )
 
@@ -934,14 +934,14 @@ cdef class SPQRFactor:
 
         if self._is_real:
             if self._use_int32:
-                assert SuiteSparseQR_free[double, int32_t](&self._fact_di, self._cm)
+                assert SuiteSparseQR_free[double, int32_t](&self._factor_di, self._cm)
             else:
-                assert SuiteSparseQR_free[double, int64_t](&self._fact_dl, self._cm)
+                assert SuiteSparseQR_free[double, int64_t](&self._factor_dl, self._cm)
         else:
             if self._use_int32:
-                assert SuiteSparseQR_free[cdouble, int32_t](&self._fact_zi, self._cm)
+                assert SuiteSparseQR_free[cdouble, int32_t](&self._factor_zi, self._cm)
             else:
-                assert SuiteSparseQR_free[cdouble, int64_t](&self._fact_zl, self._cm)
+                assert SuiteSparseQR_free[cdouble, int64_t](&self._factor_zl, self._cm)
 
         if self._use_int32:
             cholmod_finish(self._cm)
@@ -983,14 +983,14 @@ cdef class SPQRFactor:
 
         if self._is_real:
             if self._use_int32:
-                return self._fact_di.rank
+                return self._factor_di.rank
             else:
-                return self._fact_dl.rank
+                return self._factor_dl.rank
         else:
             if self._use_int32:
-                return self._fact_zi.rank
+                return self._factor_zi.rank
             else:
-                return self._fact_zl.rank
+                return self._factor_zl.rank
 
     @property
     def perm(self):
@@ -999,14 +999,14 @@ cdef class SPQRFactor:
         cdef void* ptr
         if self._is_real:
             if self._use_int32:
-                ptr = <void*>self._fact_di.Q1fill
+                ptr = <void*>self._factor_di.Q1fill
             else:
-                ptr = <void*>self._fact_dl.Q1fill
+                ptr = <void*>self._factor_dl.Q1fill
         else:
             if self._use_int32:
-                ptr = <void*>self._fact_zi.Q1fill
+                ptr = <void*>self._factor_zi.Q1fill
             else:
-                ptr = <void*>self._fact_zl.Q1fill
+                ptr = <void*>self._factor_zl.Q1fill
 
         return _ndarray_copy_from_intptr(ptr, self._N, self._use_int32)
 
@@ -1043,18 +1043,18 @@ cdef class SPQRFactor:
         # Deep copy the factorization
         if self._is_real:
             if self._use_int32:
-                dest._fact_di = <spqr_fact_di*>malloc(sizeof(spqr_fact_di))
-                _copy_spqr_factor(dest._fact_di, self._fact_di)
+                dest._factor_di = <spqr_factor_di*>malloc(sizeof(spqr_factor_di))
+                _copy_spqr_factor(dest._factor_di, self._factor_di)
             else:
-                dest._fact_dl = <spqr_fact_dl*>malloc(sizeof(spqr_fact_dl))
-                _copy_spqr_factor(dest._fact_dl, self._fact_dl)
+                dest._factor_dl = <spqr_factor_dl*>malloc(sizeof(spqr_factor_dl))
+                _copy_spqr_factor(dest._factor_dl, self._factor_dl)
         else:
             if self._use_int32:
-                dest._fact_zi = <spqr_fact_zi*>malloc(sizeof(spqr_fact_zi))
-                _copy_spqr_factor(dest._fact_zi, self._fact_zi)
+                dest._factor_zi = <spqr_factor_zi*>malloc(sizeof(spqr_factor_zi))
+                _copy_spqr_factor(dest._factor_zi, self._factor_zi)
             else:
-                dest._fact_zl = <spqr_fact_zl*>malloc(sizeof(spqr_fact_zl))
-                _copy_spqr_factor(dest._fact_zl, self._fact_zl)
+                dest._factor_zl = <spqr_factor_zl*>malloc(sizeof(spqr_factor_zl))
+                _copy_spqr_factor(dest._factor_zl, self._factor_zl)
 
         return dest
 
@@ -1106,20 +1106,20 @@ cdef class SPQRFactor:
         if self._is_real:
             if self._use_int32:
                 SuiteSparseQR_numeric[double, int32_t](
-                    self._tol, Ac, self._fact_di, self._cm
+                    self._tol, Ac, self._factor_di, self._cm
                 )
             else:
                 SuiteSparseQR_numeric[double, int64_t](
-                    self._tol, Ac, self._fact_dl, self._cm
+                    self._tol, Ac, self._factor_dl, self._cm
                 )
         else:
             if self._use_int32:
                 SuiteSparseQR_numeric[cdouble, int32_t](
-                    self._tol, Ac, self._fact_zi, self._cm
+                    self._tol, Ac, self._factor_zi, self._cm
                 )
             else:
                 SuiteSparseQR_numeric[cdouble, int64_t](
-                    self._tol, Ac, self._fact_zl, self._cm
+                    self._tol, Ac, self._factor_zl, self._cm
                 )
 
         _handle_errors(self._cm.status)
@@ -1184,20 +1184,20 @@ cdef class SPQRFactor:
         if self._is_real:
             if self._use_int32:
                 Ys = SuiteSparseQR_qmult_fs[double, int32_t](
-                    method, self._fact_di, Xs, self._cm
+                    method, self._factor_di, Xs, self._cm
                 )
             else:
                 Ys = SuiteSparseQR_qmult_fs[double, int64_t](
-                    method, self._fact_dl, Xs, self._cm
+                    method, self._factor_dl, Xs, self._cm
                 )
         else:
             if self._use_int32:
                 Ys = SuiteSparseQR_qmult_fs[cdouble, int32_t](
-                    method, self._fact_zi, Xs, self._cm
+                    method, self._factor_zi, Xs, self._cm
                 )
             else:
                 Ys = SuiteSparseQR_qmult_fs[cdouble, int64_t](
-                    method, self._fact_zl, Xs, self._cm
+                    method, self._factor_zl, Xs, self._cm
                 )
 
         _handle_errors(self._cm.status)
@@ -1217,20 +1217,20 @@ cdef class SPQRFactor:
         if self._is_real:
             if self._use_int32:
                 Yd = SuiteSparseQR_qmult_fd[double, int32_t](
-                    method, self._fact_di, Xd, self._cm
+                    method, self._factor_di, Xd, self._cm
                 )
             else:
                 Yd = SuiteSparseQR_qmult_fd[double, int64_t](
-                    method, self._fact_dl, Xd, self._cm
+                    method, self._factor_dl, Xd, self._cm
                 )
         else:
             if self._use_int32:
                 Yd = SuiteSparseQR_qmult_fd[cdouble, int32_t](
-                    method, self._fact_zi, Xd, self._cm
+                    method, self._factor_zi, Xd, self._cm
                 )
             else:
                 Yd = SuiteSparseQR_qmult_fd[cdouble, int64_t](
-                    method, self._fact_zl, Xd, self._cm
+                    method, self._factor_zl, Xd, self._cm
                 )
 
         _handle_errors(self._cm.status)
@@ -1315,20 +1315,20 @@ cdef class SPQRFactor:
             if self._is_real:
                 if self._use_int32:
                     Bd = SuiteSparseQR_qmult_fd[double, int32_t](
-                        SPQR_QTX, self._fact_di, Bd, self._cm
+                        SPQR_QTX, self._factor_di, Bd, self._cm
                     )
                 else:
                     Bd = SuiteSparseQR_qmult_fd[double, int64_t](
-                        SPQR_QTX, self._fact_dl, Bd, self._cm
+                        SPQR_QTX, self._factor_dl, Bd, self._cm
                     )
             else:
                 if self._use_int32:
                     Bd = SuiteSparseQR_qmult_fd[cdouble, int32_t](
-                        SPQR_QTX, self._fact_zi, Bd, self._cm
+                        SPQR_QTX, self._factor_zi, Bd, self._cm
                     )
                 else:
                     Bd = SuiteSparseQR_qmult_fd[cdouble, int64_t](
-                        SPQR_QTX, self._fact_zl, Bd, self._cm
+                        SPQR_QTX, self._factor_zl, Bd, self._cm
                     )
 
         _handle_errors(self._cm.status)
@@ -1340,20 +1340,20 @@ cdef class SPQRFactor:
         if self._is_real:
             if self._use_int32:
                 Xd = SuiteSparseQR_solve[double, int32_t](
-                    system, self._fact_di, Bd, self._cm
+                    system, self._factor_di, Bd, self._cm
                 )
             else:
                 Xd = SuiteSparseQR_solve[double, int64_t](
-                    system, self._fact_dl, Bd, self._cm
+                    system, self._factor_dl, Bd, self._cm
                 )
         else:
             if self._use_int32:
                 Xd = SuiteSparseQR_solve[cdouble, int32_t](
-                    system, self._fact_zi, Bd, self._cm
+                    system, self._factor_zi, Bd, self._cm
                 )
             else:
                 Xd = SuiteSparseQR_solve[cdouble, int64_t](
-                    system, self._fact_zl, Bd, self._cm
+                    system, self._factor_zl, Bd, self._cm
                 )
 
         _handle_errors(self._cm.status)
@@ -1365,20 +1365,20 @@ cdef class SPQRFactor:
             if self._is_real:
                 if self._use_int32:
                     Xd = SuiteSparseQR_qmult_fd[double, int32_t](
-                        SPQR_QX, self._fact_di, Xd, self._cm
+                        SPQR_QX, self._factor_di, Xd, self._cm
                     )
                 else:
                     Xd = SuiteSparseQR_qmult_fd[double, int64_t](
-                        SPQR_QX, self._fact_dl, Xd, self._cm
+                        SPQR_QX, self._factor_dl, Xd, self._cm
                     )
             else:
                 if self._use_int32:
                     Xd = SuiteSparseQR_qmult_fd[cdouble, int32_t](
-                        SPQR_QX, self._fact_zi, Xd, self._cm
+                        SPQR_QX, self._factor_zi, Xd, self._cm
                     )
                 else:
                     Xd = SuiteSparseQR_qmult_fd[cdouble, int64_t](
-                        SPQR_QX, self._fact_zl, Xd, self._cm
+                        SPQR_QX, self._factor_zl, Xd, self._cm
                     )
 
         _handle_errors(self._cm.status)
@@ -1392,28 +1392,28 @@ cdef class SPQRFactor:
         """Raise an error if the symbolic factorization has not been computed yet."""
         if self._is_real:
             if self._use_int32:
-                assert self._fact_di is not NULL and self._fact_di.QRsym is not NULL
+                assert self._factor_di is not NULL and self._factor_di.QRsym is not NULL
             else:
-                assert self._fact_dl is not NULL and self._fact_dl.QRsym is not NULL
+                assert self._factor_dl is not NULL and self._factor_dl.QRsym is not NULL
         else:
             if self._use_int32:
-                assert self._fact_zi is not NULL and self._fact_zi.QRsym is not NULL
+                assert self._factor_zi is not NULL and self._factor_zi.QRsym is not NULL
             else:
-                assert self._fact_zl is not NULL and self._fact_zl.QRsym is not NULL
+                assert self._factor_zl is not NULL and self._factor_zl.QRsym is not NULL
 
     cdef inline int _require_numeric(self) except -1:
         """Raise an error if the numeric factorization has not been computed yet."""
         self._require_symbolic()
         if self._is_real:
             if self._use_int32:
-                assert self._fact_di.QRnum is not NULL
+                assert self._factor_di.QRnum is not NULL
             else:
-                assert self._fact_dl.QRnum is not NULL
+                assert self._factor_dl.QRnum is not NULL
         else:
             if self._use_int32:
-                assert self._fact_zi.QRnum is not NULL
+                assert self._factor_zi.QRnum is not NULL
             else:
-                assert self._fact_zl.QRnum is not NULL
+                assert self._factor_zl.QRnum is not NULL
 
     def _check_input_matrix(self, object A, object itype):
         """Check that the input matrix matches the existing factorization."""
