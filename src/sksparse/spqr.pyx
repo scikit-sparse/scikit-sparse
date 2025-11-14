@@ -34,6 +34,7 @@ Function Interface
     spqr - Compute the SPQR factorization of a sparse matrix.
     spqr_qmult - Multiply by Q from the SPQR factorization.
     spqr_solve - Solve a linear system using the SPQR factorization.
+    SPQRHouseholder - A class representing the Householder vectors.
 
 
 Object Interface
@@ -101,6 +102,7 @@ from sksparse.cholmod cimport (
 
 import numpy as np
 from scipy.sparse import csc_array, issparse
+from typing import NamedTuple
 import warnings
 
 from sksparse.cholmod import _cholmod_sparse_from_csc
@@ -1640,6 +1642,23 @@ cdef inline int _spqr_householder(
     return 0
 
 
+class SPQRHouseholder(NamedTuple):
+    """A class to hold the Householder representation of Q.
+
+    Attributes
+    ----------
+    H : ~scipy.sparse.csc_array
+        The Householder vectors stored in a sparse matrix.
+    tau : ~numpy.ndarray of float
+        The Householder coefficients.
+    perm : ~numpy.ndarray of int
+        The column permutation vector.
+    """
+    H: ~scipy.sparse.csc_array
+    tau: ~numpy.ndarray
+    perm: ~numpy.ndarray
+
+
 def spqr(A, *, mode="full", order=None, tol=None):
     r"""Compute the QR factorization.
 
@@ -1678,7 +1697,7 @@ def spqr(A, *, mode="full", order=None, tol=None):
     Q : csc_array
         The orthogonal matrix :math:`Q`. Shape (M, M) or (M, K) if ``mode='economic'``.
         Not returned if ``mode='r'``.
-        Replaced by ``(Q, tau)`` if ``mode='householder'``.
+        Replaced by :class:`SPQRHouseholder` if ``mode='householder'``.
     R : csc_array
         The upper-triangular matrix :math:`R`. Shape (M, N) or (K, N) if ``mode in
         ['economic', 'householder']``, where K = min(M, N).
@@ -1817,7 +1836,7 @@ def spqr(A, *, mode="full", order=None, tol=None):
     elif mode in ["full", "economic"]:
         return Q, R, E
     else:  # mode == "householder"
-        return (H, tau, v), R, E
+        return SPQRHouseholder(H=H, tau=tau, perm=v), R, E
 
 
 # -------------------------------------------------------------------------------------
@@ -2134,10 +2153,10 @@ References
 """
 
 
-_qmult_house_doc = """house : tuple
+_qmult_house_doc = """house : SPQRHouseholder or tuple
     A tuple ``(H, tau, v)`` representing the Householder vectors ``H``,
     coefficients ``tau``, and the column permutation vector ``v``. Typically,
-    these are created from ``H, R, p = spqr(A, mode='householder')``."""
+    these are created from ``Ht, R, p = spqr(A, mode='householder')``."""
 
 SPQRFactor.qmult.__doc__ = _QMULT_DOC_TEMPLATE.format(
     house_doc="",
