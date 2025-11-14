@@ -935,17 +935,21 @@ cdef class SPQRFactor:
     def __dealloc__(self):
         """Free the SPQR factorization and common objects."""
         print("[__dealloc_]: freeing SPQRFactor", flush=True)
+        if self._cm is NULL:
+            print("[__dealloc_]: cm is NULL, nothing to free", flush=True)
+            return
+
         if self._is_real:
             if self._use_int32:
                 print("[__dealloc_]: freeing spqr_fact_di", flush=True)
-                SuiteSparseQR_free[double, int32_t](&self._fact_di, self._cm)
+                assert SuiteSparseQR_free[double, int32_t](&self._fact_di, self._cm)
             else:
-                SuiteSparseQR_free[double, int64_t](&self._fact_dl, self._cm)
+                assert SuiteSparseQR_free[double, int64_t](&self._fact_dl, self._cm)
         else:
             if self._use_int32:
-                SuiteSparseQR_free[cdouble, int32_t](&self._fact_zi, self._cm)
+                assert SuiteSparseQR_free[cdouble, int32_t](&self._fact_zi, self._cm)
             else:
-                SuiteSparseQR_free[cdouble, int64_t](&self._fact_zl, self._cm)
+                assert SuiteSparseQR_free[cdouble, int64_t](&self._fact_zl, self._cm)
 
         if self._use_int32:
             print("[__dealloc_]: finishing cholmod_common", flush=True)
