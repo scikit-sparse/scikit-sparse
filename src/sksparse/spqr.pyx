@@ -424,7 +424,6 @@ cdef int _copy_spqr_symbolic_base(
         assert False
         return 0
 
-    print("[copy_spqr_symbolic]: Copying symbolic struct...", flush=True)
     dest.m = src.m
     dest.n = src.n
     dest.anz = src.anz
@@ -460,7 +459,6 @@ cdef int _copy_spqr_symbolic_base(
     dest.ntasks = src.ntasks
     dest.ns = src.ns
 
-    print("[copy_spqr_symbolic]: setting Task pointers to NULL...", flush=True)
     if dest.ntasks > 1:
         raise NotImplementedError("SPQR task parallelism and GPU not yet supported.")
 
@@ -660,7 +658,6 @@ cdef int _copy_spqr_factor_base(
         else:
             dest.QRsym = <spqr_symb_l*>malloc(sizeof(spqr_symb_l))
 
-        print("[copy_spqr_factor]: Copying symbolic factorization...", flush=True)
         _copy_spqr_symbolic(dest.QRsym, src.QRsym)
 
     # Deep copy numeric factorization (if present)
@@ -676,10 +673,8 @@ cdef int _copy_spqr_factor_base(
         else:  # factor_t is spqr_fact_zl
             dest.QRnum = <spqr_num_zl*>malloc(sizeof(spqr_num_zl))
 
-        print("[copy_spqr_factor]: Copying numeric factorization...", flush=True)
         _copy_spqr_numeric(dest.QRnum, src.QRnum)
 
-    print("[copy_spqr_factor]: Copying rest of pointers...", flush=True)
     dest.R1p = <index_t*>_malloc_copy(src.R1p, src.n1rows + 1, sizeof(index_t))
     dest.R1j = <index_t*>_malloc_copy(src.R1j, src.r1nz, sizeof(index_t))
     dest.R1x = <value_t*>_malloc_copy(src.R1x, src.r1nz, sizeof(value_t))
@@ -934,14 +929,11 @@ cdef class SPQRFactor:
 
     def __dealloc__(self):
         """Free the SPQR factorization and common objects."""
-        print("[__dealloc_]: freeing SPQRFactor", flush=True)
         if self._cm is NULL:
-            print("[__dealloc_]: cm is NULL, nothing to free", flush=True)
             return
 
         if self._is_real:
             if self._use_int32:
-                print("[__dealloc_]: freeing spqr_fact_di", flush=True)
                 assert SuiteSparseQR_free[double, int32_t](&self._fact_di, self._cm)
             else:
                 assert SuiteSparseQR_free[double, int64_t](&self._fact_dl, self._cm)
@@ -952,12 +944,10 @@ cdef class SPQRFactor:
                 assert SuiteSparseQR_free[cdouble, int64_t](&self._fact_zl, self._cm)
 
         if self._use_int32:
-            print("[__dealloc_]: finishing cholmod_common", flush=True)
             cholmod_finish(self._cm)
         else:
             cholmod_l_finish(self._cm)
 
-        print("[__dealloc_]: done", flush=True)
 
     def __repr__(self):
         cls_name = self.__class__.__name__
@@ -1054,7 +1044,6 @@ cdef class SPQRFactor:
         if self._is_real:
             if self._use_int32:
                 dest._fact_di = <spqr_fact_di*>malloc(sizeof(spqr_fact_di))
-                print("[copy]: copying spqr_fact_di", flush=True)
                 _copy_spqr_factor(dest._fact_di, self._fact_di)
             else:
                 dest._fact_dl = <spqr_fact_dl*>malloc(sizeof(spqr_fact_dl))
@@ -1067,7 +1056,6 @@ cdef class SPQRFactor:
                 dest._fact_zl = <spqr_fact_zl*>malloc(sizeof(spqr_fact_zl))
                 _copy_spqr_factor(dest._fact_zl, self._fact_zl)
 
-        print("[copy]: done", flush=True)
         return dest
 
     def factorize(self, object A, *, object tol=None):
