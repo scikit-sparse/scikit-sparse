@@ -678,16 +678,19 @@ cdef int _copy_spqr_factor_base(
 
     print("[copy_spqr_factor]: Copying rest of pointers...", flush=True)
     dest.R1p = <index_t*>_malloc_copy(src.R1p, src.n1rows + 1, sizeof(index_t))
-    dest.R1j = <index_t*>_malloc_copy(src.R1j, src.n1rows, sizeof(index_t))
+    dest.R1j = <index_t*>_malloc_copy(src.R1j, src.r1nz, sizeof(index_t))
     dest.R1x = <value_t*>_malloc_copy(src.R1x, src.r1nz, sizeof(value_t))
     dest.r1nz = src.r1nz
 
-    dest.Q1fill = <index_t*>_malloc_copy(src.Q1fill, src.nacols, sizeof(index_t))
-    dest.P1inv = <index_t*>_malloc_copy(src.P1inv, src.narows, sizeof(index_t))
-    dest.HP1inv = <index_t*>_malloc_copy(src.HP1inv, src.narows, sizeof(index_t))
+    cdef size_t m = src.narows
+    cdef size_t n = src.nacols
 
-    dest.Rmap = <index_t*>_malloc_copy(src.Rmap, src.nacols, sizeof(index_t))
-    dest.RmapInv = <index_t*>_malloc_copy(src.RmapInv, src.nacols, sizeof(index_t))
+    dest.Q1fill = <index_t*>_malloc_copy(src.Q1fill, n + src.bncols, sizeof(index_t))
+    dest.P1inv = <index_t*>_malloc_copy(src.P1inv, m, sizeof(index_t))
+    dest.HP1inv = <index_t*>_malloc_copy(src.HP1inv, m, sizeof(index_t))
+
+    dest.Rmap = <index_t*>_malloc_copy(src.Rmap, n, sizeof(index_t))
+    dest.RmapInv = <index_t*>_malloc_copy(src.RmapInv, n, sizeof(index_t))
 
     dest.n1rows = src.n1rows
     dest.n1cols = src.n1cols
