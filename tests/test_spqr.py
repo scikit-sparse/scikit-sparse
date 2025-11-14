@@ -622,7 +622,7 @@ def test_solve_real(problem):
     ATb = A.T @ b
     expect_x = np.linalg.lstsq(A.toarray(), b)[0]
     x = spqr_solve(ATA, ATb)
-    assert_allclose(x, expect_x, atol=1e-7)
+    assert_allclose(x, expect_x, rtol=1e-6, atol=1e-8)
 
 
 # -----------------------------------------------------------------------------

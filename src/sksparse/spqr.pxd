@@ -46,6 +46,9 @@ cdef extern from "SuiteSparseQR_definitions.h":
 
 
 cdef extern from "SuiteSparseQR.hpp":
+    cdef cppclass spqr_gpu_impl[Int]:
+        pass
+
     cdef cppclass spqr_symbolic[Int]:
         Int m
         Int n
@@ -79,21 +82,21 @@ cdef extern from "SuiteSparseQR.hpp":
         Int ns
 
         # These are for task parallelism (not yet supported)
-        # Int *TaskChildp
-        # Int *TaskChild
-        # Int *TaskStack
-        # Int *TaskFront
-        # Int *TaskFrontp
-        # Int *On_stack
-        # Int *Stack_maxstack
-        # Int *Fm
-        # Int *Cm
+        Int *TaskChildp
+        Int *TaskChild
+        Int *TaskStack
+        Int *TaskFront
+        Int *TaskFrontp
+        Int *On_stack
+        Int *Stack_maxstack
+        Int *Fm
+        Int *Cm
 
-        # size_t maxcsize
-        # size_t maxesize
-        # Int *ColCount
+        size_t maxcsize
+        size_t maxesize
+        Int *ColCount
 
-        # spqr_gpu_impl <Int> *QRgpu
+        spqr_gpu_impl[Int] *QRgpu
 
     cdef cppclass spqr_numeric[Entry, Int]:
         Entry **Rblock
