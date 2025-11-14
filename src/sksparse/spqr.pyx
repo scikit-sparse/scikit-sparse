@@ -651,14 +651,17 @@ cdef int _copy_spqr_factor_base(
 
     dest.tol = src.tol
 
-    # Deep copy symbolic factorization
-    if factor_t is spqr_fact_di or factor_t is spqr_fact_zi:
-        dest.QRsym = <spqr_symb_i*>malloc(sizeof(spqr_symb_i))
-    else:
-        dest.QRsym = <spqr_symb_l*>malloc(sizeof(spqr_symb_l))
+    # Deep copy symbolic factorization (if present)
+    dest.QRsym = NULL
 
-    print("[copy_spqr_factor]: Copying symbolic factorization...", flush=True)
-    _copy_spqr_symbolic(dest.QRsym, src.QRsym)
+    if src.QRsym is not NULL:
+        if index_t is int32_t:
+            dest.QRsym = <spqr_symb_i*>malloc(sizeof(spqr_symb_i))
+        else:
+            dest.QRsym = <spqr_symb_l*>malloc(sizeof(spqr_symb_l))
+
+        print("[copy_spqr_factor]: Copying symbolic factorization...", flush=True)
+        _copy_spqr_symbolic(dest.QRsym, src.QRsym)
 
     # Deep copy numeric factorization (if present)
     dest.QRnum = NULL
