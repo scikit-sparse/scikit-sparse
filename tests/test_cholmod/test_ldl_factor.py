@@ -17,11 +17,18 @@ import pytest
 from numpy.testing import assert_allclose
 from scipy import sparse
 
-from sksparse.cholmod import ldl_factor
+from sksparse.cholmod import CholeskyFactor, ldl_factor
 
 from ..helpers import generate_random_matrices
 
+ITYPES = [np.int32, np.int64]
 DTYPES = [np.float32, np.float64, np.complex64, np.complex128]
+
+
+def assert_LDLT_equals_A(f, A, atol=1e-15):
+    """Assert that L @ @ D L.T.conj() equals A."""
+    L, D = f.get_factor(kind="LDL", lower=True)
+    assert_allclose((L @ D @ L.T.conj()).toarray(), A.toarray(), atol=atol)
 
 
 @pytest.mark.parametrize("dtype", DTYPES)
@@ -114,6 +121,41 @@ test_As = [
 ]
 
 
+@pytest.mark.parametrize("itype", ITYPES)
+@pytest.mark.parametrize("A", test_As)
+def test_copy_symbolic(A, itype):
+    atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
+    A = A.copy()
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+    A.indptr = A.indptr.astype(itype)
+    A.indices = A.indices.astype(itype)
+    f = CholeskyFactor(A, lower=True)
+    g = f.copy()
+    assert g is not f
+    # Test that numeric factorization can be done on the copy
+    f.factorize(A)
+    assert_LDLT_equals_A(f, A, atol=atol)
+    del f  # ensure no shared state
+    g.factorize(A)
+    assert_LDLT_equals_A(g, A, atol=atol)
+
+
+@pytest.mark.parametrize("itype", ITYPES)
+@pytest.mark.parametrize("A", test_As)
+def test_copy_numeric(A, itype):
+    atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
+    A = A.copy()
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+    A.indptr = A.indptr.astype(itype)
+    A.indices = A.indices.astype(itype)
+    f = ldl_factor(A)
+    g = f.copy()
+    assert g is not f
+    assert_LDLT_equals_A(f, A, atol=atol)
+    del f  # ensure no shared state
+    assert_LDLT_equals_A(g, A, atol=atol)
+
+
 def _create_randomized_matrix(A):
     """Create a new matrix with the same sparsity pattern as A but different values."""
     Bl = sparse.tril(A, -1).copy()
@@ -132,12 +174,15 @@ def _create_randomized_matrix(A):
 
 
 @pytest.mark.parametrize("copy", [False])
+@pytest.mark.parametrize("itype", ITYPES)
 @pytest.mark.parametrize("A", test_As)
-def test_refactor(A, copy):
+def test_refactor(A, itype, copy):
     atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-3
+    A = A.copy()
+    A.indptr = A.indptr.astype(itype)
+    A.indices = A.indices.astype(itype)
     f = ldl_factor(A)
-    L, D = f.get_factor()
-    assert_allclose((L @ D @ L.T.conj()).toarray(), A.toarray(), atol=atol)
+    assert_LDLT_equals_A(f, A, atol=atol)
     # Create a new matrix with the same sparsity pattern but different values
     B = _create_randomized_matrix(A)
     # Factor the new matrix with the same sparsity pattern
@@ -145,9 +190,11 @@ def test_refactor(A, copy):
         # Use a copy of the factorization object to ensure that we are taking
         # the relevant parameters from the underlying cholmod_common object.
         g = f.copy()
+        assert g is not f
+        assert_LDLT_equals_A(f, A, atol=atol)  # original still works
+        del f  # ensure no shared state
         g.factorize(B)
-        Lb, Db = g.get_factor()
+        assert_LDLT_equals_A(g, B, atol=atol)
     else:
         f.factorize(B)
-        Lb, Db = f.get_factor()
-    assert_allclose((Lb @ Db @ Lb.T.conj()).toarray(), B.toarray(), atol=atol)
+        assert_LDLT_equals_A(f, B, atol=atol)
