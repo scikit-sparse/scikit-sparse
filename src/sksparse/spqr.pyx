@@ -660,17 +660,19 @@ cdef int _copy_spqr_factor_base(
     print("[copy_spqr_factor]: Copying symbolic factorization...", flush=True)
     _copy_spqr_symbolic(dest.QRsym, src.QRsym)
 
-    # Deep copy numeric factorization
-    if factor_t is spqr_fact_di:
-        dest.QRnum = <spqr_num_di*>malloc(sizeof(spqr_num_di))
-    elif factor_t is spqr_fact_dl:
-        dest.QRnum = <spqr_num_dl*>malloc(sizeof(spqr_num_dl))
-    elif factor_t is spqr_fact_zi:
-        dest.QRnum = <spqr_num_zi*>malloc(sizeof(spqr_num_zi))
-    else:  # factor_t is spqr_fact_zl
-        dest.QRnum = <spqr_num_zl*>malloc(sizeof(spqr_num_zl))
+    # Deep copy numeric factorization (if present)
+    dest.QRnum = NULL
 
     if src.QRnum is not NULL:
+        if factor_t is spqr_fact_di:
+            dest.QRnum = <spqr_num_di*>malloc(sizeof(spqr_num_di))
+        elif factor_t is spqr_fact_dl:
+            dest.QRnum = <spqr_num_dl*>malloc(sizeof(spqr_num_dl))
+        elif factor_t is spqr_fact_zi:
+            dest.QRnum = <spqr_num_zi*>malloc(sizeof(spqr_num_zi))
+        else:  # factor_t is spqr_fact_zl
+            dest.QRnum = <spqr_num_zl*>malloc(sizeof(spqr_num_zl))
+
         print("[copy_spqr_factor]: Copying numeric factorization...", flush=True)
         _copy_spqr_numeric(dest.QRnum, src.QRnum)
 
