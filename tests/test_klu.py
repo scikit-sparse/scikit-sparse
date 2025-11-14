@@ -213,6 +213,21 @@ def test_copy_symbolic(A, itype):
     assert_LU_equals_A(g, A, atol=1e-12)
 
 
+@pytest.mark.parametrize("itype", ITYPES)
+@pytest.mark.parametrize("A", test_As)
+def test_copy_numeric(A, itype):
+    A = A.copy()
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+    A.indptr = A.indptr.astype(itype)
+    A.indices = A.indices.astype(itype)
+    f = klu_factor(A)
+    g = f.copy()
+    assert g is not f
+    assert_LU_equals_A(f, A, atol=1e-12)
+    del f  # ensure no shared state
+    assert_LU_equals_A(g, A, atol=1e-12)
+
+
 @pytest.mark.parametrize("copy", [False, True])
 @pytest.mark.parametrize("itype", ITYPES)
 @pytest.mark.parametrize("A", test_As)
@@ -232,6 +247,7 @@ def test_refactor(A, itype, copy):
     if copy:
         g = f.copy()
         assert g is not f
+        assert_LU_equals_A(f, A, atol=atol)  # original still works
         del f  # ensure no shared state
         g.factorize(B)
         assert_LU_equals_A(g, B, atol=atol)
