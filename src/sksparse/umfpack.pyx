@@ -1001,7 +1001,7 @@ cdef dict _TRANS_INDEX = {
 
 
 cdef class UMFFactor:
-    """The main object used for creating and using an LU factorization.
+    r"""The main object used for creating and using an LU factorization.
 
     The constructor computes the symbolic analysis of a sparse matrix :math:`A`
     and determines a fill-reducing ordering such that:
@@ -1010,6 +1010,16 @@ cdef class UMFFactor:
         L U = P R A Q.
 
     The numeric factorization is not computed until :meth:`.factorize` is called.
+
+    .. note::
+
+        Note that the use of the scale factor ``R`` differs between KLU and UMFPACK:
+
+        .. math::
+                L U &= P R_{\mathrm{umf}} A Q \quad &&\text{(UMFPACK)}, \\
+            L U + F &= R_{\mathrm{klu}} P A Q \quad &&\text{(KLU)}.
+
+        They are related by :math:`R_{\mathrm{klu}} = P R_{\mathrm{umf}} P^{\top}`.
 
     Attributes
     ----------
