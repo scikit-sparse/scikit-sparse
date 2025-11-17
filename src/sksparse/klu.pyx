@@ -47,7 +47,7 @@ Object Interface
     KLUControl - A dataclass to set KLU control parameters.
 
 
-.. klupack-exceptions:
+.. _klu-exceptions:
 
 Warnings and Exceptions
 -----------------------
@@ -827,14 +827,38 @@ cdef class KLUFactor:
 
     Attributes
     ----------
-    N : int
-        The number of rows/columns in the matrix.
+    is_numeric : bool
+        Whether the numeric factorization has been computed.
+    lnz : int
+        The number of nonzeros in the :math:`L` factor.
+    unz : int
+        The number of nonzeros in the :math:`U` factor.
+    nzoff : int
+        The number of nonzeros in the :math:`F` factor.
+    nblocks : int
+        The number of blocks in the BTF ordering of the matrix.
+    nnz : int
+        The number of nonzeros in the original matrix.
+    shape : tuple of int
+        The shape of the original matrix.
+    dtype : numpy.dtype
+        The data type of the matrix entries (``float64`` or ``complex128``).
+    itype : numpy.dtype
+        The integer type used for indexing (``int32`` or ``int64``).
     L : scipy.sparse.csc_array
         The :math:`L` factor as a sparse CSC matrix.
     U : scipy.sparse.csc_array
         The :math:`U` factor as a sparse CSC matrix.
+    F : scipy.sparse.csc_array
+        The :math:`F` factor as a sparse CSC matrix.
     perm_r, perm_c : numpy.ndarray
-        The row and column permutation arrays, :math:`P` and :math:`Q`.
+        The row and column permutation arrays.
+    rscale : numpy.ndarray
+        The row scaling array.
+    rblocks : numpy.ndarray of int
+        The row blocks in the BTF ordering.
+    info : KLUInfo
+        An object containing information about the factorization.
 
     Notes
     -----
@@ -1103,7 +1127,6 @@ cdef class KLUFactor:
 
     @property
     def info(self):
-        """Get information about the factorization and solve process."""
         if self._info is None:
             self._info = KLUInfo()
 
