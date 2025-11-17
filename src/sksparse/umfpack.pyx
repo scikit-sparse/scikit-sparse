@@ -2123,6 +2123,47 @@ def umf_factor(object A, *, object control=None, **kwargs):
 
 
     .. versionadded:: 0.5.0
+
+    Examples
+    --------
+    *See*: Davis, Timothy A. (2006). Direct Methods for Sparse Linear Systems, p 74
+    (Figure 5.1)
+
+    >>> import numpy as np
+    >>> from scipy import sparse
+    >>> from sksparse.umfpack import umf_factor
+    >>> N = 8
+    >>> rows = np.array(
+    ...    [0, 1, 2, 3, 4, 5, 6, 3, 6, 1, 6, 0, 2, 5, 7, 4, 7, 0, 1, 3, 7, 5, 6],
+    ...    dtype=np.int32,
+    ...)
+    >>> cols = np.array(
+    ...    [0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 6, 6, 7, 7],
+    ...    dtype=np.int32,
+    ...)
+    >>> vals = np.ones(len(rows), dtype=np.float64)
+    >>> vals[:7] = np.arange(1, 8, dtype=np.float64)  # make diagonal entries non-unit
+    >>> A = sparse.csc_array((vals, (rows, cols)), shape=(N, N))
+    >>> A
+    <Compressed Sparse Column sparse array of dtype 'float64'
+            with 23 stored elements and shape (8, 8)>
+    >>> # Compute the LU factorization
+    >>> f = umf_factor(A)
+    >>> f
+    <UMFFactor numeric factor of dtype 'float64' with 'int32' indices:
+        L: (8, 8) with 15 stored elements
+        U: (8, 8) with 16 stored elements>
+    >>> L, U, p, q, r = f  # unpack the factorization
+    >>> LU = (L @ U).toarray()
+    >>> PRAQ = (r[:, np.newaxis] * A).tocsc()[p][:, q].toarray()
+    >>> np.allclose(LU, PRAQ)
+    True
+    >>> # Solve a linear system
+    >>> expect_x = np.arange(N, dtype=np.float64)
+    >>> b = A @ expect_x
+    >>> x = f.solve(b)
+    >>> np.allclose(x, expect_x)
+    True
     """
     if control is None:
         control = UMFControl(**kwargs)
@@ -2178,6 +2219,36 @@ def umf_solve(object A, object b, *, object trans='N', object control=None, **kw
 
 
     .. versionadded:: 0.5.0
+
+    Examples
+    --------
+    *See*: Davis, Timothy A. (2006). Direct Methods for Sparse Linear Systems, p 74
+    (Figure 5.1)
+
+    >>> import numpy as np
+    >>> from scipy import sparse
+    >>> from sksparse.umfpack import umf_solve
+    >>> N = 8
+    >>> rows = np.array(
+    ... [0, 1, 2, 3, 4, 5, 6, 3, 6, 1, 6, 0, 2, 5, 7, 4, 7, 0, 1, 3, 7, 5, 6],
+    ... dtype=np.int32,
+    ...)
+    >>> cols = np.array(
+    ... [0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 6, 6, 7, 7],
+    ... dtype=np.int32,
+    ...)
+    >>> vals = np.ones(len(rows), dtype=np.float64)
+    >>> vals[:7] = np.arange(1, 8, dtype=np.float64)  # make diagonal entries non-unit
+    >>> A = sparse.csc_array((vals, (rows, cols)), shape=(N, N))
+    >>> A
+    <Compressed Sparse Column sparse array of dtype 'float64'
+            with 23 stored elements and shape (8, 8)>
+    >>> # Solve a linear system
+    >>> expect_x = np.arange(N, dtype=np.float64)
+    >>> b = A @ expect_x
+    >>> x = umf_solve(A, b)
+    >>> np.allclose(x, expect_x)
+    True
     """
     if control is None:
         control = UMFControl(**kwargs)
