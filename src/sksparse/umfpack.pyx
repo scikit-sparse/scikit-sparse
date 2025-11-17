@@ -47,7 +47,7 @@ Object Interface
     UMFControl - A dataclass to set UMFPACK control parameters.
 
 
-.. umfpack-exceptions:
+.. _umfpack-exceptions:
 
 Warnings and Exceptions
 -----------------------

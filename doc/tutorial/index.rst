@@ -37,6 +37,7 @@ Subpackage            Description and User Guide
 ``ccolamd``             :doc:`./ccolamd`
 ``cholmod``             :doc:`./cholmod`
 ``colamd``              :doc:`./colamd`
+``umfpack``              :doc:`./umfpack`
 ==================    ========================================
 
 .. toctree::
@@ -50,3 +51,4 @@ Subpackage            Description and User Guide
    ccolamd
    cholmod
    colamd
+   umfpack
