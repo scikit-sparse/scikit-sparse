@@ -377,25 +377,38 @@ cdef class _CholmodSparseDestructor:
     ----------
     _sparse : cholmod_sparse*
         The CHOLMOD sparse matrix to be freed.
-    _common : cholmod_common*
+    _common : cholmod_common
         The CHOLMOD common structure used for memory management.
+    _cm : cholmod_common*
+        A pointer to the CHOLMOD common structure.
     """
 
     cdef cholmod_sparse* _sparse
-    cdef cholmod_common* _common
+    cdef cholmod_common _common
+    cdef cholmod_common* _cm
 
     # NOTE __cinit__ is a *Python*-level constructor, cannot take C pointers
     cdef void init(self, cholmod_sparse* A, cholmod_common* common):
         assert A is not NULL
         assert common is not NULL
         self._sparse = A
-        self._common = common
+
+        self._cm = &self._common
+
+        if self._sparse.itype == CHOLMOD_INT:
+            cholmod_start(self._cm)
+        else:
+            cholmod_l_start(self._cm)
+
+        _copy_cholmod_common(self._cm, common)
 
     def __dealloc__(self):
         if self._sparse.itype == CHOLMOD_INT:
-            cholmod_free_sparse(&self._sparse, self._common)
+            cholmod_free_sparse(&self._sparse, self._cm)
+            cholmod_finish(self._cm)
         else:
-            cholmod_l_free_sparse(&self._sparse, self._common)
+            cholmod_l_free_sparse(&self._sparse, self._cm)
+            cholmod_l_finish(self._cm)
 
 
 cdef inline int _np_itypenum_from_cholmod(int itype) noexcept:
@@ -838,26 +851,39 @@ cdef class _CholmodDenseDestructor:
         The CHOLMOD dense matrix to be freed.
     _use_int32 : bint
         Whether to use 32-bit or 64-bit integers.
-    _common : cholmod_common*
+    _common : cholmod_common
         The CHOLMOD common structure used for memory management.
+    _cm : cholmod_common*
+        A pointer to the CHOLMOD common structure.
     """
 
     cdef cholmod_dense* _dense
-    cdef cholmod_common* _common
+    cdef cholmod_common _common
+    cdef cholmod_common* _cm
     cdef bint _use_int32
 
     cdef void init(self, cholmod_dense* A, bint use_int32, cholmod_common* common):
         assert A is not NULL
         assert common is not NULL
         self._dense = A
-        self._common = common
         self._use_int32 = use_int32
+
+        self._cm = &self._common
+
+        if self._use_int32:
+            cholmod_start(self._cm)
+        else:
+            cholmod_l_start(self._cm)
+
+        _copy_cholmod_common(self._cm, common)
 
     def __dealloc__(self):
         if self._use_int32:
-            cholmod_free_dense(&self._dense, self._common)
+            cholmod_free_dense(&self._dense, self._cm)
+            cholmod_finish(self._cm)
         else:
-            cholmod_l_free_dense(&self._dense, self._common)
+            cholmod_l_free_dense(&self._dense, self._cm)
+            cholmod_l_finish(self._cm)
 
 
 cdef cnp.ndarray _ndarray_from_cholmod_dense(
