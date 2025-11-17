@@ -73,43 +73,95 @@ cdef extern from "cholmod.h":
         double prune_dense
         double prune_dense2
         double nd_oksep
+        # double other_1[4]  # reserved for future use
         size_t nd_small
+        # double other_2[4]  # reserved for future use
         int aggressive
         int order_for_lu
         int nd_compress
         int nd_camd
         int nd_components
         int ordering
+        # size_t other_3[4]  # reserved for future use
 
     ctypedef struct cholmod_common:
+        double dbound
+        double grow0
+        double grow1
+        double grow2
+        size_t maxrank
+        double supernodal_switch
         int supernodal
+
         int final_asis
         int final_super
         int final_ll
         int final_pack
         int final_monotonic
         int final_resymbol
+
+        double zrelax[3]
+        size_t nrelax[3]
+
+        int prefer_zomplex
+        int prefer_upper
         int quick_return_if_not_posdef
+        int prefer_binary
+
+        int print
+        int precise
+        int try_catch
+
+        void (*error_handler) (
+            int status, const char *file, int line, const char *message
+        )
+
         int nmethods
         int current
         int selected
         cholmod_method_struct method[]
+
         int postorder
+        int default_nesdis
+
+        double metis_memory
+        double metis_dswitch
+        size_t metis_nswitch
+
+        # Workspace
+        # size_t nrow
+        # int64_t mark
+        # size_t iworksize
+        # size_t xworkbytes
+        # We do not explicitly use these arrays in Cython, so we
+        # comment them out:
+        # void *Flag
+        # void *Head
+        # void *Xwork
+        # void *Iwork
+        # int other_5
+
         int itype
+        # int other_5  # reserved for future use
+        int no_workspace_reallocate
+
         int status
         double fl
         double lnz
         double anz
         double modfl
+
         size_t malloc_count
         size_t memory_usage
         size_t memory_inuse
+
         double nrealloc_col
         double nrealloc_factor
         double ndbounds_hit
-        double nsbounds_hit
+
         double rowfacfl
         double aatfl
+
         int called_nd
         int blas_ok
 
@@ -126,6 +178,12 @@ cdef extern from "cholmod.h":
         double SPQR_tol_used
         double SPQR_norm_E_fro
         int64_t SPQR_istat[8]
+
+        # Skip GPU fields for now
+
+        double nsbounds_hit
+        float sbound
+        # float other_6  # reserved for future use
 
     ctypedef struct cholmod_factor:
         size_t n
@@ -365,7 +423,7 @@ cdef extern from "cholmod.h":
         int to_monotonic,
         cholmod_factor *L,
         cholmod_common *Common
-    ) 
+    )
     int cholmod_l_change_factor(
         int to_xtype,
         int to_ll,
@@ -374,7 +432,7 @@ cdef extern from "cholmod.h":
         int to_monotonic,
         cholmod_factor *L,
         cholmod_common *Common
-    ) 
+    )
 
     cholmod_factor *cholmod_copy_factor(
         cholmod_factor *L,
@@ -544,9 +602,12 @@ ctypedef fused floating_t:
     double complex
 
 cdef object _csc_from_cholmod_sparse(cholmod_sparse* A, cholmod_common* common)
-cdef void _cholmod_dense_from_ndarray(floating_t[::1, :] Xd, cholmod_dense *X_static)
+cdef void _cholmod_dense_from_ndarray(
+    floating_t[::1, :] Xd,
+    cholmod_dense *X_static
+) noexcept
 cdef cnp.ndarray _ndarray_from_cholmod_dense(
     cholmod_dense* X, bint use_int32, cholmod_common* common
 )
 cdef cnp.ndarray _ndarray_copy_from_intptr(void* ptr, size_t N, bint use_int32)
-cdef void _copy_cholmod_common(cholmod_common* dest, cholmod_common* src)
+cdef int _copy_cholmod_common(cholmod_common* dest, cholmod_common* src) except -1

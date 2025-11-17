@@ -1069,21 +1069,53 @@ cdef inline object _npdtype_class_from_xdtype(int xtype, int dtype):
 # -----------------------------------------------------------------------------
 #         CholeskyFactor Object
 # -----------------------------------------------------------------------------
-cdef void _copy_cholmod_common(cholmod_common* dest, cholmod_common* src):
+cdef int _copy_cholmod_common(cholmod_common* dest, cholmod_common* src) except -1:
     """Copy the contents of one cholmod_common struct to another."""
     assert dest is not NULL
     assert src is not NULL
+    cdef int i
 
-    # Copy known input fields, ignore others
+    dest.dbound = src.dbound
+    dest.grow0 = src.grow0
+    dest.grow1 = src.grow1
+    dest.grow2 = src.grow2
+
+    dest.maxrank = src.maxrank
+
+    dest.supernodal_switch = src.supernodal_switch
     dest.supernodal = src.supernodal
+
+    dest.final_asis = src.final_asis
+    dest.final_super = src.final_super
+    dest.final_ll = src.final_ll
+    dest.final_pack = src.final_pack
+    dest.final_monotonic = src.final_monotonic
+    dest.final_resymbol = src.final_resymbol
+
+    if src.zrelax is not NULL:
+        for i in range(3):
+            dest.zrelax[i] = src.zrelax[i]
+
+    if src.nrelax is not NULL:
+        for i in range(3):
+            dest.nrelax[i] = src.nrelax[i]
+
+    dest.prefer_zomplex = src.prefer_zomplex
+    dest.prefer_upper = src.prefer_upper
     dest.quick_return_if_not_posdef = src.quick_return_if_not_posdef
+    dest.prefer_binary = src.prefer_binary
+
+    dest.print = src.print
+    dest.precise = src.precise
+    dest.try_catch = src.try_catch
+
+    dest.error_handler = src.error_handler
 
     # Ordering
     dest.nmethods = src.nmethods
     dest.current = src.current
     dest.selected = src.selected
 
-    cdef int i
     if src.method is not NULL:
         for i in range(src.nmethods):
             dest.method[i].lnz = src.method[i].lnz
@@ -1100,7 +1132,22 @@ cdef void _copy_cholmod_common(cholmod_common* dest, cholmod_common* src):
             dest.method[i].ordering = src.method[i].ordering
 
     dest.postorder = src.postorder
+    dest.default_nesdis = src.default_nesdis
+
+    dest.metis_memory = src.metis_memory
+    dest.metis_dswitch = src.metis_dswitch
+    dest.metis_nswitch = src.metis_nswitch
+
+    # Workspace -- not copied since CHOLMOD manages workspace internally
+    # dest.nrow = src.nrow
+    # dest.mark = src.mark
+    # dest.iworksize = src.iworksize
+    # dest.xworkbytes = src.xworkbytes
+    # Flag, Head, Xwork, Iwork are set to NULL by cholmod_start, and kept as cleared
+    # arrays between CHOLMOD calls, so we do not copy them here.
+
     dest.itype = src.itype
+    dest.no_workspace_reallocate = src.no_workspace_reallocate
 
     # Output Statistics
     dest.status = src.status
@@ -1108,18 +1155,22 @@ cdef void _copy_cholmod_common(cholmod_common* dest, cholmod_common* src):
     dest.lnz = src.lnz
     dest.anz = src.anz
     dest.modfl = src.modfl
+
     dest.malloc_count = src.malloc_count
     dest.memory_usage = src.memory_usage
     dest.memory_inuse = src.memory_inuse
+
     dest.nrealloc_col = src.nrealloc_col
     dest.nrealloc_factor = src.nrealloc_factor
     dest.ndbounds_hit = src.ndbounds_hit
-    dest.nsbounds_hit = src.nsbounds_hit
+
     dest.rowfacfl = src.rowfacfl
     dest.aatfl = src.aatfl
+
     dest.called_nd = src.called_nd
     dest.blas_ok = src.blas_ok
 
+    # SPQR parameters and statistics
     dest.SPQR_grain = src.SPQR_grain
     dest.SPQR_small = src.SPQR_small
     dest.SPQR_shrink = src.SPQR_shrink
@@ -1137,7 +1188,13 @@ cdef void _copy_cholmod_common(cholmod_common* dest, cholmod_common* src):
         for i in range(8):
             dest.SPQR_istat[i] = src.SPQR_istat[i]
 
-    # Skip GPU related fields
+    # New as of CHOLMOD v5.0
+    dest.nsbounds_hit = src.nsbounds_hit
+    dest.sbound = src.sbound
+
+    # Skip GPU related fields for now
+
+    return 0
 
 
 cdef class CholeskyFactor:
@@ -1264,7 +1321,7 @@ cdef class CholeskyFactor:
     MATLAB function [#analyze_c]_.
 
     .. warning::
-    
+
         Calling ``CholeskyFactor.__new__(CholeskyFactor)`` will leave the object in an
         "unsafe" state, since the internal CHOLMOD structures will not be initialized.
         Always use the constructor ``CholeskyFactor(...)`` to create a new object.
