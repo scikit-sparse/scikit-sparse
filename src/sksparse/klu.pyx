@@ -1015,6 +1015,19 @@ cdef class KLUFactor:
         for attr in ['L', 'U', 'perm_r', 'perm_c', 'rscale', 'F', 'rblocks']:
             yield getattr(self, attr)
 
+    def __repr__(self):
+        cls_name = self.__class__.__name__
+        factor_type = 'numeric' if self.is_numeric else 'symbolic'
+        return (
+            f"<{cls_name} {factor_type} factor of dtype '{self.dtype}' "
+            f"with '{self.itype}' indices:\n"
+            f"    L: {self.shape} with {self.lnz} stored elements\n"
+            f"    U: {self.shape} with {self.unz} stored elements>"
+        )
+
+    def __str__(self):
+        return self.__repr__()
+
     # ---------------------------------------------------------------------------------
     #         Properties
     # ---------------------------------------------------------------------------------
@@ -1931,6 +1944,47 @@ def klu_factor(A, *, KLUControl control=None, **kwargs):
 
 
     .. versionadded:: 0.5.0
+
+    Examples
+    --------
+    *See*: Davis, Timothy A. (2006). Direct Methods for Sparse Linear Systems, p 74
+    (Figure 5.1)
+
+    >>> import numpy as np
+    >>> from scipy import sparse
+    >>> from sksparse.klu import klu_factor
+    >>> N = 8
+    >>> rows = np.array(
+    ...    [0, 1, 2, 3, 4, 5, 6, 3, 6, 1, 6, 0, 2, 5, 7, 4, 7, 0, 1, 3, 7, 5, 6],
+    ...    dtype=np.int32,
+    ...)
+    >>> cols = np.array(
+    ...    [0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 6, 6, 7, 7],
+    ...    dtype=np.int32,
+    ...)
+    >>> vals = np.ones(len(rows), dtype=np.float64)
+    >>> vals[:7] = np.arange(1, 8, dtype=np.float64)  # make diagonal entries non-unit
+    >>> A = sparse.csc_array((vals, (rows, cols)), shape=(N, N))
+    >>> A
+    <Compressed Sparse Column sparse array of dtype 'float64'
+            with 23 stored elements and shape (8, 8)>
+    >>> # Compute the LU factorization
+    >>> f = klu_factor(A)
+    >>> f
+    <KLUFactor numeric factor of dtype 'float64' with 'int32' indices:
+        L: (8, 8) with 16 stored elements
+        U: (8, 8) with 17 stored elements>
+    >>> L, U, p, q, r, F, _ = f  # unpack the factorization
+    >>> LUF = (L @ U + F).toarray()
+    >>> RPAQ = (r[:, np.newaxis] * A[p[:, np.newaxis], q]).toarray()
+    >>> np.allclose(LUF, RPAQ)
+    True
+    >>> # Solve a linear system
+    >>> expect_x = np.arange(N, dtype=np.float64)
+    >>> b = A @ expect_x
+    >>> x = f.solve(b)
+    >>> np.allclose(x, expect_x)
+    True
     """
     if control is None:
         control = KLUControl(**kwargs)
@@ -1983,6 +2037,36 @@ def klu_solve(A, b, *, KLUControl control=None, bint transpose=False, **kwargs):
 
 
     .. versionadded:: 0.5.0
+
+    Examples
+    --------
+    *See*: Davis, Timothy A. (2006). Direct Methods for Sparse Linear Systems, p 74
+    (Figure 5.1)
+
+    >>> import numpy as np
+    >>> from scipy import sparse
+    >>> from sksparse.klu import klu_solve
+    >>> N = 8
+    >>> rows = np.array(
+    ...    [0, 1, 2, 3, 4, 5, 6, 3, 6, 1, 6, 0, 2, 5, 7, 4, 7, 0, 1, 3, 7, 5, 6],
+    ...    dtype=np.int32,
+    ...)
+    >>> cols = np.array(
+    ...    [0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 6, 6, 7, 7],
+    ...    dtype=np.int32,
+    ...)
+    >>> vals = np.ones(len(rows), dtype=np.float64)
+    >>> vals[:7] = np.arange(1, 8, dtype=np.float64)  # make diagonal entries non-unit
+    >>> A = sparse.csc_array((vals, (rows, cols)), shape=(N, N))
+    >>> A
+    <Compressed Sparse Column sparse array of dtype 'float64'
+            with 23 stored elements and shape (8, 8)>
+    >>> # Solve a linear system
+    >>> expect_x = np.arange(N, dtype=np.float64)
+    >>> b = A @ expect_x
+    >>> x = klu_solve(A, b)
+    >>> np.allclose(x, expect_x)
+    True
     """
     if control is None:
         control = KLUControl(**kwargs)
