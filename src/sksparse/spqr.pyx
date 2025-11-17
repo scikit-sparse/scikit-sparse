@@ -49,7 +49,7 @@ Object Interface
     SPQRInfo - A dataclass to return SPQR info.
 
 
-.. spqr-exceptions:
+.. _spqr-exceptions:
 
 Warnings and Exceptions
 -----------------------
@@ -790,6 +790,8 @@ cdef class SPQRFactor:
         The rank of the matrix as determined by SPQR.
     perm : ~numpy.ndarray of int
         The combined singleton and fill-reducing column permutation vector.
+    info : SPQRInfo
+        An object containing various SPQR statistics.
 
     See Also
     --------
@@ -1687,10 +1689,25 @@ def spqr(A, *, mode="full", order=None, tol=None):
           :func:`scipy.linalg.qr`.
 
     order : str, optional
-        The ordering strategy to use.
+        The column ordering strategy to use. Let :math:`S` be the matrix :math:`A` with
+        singleton rows/columns removed, the ordering options are:
+
+        * ``default``: COLAMD(S),
+        * ``fixed``: identity permutation (*i.e.* no singletons removed),
+        * ``natural``: singletons removed, but no fill-reducing ordering applied,
+        * ``colamd``: COLAMD(S),
+        * ``amd``: AMD(:math:`S^{\top} S`),
+        * ``metis``: METIS(:math:`S^{\top} S`),
+        * ``best``: try all of ``amd``, ``colamd``, ``metis`` and pick the best,
+        * ``cholmod``: Same as ``best``,
+        * ``bestamd``: try ``amd`` and ``colamd`` and pick the best.
+
     tol : float, optional
         If the 2-norm of a column in ``A`` is less than ``tol``, that column is
-        considered to be a zero column. If ``None``, the default tolerance is used.
+        considered to be a zero column. If ``tol = 0``, no columns are treated as zero.
+        If ``None``, the default tolerance is used. The default is
+        ``tol =`` :math:`20 \epsilon (M + N) \sqrt{\max{\mathrm{diag}(A^{\top} A)}}`,
+        where :math:`\epsilon` is the machine precision.
 
     Returns
     -------

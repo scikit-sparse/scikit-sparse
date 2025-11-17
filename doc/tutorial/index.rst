@@ -38,6 +38,7 @@ Subpackage            Description and User Guide
 ``cholmod``             :doc:`./cholmod`
 ``colamd``              :doc:`./colamd`
 ``klu``                 :doc:`./klu`
+``spqr``                :doc:`./spqr`
 ``umfpack``             :doc:`./umfpack`
 ==================    ========================================
 
@@ -53,4 +54,5 @@ Subpackage            Description and User Guide
    cholmod
    colamd
    klu
+   spqr
    umfpack
