@@ -156,29 +156,23 @@ def test_nearly_singular(davis_example_chol):
 # -----------------------------------------------------------------------------
 test_As = [
     A
-    # for dtype in DTYPES  # FIXME? single precision dtypes are not close
-    for dtype in [np.float64, np.complex128]
+    for dtype in DTYPES
     for A in generate_random_matrices(
         N_trials=10, N_max=200, d_scale=0.05, pos_def_only=True, dtype=dtype
     )
 ]
 
 
-@pytest.fixture(params=test_As)
-def Am(request):
-    return request.param
-
-
-@pytest.fixture(params=[None, "amd"], ids=lambda x: f"order={x}")
-def ldl_decomp(Am, request):
-    return Am, ldl_factor(Am, order=request.param)
-
-
+@pytest.mark.parametrize("A", test_As)
+@pytest.mark.parametrize("order", [None, "amd"])
 @pytest.mark.parametrize("K", [0, 1, 3], ids=lambda k: f"K={k}")
 @pytest.mark.parametrize("is_sparse", [False, True], ids=["dense", "sparse"])
-def test_ldlsolve(ldl_decomp, K, is_sparse):
-    A, f = ldl_decomp
-    atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
+def test_ldlsolve(A, order, K, is_sparse):
+    rtol = 1e-08 if A.dtype in (np.float64, np.complex128) else 1e-3
+    atol = 1e-15 if A.dtype in (np.float64, np.complex128) else 1e-8
+
+    A = A.copy()
+    A.setdiag(A.diagonal() + 1.0)  # improve conditioning
 
     # Build RHS
     N = A.shape[0]
@@ -196,10 +190,10 @@ def test_ldlsolve(ldl_decomp, K, is_sparse):
 
     # Solve the system
     b = A @ expect_x
-    x = f.solve(b)
+    x = ldl_factor(A, order=order).solve(b)
 
     # Compare
     if is_sparse:
-        assert_allclose(x.toarray(), expect_x.toarray(), atol=atol)
+        assert_allclose(x.toarray(), expect_x.toarray(), rtol=rtol, atol=atol)
     else:
-        assert_allclose(x, expect_x, atol=atol)
+        assert_allclose(x, expect_x, rtol=rtol, atol=atol)

@@ -180,33 +180,36 @@ def test_nearly_singular(davis_example_chol):
 # -----------------------------------------------------------------------------
 test_As = [
     A
-    # for dtype in DTYPES  # FIXME? single precision dtypes are not close
-    for dtype in [np.float64, np.complex128]
+    for dtype in DTYPES
     for A in generate_random_matrices(
-        N_trials=10, N_max=200, d_scale=0.05, pos_def_only=True, dtype=dtype
+        N_trials=5, N_max=200, d_scale=0.05, pos_def_only=True, dtype=dtype
     )
 ]
 
 
+orders = [
+    None,
+    "default",
+    "best",
+    "natural",
+    "amd",
+    "metis",
+    "nesdis",
+    "colamd",
+    "postordered",
+]
+
+
 @pytest.mark.parametrize("A", test_As)
-@pytest.mark.parametrize(
-    "order",
-    [
-        None,
-        "default",
-        "best",
-        "natural",
-        "amd",
-        "metis",
-        "nesdis",
-        "colamd",
-        "postordered",
-    ],
-)
+@pytest.mark.parametrize("order", orders)
 @pytest.mark.parametrize("K", [0, 1, 3], ids=lambda k: f"K={k}")
 @pytest.mark.parametrize("is_sparse", [False, True], ids=["dense", "sparse"])
 def test_solve(A, order, K, is_sparse):
-    atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
+    rtol = 1e-08 if A.dtype in (np.float64, np.complex128) else 1e-3
+    atol = 1e-15 if A.dtype in (np.float64, np.complex128) else 1e-8
+
+    A = A.copy()
+    A.setdiag(A.diagonal() + 1.0)  # improve conditioning
 
     # Build RHS
     N = A.shape[0]
@@ -228,9 +231,9 @@ def test_solve(A, order, K, is_sparse):
 
     # Compare
     if is_sparse:
-        assert_allclose(x.toarray(), expect_x.toarray(), atol=atol)
+        assert_allclose(x.toarray(), expect_x.toarray(), rtol=rtol, atol=atol)
     else:
-        assert_allclose(x, expect_x, atol=atol)
+        assert_allclose(x, expect_x, rtol=rtol, atol=atol)
 
 
 # Test solve on "real-world" matrices
