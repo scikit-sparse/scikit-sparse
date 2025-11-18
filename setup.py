@@ -107,7 +107,7 @@ extensions = [
         [f"src/sksparse/{name}.pyx"],
         include_dirs=INCLUDE_DIRS,
         library_dirs=LIBRARY_DIRS,
-        libraries=[name],
+        libraries=[name] if name != "spqr" else ["cholmod", "spqr"],
     )
     for name in extension_names
 ]
