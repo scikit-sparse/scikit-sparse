@@ -11,6 +11,7 @@ _dev_scripts/
 *.c
 *.cpp
 *.html
+*.inv
 
 # Cribbed from numpy's .gitignore:
 

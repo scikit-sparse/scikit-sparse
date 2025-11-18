@@ -49,11 +49,37 @@ extensions = [
     "sphinx_copybutton",  # add "copy" button to code blocks
 ]
 
+
+def map_intersphinx(url, local_inv):
+    """Map an intersphinx inventory, using a local copy if available.
+
+    Parameters
+    ----------
+    url : str
+        URL of the intersphinx inventory.
+    local_inv : str
+        Path to the local inventory file.
+
+    Returns
+    -------
+    tuple
+        Tuple of (url, local_inv or None).
+    """
+    if Path(local_inv).exists():
+        return (url, str(local_inv))
+    return (url, None)
+
+
 intersphinx_mapping = {
-    "python": ("https://docs.python.org/3", None),
-    "numpy": ("https://numpy.org/doc/stable", None),
-    "scipy": ("https://docs.scipy.org/doc/scipy", None),
+    "python": map_intersphinx("https://docs.python.org/3", '_intersphinx/python.inv'),
+    "numpy": map_intersphinx("https://numpy.org/doc/stable", '_intersphinx/numpy.inv'),
+    "scipy": map_intersphinx(
+        "https://docs.scipy.org/doc/scipy", '_intersphinx/scipy.inv'
+    ),
 }
+
+intersphinx_timeout = 120     # seconds to wait for a response
+intersphinx_cache_limit = 30  # days to cache the inventories
 
 nitpicky = True  # warn about all references where the target cannot be found
 
