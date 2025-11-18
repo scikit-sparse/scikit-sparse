@@ -66,6 +66,7 @@ def generate_random_matrices(
     shape_kind="square",
     d_scale=1,
     pos_def_only=False,
+    itype=None,
     dtype=float,
 ):
     """Generate a list of random sparse matrices of maximum size N x N.
@@ -93,6 +94,11 @@ def generate_random_matrices(
     pos_def_only : bool
         If True, generate only positive definite matrices. This requires
         that the matrix is square and symmetric.
+    itype : dtype, optional
+        Integer type to use for matrix indices. If None, ``scipy.sparse``
+        determines the type based on the size of the matrix.
+    dtype : dtype, optional
+        Data type of the matrix entries. Default is float.
 
     Returns
     -------
@@ -158,6 +164,10 @@ def generate_random_matrices(
             # Add a small value to the diagonal to ensure positive definiteness
             A += sparse.diags_array(np.full(N, 1e-6, dtype=dtype))
             A = A.tocsc()
+
+        if itype is not None:
+            A.indices = A.indices.astype(itype)
+            A.indptr = A.indptr.astype(itype)
 
         yield pytest.param(
             A, id=f"random_{trial:02d}::{A.shape}::{A.nnz}::{dtype.__name__}"

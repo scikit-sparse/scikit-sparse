@@ -57,12 +57,7 @@ def test_view_vs_get(davis_example_chol, order):
 @pytest.fixture
 def A_small():
     return sparse.csc_array(
-        np.array(
-            [[10,  0, 3,  0],
-              [0,  5, 0, -2],
-              [3,  0, 5,  0],
-              [0, -2, 0,  2]]
-        ),
+        np.array([[10, 0, 3, 0], [0, 5, 0, -2], [3, 0, 5, 0], [0, -2, 0, 2]]),
         dtype=np.float64,
     )
 
@@ -113,21 +108,24 @@ def test_bad_refactor_type(A_small):
 
 test_As = [
     A
+    for itype in ITYPES
     for dtype in DTYPES
     for A in generate_random_matrices(
-        N_trials=10, N_max=200, d_scale=0.05, pos_def_only=True, dtype=dtype
+        N_trials=10,
+        N_max=200,
+        d_scale=0.05,
+        pos_def_only=True,
+        itype=itype,
+        dtype=dtype,
     )
 ]
 
 
-@pytest.mark.parametrize("itype", ITYPES)
 @pytest.mark.parametrize("A", test_As)
-def test_copy_symbolic(A, itype):
+def test_copy_symbolic(A):
     atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
     A = A.copy()
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
-    A.indptr = A.indptr.astype(itype)
-    A.indices = A.indices.astype(itype)
     f = CholeskyFactor(A)
     g = f.copy()
     assert g is not f
@@ -139,14 +137,11 @@ def test_copy_symbolic(A, itype):
     assert_LLT_equals_A(g, A, atol=atol)
 
 
-@pytest.mark.parametrize("itype", ITYPES)
 @pytest.mark.parametrize("A", test_As)
-def test_copy_numeric(A, itype):
+def test_copy_numeric(A):
     atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
     A = A.copy()
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
-    A.indptr = A.indptr.astype(itype)
-    A.indices = A.indices.astype(itype)
     f = cho_factor(A)
     g = f.copy()
     assert g is not f
@@ -173,13 +168,10 @@ def _create_randomized_matrix(A):
 
 
 @pytest.mark.parametrize("copy", [False, True])
-@pytest.mark.parametrize("itype", ITYPES)
 @pytest.mark.parametrize("A", test_As)
-def test_refactor(A, itype, copy):
+def test_refactor(A, copy):
     atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-3
     A = A.copy()
-    A.indptr = A.indptr.astype(itype)
-    A.indices = A.indices.astype(itype)
     f = cho_factor(A, lower=True)
     assert_LLT_equals_A(f, A, atol=atol)
     # Create a new matrix with the same sparsity pattern but different values

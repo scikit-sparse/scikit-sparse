@@ -241,20 +241,20 @@ def test_iter(davis_example_qr):
 
 test_As = [
     A
+    for itype in ITYPES
     for dtype in DTYPES
-    for A in generate_random_matrices(N_trials=10, N_max=200, d_scale=0.05, dtype=dtype)
+    for A in generate_random_matrices(
+        N_trials=10, N_max=200, d_scale=0.05, itype=itype, dtype=dtype
+    )
 ]
 
 
 @pytest.mark.parametrize("copy", [False, True])
-@pytest.mark.parametrize("itype", ITYPES)
 @pytest.mark.parametrize("A", test_As)
-def test_refactor(A, itype, copy):
+def test_refactor(A, copy):
     atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-6
     A = A.copy()
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
-    A.indptr = A.indptr.astype(itype)
-    A.indices = A.indices.astype(itype)
     f = umf_factor(A)
     assert_LU_equals_A(f, A, atol=atol)
     # Create a new matrix with the same sparsity pattern but different values

@@ -185,20 +185,23 @@ def test_davis_example_qr(davis_example_qr, itype, dtype):
 
 test_As = [
     A
+    for itype in ITYPES
     for dtype in DTYPES
     for A in generate_random_matrices(
-        N_trials=10, N_max=200, d_scale=0.05, shape_kind="M >= N", dtype=dtype
+        N_trials=10,
+        N_max=200,
+        d_scale=0.05,
+        shape_kind="M >= N",
+        itype=itype,
+        dtype=dtype,
     )
 ]
 
 
-@pytest.mark.parametrize("itype", ITYPES)
 @pytest.mark.parametrize("A", test_As)
-def test_copy_symbolic(A, itype):
+def test_copy_symbolic(A):
     A = A.copy()
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
-    A.indptr = A.indptr.astype(itype)
-    A.indices = A.indices.astype(itype)
     f = SPQRFactor(A)
     g = f.copy()
     assert g is not f
@@ -213,13 +216,10 @@ def test_copy_symbolic(A, itype):
     assert_solve_dense(A, g)
 
 
-@pytest.mark.parametrize("itype", ITYPES)
 @pytest.mark.parametrize("A", test_As)
-def test_copy_numeric(A, itype):
+def test_copy_numeric(A):
     A = A.copy()
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
-    A.indptr = A.indptr.astype(itype)
-    A.indices = A.indices.astype(itype)
     f = spqr_factor(A)
     g = f.copy()
     assert g is not f
@@ -229,13 +229,10 @@ def test_copy_numeric(A, itype):
 
 
 @pytest.mark.parametrize("copy", [False, True])
-@pytest.mark.parametrize("itype", ITYPES)
 @pytest.mark.parametrize("A", test_As)
-def test_refactor(A, itype, copy):
+def test_refactor(A, copy):
     A = A.copy()
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
-    A.indptr = A.indptr.astype(itype)
-    A.indices = A.indices.astype(itype)
     f = spqr_factor(A)
     # Create a new matrix with the same sparsity pattern but different values
     B = A.copy()
@@ -665,11 +662,8 @@ def test_ordering(davis_example_qr, order):
 #         Test spqr
 # -----------------------------------------------------------------------------
 @pytest.mark.parametrize("A", test_As)
-@pytest.mark.parametrize("itype", ITYPES)
-def test_spqr_r(A, itype):
+def test_spqr_r(A):
     A = A.copy()
-    A.indptr = A.indptr.astype(itype)
-    A.indices = A.indices.astype(itype)
     R, p = spqr(A, mode="r")
     RTR = (R.T.conj() @ R).toarray()
     ATA = (A.T.conj() @ A)[p[:, np.newaxis], p].toarray()
@@ -677,33 +671,27 @@ def test_spqr_r(A, itype):
 
 
 @pytest.mark.parametrize("A", test_As)
-@pytest.mark.parametrize("itype", ITYPES)
-def test_spqr_full(A, itype):
+def test_spqr_full(A):
     A = A.copy()
-    A.indptr = A.indptr.astype(itype)
-    A.indices = A.indices.astype(itype)
     Q, R, p = spqr(A, mode="full")
     assert_allclose((Q @ R).toarray(), A[:, p].toarray(), atol=1e-14, strict=True)
 
 
 @pytest.mark.parametrize("A", test_As)
-@pytest.mark.parametrize("itype", ITYPES)
-def test_spqr_householder(A, itype):
+def test_spqr_householder(A):
     A = A.copy()
-    A.indptr = A.indptr.astype(itype)
-    A.indices = A.indices.astype(itype)
     Ht, R, p = spqr(A, mode="householder")
 
     M, N = A.shape
     H, tau, v = Ht
 
-    assert H.shape[0] == M             # number of columns not known exactly
-    assert v.shape == (H.shape[0],)    # row permutation of H
+    assert H.shape[0] == M  # number of columns not known exactly
+    assert v.shape == (H.shape[0],)  # row permutation of H
     assert tau.shape == (H.shape[1],)  # column coefficients of H
 
     assert H.dtype == A.dtype
     assert tau.dtype == A.dtype
-    assert v.dtype == itype
+    assert v.dtype == A.indptr.dtype
 
     Q = spqr_qmult(Ht, np.eye(A.shape[0], dtype=A.dtype))
     assert_allclose(Q @ R, A[:, p].toarray(), atol=1e-14, strict=True)

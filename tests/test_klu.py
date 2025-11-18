@@ -181,20 +181,18 @@ def test_iter(davis_example_qr):
 
 test_As = [
     A
+    for itype in ITYPES
     for dtype in DTYPES
     for A in generate_random_matrices(
-        N_trials=10, N_max=200, d_scale=0.05, dtype=dtype
+        N_trials=10, N_max=200, d_scale=0.05, itype=itype, dtype=dtype
     )
 ]
 
 
-@pytest.mark.parametrize("itype", ITYPES)
 @pytest.mark.parametrize("A", test_As)
-def test_copy_symbolic(A, itype):
+def test_copy_symbolic(A):
     A = A.copy()
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
-    A.indptr = A.indptr.astype(itype)
-    A.indices = A.indices.astype(itype)
     f = KLUFactor(A)
     g = f.copy()
     assert g is not f
@@ -210,13 +208,10 @@ def test_copy_symbolic(A, itype):
     assert_LU_equals_A(g, A, atol=1e-12)
 
 
-@pytest.mark.parametrize("itype", ITYPES)
 @pytest.mark.parametrize("A", test_As)
-def test_copy_numeric(A, itype):
+def test_copy_numeric(A):
     A = A.copy()
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
-    A.indptr = A.indptr.astype(itype)
-    A.indices = A.indices.astype(itype)
     f = klu_factor(A)
     g = f.copy()
     assert g is not f
@@ -226,14 +221,11 @@ def test_copy_numeric(A, itype):
 
 
 @pytest.mark.parametrize("copy", [False, True])
-@pytest.mark.parametrize("itype", ITYPES)
 @pytest.mark.parametrize("A", test_As)
-def test_refactor(A, itype, copy):
+def test_refactor(A, copy):
     atol = 1e-8
     A = A.copy()
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
-    A.indptr = A.indptr.astype(itype)
-    A.indices = A.indices.astype(itype)
     f = klu_factor(A)
     assert_LU_equals_A(f, A, atol=atol)
     # Create a new matrix with the same sparsity pattern but different values
