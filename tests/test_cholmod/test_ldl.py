@@ -53,7 +53,7 @@ def test_singleton_matrix(dtype):
 
 @pytest.mark.parametrize(
     "A",
-    generate_random_matrices(N_trials=1, N_max=200, d_scale=0.05, pos_def_only=True),
+    generate_random_matrices(N_trials=1, N_max=200, d_scale=0.05, spd_only=True),
 )
 @pytest.mark.parametrize("itype", [np.int32, np.int64])
 def test_itype(A, itype):
@@ -76,7 +76,7 @@ test_As = [
     A
     for dtype in DTYPES
     for A in generate_random_matrices(
-        N_trials=10, N_max=200, d_scale=0.05, pos_def_only=True, dtype=dtype
+        N_trials=10, N_max=200, d_scale=0.05, spd_only=True, dtype=dtype
     )
 ]
 

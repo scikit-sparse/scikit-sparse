@@ -168,7 +168,7 @@ def test_rowcol(davis_example_chol):
 #         Test many random matrices of various dtypes
 # -----------------------------------------------------------------------------
 pos_def_As = list(
-    generate_random_matrices(N_trials=10, N_max=200, d_scale=0.05, pos_def_only=True)
+    generate_random_matrices(N_trials=10, N_max=200, d_scale=0.05, spd_only=True)
 )
 general_As = list(generate_random_matrices(N_trials=10, N_max=200, d_scale=0.05))
 

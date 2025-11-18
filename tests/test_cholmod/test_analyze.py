@@ -156,7 +156,7 @@ def test_ordering(davis_example_chol, order):
 #         Test many random matrices of various dtypes
 # -----------------------------------------------------------------------------
 posdef_As = list(
-    generate_random_matrices(N_trials=10, N_max=200, d_scale=0.05, pos_def_only=True)
+    generate_random_matrices(N_trials=10, N_max=200, d_scale=0.05, spd_only=True)
 )
 
 

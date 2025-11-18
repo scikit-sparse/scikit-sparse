@@ -110,7 +110,7 @@ test_As = [
     A
     for dtype in DTYPES
     for A in generate_random_matrices(
-        N_trials=10, N_max=200, d_scale=0.05, pos_def_only=True, dtype=dtype
+        N_trials=10, N_max=200, d_scale=0.05, spd_only=True, dtype=dtype
     )
 ]
 

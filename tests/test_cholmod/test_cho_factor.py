@@ -114,7 +114,7 @@ test_As = [
         N_trials=10,
         N_max=200,
         d_scale=0.05,
-        pos_def_only=True,
+        spd_only=True,
         itype=itype,
         dtype=dtype,
     )

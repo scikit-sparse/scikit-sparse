@@ -65,7 +65,7 @@ def generate_random_matrices(
     N_max=10,
     shape_kind="square",
     d_scale=1,
-    pos_def_only=False,
+    spd_only=False,
     itype=None,
     dtype=float,
 ):
@@ -91,9 +91,9 @@ def generate_random_matrices(
     d_scale : float
         Scale factor for the density of the sparse matrix. The density will
         be a random value between 0 and ``d_scale``.
-    pos_def_only : bool
-        If True, generate only positive definite matrices. This requires
-        that the matrix is square and symmetric.
+    spd_only : bool
+        If True, generate only symmetric, positive-definite matrices. This
+        option overrides ``shape_kind`` to ensure square matrices.
     itype : dtype, optional
         Integer type to use for matrix indices. If None, ``scipy.sparse``
         determines the type based on the size of the matrix.
@@ -134,7 +134,7 @@ def generate_random_matrices(
     except KeyError as e:
         raise ValueError(f"Invalid shape_kind: {shape_kind}") from e
 
-    if pos_def_only and op_str != "==":
+    if spd_only and op_str != "==":
         raise ValueError(
             "Positive definite matrices must be square. "
             "Set shape_kind to 'square' or 'M == N'."
@@ -157,7 +157,7 @@ def generate_random_matrices(
 
         A = sparse.random_array((M, N), density=d, format="csc", dtype=dtype, rng=rng)
 
-        if pos_def_only:
+        if spd_only:
             # Ensure the matrix is positive definite
             A = A.T.conj() @ A
             A = 0.5 * (A + A.T.conj())  # make it strictly Hermitian
