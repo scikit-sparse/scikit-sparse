@@ -22,42 +22,43 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
-        env:
-          PIP_DISABLE_PIP_VERSION_CHECK: 1
+      - name: Set up Micromamba ${{ matrix.python-version }}
+        uses: mamba-org/setup-micromamba@v1
         with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install non-python dependencies on mac
-        if: runner.os == 'macOS'
-        run: |
-          brew install suite-sparse
-
-      - name: Install non-python dependencies on linux
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get install libsuitesparse-dev
+          environment-name: dev-env
+          create-args: >-
+            python=${{ matrix.python-version }}
+            pip
+            suitesparse
+            -c conda-forge
+          init-shell: >-
+            bash
+            powershell
 
       - name: Install dependencies and package
         run: |
           pip install --upgrade pip
           pip install -v -e .[dev]
+        shell: bash -el {0}  # ensure login shell so mamba is activated
 
       - name: Display installed packages
         run: |
           python -m pip list
+        shell: bash -el {0}
 
       - name: Run lint
-        run:  ruff check
+        run: ruff check
+        shell: bash -el {0}
 
       - name: Test with pytest
         run: pytest -v -s
+        shell: bash -el {0}
 
       - name: Build Docs
         run: |
           cd doc
           make SPHINXOPTS=-nW html
+        shell: bash -el {0}
 
       - name: Upload docs as artifact
         uses: actions/upload-artifact@v4
