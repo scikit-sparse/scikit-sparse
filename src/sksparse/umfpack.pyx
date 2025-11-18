@@ -1100,15 +1100,6 @@ cdef class UMFFactor:
         """
         A, _, _ = validate_csc_input(A)
 
-        # Promote single to double precision
-        if not (
-            np.issubdtype(A.dtype, np.float64) or np.issubdtype(A.dtype, np.complex128)
-        ):
-            if np.issubdtype(A.dtype, np.floating):
-                A = A.astype(np.promote_types(A.dtype, np.float64))
-            elif np.issubdtype(A.dtype, np.complexfloating):
-                A = A.astype(np.promote_types(A.dtype, np.complex128))
-
         # Cache the matrix data
         self._Ap = A.indptr
         self._Ai = A.indices

@@ -836,15 +836,6 @@ cdef class SPQRFactor:
         """Initialize the SPQRFactor object and perform symbolic analysis."""
         A, _, _ = validate_csc_input(A)
 
-        # Promote single to double precision
-        if not (
-            np.issubdtype(A.dtype, np.float64) or np.issubdtype(A.dtype, np.complex128)
-        ):
-            if np.issubdtype(A.dtype, np.floating):
-                A = A.astype(np.promote_types(A.dtype, np.float64))
-            elif np.issubdtype(A.dtype, np.complexfloating):
-                A = A.astype(np.promote_types(A.dtype, np.complex128))
-
         # Validate inputs
         cdef int ordering
 
@@ -1746,15 +1737,6 @@ def spqr(A, *, mode="full", order=None, tol=None):
         raise ValueError(
             f"Invalid mode '{mode}'. Expected one of {allowed_modes}."
         )
-
-    # Promote single to double precision
-    if not (
-        np.issubdtype(A.dtype, np.float64) or np.issubdtype(A.dtype, np.complex128)
-    ):
-        if np.issubdtype(A.dtype, np.floating):
-            A = A.astype(np.promote_types(A.dtype, np.float64))
-        elif np.issubdtype(A.dtype, np.complexfloating):
-            A = A.astype(np.promote_types(A.dtype, np.complex128))
 
     cdef int ordering
 

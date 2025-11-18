@@ -65,37 +65,50 @@ def test_input_conversion(matrix_type):
     assert out_itype == np.int32
 
 
-DTYPES = [
-    bool,
-    int,
-    float,
-    complex,
-    np.bool_,
-    np.int8,
-    np.int16,
-    np.int32,
-    np.int64,
-    np.float32,
-    np.float64,
-    np.complex64,
-    np.complex128,
-]
+BOOL_TYPES = [bool, np.bool_]
+INT_TYPES = [np.int8, np.int16, np.int32, np.int64, int]
+FLOAT_TYPES = [np.float32, np.float64, float]
+COMPLEX_TYPES = [np.complex64, np.complex128, complex]
 
 
-@pytest.mark.parametrize("dtype", DTYPES)
-def test_data_types(dtype):
+def _test_type_promotion(dtype, expected_dtype, ensure_double=False):
     A = sparse.csc_array(np.arange(12).reshape(3, 4)).astype(dtype)
-    result, use_int32, out_itype = validate_csc_input(A)
+    result, use_int32, out_itype = validate_csc_input(A, ensure_double=ensure_double)
     assert isinstance(result, sparse.csc_array)
-
-    # bools and ints are coerced to at least float32
-    if np.issubdtype(dtype, np.bool_) or np.issubdtype(dtype, np.integer):
-        expected_dtype = np.result_type(dtype, np.float32)
-    else:
-        expected_dtype = dtype
-
     assert result.dtype == expected_dtype
     assert use_int32
     assert out_itype == np.int32
-    assert use_int32
-    assert out_itype == np.int32
+
+
+@pytest.mark.parametrize("dtype", BOOL_TYPES)
+def test_bool_type_promotion(dtype):
+    _test_type_promotion(dtype, np.float32)
+
+
+@pytest.mark.parametrize("dtype", INT_TYPES)
+def test_int_type_promotion(dtype):
+    if dtype in [np.int8, np.int16]:
+        expected_dtype = np.float32
+    else:
+        expected_dtype = np.float64
+    _test_type_promotion(dtype, expected_dtype)
+
+
+@pytest.mark.parametrize("dtype", FLOAT_TYPES)
+def test_float_type_promotion(dtype):
+    _test_type_promotion(dtype, dtype)
+
+
+@pytest.mark.parametrize("dtype", COMPLEX_TYPES)
+def test_complex_type_promotion(dtype):
+    _test_type_promotion(dtype, dtype)
+
+
+@pytest.mark.parametrize("dtype", BOOL_TYPES + INT_TYPES + FLOAT_TYPES)
+def test_ensure_double_bool_int_float(dtype):
+    _test_type_promotion(dtype, np.float64, ensure_double=True)
+
+
+@pytest.mark.parametrize("dtype", COMPLEX_TYPES)
+def test_ensure_double_complex(dtype):
+    _test_type_promotion(dtype, np.complex128, ensure_double=True)

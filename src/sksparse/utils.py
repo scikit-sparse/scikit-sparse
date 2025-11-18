@@ -16,8 +16,10 @@ import numpy as np
 from scipy.sparse import SparseEfficiencyWarning, csc_array, issparse
 
 
-def validate_csc_input(A, require_square=False):
+def validate_csc_input(A, require_square=False, ensure_double=True):
     """Validate and convert input matrix to CSC format.
+
+    Integer and boolean data types are converted to float32 by default.
 
     Parameters
     ----------
@@ -27,6 +29,12 @@ def validate_csc_input(A, require_square=False):
         be converted to canonical format in-place (a copy is not made).
     require_square : bool, optional
         If True, the input matrix must be square (M == N). Default is False.
+    ensure_double : bool, optional
+        If True, the input matrix will be converted to double precision (either
+        float64 or complex128) if it is not already in double precision.
+        Otherwise, it will retain its original floating-point precision
+        (float32 or complex64), or the minimum precision required to convert
+        integer or boolean types.
 
     Returns
     -------
@@ -79,6 +87,13 @@ def validate_csc_input(A, require_square=False):
     if np.issubdtype(A.dtype, np.bool_) or np.issubdtype(A.dtype, np.integer):
         dtype = np.result_type(A.dtype, np.float32)
         A = A.astype(dtype)
+
+    # Ensure double precision if requested
+    if ensure_double:
+        if np.issubdtype(A.dtype, np.floating) and A.dtype != np.float64:
+            A = A.astype(np.float64)
+        elif np.issubdtype(A.dtype, np.complexfloating) and A.dtype != np.complex128:
+            A = A.astype(np.complex128)
 
     # NOTE as of scipy 1.16.2, A.has_sorted_indices and A.has_canonical_format
     #   are not always set correctly!

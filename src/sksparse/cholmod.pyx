@@ -1375,7 +1375,9 @@ cdef class CholeskyFactor:
         object sym_kind=None,
         object supernodal_mode=None,
     ):
-        A, self._use_int32, _ = validate_csc_input(A, require_square=True)
+        A, self._use_int32, _ = validate_csc_input(
+            A, require_square=True, ensure_double=False
+        )
 
         if sym_kind is None:
             sym_kind = "sym"
@@ -1734,7 +1736,7 @@ cdef class CholeskyFactor:
         """
         assert self._factor is not NULL, "The factor has not been initialized."
 
-        A, _, _ = validate_csc_input(A, require_square=True)
+        A, _, _ = validate_csc_input(A, require_square=True, ensure_double=False)
 
         if ldl is None:
             if self.is_numeric:
@@ -1911,7 +1913,7 @@ cdef class CholeskyFactor:
 
         cdef int stype = 0
 
-        b, _, _ = validate_csc_input(b)
+        b, _, _ = validate_csc_input(b, ensure_double=False)
 
         _cholmod_sparse_from_csc(
             b.shape, b.indptr, b.indices, b.data, stype, <uintptr_t>&Bspmatrix
@@ -2003,7 +2005,7 @@ cdef class CholeskyFactor:
             C = C.reshape((-1, 1)).tocsc()  # (N, 1)
 
         cdef int stype = 0  # use all of C
-        C, _, _ = validate_csc_input(C)
+        C, _, _ = validate_csc_input(C, ensure_double=False)
 
         cdef cholmod_sparse Cmatrix
         cdef cholmod_sparse* Cc = &Cmatrix
@@ -2110,7 +2112,7 @@ cdef class CholeskyFactor:
         if C.ndim == 1:
             C = C.reshape((-1, 1)).tocsc()  # (N, 1)
 
-        C, _, _ = validate_csc_input(C)
+        C, _, _ = validate_csc_input(C, ensure_double=False)
         _cholmod_sparse_from_csc(
             C.shape, C.indptr, C.indices, C.data, stype, <uintptr_t>&Cmatrix
         )
@@ -2211,7 +2213,7 @@ cdef class CholeskyFactor:
         self._require_factorized()
 
         cdef bint A_use_int32
-        A, A_use_int32, _ = validate_csc_input(A, require_square=True)
+        A, A_use_int32, _ = validate_csc_input(A, require_square=True, ensure_double=False)
 
         if A.shape[0] != self.N:
             raise ValueError(
