@@ -342,7 +342,7 @@ def amd(A, dense_thresh=None, aggressive=None, return_info=False):
     N = A.shape[0]
 
     if N == 0:
-        return np.empty(0, dtype=out_itype)
+        return np.array([], dtype=out_itype)
 
     if A.nnz == 0:
         return np.arange(N, dtype=out_itype)

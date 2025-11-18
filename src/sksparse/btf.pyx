@@ -114,7 +114,7 @@ def maxtrans(A):
     cdef Py_ssize_t N = A.shape[1]
 
     if M == 0 or N == 0:
-        return np.empty(0, dtype=out_dtype)
+        return np.array([], dtype=out_dtype)
 
     if A.nnz == 0:
         return np.full(M, -1, dtype=out_dtype)
@@ -230,10 +230,10 @@ def strongcomp(A, q=None):
     cdef Py_ssize_t N = A.shape[0]
 
     if N == 0:
-        p = np.empty(0, dtype=out_dtype)
+        p = np.array([], dtype=out_dtype)
         r = np.zeros(1, dtype=out_dtype)  # no blocks
         if q is not None:
-            q = np.empty(0, dtype=out_dtype)
+            q = np.array([], dtype=out_dtype)
             return p, q, r
         else:
             return p, r
@@ -377,8 +377,8 @@ def btf(A):
     cdef Py_ssize_t M = A.shape[1]
 
     if N == 0:
-        p = np.empty(0, dtype=out_dtype)
-        q = np.empty(0, dtype=out_dtype)
+        p = np.array([], dtype=out_dtype)
+        q = np.array([], dtype=out_dtype)
         r = np.zeros(1, dtype=out_dtype)  # no blocks
         return p, q, r
 

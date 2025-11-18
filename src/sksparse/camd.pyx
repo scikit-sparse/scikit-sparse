@@ -348,7 +348,7 @@ def camd(A, constraints=None, dense_thresh=None, aggressive=None, return_info=Fa
     cdef Py_ssize_t N = A.shape[0]
 
     if N == 0:
-        return np.empty(0, dtype=out_itype)
+        return np.array([], dtype=out_itype)
 
     if A.nnz == 0:
         return np.arange(N, dtype=out_itype)

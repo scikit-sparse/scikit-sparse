@@ -244,7 +244,7 @@ def _colamd_base(
     cdef Py_ssize_t N = A.shape[1]
 
     if M == 0 or N == 0:
-        return np.empty(0, dtype=out_dtype)
+        return np.array([], dtype=out_dtype)
 
     if A.nnz == 0 or (not is_symmetric and M == 1):
         return np.arange(N, dtype=out_dtype)
