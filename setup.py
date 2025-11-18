@@ -51,8 +51,13 @@ if user_library_dir:
 conda_prefix = os.getenv("CONDA_PREFIX")
 
 if conda_prefix:
-    conda_include = Path(conda_prefix) / "include" / "suitesparse"
-    conda_lib = Path(conda_prefix) / "lib"
+    if os.name == "nt":  # Windows
+        conda_include = Path(conda_prefix) / "Library" / "include" / "suitesparse"
+        conda_lib = Path(conda_prefix) / "Library" / "lib"
+    else:
+        conda_include = Path(conda_prefix) / "include" / "suitesparse"
+        conda_lib = Path(conda_prefix) / "lib"
+
     if conda_include.is_dir():
         INCLUDE_DIRS.append(str(conda_include))
     if conda_lib.is_dir():
