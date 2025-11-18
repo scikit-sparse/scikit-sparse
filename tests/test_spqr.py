@@ -10,14 +10,11 @@
 
 """Unit tests for the scikit-sparse.spqr module."""
 
-from pathlib import Path
-
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose, assert_array_equal
 from scipy import linalg as la
 from scipy import sparse
-from scipy.io import mmread
 
 from sksparse.spqr import (
     SPQRFactor,
@@ -28,7 +25,7 @@ from sksparse.spqr import (
     spqr_solve,
 )
 
-from .helpers import generate_random_matrices
+from .helpers import generate_random_matrices, load_problem
 
 ITYPES = [np.int32, np.int64]
 DTYPES = [np.float64, np.complex128]
@@ -593,30 +590,9 @@ def test_min2norm(davis_example_qr):
 
 
 # Test solve on "real-world" matrices
-def _load_problem(name):
-    """Load a matrix and RHS from a Matrix Market file."""
-    data_path = Path(__file__).parent / "data"
-    matrix_file = data_path / f"{name}.mtx.gz"
-
-    if not matrix_file.exists():
-        raise FileNotFoundError(f"Matrix Market file {matrix_file} not found.")
-
-    A = mmread(matrix_file, spmatrix=False).tocsc()
-
-    # Possibly load RHS
-    rhs_file = data_path / f"{name}_rhs1.mtx.gz"
-
-    if not rhs_file.exists():
-        raise FileNotFoundError(f"Matrix Market file {rhs_file} not found.")
-
-    b = mmread(rhs_file)
-
-    return A, b
-
-
 @pytest.mark.parametrize("problem", ["well1033", "illc1033", "well1850", "illc1850"])
 def test_solve_real(problem):
-    A, b = _load_problem(problem)
+    A, b = load_problem(problem)
     # Solve the normal equations A^T A x = A^T b
     ATA = (A.T @ A).tocsc()
     ATb = A.T @ b
@@ -767,6 +743,7 @@ def test_spqr_qmult(davis_example_qr, is_sparse, itype, dtype):
         assert_allclose(QTQ.toarray(), I.toarray(), atol=1e-15, strict=True)
     else:
         assert_allclose(QTQ, I, atol=1e-15, strict=True)
+
 
 # =============================================================================
 # =============================================================================

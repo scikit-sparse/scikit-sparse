@@ -11,10 +11,12 @@
 """Helper functions for the scikit-sparse project unit tests."""
 
 import operator
+from pathlib import Path
 
 import numpy as np
 import pytest
 from scipy import sparse
+from scipy.io import mmread
 
 
 def is_valid_permutation(p, N=None):
@@ -160,3 +162,24 @@ def generate_random_matrices(
         yield pytest.param(
             A, id=f"random_{trial:02d}::{A.shape}::{A.nnz}::{dtype.__name__}"
         )
+
+
+def load_problem(name):
+    """Load a matrix and RHS from a Matrix Market file."""
+    data_path = Path(__file__).parent / "data"
+    matrix_file = data_path / f"{name}.mtx.gz"
+
+    if not matrix_file.exists():
+        raise FileNotFoundError(f"Matrix Market file {matrix_file} not found.")
+
+    A = mmread(matrix_file, spmatrix=False).tocsc()
+
+    # Possibly load RHS
+    rhs_file = data_path / f"{name}_rhs1.mtx.gz"
+
+    if not rhs_file.exists():
+        raise FileNotFoundError(f"Matrix Market file {rhs_file} not found.")
+
+    b = mmread(rhs_file)
+
+    return A, b
