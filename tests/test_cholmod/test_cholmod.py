@@ -168,8 +168,10 @@ def test_nearly_singular(davis_example_chol):
 
     expect_x = sparse.coo_array(np.arange(1, N + 1, dtype=A.dtype))
     b = A @ expect_x
+    f = cho_factor(A)
+    assert f.rcond < np.finfo(A.dtype).eps
     with pytest.warns(CholmodWarning, match="nearly singular"):
-        cho_factor(A).solve(b)
+        f.solve(b)
 
 
 class TestRHSCasting:
