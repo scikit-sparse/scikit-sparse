@@ -14,7 +14,8 @@ import warnings
 
 import numpy as np
 import pytest
-from numpy.testing import assert_allclose
+from numpy.testing import assert_allclose, assert_array_equal
+from scipy import linalg as la
 from scipy import sparse
 
 from sksparse.cholmod import CholeskyFactor, ldl_factor
@@ -25,10 +26,10 @@ ITYPES = [np.int32, np.int64]
 DTYPES = [np.float32, np.float64, np.complex64, np.complex128]
 
 
-def assert_LDLT_equals_A(f, A, atol=1e-15):
+def assert_LDLT_equals_A(f, A, rtol=1e-7, atol=1e-15):
     """Assert that L @ @ D L.T.conj() equals A."""
     L, D = f.get_factor(kind="LDL", lower=True)
-    assert_allclose((L @ D @ L.T.conj()).toarray(), A.toarray(), atol=atol)
+    assert_allclose((L @ D @ L.T.conj()).toarray(), A.toarray(), rtol=rtol, atol=atol)
 
 
 @pytest.mark.parametrize("dtype", DTYPES)
@@ -190,3 +191,66 @@ def test_refactor(A, copy):
     else:
         f.factorize(B)
         assert_LDLT_equals_A(f, B, atol=atol)
+
+
+# -----------------------------------------------------------------------------
+#         Non-Square or Unsymmetric Matrices
+# -----------------------------------------------------------------------------
+test_As = [
+    A
+    for itype in ITYPES
+    for dtype in DTYPES
+    for A in generate_random_matrices(
+        N_trials=5,
+        N_max=200,
+        d_scale=0.05,
+        shape_kind="M > N",
+        itype=itype,
+        dtype=dtype,
+    )
+]
+
+
+@pytest.mark.parametrize("A", test_As)
+@pytest.mark.parametrize("sym_kind", ["row", "col"])
+def test_sym(A, sym_kind):
+    rtol = 1e-7 if A.dtype in (np.float64, np.complex128) else 1e-3
+    atol = 1e-14 if A.dtype in (np.float64, np.complex128) else 1e-5
+    A = A.copy()
+
+    if sym_kind == "row":
+        A = A.T.conj().tocsc()  # M > N -> M < N, so A @ A.T is (M, M)
+        assert A.shape[0] < A.shape[1]
+
+    A.setdiag(A.diagonal() + 10.0)  # make non-singular
+
+    if sym_kind == "row":
+        AXX = A @ A.T.conj()
+    else:
+        AXX = (A.T.conj() @ A).tocsc()
+
+    if np.iscomplexobj(AXX):
+        AXX = (AXX + AXX.T.conj()) / 2  # make *exactly* Hermitian
+
+    lamAXX = la.eigvals(AXX.toarray()).min()
+    A_str = "AAT" if sym_kind == "row" else "ATA"
+    print(f"\nmin(eig({A_str})): {lamAXX:.2e}")
+
+    # Test symbolic analysis
+    f = CholeskyFactor(A, sym_kind=sym_kind)
+    g = CholeskyFactor(AXX, sym_kind="sym")
+    assert_array_equal(f.colcount, g.colcount)
+
+    # Test numeric factorization
+    f.factorize(A, ldl=True)
+    g.factorize(AXX, ldl=True)
+
+    # Check self-consistency
+    assert_LDLT_equals_A(f, AXX, rtol=rtol, atol=atol)
+    assert_LDLT_equals_A(g, AXX, rtol=rtol, atol=atol)
+
+    # Check that the factors are equal
+    Lf, Df = f.get_factor()
+    Lg, Dg = g.get_factor()
+    assert_allclose(Lf.toarray(), Lg.toarray(), rtol=rtol, atol=atol)
+    assert_allclose(Df.toarray(), Dg.toarray(), rtol=rtol, atol=atol)
