@@ -1456,7 +1456,8 @@ cdef class CholeskyFactor:
                 self._factor = cholmod_l_analyze(Ac, self._cm)
 
         # Check for errors
-        _handle_errors(self._cm.status, self._factor.minor)
+        cdef int minor = -1 if self._factor is NULL else self._factor.minor
+        _handle_errors(self._cm.status, minor)
 
     def __dealloc__(self):
         """Deallocate memory used by the CholeskyFactor."""
