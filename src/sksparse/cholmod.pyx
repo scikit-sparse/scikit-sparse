@@ -1359,12 +1359,14 @@ cdef class CholeskyFactor:
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/analyze.c
     """
 
-    cdef cholmod_common _Common
-    cdef cholmod_common *_cm
-    cdef cholmod_factor *_factor
-    cdef bint _use_int32
-    cdef bint _is_lower
-    cdef int _stype
+    cdef:
+        cholmod_common _Common
+        cholmod_common *_cm
+        cholmod_factor *_factor
+        bint _use_int32
+        bint _is_lower
+        int _stype
+        readonly object sym_kind
 
     def __init__(
         self,
@@ -1375,9 +1377,7 @@ cdef class CholeskyFactor:
         object sym_kind=None,
         object supernodal_mode=None,
     ):
-        A, self._use_int32, _ = validate_csc_input(
-            A, require_square=True, ensure_double=False
-        )
+        A, self._use_int32, _ = validate_csc_input(A, ensure_double=False)
 
         if sym_kind is None:
             sym_kind = "sym"
@@ -1390,6 +1390,9 @@ cdef class CholeskyFactor:
                 f"Unknown symmetry kind: {sym_kind}. "
                 "Must be one of 'sym', 'row', 'col'."
             )
+
+        if sym_kind == "sym" and A.shape[0] != A.shape[1]:
+            raise ValueError(f"Expected square matrix. Got {A.shape}.")
 
         if supernodal_mode not in _supernodal_modes:
             raise ValueError(
@@ -1415,12 +1418,13 @@ cdef class CholeskyFactor:
 
         # Use lower or upper triangular part of A
         self._is_lower = lower
+        self.sym_kind = sym_kind
         cdef int stype = -1 if self._is_lower else 1
         cdef bint transpose = False
 
-        if sym_kind in ["row", "col"]:
+        if self.sym_kind in ["row", "col"]:
             stype = 0                        # unsymmetric A @ A.T or A.T @ A
-            transpose = (sym_kind == "col")  # A.T @ A
+            transpose = (self.sym_kind == "col")  # A.T @ A
 
         _cholmod_sparse_from_csc(
             A.shape, A.indptr, A.indices, A.data, stype, <uintptr_t>Ac
@@ -1734,7 +1738,7 @@ cdef class CholeskyFactor:
         """
         assert self._factor is not NULL, "The factor has not been initialized."
 
-        A, _, _ = validate_csc_input(A, require_square=True, ensure_double=False)
+        A, _, _ = validate_csc_input(A, ensure_double=False)
 
         if ldl is None:
             if self.is_numeric:
@@ -1776,11 +1780,28 @@ cdef class CholeskyFactor:
         betac[0] = beta
         betac[1] = 0.0
 
+        # If the symbolic analysis was for the unsymmetric case, determine
+        # whether to factorize A @ A.T or A.T @ A
+        cdef bint transpose = False
+        if self._stype == 0:
+            # Unsymmetric case: factorize A @ A.T or A.T @ A
+            transpose = (self.sym_kind == "col")
+
         # Factorize the matrix
-        if self._use_int32:
-            cholmod_factorize_p(Ac, betac, NULL, 0, self._factor, self._cm)
+        if transpose:
+            if self._use_int32:
+                C = cholmod_transpose(Ac, CHOLMOD_TRANS_CONJ, self._cm)
+                cholmod_factorize_p(C, betac, NULL, 0, self._factor, self._cm)
+                cholmod_free_sparse(&C, self._cm)
+            else:
+                C = cholmod_l_transpose(Ac, CHOLMOD_TRANS_CONJ, self._cm)
+                cholmod_l_factorize_p(C, betac, NULL, 0, self._factor, self._cm)
+                cholmod_l_free_sparse(&C, self._cm)
         else:
-            cholmod_l_factorize_p(Ac, betac, NULL, 0, self._factor, self._cm)
+            if self._use_int32:
+                cholmod_factorize_p(Ac, betac, NULL, 0, self._factor, self._cm)
+            else:
+                cholmod_l_factorize_p(Ac, betac, NULL, 0, self._factor, self._cm)
 
         # Check for errors
         _handle_errors(self._cm.status, self._factor.minor)
