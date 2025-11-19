@@ -172,6 +172,27 @@ def test_nearly_singular(davis_example_chol):
         cho_factor(A).solve(b)
 
 
+class TestRHSCasting:
+    @pytest.fixture
+    def example_system(self, davis_example_chol):
+        A = davis_example_chol.astype(np.float32)
+        N = A.shape[0]
+        f = cho_factor(A)
+        expect_x = np.arange(1, N + 1, dtype=A.dtype)
+        b = A @ expect_x
+        return f, expect_x, b
+
+    def test_upcast_rhs(self, example_system):
+        f, expect_x, b = example_system
+        x = f.solve(b.astype(np.float16))
+        assert_allclose(x, expect_x, strict=True, rtol=1e-3)
+
+    def test_downcast_rhs(self, example_system):
+        f, expect_x, b = example_system
+        with pytest.raises(TypeError, match="Cannot safely cast"):
+            f.solve(b.astype(np.float64))
+
+
 # -----------------------------------------------------------------------------
 #         Test many random matrices of various dtypes
 # -----------------------------------------------------------------------------
