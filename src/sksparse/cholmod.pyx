@@ -1367,6 +1367,7 @@ cdef class CholeskyFactor:
         bint _is_lower
         int _stype
         readonly object sym_kind
+        readonly double rcond
 
     def __init__(
         self,
@@ -1419,6 +1420,7 @@ cdef class CholeskyFactor:
         # Use lower or upper triangular part of A
         self._is_lower = lower
         self.sym_kind = sym_kind
+        self.rcond = -1.0
         cdef int stype = -1 if self._is_lower else 1
         cdef bint transpose = False
 
@@ -1806,6 +1808,9 @@ cdef class CholeskyFactor:
         # Check for errors
         _handle_errors(self._cm.status, self._factor.minor)
 
+        # Update rcond
+        self._rcond()
+
         return self  # for method chaining
 
     def solve(self, b):
@@ -1983,26 +1988,27 @@ cdef class CholeskyFactor:
 
         return _ndarray_from_cholmod_dense(Xd, self._use_int32, self._cm)
 
+    cdef int _rcond(self) except -1:
+        """Compute the reciprocal condition number."""
+        if self._use_int32:
+            self.rcond = cholmod_rcond(self._factor, self._cm)
+        else:
+            self.rcond = cholmod_l_rcond(self._factor, self._cm)
+        _handle_errors(self._cm.status)
+        return 0
+
     cdef int _check_rcond(self) except -1:
         """Check the condition number."""
-        cdef double rcond
-        cdef double eps = np.finfo(np.float64).eps
+        cdef double thresh = self._factor.n * np.finfo(self.dtype).eps
 
-        if self._use_int32:
-            rcond = cholmod_rcond(self._factor, self._cm)
-        else:
-            rcond = cholmod_l_rcond(self._factor, self._cm)
-
-        _handle_errors(self._cm.status)
-
-        if rcond == 0:
+        if self.rcond == 0:
             raise CholmodNotPositiveDefiniteError(
                 "Matrix is indefinite or singular to working precision."
             )
-        elif rcond < eps:
+        elif self.rcond < thresh:
             warnings.warn(
                 "Matrix is nearly singular."
-                f"  Results may be inaccurate (rcond={rcond:.2e}).",
+                f"  Results may be inaccurate (rcond={self.rcond:.2e}).",
                 CholmodWarning,
             )
 
