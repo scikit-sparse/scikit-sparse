@@ -1443,11 +1443,11 @@ cdef class CholeskyFactor:
         if transpose:
             if self._use_int32:
                 C = cholmod_transpose(Ac, CHOLMOD_TRANS_PATTERN, self._cm)
-                self._factor = cholmod_analyze(Ac, self._cm)
+                self._factor = cholmod_analyze(C, self._cm)
                 cholmod_free_sparse(&C, self._cm)
             else:
                 C = cholmod_l_transpose(Ac, CHOLMOD_TRANS_PATTERN, self._cm)
-                self._factor = cholmod_l_analyze(Ac, self._cm)
+                self._factor = cholmod_l_analyze(C, self._cm)
                 cholmod_l_free_sparse(&C, self._cm)
         else:
             if self._use_int32:
