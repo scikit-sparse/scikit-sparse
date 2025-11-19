@@ -1815,12 +1815,14 @@ cdef class CholeskyFactor:
         Parameters
         ----------
         b : (N,) or (N, K) ndarray or sparse matrix
-            The right-hand side vector or matrix.
+            The right-hand side vector or matrix. Must be a type that can be safely
+            cast to the data type of the factor. The number of rows in ``b`` must be
+            equal to the size of the factor.
 
         Returns
         -------
         x : (N,) or (N, K) ndarray or sparse matrix
-            The solution vector or matrix, returned in the same format as `b`.
+            The solution vector or matrix, returned in the same format as ``b``.
 
         Raises
         ------
@@ -1888,7 +1890,12 @@ cdef class CholeskyFactor:
                 "Right-hand side b must have the same number of rows as L."
             )
 
-        # Special case: empty matrix
+        if not np.can_cast(b.dtype, self.dtype):
+            raise TypeError(f"Cannot safely cast {b.dtype=} to {self.dtype=}.")
+        else:
+            b = b.astype(self.dtype)
+
+        # Special case: zero-dimension matrix
         if N == 0:
             return type(b)(b.shape, dtype=b.dtype)
 
@@ -2232,6 +2239,7 @@ cdef class CholeskyFactor:
         self._require_factorized()
 
         cdef bint A_use_int32
+        # TODO support non-square matrices with sym_kind='row'
         A, A_use_int32, _ = validate_csc_input(A, require_square=True, ensure_double=False)
 
         if A.shape[0] != self.N:
