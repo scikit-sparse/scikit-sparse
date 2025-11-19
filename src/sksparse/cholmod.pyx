@@ -1461,15 +1461,12 @@ cdef class CholeskyFactor:
 
     def __dealloc__(self):
         """Deallocate memory used by the CholeskyFactor."""
-        if self._cm is not NULL:
-            if self._use_int32:
-                if self._factor is not NULL:
-                    cholmod_free_factor(&self._factor, self._cm)
-                cholmod_finish(self._cm)
-            else:
-                if self._factor is not NULL:
-                    cholmod_l_free_factor(&self._factor, self._cm)
-                cholmod_l_finish(self._cm)
+        if self._use_int32:
+            cholmod_free_factor(&self._factor, self._cm)
+            cholmod_finish(self._cm)
+        else:
+            cholmod_l_free_factor(&self._factor, self._cm)
+            cholmod_l_finish(self._cm)
 
     def _require_factorized(self):
         """Raise an error if the factor is symbolic only."""
