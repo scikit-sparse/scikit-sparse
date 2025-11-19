@@ -1241,15 +1241,17 @@ cdef class CholeskyFactor:
     ----------
     A : (N, N) array_like or sparse array
         An array convertible to a sparse matrix in Compressed Sparse Column
-        (CSC) format. The matrix must be square and symmetric positive
-        definite. Only the upper or lower triangular part of the matrix is
-        used, and no check is made for symmetry.
+        (CSC) format.
     sym_kind : str in {"sym", "row", "col"}, optional
         The type of factorization for which to analyze the matrix:
 
-        * ``sym``: Symmetric factorization. No check is made for symmetry.
+        * ``sym``: Symmetric factorization.  Only the upper or lower triangular part of
+          the matrix is used (depending on ``lower``), and no check is made for
+          symmetry.
         * ``row``: Unsymmetric factorization of :math:`A A^{\\top}`.
         * ``col``: Unsymmetric factorization of :math:`A^{\\top} A`.
+
+        The resulting matrix must be square and symmetric positive definite.
 
     supernodal_mode : str in {"auto", "simplicial", "supernodal"}, optional
         The type of factorization to use:
@@ -1301,6 +1303,13 @@ cdef class CholeskyFactor:
         The integer type used for indices and indptr in the factor.
     dtype : numpy.dtype
         The data type used for numerical values in the factor.
+    sym_kind : str
+        The symmetry kind used for the factorization.
+    rcond : float
+        A rough estimate of the reciprocal of the condition number of the matrix,
+        defined as ``(L.diagonal().min() / L.diagonal().max())**2`` for an ``LL.T``
+        factorization. Estimated during the numeric factorization. If
+        :meth:`.factorize` has not yet been called, this value is ``-1.0``.
     colcount : *(N,)* :obj:`numpy.ndarray` of int
         The number of nonzeros in each column of the factor.
     nnz : int
