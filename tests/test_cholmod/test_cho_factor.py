@@ -18,7 +18,12 @@ from numpy.testing import assert_allclose, assert_array_equal
 from scipy import linalg as la
 from scipy import sparse
 
-from sksparse.cholmod import CholeskyFactor, CholmodInvalidInputError, cho_factor
+from sksparse.cholmod import (
+    CholeskyFactor,
+    CholmodInvalidInputError,
+    CholmodNotPositiveDefiniteError,
+    cho_factor,
+)
 
 from ..helpers import generate_random_matrices
 
@@ -214,6 +219,41 @@ def test_bad_sym(A_small):
     A = A_small[:-1, :]  # make non-square
     with pytest.raises(ValueError, match="Expected square matrix"):
         CholeskyFactor(A, sym_kind="sym")
+
+
+@pytest.mark.parametrize("dtype", DTYPES)
+def test_nonspd_sym(dtype):
+    # NOTE If A is (M, N) with M > N, then A @ A.T is (M, M) but A can have at
+    # most rank(N) < M, so A @ A.T is symmetric, but not positive definite.
+    # Similarly, for the "col" case with A.T, A.T @ A is (N, N) but rank
+    # at most rank(M) < N.
+    A = sparse.random_array((10, 7), density=0.6, format="csc", dtype=dtype, rng=56)
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+
+    AAT = A @ A.T.conj()
+    AAT = (AAT + AAT.T.conj()) / 2  # make *exactly* Hermitian
+    lam = la.eigvals(AAT.toarray()).min()
+    print(f"\nmin(eig(AAT)): {lam:.2e}")
+
+    f = CholeskyFactor(A, sym_kind="row")
+    with pytest.raises(
+        CholmodNotPositiveDefiniteError, match="matrix is not positive definite"
+    ):
+        f.factorize(A)
+
+    # Test the "col" case with A.T
+    A = A.T.conj().tocsc()
+
+    ATA = A.T.conj() @ A
+    ATA = (ATA + ATA.T.conj()) / 2  # make *exactly* Hermitian
+    lam = la.eigvals(ATA.toarray()).min()
+    print(f"\nmin(eig(ATA)): {lam:.2e}")
+
+    f = CholeskyFactor(A, sym_kind="col")
+    with pytest.raises(
+        CholmodNotPositiveDefiniteError, match="matrix is not positive definite"
+    ):
+        f.factorize(A)
 
 
 @pytest.mark.parametrize("A", test_As)

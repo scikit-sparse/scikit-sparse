@@ -18,7 +18,7 @@ from numpy.testing import assert_allclose, assert_array_equal
 from scipy import linalg as la
 from scipy import sparse
 
-from sksparse.cholmod import CholeskyFactor, ldl_factor
+from sksparse.cholmod import CholeskyFactor, CholmodNotPositiveDefiniteError, ldl_factor
 
 from ..helpers import generate_random_matrices
 
@@ -27,7 +27,7 @@ DTYPES = [np.float32, np.float64, np.complex64, np.complex128]
 
 
 def assert_LDLT_equals_A(f, A, rtol=1e-7, atol=1e-15):
-    """Assert that L @ @ D L.T.conj() equals A."""
+    """Assert that L @ D @ L.T.conj() equals A."""
     L, D = f.get_factor(kind="LDL", lower=True)
     assert_allclose((L @ D @ L.T.conj()).toarray(), A.toarray(), rtol=rtol, atol=atol)
 
@@ -209,6 +209,48 @@ test_As = [
         dtype=dtype,
     )
 ]
+
+
+@pytest.mark.parametrize("dtype", DTYPES)
+def test_nonspd_sym(dtype):
+    rtol = 1e-7 if dtype in (np.float64, np.complex128) else 1e-3
+    atol = 1e-14 if dtype in (np.float64, np.complex128) else 1e-5
+
+    # NOTE If A is (M, N) with M > N, then A @ A.T is (M, M) but A can have at
+    # most rank(N) < M, so A @ A.T is symmetric, but not positive definite.
+    # Similarly, for the "col" case with A.T, A.T @ A is (N, N) but rank
+    # at most rank(M) < N.
+    A = sparse.random_array((10, 7), density=0.6, format="csc", dtype=dtype, rng=56)
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+
+    AAT = A @ A.T.conj()
+    AAT = (AAT + AAT.T.conj()) / 2  # make *exactly* Hermitian
+    lam = la.eigvals(AAT.toarray()).min()
+    print(f"\nmin(eig(AAT)): {lam:.2e}")
+
+    f = ldl_factor(A, sym_kind="row")  # does not raise for LDL.T factorization
+    assert_LDLT_equals_A(f, AAT, rtol=rtol, atol=atol)
+
+    with pytest.raises(
+        CholmodNotPositiveDefiniteError, match="matrix is not positive definite"
+    ):
+        f.get_factor(kind="LL")
+
+    # Test the "col" case with A.T
+    A = A.T.conj().tocsc()
+
+    ATA = A.T.conj() @ A
+    ATA = (ATA + ATA.T.conj()) / 2  # make *exactly* Hermitian
+    lam = la.eigvals(ATA.toarray()).min()
+    print(f"\nmin(eig(ATA)): {lam:.2e}")
+
+    f = ldl_factor(A, sym_kind="col")  # does not raise for LDL.T factorization
+    assert_LDLT_equals_A(f, ATA, rtol=rtol, atol=atol)
+
+    with pytest.raises(
+        CholmodNotPositiveDefiniteError, match="matrix is not positive definite"
+    ):
+        f.get_factor(kind="LL")
 
 
 @pytest.mark.parametrize("A", test_As)
