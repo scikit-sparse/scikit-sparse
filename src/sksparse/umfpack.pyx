@@ -1560,11 +1560,6 @@ cdef class UMFFactor:
         if not (isinstance(b, np.ndarray) or issparse(b)):
             raise ValueError("b must be an ndarray or sparse matrix.")
 
-        if b.dtype != self.dtype:
-            raise ValueError(
-                f"LHS and RHS dtypes do not match. {self.dtype=} and {b.dtype=}"
-            )
-
         if b.ndim not in (1, 2):
             raise ValueError("b must be a 1D or 2D array.")
 
@@ -1575,6 +1570,11 @@ cdef class UMFFactor:
             raise ValueError(
                 "Right-hand side b must have the same number of rows as A."
             )
+
+        if not np.can_cast(b.dtype, self.dtype):
+            raise TypeError(f"Cannot safely cast {b.dtype=} to {self.dtype=}.")
+        else:
+            b = b.astype(self.dtype)
 
         cdef bint return_sparse = issparse(b)
 
