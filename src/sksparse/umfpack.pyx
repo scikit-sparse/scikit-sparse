@@ -1503,7 +1503,7 @@ cdef class UMFFactor:
         _handle_errors(status)
 
     # TODO allow x as input?
-    def solve(self, object b, object A=None, *, object trans='N'):
+    def solve(self, object b, *, object trans='N'):
         """Solve a linear system using the LU factorization.
 
         This method solves one of the following linear systems:
@@ -1512,18 +1512,10 @@ cdef class UMFFactor:
         * :math:`A^{\\top} x = b` (if ``trans='T'`` and :math:`A` is real)
         * :math:`A^{H} x = b` (if ``trans='H'`` and :math:`A` is complex)
 
-        The matrix :math:`A` must have the same shape and nonzero pattern as
-        the one used to create this :class:`UMFFactor` object, but need not
-        have the same values. No check is performed to ensure that the
-        input matrix is compatible with the existing factorization.
-
         Parameters
         ----------
         b : (N,) or (N, K) numpy.ndarray or sparse array
             The right-hand side vector or martrix.
-        A : (N, N) numpy.ndarray or sparse array, optional
-            The input matrix. Must have the same shape and nonzero pattern as
-            the matrix used to create this :class:`UMFFactor` object.
         trans : str, optional
             The type of system to solve. Possible values are:
 
@@ -1568,14 +1560,6 @@ cdef class UMFFactor:
         if not (isinstance(b, np.ndarray) or issparse(b)):
             raise ValueError("b must be an ndarray or sparse matrix.")
 
-        if A is not None:
-            A, _, itype = validate_csc_input(A, require_square=True)
-            self._check_input_matrix(A, itype)
-            # Update cached matrix data
-            self._Ap = A.indptr
-            self._Ai = A.indices
-            self._Ax = A.data
-
         if b.dtype != self.dtype:
             raise ValueError(
                 f"LHS and RHS dtypes do not match. {self.dtype=} and {b.dtype=}"
@@ -1601,11 +1585,6 @@ cdef class UMFFactor:
 
         if b.ndim == 1:
             b = b.reshape((N, 1))
-
-        # TODO warn here?
-        # Prepare to solve the system
-        if self._numeric is NULL:
-            self.factorize(A)
 
         # Check the condition number
         self._check_rcond()
