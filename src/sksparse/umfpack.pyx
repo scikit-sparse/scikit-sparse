@@ -1074,6 +1074,7 @@ cdef class UMFFactor:
         readonly UMFInfo info
         bint _use_int32
         bint _is_real
+        bint _has_zero_dim
         size_t _M
         size_t _N
         size_t _N_inner  # min(M, N) inner dimension of LU
@@ -1105,9 +1106,24 @@ cdef class UMFFactor:
         self._Ai = A.indices
         self._Ax = A.data
 
+        # Store matrix shape
+        self._M = A.shape[0]
+        self._N = A.shape[1]
+        self._N_inner = min(self._M, self._N)
+        self._has_zero_dim = self._M == 0 or self._N == 0
+
         # Initialize the control and info arrays
         self.control = UMFControl() if control is None else control
         self.info = UMFInfo()
+
+        # Special case: zero-dimensional matrix
+        if self._has_zero_dim:
+            self.itype = A.indptr.dtype
+            self.dtype = A.dtype
+            self.info.data[UMFPACK_LNZ] = 0
+            self.info.data[UMFPACK_UNZ] = 0
+            self.info.data[UMFPACK_UDIAG_NZ] = 0
+            return
 
         # Compute the symbolic analysis
         self._init_symbolic(A.shape[0], A.shape[1], self._Ap, self._Ai, self._Ax)
@@ -1194,11 +1210,6 @@ cdef class UMFFactor:
 
         _handle_errors(status)
 
-        # Store matrix shape (ensure non-negative before cast)
-        self._M = <size_t>max(self.info.data[UMFPACK_NROW], 0)
-        self._N = <size_t>max(self.info.data[UMFPACK_NCOL], 0)
-        self._N_inner = min(self._M, self._N)
-
         self.itype = np.dtype(np.int32 if self._use_int32 else np.int64)
         self.dtype = np.dtype(np.float64 if self._is_real else np.complex128)
 
@@ -1252,7 +1263,10 @@ cdef class UMFFactor:
     # -------------------------------------------------------------------------
     @property
     def is_numeric(self):
-        return self._symbolic is not NULL and self._numeric is not NULL
+        return (
+            self._has_zero_dim
+            or (self._symbolic is not NULL and self._numeric is not NULL)
+        )
 
     @property
     def lnz(self):
@@ -1318,6 +1332,7 @@ cdef class UMFFactor:
 
         umf._use_int32 = self._use_int32
         umf._is_real = self._is_real
+        umf._has_zero_dim = self._has_zero_dim
         umf._M = self._M
         umf._N = self._N
         umf._N_inner = self._N_inner
@@ -1394,7 +1409,7 @@ cdef class UMFFactor:
         :class:`UMFFactor`
             The current object, for method chaining.
         """
-        assert self._symbolic is not NULL, (
+        assert self._has_zero_dim or self._symbolic is not NULL, (
             "Symbolic factorization not present. "
             "Cannot perform numeric factorization."
         )
@@ -1407,7 +1422,8 @@ cdef class UMFFactor:
             self._Ai = A.indices
             self._Ax = A.data
 
-        # TODO free any existing numeric factorization?
+        if self._has_zero_dim:
+            return self  # nothing to do for zero-dimensional matrix
 
         # Clear cached factor objects
         self._L = None
@@ -1542,6 +1558,11 @@ cdef class UMFFactor:
             In that case, the solution will have infinite or NaN values,
             but other entries may still be valid.
         """
+        if not self.is_numeric:
+            raise UMFPACKError(
+                "Factor is symbolic. Call `UMFFactor.factorize` before solving."
+            )
+
         if self._M != self._N:
             raise ValueError(
                 "Matrix must be square to use the solve method. "
@@ -1564,7 +1585,6 @@ cdef class UMFFactor:
             raise ValueError("b must be a 1D or 2D array.")
 
         cdef size_t N = <size_t>self.info.data[UMFPACK_NROW]
-        cdef bint return_1D = b.ndim == 1
 
         if b.shape[0] != N:
             raise ValueError(
@@ -1576,6 +1596,14 @@ cdef class UMFFactor:
         else:
             b = b.astype(self.dtype)
 
+        # Special case: zero-dimension matrix
+        if self._has_zero_dim:
+            return type(b)(b.shape, dtype=b.dtype)
+
+        # Check the condition number
+        self._check_rcond()
+
+        cdef bint return_1D = b.ndim == 1
         cdef bint return_sparse = issparse(b)
 
         if return_sparse:
@@ -1585,9 +1613,6 @@ cdef class UMFFactor:
 
         if b.ndim == 1:
             b = b.reshape((N, 1))
-
-        # Check the condition number
-        self._check_rcond()
 
         # Ensure columns are contiguous for multiple RHS
         b = np.asfortranarray(b)
@@ -1715,6 +1740,12 @@ cdef class UMFFactor:
         --------
         numpy.linalg.slogdet
         """
+        if self._has_zero_dim:
+            if self._M == self._N:
+                return (self.dtype.type(1), self.dtype.type(0))  # det([]) = 1
+            else:
+                raise ValueError("Matrix must be square.")
+
         if not self.is_numeric:
             raise ValueError(
                 "Numeric factorization not present. "
@@ -1901,6 +1932,15 @@ cdef class UMFFactor:
 
     cdef void _get_numeric(self) except *:
         """Extract the numeric factorization data from UMFPACK."""
+        if self._has_zero_dim:
+            # Zero-dimensional matrix: cache empty factors
+            self._L = csr_array((self._M, self._N_inner), dtype=self.dtype)
+            self._U = csc_array((self._N_inner, self._N), dtype=self.dtype)
+            self._P = np.arange(self._M, dtype=self.itype)
+            self._Q = np.arange(self._N, dtype=self.itype)
+            self._Rs = np.ones(self._M, dtype=np.float64)  # always real
+            return
+
         if self._numeric is NULL:
             raise UMFPACKError(
                 "Numeric factorization not present. "
