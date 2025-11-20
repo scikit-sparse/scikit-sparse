@@ -612,7 +612,7 @@ cdef class UMFInfo:
         Strategy used in the factorization. One of:
         ``{"auto", "unsymmetric", "symmetric"}``.
     ordering_used : str
-        Ordering method used in the factorization. One of: 
+        Ordering method used in the factorization. One of:
         ``{"cholmod", "amd", "given", "none", "metis", "best", "user", "metis_guard"}``
     qfixed : bool
         Whether the column permutation Q was fixed.
@@ -1930,7 +1930,7 @@ cdef class UMFFactor:
                 UMFPACKSingularMatrixWarning
             )
 
-    cdef void _get_numeric(self) except *:
+    cdef int _get_numeric(self) except -1:
         """Extract the numeric factorization data from UMFPACK."""
         if self._has_zero_dim:
             # Zero-dimensional matrix: cache empty factors
@@ -1939,7 +1939,7 @@ cdef class UMFFactor:
             self._P = np.arange(self._M, dtype=self.itype)
             self._Q = np.arange(self._N, dtype=self.itype)
             self._Rs = np.ones(self._M, dtype=np.float64)  # always real
-            return
+            return 0
 
         if self._numeric is NULL:
             raise UMFPACKError(
@@ -1971,6 +1971,7 @@ cdef class UMFFactor:
         self._L = csr_array((Lx, Lj, Lp), shape=(self._M, self._N_inner))
         self._U = csc_array((Ux, Ui, Up), shape=(self._N_inner, self._N))
 
+        return 0
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -2106,6 +2107,7 @@ print_level : int, optional
 UMFFactor.report_symbolic.__doc__ = _REPORT_DOC.format(kind="symbolic")
 UMFFactor.report_numeric.__doc__ = _REPORT_DOC.format(kind="numeric")
 UMFFactor.report_control.__doc__ = UMFControl.report.__doc__
+
 
 # -----------------------------------------------------------------------------
 #         Convenience Functions
