@@ -1909,11 +1909,11 @@ cdef class UMFFactor:
     cdef int _check_rcond(self) except -1:
         """Check the condition number."""
         cdef double rcond = self.info.data[UMFPACK_RCOND]
-        cdef double eps = np.finfo(np.float64).eps
+        cdef double thresh = max(self._M, self._N) * np.finfo(self.dtype).eps
 
         if rcond == 0:
             raise UMFPACKError("Matrix is indefinite or singular to working precision.")
-        elif rcond < eps:
+        elif rcond < thresh:
             warnings.warn(
                 "Matrix is nearly singular."
                 f"  Results may be inaccurate (rcond={rcond:.2e}).",
