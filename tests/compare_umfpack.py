@@ -33,7 +33,7 @@ from sksparse.umfpack import umf_factor, umf_solve
 
 SEED = 565656
 
-SAVE_FIGS = False
+SAVE_FIGS = True
 
 DATA_PATH = Path(__file__).absolute().parent.parent.parent / "_dev_data"
 DATA_PATH.mkdir(parents=True, exist_ok=True)
@@ -93,13 +93,7 @@ def run_package_comparison(df_file, force_update=False):
     Ns = np.unique(np.logspace(1, 3, num=20, dtype=int))
     sqrtNs = [int(np.sqrt(N)) for N in Ns]
 
-    func_types = ["factorize", "solve"]
-    index = pd.MultiIndex.from_product(
-        [PKG_NAMES, func_types, Ns], names=["package", "function", "N"]
-    )
-    columns = ["time", "memory"]
-    df = pd.DataFrame(np.nan, index=index, columns=columns, dtype=float)
-    df = df.sort_index()
+    results = []
 
     # Test performance of multiple solves
     for sqrtN in tqdm(sqrtNs):
@@ -123,8 +117,21 @@ def run_package_comparison(df_file, force_update=False):
 
         for key, func in tqdm(funcs.items(), leave=False):
             time, mem = measure_perf(func)
-            df.loc[(key[0], key[1], N), "time"] = time
-            df.loc[(key[0], key[1], N), "memory"] = mem
+            results.append({
+                "package": key[0],
+                "function": key[1],
+                "N": N,
+                "time": time,
+                "memory": mem,
+            })
+
+    # Build the results DataFrame
+    df = (
+        pd.DataFrame(results)
+        .set_index(["package", "function", "N"])
+        .sort_index()
+    )
+    df = df.loc[~df.index.duplicated(keep="first")]  # remove duplicates
 
     df.to_pickle(df_file)
     return df
@@ -142,13 +149,6 @@ def run_batch_comparison(df_file, force_update=False):
     # Build the results DataFrame
     densities = [0.01, 0.1, 0.5, 1.0]
     batch_sizes = [1, 3, 10, 30, 100, 300, 1_000, 3_000, 10_000]
-    index = pd.MultiIndex.from_product(
-        [PKG_NAMES, batch_sizes, densities],
-        names=["package", "rhs_batch_size", "density"],
-    )
-    columns = ["time", "memory"]
-    df = pd.DataFrame(np.nan, index=index, columns=columns, dtype=float)
-    df = df.sort_index()
 
     Nsq = 100
     Ng = np.sqrt(Nsq).astype(int)
@@ -165,6 +165,8 @@ def run_batch_comparison(df_file, force_update=False):
     umf = splu(sparse.csc_matrix(A))  # scikits does not accept csc_array
     lu = umf_factor(A)
 
+    results = []
+
     # Sparse solve with batches
     for d in tqdm(densities):
         b = sparse.random_array((N, K), density=d, format="csc", random_state=SEED)
@@ -172,15 +174,32 @@ def run_batch_comparison(df_file, force_update=False):
         # Scikits-umfpack solve (no batching)
         umf_func = partial(umf.solve_sparse, b)
         time, mem = measure_perf(umf_func)
-        df.loc[("scikits", 1, d), "time"] = time
-        df.loc[("scikits", 1, d), "memory"] = mem
+        results.append({
+            "package": "scikits",
+            "rhs_batch_size": 1,
+            "density": d,
+            "time": time,
+            "memory": mem,
+        })
 
         # Scikit-sparse umfpack solve (with batching)
         for rhs_batch_size in tqdm(batch_sizes, leave=False):
             solve_func = partial(lu.solve, b, rhs_batch_size=rhs_batch_size)
             time, mem = measure_perf(solve_func)
-            df.loc[("sksparse", rhs_batch_size, d), "time"] = time
-            df.loc[("sksparse", rhs_batch_size, d), "memory"] = mem
+            results.append({
+                "package": "sksparse",
+                "rhs_batch_size": rhs_batch_size,
+                "density": d,
+                "time": time,
+                "memory": mem,
+            })
+
+    # Build the results DataFrame
+    df = (
+        pd.DataFrame(results)
+        .set_index(["package", "rhs_batch_size", "density"])
+        .sort_index()
+    )
 
     df.to_pickle(df_file)
     return df
@@ -236,12 +255,12 @@ if __name__ == "__main__":
         DATA_PATH / "umf_perf_batch_results.pkl", force_update=False
     )
 
+    tf = df.xs("sksparse")
+
     # Plot results
     fig, axs = plt.subplots(num=2, nrows=2, sharex=True, clear=True)
     fig.suptitle("sksparse.umfpack Batch RHS Solve Performance")
     fig.set_size_inches((6.4, 8), forward=True)
-
-    tf = df.xs("sksparse")
 
     for i, col in enumerate(["time", "memory"]):
         sns.lineplot(
@@ -251,7 +270,7 @@ if __name__ == "__main__":
             y=col,
             hue="density",
             hue_norm=mpl.colors.LogNorm(),
-            palette="mako",
+            palette="flare",
             marker="o",
             legend=(i == 0),
         )
@@ -275,7 +294,7 @@ if __name__ == "__main__":
     # -------------------------------------------------------------------------
     #         Plot sksparse vs scikits vs density
     # -------------------------------------------------------------------------
-    # Stack the columns to get the desired long format
+    # Only compare batch_size=1 case
     tf = df.xs(1, level="rhs_batch_size")
 
     fig, axs = plt.subplots(num=3, nrows=2, sharex=True, clear=True)
@@ -289,9 +308,8 @@ if __name__ == "__main__":
             x="density",
             y=col,
             hue="package",
-            style="package",
             ls="-",
-            markers=True,
+            marker="o",
             legend=(i == 0),
         )
         axs[i].grid(True, which="both")
