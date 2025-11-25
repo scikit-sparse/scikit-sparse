@@ -86,7 +86,7 @@ cimport cython
 cimport numpy as cnp
 
 import numpy as np
-from scipy.sparse import issparse, csr_array, csc_array
+from scipy.sparse import issparse, csr_array, csc_array, hstack, SparseEfficiencyWarning
 import warnings
 
 from .utils import validate_csc_input
@@ -1518,8 +1518,7 @@ cdef class UMFFactor:
 
         _handle_errors(status)
 
-    # TODO allow x as input?
-    def solve(self, object b, *, object trans='N'):
+    def solve(self, object b, *, object trans='N', Py_ssize_t rhs_batch_size=100):
         """Solve a linear system using the LU factorization.
 
         This method solves one of the following linear systems:
@@ -1542,6 +1541,12 @@ cdef class UMFFactor:
             .. note::
 
                 If :math:`A` is real, then ``T`` and ``H`` are equivalent.
+
+        rhs_batch_size : int, optional
+            If ``b`` is a 2D sparse array, this parameter controls the number of
+            columns to be solved simultaneously. A larger number will increase
+            memory consumption by converting more columns at a time to dense
+            arrays, but may improve runtime.
 
         Returns
         -------
@@ -1606,35 +1611,75 @@ cdef class UMFFactor:
         cdef bint return_1D = b.ndim == 1
         cdef bint return_sparse = issparse(b)
 
-        if return_sparse:
-            b = b.toarray()
-        else:
-            b = np.asarray(b)
-
+        # UMFPACK expects 2D RHS
         if b.ndim == 1:
             b = b.reshape((N, 1))
 
-        # Ensure columns are contiguous for multiple RHS
-        b = np.asfortranarray(b)
-
-        # Allocate the output array
-        x = np.empty_like(b, order="F")
-
-        self._solve(sys, b, self._Ap, self._Ai, self._Ax, x)
-
         if return_sparse:
-            x = csc_array(x, dtype=b.dtype)
-            x.indptr = x.indptr.astype(self.itype)
-            x.indices = x.indices.astype(self.itype)
+            x = self._solve_sparse(sys, b, rhs_batch_size)
+        else:
+            b = np.asfortranarray(b)  # ensure columns are contiguous for multiple RHS
+            x = np.empty_like(b, order="F")  # allocate the output array
+            self._solve_dense(sys, b, self._Ap, self._Ai, self._Ax, x)
 
         if return_1D:
             x = x[:, 0]
 
         return x
 
+    cdef _solve_sparse(self, int sys, object b, Py_ssize_t rhs_batch_size):
+        """Solve multiple RHS systems where b is a sparse matrix.
+
+        Parameters
+        ----------
+        sys : int
+            The system type (UMFPACK_A, UMFPACK_Aat, UMFPACK_At).
+        b : 2D array of value_t, shape (N, K)
+            The right-hand side matrix.
+        """
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", SparseEfficiencyWarning)
+            b, _, _ = validate_csc_input(b)
+
+        cdef:
+            Py_ssize_t k
+            Py_ssize_t batch_end
+            Py_ssize_t width
+            Py_ssize_t K = b.shape[1]
+            list x_blocks = []
+            cnp.ndarray b_view
+            cnp.ndarray x_view
+
+        # Pre-allocate dense space for RHS and solution
+        cdef cnp.ndarray b_batch = np.empty(
+            (b.shape[0], min(rhs_batch_size, K)), dtype=b.dtype, order="F"
+        )
+
+        cdef cnp.ndarray x_batch = np.empty(
+            (b.shape[0], min(rhs_batch_size, K)), dtype=b.dtype, order="F"
+        )
+
+        for k in range(0, K, rhs_batch_size):
+            batch_end = min(k + rhs_batch_size, K)
+            width = batch_end - k
+            # Views on the correct columns of the buffers
+            b_view = b_batch[:, :width]
+            x_view = x_batch[:, :width]
+            # Convert the sparse RHS to dense in the buffer
+            b[:, k:batch_end].toarray(out=b_view)
+            # Solve the systems
+            self._solve_dense(sys, b_batch, self._Ap, self._Ai, self._Ax, x_view)
+            # Only take the relevant columns
+            x_blocks.append(csc_array(x_view, dtype=b.dtype))
+
+        x = hstack(x_blocks)
+        x.indptr = x.indptr.astype(self.itype)
+        x.indices = x.indices.astype(self.itype)
+        return x
+
     @cython.boundscheck(False)  # for-loop guaranteed in-bounds
     @cython.wraparound(False)
-    def _solve(
+    def _solve_dense(
         self,
         int sys,
         value_t[::1, :] b,
@@ -2192,7 +2237,15 @@ def umf_factor(object A, *, object control=None, **kwargs):
     return UMFFactor(A, control).factorize()
 
 
-def umf_solve(object A, object b, *, object trans='N', object control=None, **kwargs):
+def umf_solve(
+    object A,
+    object b,
+    *,
+    object trans='N',
+    Py_ssize_t rhs_batch_size=10,
+    object control=None,
+    **kwargs,
+):
     """Solve a linear system using UMFPACK.
 
     This is a convenience function that creates a :class:`UMFFactor` object,
@@ -2215,6 +2268,11 @@ def umf_solve(object A, object b, *, object trans='N', object control=None, **kw
 
             If :math:`A` is real, then ``T`` and ``H`` are equivalent.
 
+    rhs_batch_size : int, optional
+        If ``b`` is a 2D sparse array, this parameter controls the number of
+        columns to be solved simultaneously. A larger number will increase
+        memory consumption by converting more columns at a time to dense
+        arrays, but may improve runtime.
     control : :class:`UMFControl`, optional
         The control parameters to use for the factorization. If not provided,
         default parameters are used.
@@ -2278,7 +2336,11 @@ def umf_solve(object A, object b, *, object trans='N', object control=None, **kw
     # factorize() and solve() will each warn for a singular matrix,
     # so we catch the warnings from factorize() and re-raise only once.
     with warnings.catch_warnings(record=True) as ws:
-        x = UMFFactor(A, control).factorize().solve(b, trans=trans)
+        x = (
+            UMFFactor(A, control)
+            .factorize()
+            .solve(b, trans=trans, rhs_batch_size=rhs_batch_size)
+        )
 
     # Raise only the latest singular matrix warning from solve
     if ws:
