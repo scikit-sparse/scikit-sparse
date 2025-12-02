@@ -1668,7 +1668,7 @@ cdef class UMFFactor:
             # Convert the sparse RHS to dense in the buffer
             b[:, k:batch_end].toarray(out=b_view)
             # Solve the systems
-            self._solve_dense(sys, b_batch, self._Ap, self._Ai, self._Ax, x_view)
+            self._solve_dense(sys, b_view, self._Ap, self._Ai, self._Ax, x_view)
             # Only take the relevant columns
             x_blocks.append(csc_array(x_view, dtype=b.dtype))
 
@@ -2242,7 +2242,7 @@ def umf_solve(
     object b,
     *,
     object trans='N',
-    Py_ssize_t rhs_batch_size=10,
+    Py_ssize_t rhs_batch_size=100,
     object control=None,
     **kwargs,
 ):
