@@ -91,7 +91,7 @@ def run_package_comparison(df_file, force_update=False):
     assert df_file.parent.exists(), f"Data path does not exist: {df_file.parent}"
     print(f"Running performance tests for {df_file}...")
     Ns = np.unique(np.logspace(1, 3, num=20, dtype=int))
-    sqrtNs = [int(np.sqrt(N)) for N in Ns]
+    sqrtNs = np.unique([int(np.sqrt(N)) for N in Ns])
 
     results = []
 
@@ -131,7 +131,6 @@ def run_package_comparison(df_file, force_update=False):
         .set_index(["package", "function", "N"])
         .sort_index()
     )
-    df = df.loc[~df.index.duplicated(keep="first")]  # remove duplicates
 
     df.to_pickle(df_file)
     return df
