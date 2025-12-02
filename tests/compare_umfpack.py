@@ -102,7 +102,7 @@ def run_package_comparison(df_file, force_update=False):
         N = A.shape[0]
 
         x_col = np.arange(1, N + 1, dtype=float)
-        expect_x = np.outer(x_col, x_col)  # multiple RHS columns
+        expect_x = np.outer(x_col, np.arange(1, 1000))  # many RHS columns
         B = A @ expect_x
 
         Am = sparse.csc_matrix(A)  # scikits does not accept csc_array
