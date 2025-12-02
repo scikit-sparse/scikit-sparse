@@ -38,7 +38,7 @@ SAVE_FIGS = True
 DATA_PATH = Path(__file__).absolute().parent.parent.parent / "_dev_data"
 DATA_PATH.mkdir(parents=True, exist_ok=True)
 
-PKG_NAMES = ["sksparse", "scikits"]
+PKG_NAMES = ["sksparse", "scikit-umfpack"]
 
 
 def measure_perf(func, N_repeats=5, N_samples=None):
@@ -117,20 +117,18 @@ def run_package_comparison(df_file, force_update=False):
 
         for key, func in tqdm(funcs.items(), leave=False):
             time, mem = measure_perf(func)
-            results.append({
-                "package": key[0],
-                "function": key[1],
-                "N": N,
-                "time": time,
-                "memory": mem,
-            })
+            results.append(
+                {
+                    "package": key[0],
+                    "function": key[1],
+                    "N": N,
+                    "time": time,
+                    "memory": mem,
+                }
+            )
 
     # Build the results DataFrame
-    df = (
-        pd.DataFrame(results)
-        .set_index(["package", "function", "N"])
-        .sort_index()
-    )
+    df = pd.DataFrame(results).set_index(["package", "function", "N"]).sort_index()
 
     df.to_pickle(df_file)
     return df
@@ -173,25 +171,29 @@ def run_batch_comparison(df_file, force_update=False):
         # Scikits-umfpack solve (no batching)
         umf_func = partial(umf.solve_sparse, b)
         time, mem = measure_perf(umf_func)
-        results.append({
-            "package": "scikits",
-            "rhs_batch_size": 1,
-            "density": d,
-            "time": time,
-            "memory": mem,
-        })
+        results.append(
+            {
+                "package": "scikit-umfpack",
+                "rhs_batch_size": 1,
+                "density": d,
+                "time": time,
+                "memory": mem,
+            }
+        )
 
         # Scikit-sparse umfpack solve (with batching)
         for rhs_batch_size in tqdm(batch_sizes, leave=False):
             solve_func = partial(lu.solve, b, rhs_batch_size=rhs_batch_size)
             time, mem = measure_perf(solve_func)
-            results.append({
-                "package": "sksparse",
-                "rhs_batch_size": rhs_batch_size,
-                "density": d,
-                "time": time,
-                "memory": mem,
-            })
+            results.append(
+                {
+                    "package": "sksparse",
+                    "rhs_batch_size": rhs_batch_size,
+                    "density": d,
+                    "time": time,
+                    "memory": mem,
+                }
+            )
 
     # Build the results DataFrame
     df = (
@@ -213,7 +215,7 @@ if __name__ == "__main__":
     )
 
     fig, axs = plt.subplots(num=1, nrows=2, sharex=True, clear=True)
-    fig.suptitle("scikit-sparse vs scikits-umfpack Performance")
+    fig.suptitle("sksparse.umfpack vs scikit-umfpack Performance")
     fig.set_size_inches((6.4, 8), forward=True)
 
     for i, col in enumerate(["time", "memory"]):
@@ -258,7 +260,7 @@ if __name__ == "__main__":
 
     # Plot results
     fig, axs = plt.subplots(num=2, nrows=2, sharex=True, clear=True)
-    fig.suptitle("sksparse.umfpack Batch RHS Solve Performance")
+    fig.suptitle("sksparse.umfpack Batch RHS Sparse Solve Performance")
     fig.set_size_inches((6.4, 8), forward=True)
 
     for i, col in enumerate(["time", "memory"]):
