@@ -325,6 +325,11 @@ if __name__ == "__main__":
         ylabel="peak memory [MB]",
     )
 
+    if SAVE_FIGS:
+        fig_file = DATA_PATH / "umf_compare_sparse_solve.pdf"
+        fig.savefig(fig_file)
+        print(f"Saved figure to: {fig_file}")
+
     plt.show()
 
 
