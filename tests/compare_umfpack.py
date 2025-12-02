@@ -24,12 +24,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from scikits.umfpack import splu, spsolve
+from scikits.umfpack import splu
 from scipy import sparse
 from scipy.sparse.linalg import LaplacianNd
 from tqdm import tqdm
 
-from sksparse.umfpack import umf_factor, umf_solve
+from sksparse.umfpack import umf_factor
 
 SEED = 565656
 
@@ -103,16 +103,22 @@ def run_package_comparison(df_file, force_update=False):
 
         x_col = np.arange(1, N + 1, dtype=float)
         expect_x = np.outer(x_col, np.arange(1, 1000))  # many RHS columns
-        B = A @ expect_x
+        B = np.asfortranarray(A @ expect_x)  # dense RHS
+        Bsp = sparse.csc_array(B)
 
         Am = sparse.csc_matrix(A)  # scikits does not accept csc_array
 
-        # NOTE the solve tested here is a dense solve.
+        # Pre-factor matrices to test solve performance
+        lu = umf_factor(A)
+        umf = splu(Am)
+
         funcs = {
             ("sksparse", "factorize"): partial(umf_factor, A),
-            ("scikits", "factorize"): partial(splu, Am),
-            ("sksparse", "solve"): partial(umf_solve, A, B, rhs_batch_size=1),
-            ("scikits", "solve"): partial(spsolve, Am, B),
+            ("scikit-umfpack", "factorize"): partial(splu, Am),
+            ("sksparse", "solve dense"): partial(lu.solve, B),
+            ("scikit-umfpack", "solve dense"): partial(umf.solve, B),
+            ("sksparse", "solve sparse"): partial(lu.solve, Bsp, rhs_batch_size=1),
+            ("scikit-umfpack", "solve sparse"): partial(umf.solve_sparse, Bsp),
         }
 
         for key, func in tqdm(funcs.items(), leave=False):
@@ -227,7 +233,7 @@ if __name__ == "__main__":
             hue="package",
             style="function",
             markers=True,
-            legend=(i == 0),
+            legend=(i == 1),
         )
         axs[i].grid(True, which="both")
         axs[i].set(yscale="log")
@@ -238,6 +244,7 @@ if __name__ == "__main__":
         xscale="log",
     )
 
+    axs[1].legend(loc="lower right")
     axs[1].set(
         ylabel="peak memory [MB]",
     )
