@@ -74,6 +74,7 @@ Warnings and Exceptions
     UMFPACKFileIOError
     UMFPACKOrderingFailedError
     UMFPACKInvalidBlobError
+    UMFPACKSingularMatrixError
 
 
 References
@@ -195,6 +196,11 @@ class UMFPACKOrderingFailedError(UMFPACKError):
 
 class UMFPACKInvalidBlobError(UMFPACKError):
     """An invalid blob was passed to a UMFPACK routine."""
+    pass
+
+
+class UMFPACKSingularMatrixError(UMFPACKError):
+    """A singular matrix was encountered in a UMFPACK routine."""
     pass
 
 
@@ -1996,7 +2002,9 @@ cdef class UMFFactor:
         cdef double thresh = max(self._M, self._N) * np.finfo(self.dtype).eps
 
         if rcond == 0:
-            raise UMFPACKError("Matrix is indefinite or singular to working precision.")
+            raise UMFPACKSingularMatrixError(
+                "Matrix is indefinite or singular to working precision."
+            )
         elif rcond < thresh:
             warnings.warn(
                 "Matrix is nearly singular."
