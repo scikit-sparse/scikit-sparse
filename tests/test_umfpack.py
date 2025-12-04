@@ -23,6 +23,7 @@ from sksparse.umfpack import (
     UMFFactor,
     UMFPACKDifferentPatternError,
     UMFPACKError,
+    UMFPACKSingularMatrixError,
     UMFPACKSingularMatrixWarning,
     umf_factor,
     umf_solve,
@@ -450,7 +451,7 @@ def test_exactly_singular(davis_example_qr):
     b = A @ expect_x
 
     with pytest.raises(
-        UMFPACKError, match="indefinite or singular to working precision"
+        UMFPACKSingularMatrixError, match="indefinite or singular to working precision"
     ):
         umf_solve(A, b)
 
