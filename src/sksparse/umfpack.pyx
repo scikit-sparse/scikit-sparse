@@ -1134,9 +1134,9 @@ cdef class UMFFactor:
         self,
         int M,
         int N,
-        index_t[::1] indptr,
-        index_t[::1] indices,
-        value_t[::1] data
+        const index_t[::1] indptr not None,
+        const index_t[::1] indices not None,
+        const value_t[::1] data not None,
     ):
         """Compute the symbolic factorization.
 
@@ -1440,9 +1440,9 @@ cdef class UMFFactor:
     @cython.wraparound(False)
     def _factorize(
         self,
-        index_t[::1] indptr,
-        index_t[::1] indices,
-        value_t[::1] data,
+        const index_t[::1] indptr,
+        const index_t[::1] indices,
+        const value_t[::1] data,
     ):
         """Compute the numeric factorization given the CSC arrays.
 
@@ -1691,10 +1691,10 @@ cdef class UMFFactor:
         self,
         int sys,
         cnp.ndarray b,
-        index_t[::1] indptr,
-        index_t[::1] indices,
-        value_t[::1] data,
-        value_t[::1, :] x,
+        const index_t[::1] indptr not None,
+        const index_t[::1] indices not None,
+        const value_t[::1] data not None,
+        value_t[::1, :] x not None,
     ):
         """Solve multiple RHS systems.
 
@@ -1842,7 +1842,7 @@ cdef class UMFFactor:
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def _slogdet(self, value_t[::1] Mx, double[::1] Ex):
+    def _slogdet(self, value_t[::1] Mx not None, double[::1] Ex not None):
         """Compute the determinant of the matrix.
 
         Parameters
@@ -2051,11 +2051,15 @@ cdef class UMFFactor:
     @cython.wraparound(False)
     def _dispatch_get_numeric(
         self,
-        index_t[::1] Lp, index_t[::1] Lj, value_t[::1] Lx,
-        index_t[::1] Up, index_t[::1] Ui, value_t[::1] Ux,
-        index_t[::1] P,
-        index_t[::1] Q,
-        double[::1] Rs,
+        index_t[::1] Lp not None,
+        index_t[::1] Lj not None,
+        value_t[::1] Lx not None,
+        index_t[::1] Up not None,
+        index_t[::1] Ui not None,
+        value_t[::1] Ux not None,
+        index_t[::1] P not None,
+        index_t[::1] Q not None,
+        double[::1] Rs not None,
     ):
         """Call the appropriate UMFPACK get_numeric function.
 
