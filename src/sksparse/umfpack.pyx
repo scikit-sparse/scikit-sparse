@@ -1599,7 +1599,7 @@ cdef class UMFFactor:
         if not np.can_cast(b.dtype, self.dtype):
             raise TypeError(f"Cannot safely cast {b.dtype=} to {self.dtype=}.")
         else:
-            b = b.astype(self.dtype)
+            b = b.astype(self.dtype, copy=False)
 
         # Special case: zero-dimension matrix
         if self._has_zero_dim:
@@ -1673,8 +1673,8 @@ cdef class UMFFactor:
             x_blocks.append(csc_array(x_view, dtype=b.dtype))
 
         x = hstack(x_blocks)
-        x.indptr = x.indptr.astype(self.itype)
-        x.indices = x.indices.astype(self.itype)
+        x.indptr = x.indptr.astype(self.itype, copy=False)
+        x.indices = x.indices.astype(self.itype, copy=False)
         return x
 
     @cython.boundscheck(False)  # for-loop guaranteed in-bounds
