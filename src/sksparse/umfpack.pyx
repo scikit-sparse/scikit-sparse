@@ -568,7 +568,7 @@ cdef dict _INFO_DISPATCH = {
 #         Info and Control Classes
 # -----------------------------------------------------------------------------
 cdef class UMFInfo:
-    """A data class to store UMFPACK info.
+    r"""A data class to store UMFPACK info.
 
     Attributes
     ----------
@@ -622,7 +622,7 @@ cdef class UMFInfo:
         Symmetry of the nonzero pattern of the input matrix, excluding dense
         rows and columns (aka :math:`S`).
     nz_a_plus_at : int
-        Number of nonzeros in :math:`S + S^{\\top}`, excluding the diagonal.
+        Number of nonzeros in :math:`S + S^{\top}`, excluding the diagonal.
     nzdiag : int
         Number of nonzeros on the diagonal of :math:`S`.
     symmetric_lunz : int
@@ -631,7 +631,7 @@ cdef class UMFInfo:
         Number of floating-point operations for the factorization, if AMD
         ordering was used.
     symmetric_ndense : int
-        Number of dense rows and columns in :math:`S + S^{\\top}`.
+        Number of dense rows and columns in :math:`S + S^{\top}`.
     symmetric_dmax : int
         Maximum number of entries in any column of :math:`L`, for AMD.
     col_singletons : int
@@ -786,7 +786,7 @@ cdef class UMFInfo:
 
 
 cdef class UMFControl:
-    """The class used to manage UMFPACK control parameters.
+    r"""The class used to manage UMFPACK control parameters.
 
     Attributes
     ----------
@@ -805,7 +805,7 @@ cdef class UMFControl:
 
         * ``auto``: choose the strategy automatically
         * ``unsymmetric``: order the columns of :math:`A` with COLAMD
-        * ``symmetric``: Order the matrix :math:`A + A^{\\top}` with AMD
+        * ``symmetric``: Order the matrix :math:`A + A^{\top}` with AMD
 
     ordering_method : str
         The ordering method to use. Default value is ``amd``. Possible values
@@ -815,7 +815,7 @@ cdef class UMFControl:
         * ``amd``: just use AMD or COLAMD
         * ``given``: use the user-provided ordering
         * ``none``: no ordering
-        * ``metis``: use METIS on :math:`A + A^{\\top}` or :math:`A^{\\top} A`
+        * ``metis``: use METIS on :math:`A + A^{\top}` or :math:`A^{\top} A`
         * ``best``: try AMD/COLAMD, METIS and NESDIS
         * ``user``: use the user-provided function to compute the ordering
         * ``metis_guard``: use METIS for symmetric strategy, try METIS for
@@ -1519,12 +1519,12 @@ cdef class UMFFactor:
         _handle_errors(status)
 
     def solve(self, object b, *, object trans='N', Py_ssize_t rhs_batch_size=100):
-        """Solve a linear system using the LU factorization.
+        r"""Solve a linear system using the LU factorization.
 
         This method solves one of the following linear systems:
 
         * :math:`A x = b` (if ``trans='N'``)
-        * :math:`A^{\\top} x = b` (if ``trans='T'`` and :math:`A` is real)
+        * :math:`A^{\top} x = b` (if ``trans='T'`` and :math:`A` is real)
         * :math:`A^{H} x = b` (if ``trans='H'`` and :math:`A` is complex)
 
         Parameters
@@ -1535,7 +1535,7 @@ cdef class UMFFactor:
             The type of system to solve. Possible values are:
 
             * ``N``: solve :math:`A x = b` (default)
-            * ``T``: solve :math:`A^{\\top} x = b`
+            * ``T``: solve :math:`A^{\top} x = b`
             * ``H``: solve :math:`A^{H} x = b`
 
             .. note::
@@ -1562,6 +1562,15 @@ cdef class UMFFactor:
             If the matrix is detected to be singular to working precision.
             In that case, the solution will have infinite or NaN values,
             but other entries may still be valid.
+
+        Notes
+        -----
+        The underlying UMFPACK solver can only handle 1D dense array inputs. If the RHS
+        ``b`` is a 2D array, this method will solve each column independently. If ``b``
+        is dense, there is a slight performance gain (~5% in time) by passing it as
+        a Fortran-contiguous array (*e.g.* by using :func:`numpy.asfortranarray`),
+        since the columns are then stored contiguously in memory. Otherwise, each
+        column will be copied to a temporary Fortran-contiguous buffer before solving.
         """
         if not self.is_numeric:
             raise UMFPACKError(
@@ -2266,7 +2275,7 @@ def umf_solve(
     object control=None,
     **kwargs,
 ):
-    """Solve a linear system using UMFPACK.
+    r"""Solve a linear system using UMFPACK.
 
     This is a convenience function that creates a :class:`UMFFactor` object,
     computes the numeric factorization, and solves the linear system.
@@ -2281,7 +2290,7 @@ def umf_solve(
         The type of system to solve. Possible values are:
 
         * ``N``: solve :math:`A x = b` (default)
-        * ``T``: solve :math:`A^{\\top} x = b`
+        * ``T``: solve :math:`A^{\top} x = b`
         * ``H``: solve :math:`A^{H} x = b`
 
         .. note::
@@ -2319,6 +2328,15 @@ def umf_solve(
 
 
     .. versionadded:: 0.5.0
+
+    Notes
+    -----
+    The underlying UMFPACK solver can only handle 1D dense array inputs. If the RHS
+    ``b`` is a 2D array, this method will solve each column independently. If ``b`` is
+    dense, there is a slight performance gain (~5% in time) by passing it as
+    a Fortran-contiguous array (*e.g.* by using :func:`numpy.asfortranarray`), since
+    the columns are then stored contiguously in memory. Otherwise, each column will be
+    copied to a temporary Fortran-contiguous buffer before solving.
 
     Examples
     --------
