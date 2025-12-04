@@ -33,7 +33,7 @@ from sksparse.umfpack import umf_factor
 
 SEED = 565656
 
-SAVE_FIGS = True
+SAVE_FIGS = False
 
 DATA_PATH = Path(__file__).absolute().parent.parent.parent / "_dev_data"
 DATA_PATH.mkdir(parents=True, exist_ok=True)
@@ -103,7 +103,8 @@ def run_package_comparison(df_file, force_update=False):
 
         x_col = np.arange(1, N + 1, dtype=float)
         expect_x = np.outer(x_col, np.arange(1, 1000))  # many RHS columns
-        B = np.asfortranarray(A @ expect_x)  # dense RHS
+        B = A @ expect_x  # C order
+        Bf = np.asfortranarray(B)  # Fortran order
         Bsp = sparse.csc_array(B)
 
         Am = sparse.csc_matrix(A)  # scikits does not accept csc_array
@@ -115,8 +116,10 @@ def run_package_comparison(df_file, force_update=False):
         funcs = {
             ("sksparse", "factorize"): partial(umf_factor, A),
             ("scikit-umfpack", "factorize"): partial(splu, Am),
-            ("sksparse", "solve dense"): partial(lu.solve, B),
-            ("scikit-umfpack", "solve dense"): partial(umf.solve, B),
+            ("sksparse", "solve dense C"): partial(lu.solve, B),
+            ("scikit-umfpack", "solve dense C"): partial(umf.solve, B),
+            ("sksparse", "solve dense F"): partial(lu.solve, Bf),
+            ("scikit-umfpack", "solve dense F"): partial(umf.solve, Bf),
             ("sksparse", "solve sparse"): partial(lu.solve, Bsp, rhs_batch_size=1),
             ("scikit-umfpack", "solve sparse"): partial(umf.solve_sparse, Bsp),
         }
@@ -135,6 +138,7 @@ def run_package_comparison(df_file, force_update=False):
 
     # Build the results DataFrame
     df = pd.DataFrame(results).set_index(["package", "function", "N"]).sort_index()
+    df.columns.name = "metric"
 
     df.to_pickle(df_file)
     return df
@@ -207,21 +211,25 @@ def run_batch_comparison(df_file, force_update=False):
         .set_index(["package", "rhs_batch_size", "density"])
         .sort_index()
     )
+    df.columns.name = "metric"
 
     df.to_pickle(df_file)
     return df
 
 
+# -----------------------------------------------------------------------------
+#         Run the Tests
+# -----------------------------------------------------------------------------
 if __name__ == "__main__":
-    # -------------------------------------------------------------------------
-    #         Package Tests
-    # -------------------------------------------------------------------------
+    # ---------- Package Tests
     df_pkg = run_package_comparison(
         DATA_PATH / "umf_perf_pkg_results.pkl", force_update=False
     )
 
     fig, axs = plt.subplots(num=1, nrows=2, sharex=True, clear=True)
-    fig.suptitle("sksparse.umfpack vs scikit-umfpack Performance")
+    fig.suptitle(
+        "sksparse.umfpack vs scikit-umfpack\nA (N, N) 2D Laplacian, B (N, 1000)"
+    )
     fig.set_size_inches((6.4, 8), forward=True)
 
     for i, col in enumerate(["time", "memory"]):
@@ -239,13 +247,13 @@ if __name__ == "__main__":
         axs[i].set(yscale="log")
 
     axs[0].set(
-        xlabel="Number of Rows/Columns (N)",
         ylabel="time [s]",
-        xscale="log",
     )
 
     axs[1].legend(loc="lower right")
     axs[1].set(
+        xscale="log",
+        xlabel="Number of Rows/Columns (N)",
         ylabel="peak memory [MB]",
     )
 
@@ -256,21 +264,100 @@ if __name__ == "__main__":
         fig.savefig(fig_file)
         print(f"Saved figure to: {fig_file}")
 
-    # -------------------------------------------------------------------------
-    #         Batch Solve Tests
-    # -------------------------------------------------------------------------
-    df = run_batch_comparison(
-        DATA_PATH / "umf_perf_batch_results.pkl", force_update=False
+    # ---------- Plot ratios of sksparse / scikit-umfpack
+    # NOTE we get linter warnings for "modern" pandas usage on this code:
+    # df_ratio = (
+    #     df_pkg.stack("metric")
+    #     .unstack("package")
+    #     .assign(ratio=lambda x: x["sksparse"] / x["scikit-umfpack"])
+    #     .unstack("metric")["ratio"]
+    # )
+
+    df_ratio = (
+        df_pkg.reset_index()
+        .melt(
+            id_vars=["package", "function", "N"],
+            value_vars=["time", "memory"],
+            var_name="metric",
+            value_name="value",
+        )
+        .pivot_table(
+            index=["function", "N", "metric"],
+            columns="package",
+            values="value",
+        )
+        .assign(ratio=lambda x: x["sksparse"] / x["scikit-umfpack"])["ratio"]
+        .reset_index()
+        .pivot_table(index=["function", "N"], columns="metric", values="ratio")
     )
 
-    tf = df.xs("sksparse")
-
-    # Plot results
-    fig, axs = plt.subplots(num=2, nrows=2, sharex=True, clear=True)
-    fig.suptitle("sksparse.umfpack Batch RHS Sparse Solve Performance")
+    fig, axs = plt.subplots(num=3, nrows=2, sharex=True, sharey=True, clear=True)
+    fig.suptitle(
+        "sksparse.umfpack / scikit-umfpack\nA (N, N) 2D Laplacian, B (N, 1000)"
+    )
     fig.set_size_inches((6.4, 8), forward=True)
 
     for i, col in enumerate(["time", "memory"]):
+        sns.lineplot(
+            ax=axs[i],
+            data=df_ratio,
+            x="N",
+            y=col,
+            style="function",
+            markers=True,
+            legend=(i == 0),
+        )
+        axs[i].grid(True, which="both")
+
+    axs[0].legend(loc="lower right")
+    axs[0].set(
+        ylabel="ratio of runtime",
+        ylim=(-0.05, None),
+    )
+
+    axs[1].set(
+        xscale="log",
+        xlabel="Number of Rows/Columns (N)",
+        ylabel="ratio of peak memory",
+    )
+
+    plt.show()
+
+    if SAVE_FIGS:
+        fig_file = DATA_PATH / "umf_perf_pkg_ratio.pdf"
+        fig.savefig(fig_file)
+        print(f"Saved figure to: {fig_file}")
+
+    # ---------- Batch Solve Tests
+    df_batch = run_batch_comparison(
+        DATA_PATH / "umf_perf_batch_results.pkl", force_update=False
+    )
+
+    tf = df_batch.xs("sksparse")
+
+    # Plot results
+    fig, axs = plt.subplots(num=2, nrows=2, sharex=True, clear=True)
+    fig.suptitle(
+        "Batch RHS Sparse Solve Performance\nA (100, 100) 2D Laplacian, B (100, 9,056)"
+    )
+    fig.set_size_inches((6.4, 8), forward=True)
+
+    for i, col in enumerate(["time", "memory"]):
+        # Plot marker to compare scikit-umfpack (no batching)
+        sns.scatterplot(
+            ax=axs[i],
+            data=df_batch.xs("scikit-umfpack"),
+            x="rhs_batch_size",
+            y=col,
+            hue="density",
+            hue_norm=mpl.colors.LogNorm(),
+            palette="mako_r",
+            marker="X",
+            s=100,
+            legend=(i == 0),
+        )
+
+        # Plot sksparse results
         sns.lineplot(
             ax=axs[i],
             data=tf,
@@ -286,55 +373,18 @@ if __name__ == "__main__":
 
     axs[0].legend(title="density")
     axs[0].set(
-        xlabel="RHS Batch Size",
         ylabel="time [s]",
-        xscale="log",
         yscale="log",
     )
 
-    axs[1].set(ylabel="peak memory [MB]")
-
-    if SAVE_FIGS:
-        fig_file = DATA_PATH / "umf_perf_batch.pdf"
-        fig.savefig(fig_file)
-        print(f"Saved figure to: {fig_file}")
-
-    # -------------------------------------------------------------------------
-    #         Plot sksparse vs scikits vs density
-    # -------------------------------------------------------------------------
-    # Only compare batch_size=1 case
-    tf = df.xs(1, level="rhs_batch_size")
-
-    fig, axs = plt.subplots(num=3, nrows=2, sharex=True, clear=True)
-    fig.suptitle("Sparse RHS Solve Comparison")
-    fig.set_size_inches((6.4, 8), forward=True)
-
-    for i, col in enumerate(["time", "memory"]):
-        sns.lineplot(
-            ax=axs[i],
-            data=tf,
-            x="density",
-            y=col,
-            hue="package",
-            ls="-",
-            marker="o",
-            legend=(i == 0),
-        )
-        axs[i].grid(True, which="both")
-
-    axs[0].set(
-        xlabel="RHS Density",
-        ylabel="time [s]",
-        xscale="log",
-    )
-
     axs[1].set(
-        xlabel="RHS Density",
+        xscale="log",
+        xlabel="RHS Batch Size",
         ylabel="peak memory [MB]",
     )
 
     if SAVE_FIGS:
-        fig_file = DATA_PATH / "umf_compare_sparse_solve.pdf"
+        fig_file = DATA_PATH / "umf_perf_batch.pdf"
         fig.savefig(fig_file)
         print(f"Saved figure to: {fig_file}")
 
