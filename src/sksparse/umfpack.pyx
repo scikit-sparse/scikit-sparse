@@ -1618,8 +1618,7 @@ cdef class UMFFactor:
         if return_sparse:
             x = self._solve_sparse(sys, b, rhs_batch_size)
         else:
-            b = np.asfortranarray(b)  # ensure columns are contiguous for multiple RHS
-            x = np.empty_like(b, order="F")  # allocate the output array
+            x = np.empty_like(b, order="F")
             self._solve_dense(sys, b, self._Ap, self._Ai, self._Ax, x)
 
         if return_1D:
@@ -1682,11 +1681,11 @@ cdef class UMFFactor:
     def _solve_dense(
         self,
         int sys,
-        value_t[::1, :] b,
+        cnp.ndarray b,
         index_t[::1] indptr,
         index_t[::1] indices,
         value_t[::1] data,
-        value_t[::1, :] x
+        value_t[::1, :] x,
     ):
         """Solve multiple RHS systems.
 
@@ -1709,14 +1708,35 @@ cdef class UMFFactor:
             Py_ssize_t k
             Py_ssize_t K = b.shape[1]
             double* data_ptr = <double*>&data[0]
-            double* x_ptr
             double* b_ptr
+            double* x_ptr
+            bint f_contiguous = b.flags['F_CONTIGUOUS']
+            value_t[::1, :] b_F = None
+            value_t[:, :] b_arr = None
+            value_t[::1] b_col = None
+
+        if f_contiguous:
+            # Directly access the contiguous column data
+            b_F = b
+        else:
+            # Allocate temporary buffer for a single column of b
+            b_arr = b
+            b_col = np.empty(
+                b.shape[0], dtype=np.float64 if value_t is double else np.complex128
+            )
 
         for k in range(K):
             # NOTE numpy complex arrays store real and imag parts interleaved,
             # so we can just pass the pointer to the data as double*
+            if f_contiguous:
+                # Directly access the contiguous column data
+                b_ptr = <double*>&b_F[0, k]
+            else:
+                # Input is not contiguous, so copy the column into contiguous buffer
+                b_col[:] = b_arr[:, k]
+                b_ptr = <double*>&b_col[0]
+
             x_ptr = <double*>&x[0, k]
-            b_ptr = <double*>&b[0, k]
 
             # Solve the system
             if self._is_real:
