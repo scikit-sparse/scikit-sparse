@@ -1238,11 +1238,6 @@ cdef class SPQRFactor:
         if not (isinstance(b, np.ndarray) or issparse(b)):
             raise ValueError("b must be an ndarray or sparse matrix.")
 
-        if b.dtype != self.dtype:
-            raise ValueError(
-                f"LHS and RHS dtypes do not match. {self.dtype=} and {b.dtype=}"
-            )
-
         if b.ndim not in (1, 2):
             raise ValueError("b must be a 1D or 2D array.")
 
@@ -1254,6 +1249,11 @@ cdef class SPQRFactor:
                 "Right-hand side b must have compatible shape with A. "
                 f"Got {b.shape=}, but A.shape={self.shape} ({transpose=})."
             )
+
+        if np.can_cast(b.dtype, self.dtype):
+            b = b.astype(self.dtype, copy=False)
+        else:
+            raise TypeError(f"Cannot safely cast {b.dtype=} to {self.dtype=}.")
 
         # Check the rank of A and warn if rank deficient
         if self.rank < min(self._M, self._N):
@@ -1285,8 +1285,8 @@ cdef class SPQRFactor:
 
         if return_sparse:
             x = csc_array(x, dtype=b.dtype)
-            x.indptr = x.indptr.astype(self.itype)
-            x.indices = x.indices.astype(self.itype)
+            x.indptr = x.indptr.astype(self.itype, copy=False)
+            x.indices = x.indices.astype(self.itype, copy=False)
 
         if return_1D:
             x = x[:, 0]
