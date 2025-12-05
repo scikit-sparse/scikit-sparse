@@ -1170,6 +1170,7 @@ cdef class SPQRFactor:
         cdef cholmod_sparse Xsparse
         cdef cholmod_sparse *Xs = &Xsparse
         cdef int stype = 0  # assume unsymmetric
+        X, _, _ = validate_csc_input(X)
         _cholmod_sparse_from_csc(
             X.shape, X.indptr, X.indices, X.data, stype, <uintptr_t>Xs
         )
@@ -1853,6 +1854,7 @@ cdef object _qmult_sparse(
     cdef cholmod_sparse Xsparse
     cdef cholmod_sparse *Xs = &Xsparse
     cdef int stype = 0  # assume unsymmetric
+    X, _, _ = validate_csc_input(X)
     _cholmod_sparse_from_csc(
         X.shape, X.indptr, X.indices, X.data, stype, <uintptr_t>Xs
     )
