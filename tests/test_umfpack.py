@@ -23,7 +23,7 @@ from sksparse.umfpack import (
     UMFFactor,
     UMFPACKDifferentPatternError,
     UMFPACKError,
-    UMFPACKNonpositiveError,
+    UMFPACKSingularMatrixError,
     UMFPACKSingularMatrixWarning,
     umf_factor,
     umf_solve,
@@ -46,10 +46,27 @@ def assert_LU_equals_A(f, A, atol=1e-15):
 # -----------------------------------------------------------------------------
 #         Simple Tests
 # -----------------------------------------------------------------------------
-def test_empty_input():
-    empty_A = sparse.csc_array((0, 0))
-    with pytest.raises(UMFPACKNonpositiveError, match="non-positive"):
-        _f = UMFFactor(empty_A)
+@pytest.mark.parametrize("shape", [(0, 0), (0, 5), (5, 0)], ids=lambda s: f"shape={s}")
+def test_zero_dim_input(shape):
+    empty_A = sparse.csc_array(shape)
+    f = UMFFactor(empty_A)
+    f.factorize()
+    assert f.nnz == 0
+    assert f.shape == shape
+    assert f.itype == empty_A.indptr.dtype
+    assert f.dtype == empty_A.dtype
+    assert f.lnz == 0
+    assert f.unz == 0
+    assert f.nz_udiag == 0
+    expect_L = sparse.csr_array((shape[0], 0), dtype=empty_A.dtype).toarray()
+    expect_U = sparse.csr_array((0, shape[1]), dtype=empty_A.dtype).toarray()
+    expect_P = np.arange(shape[0], dtype=f.itype)
+    expect_Q = np.arange(shape[1], dtype=f.itype)
+    assert_allclose(f.L.toarray(), expect_L, strict=True)
+    assert_allclose(f.U.toarray(), expect_U, strict=True)
+    assert_array_equal(f.perm_r, expect_P)
+    assert_array_equal(f.perm_c, expect_Q)
+    assert_LU_equals_A(f, empty_A)
 
 
 def test_zero_input():
@@ -150,6 +167,27 @@ def test_bad_refactorize_structure(davis_example_qr):
     B.indices = B.indices.astype(A.indices.dtype)
     with pytest.raises(UMFPACKDifferentPatternError, match="different nonzero pattern"):
         f.factorize(B)
+
+
+def test_bad_refactor_zero_dim():
+    empty_A = sparse.csc_array((0, 0))
+    f = umf_factor(empty_A)
+    assert f.shape == (0, 0)
+    B = sparse.random_array((3, 5), density=0.5, format="csc")
+    with pytest.raises(ValueError, match="shape.*does not match"):
+        f.factorize(B)
+
+
+def test_refactor_zero_dim():
+    empty_A = sparse.csc_array((0, 0))
+    f = umf_factor(empty_A)
+    assert f.shape == (0, 0)
+    assert_LU_equals_A(f, empty_A)
+    # Refactorize "new" matrix
+    empty_B = empty_A.copy()
+    f.factorize(empty_B)
+    assert f.shape == (0, 0)
+    assert_LU_equals_A(f, empty_B)
 
 
 @pytest.mark.parametrize("itype", ITYPES)
@@ -315,6 +353,29 @@ class TestBadBShape:
             f.solve(b)
 
 
+@pytest.mark.parametrize("K", [0, 1, 3], ids=lambda k: f"K={k}")
+def test_zero_dim_A_solve_dense(K):
+    A = sparse.csc_array((0, 0)).astype(float)
+    b = np.array([], dtype=float).reshape((0,) if K == 0 else (0, K))
+    f = umf_factor(A)
+    x = f.solve(b)
+    assert_allclose(x, b, strict=True)
+
+
+@pytest.mark.parametrize("K", [0, 1, 3], ids=lambda k: f"K={k}")
+def test_zero_dim_A_solve_sparse(K):
+    A = sparse.csc_array((0, 0)).astype(float)
+    b = np.array([], dtype=float).reshape((0,) if K == 0 else (0, K))
+    if b.ndim == 1:
+        b = sparse.coo_array(b)
+    else:
+        b = sparse.csc_array(b)
+    f = umf_factor(A)
+    x = f.solve(b)
+    assert isinstance(x, type(b))
+    assert_allclose(x.toarray(), b.toarray(), strict=True)
+
+
 def test_bad_A_shape_solve():
     A = sparse.csc_array([[1, 2, 3], [3, 4, 4]]).astype(float)
     assert A.shape == (2, 3)
@@ -390,7 +451,7 @@ def test_exactly_singular(davis_example_qr):
     b = A @ expect_x
 
     with pytest.raises(
-        UMFPACKError, match="indefinite or singular to working precision"
+        UMFPACKSingularMatrixError, match="indefinite or singular to working precision"
     ):
         umf_solve(A, b)
 
@@ -416,6 +477,27 @@ def test_nearly_singular(davis_example_qr):
     f = umf_factor(A, row_scale="none")  # turn off scaling to trigger warning
     with pytest.warns(UMFPACKSingularMatrixWarning, match="nearly singular"):
         f.solve(b)
+
+
+class TestRHSCasting:
+    @pytest.fixture
+    def example_system(self, davis_example_qr):
+        A = davis_example_qr
+        N = A.shape[0]
+        f = umf_factor(A)
+        expect_x = np.arange(1, N + 1, dtype=A.dtype)
+        b = A @ expect_x
+        return f, expect_x, b
+
+    def test_upcast_rhs(self, example_system):
+        f, expect_x, b = example_system
+        x = f.solve(b.astype(np.float16))
+        assert_allclose(x, expect_x, strict=True, rtol=1e-3)
+
+    def test_downcast_rhs(self, example_system):
+        f, expect_x, b = example_system
+        with pytest.raises(TypeError, match="Cannot safely cast"):
+            f.solve(b.astype(np.complex64))
 
 
 square_As = [
@@ -458,6 +540,25 @@ def test_solve(A, K, is_sparse):
         assert_allclose(x.toarray(), expect_x.toarray(), atol=atol)
     else:
         assert_allclose(x, expect_x, atol=atol)
+
+
+@pytest.mark.parametrize(
+    "rhs_batch_size", [1, 10, 50, 100], ids=lambda b: f"rhs_batch_size={b}"
+)
+def test_solve_many_sparse_RHS(davis_example_qr, rhs_batch_size):
+    A = davis_example_qr
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+    N = A.shape[0]
+    K = 56  # large, arbitrary number of RHS
+    s = np.arange(1, N + 1, dtype=A.dtype)
+    data = np.array([i * s for i in range(1, K + 1)]).T
+    expect_x = sparse.csc_array(data, dtype=A.dtype)
+    b = A @ expect_x
+    f = umf_factor(A)
+    x = f.solve(b, rhs_batch_size=rhs_batch_size)
+    assert_allclose(x.toarray(), expect_x.toarray(), atol=1e-12)
+    x = umf_solve(A, b, rhs_batch_size=rhs_batch_size)
+    assert_allclose(x.toarray(), expect_x.toarray(), atol=1e-12)
 
 
 @pytest.mark.parametrize("problem", ["well1033", "illc1033", "well1850", "illc1850"])

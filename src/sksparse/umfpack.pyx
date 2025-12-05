@@ -74,6 +74,7 @@ Warnings and Exceptions
     UMFPACKFileIOError
     UMFPACKOrderingFailedError
     UMFPACKInvalidBlobError
+    UMFPACKSingularMatrixError
 
 
 References
@@ -86,7 +87,7 @@ cimport cython
 cimport numpy as cnp
 
 import numpy as np
-from scipy.sparse import issparse, csr_array, csc_array
+from scipy.sparse import issparse, csr_array, csc_array, hstack, SparseEfficiencyWarning
 import warnings
 
 from .utils import validate_csc_input
@@ -195,6 +196,11 @@ class UMFPACKOrderingFailedError(UMFPACKError):
 
 class UMFPACKInvalidBlobError(UMFPACKError):
     """An invalid blob was passed to a UMFPACK routine."""
+    pass
+
+
+class UMFPACKSingularMatrixError(UMFPACKError):
+    """A singular matrix was encountered in a UMFPACK routine."""
     pass
 
 
@@ -568,7 +574,7 @@ cdef dict _INFO_DISPATCH = {
 #         Info and Control Classes
 # -----------------------------------------------------------------------------
 cdef class UMFInfo:
-    """A data class to store UMFPACK info.
+    r"""A data class to store UMFPACK info.
 
     Attributes
     ----------
@@ -612,7 +618,7 @@ cdef class UMFInfo:
         Strategy used in the factorization. One of:
         ``{"auto", "unsymmetric", "symmetric"}``.
     ordering_used : str
-        Ordering method used in the factorization. One of: 
+        Ordering method used in the factorization. One of:
         ``{"cholmod", "amd", "given", "none", "metis", "best", "user", "metis_guard"}``
     qfixed : bool
         Whether the column permutation Q was fixed.
@@ -622,7 +628,7 @@ cdef class UMFInfo:
         Symmetry of the nonzero pattern of the input matrix, excluding dense
         rows and columns (aka :math:`S`).
     nz_a_plus_at : int
-        Number of nonzeros in :math:`S + S^{\\top}`, excluding the diagonal.
+        Number of nonzeros in :math:`S + S^{\top}`, excluding the diagonal.
     nzdiag : int
         Number of nonzeros on the diagonal of :math:`S`.
     symmetric_lunz : int
@@ -631,7 +637,7 @@ cdef class UMFInfo:
         Number of floating-point operations for the factorization, if AMD
         ordering was used.
     symmetric_ndense : int
-        Number of dense rows and columns in :math:`S + S^{\\top}`.
+        Number of dense rows and columns in :math:`S + S^{\top}`.
     symmetric_dmax : int
         Maximum number of entries in any column of :math:`L`, for AMD.
     col_singletons : int
@@ -786,7 +792,7 @@ cdef class UMFInfo:
 
 
 cdef class UMFControl:
-    """The class used to manage UMFPACK control parameters.
+    r"""The class used to manage UMFPACK control parameters.
 
     Attributes
     ----------
@@ -805,7 +811,7 @@ cdef class UMFControl:
 
         * ``auto``: choose the strategy automatically
         * ``unsymmetric``: order the columns of :math:`A` with COLAMD
-        * ``symmetric``: Order the matrix :math:`A + A^{\\top}` with AMD
+        * ``symmetric``: Order the matrix :math:`A + A^{\top}` with AMD
 
     ordering_method : str
         The ordering method to use. Default value is ``amd``. Possible values
@@ -815,7 +821,7 @@ cdef class UMFControl:
         * ``amd``: just use AMD or COLAMD
         * ``given``: use the user-provided ordering
         * ``none``: no ordering
-        * ``metis``: use METIS on :math:`A + A^{\\top}` or :math:`A^{\\top} A`
+        * ``metis``: use METIS on :math:`A + A^{\top}` or :math:`A^{\top} A`
         * ``best``: try AMD/COLAMD, METIS and NESDIS
         * ``user``: use the user-provided function to compute the ordering
         * ``metis_guard``: use METIS for symmetric strategy, try METIS for
@@ -1074,6 +1080,7 @@ cdef class UMFFactor:
         readonly UMFInfo info
         bint _use_int32
         bint _is_real
+        bint _has_zero_dim
         size_t _M
         size_t _N
         size_t _N_inner  # min(M, N) inner dimension of LU
@@ -1105,9 +1112,24 @@ cdef class UMFFactor:
         self._Ai = A.indices
         self._Ax = A.data
 
+        # Store matrix shape
+        self._M = A.shape[0]
+        self._N = A.shape[1]
+        self._N_inner = min(self._M, self._N)
+        self._has_zero_dim = self._M == 0 or self._N == 0
+
         # Initialize the control and info arrays
         self.control = UMFControl() if control is None else control
         self.info = UMFInfo()
+
+        # Special case: zero-dimensional matrix
+        if self._has_zero_dim:
+            self.itype = A.indptr.dtype
+            self.dtype = A.dtype
+            self.info.data[UMFPACK_LNZ] = 0
+            self.info.data[UMFPACK_UNZ] = 0
+            self.info.data[UMFPACK_UDIAG_NZ] = 0
+            return
 
         # Compute the symbolic analysis
         self._init_symbolic(A.shape[0], A.shape[1], self._Ap, self._Ai, self._Ax)
@@ -1118,9 +1140,9 @@ cdef class UMFFactor:
         self,
         int M,
         int N,
-        index_t[::1] indptr,
-        index_t[::1] indices,
-        value_t[::1] data
+        const index_t[::1] indptr not None,
+        const index_t[::1] indices not None,
+        const value_t[::1] data not None,
     ):
         """Compute the symbolic factorization.
 
@@ -1194,11 +1216,6 @@ cdef class UMFFactor:
 
         _handle_errors(status)
 
-        # Store matrix shape (ensure non-negative before cast)
-        self._M = <size_t>max(self.info.data[UMFPACK_NROW], 0)
-        self._N = <size_t>max(self.info.data[UMFPACK_NCOL], 0)
-        self._N_inner = min(self._M, self._N)
-
         self.itype = np.dtype(np.int32 if self._use_int32 else np.int64)
         self.dtype = np.dtype(np.float64 if self._is_real else np.complex128)
 
@@ -1252,7 +1269,10 @@ cdef class UMFFactor:
     # -------------------------------------------------------------------------
     @property
     def is_numeric(self):
-        return self._symbolic is not NULL and self._numeric is not NULL
+        return (
+            self._has_zero_dim
+            or (self._symbolic is not NULL and self._numeric is not NULL)
+        )
 
     @property
     def lnz(self):
@@ -1318,6 +1338,7 @@ cdef class UMFFactor:
 
         umf._use_int32 = self._use_int32
         umf._is_real = self._is_real
+        umf._has_zero_dim = self._has_zero_dim
         umf._M = self._M
         umf._N = self._N
         umf._N_inner = self._N_inner
@@ -1394,7 +1415,7 @@ cdef class UMFFactor:
         :class:`UMFFactor`
             The current object, for method chaining.
         """
-        assert self._symbolic is not NULL, (
+        assert self._has_zero_dim or self._symbolic is not NULL, (
             "Symbolic factorization not present. "
             "Cannot perform numeric factorization."
         )
@@ -1407,7 +1428,8 @@ cdef class UMFFactor:
             self._Ai = A.indices
             self._Ax = A.data
 
-        # TODO free any existing numeric factorization?
+        if self._has_zero_dim:
+            return self  # nothing to do for zero-dimensional matrix
 
         # Clear cached factor objects
         self._L = None
@@ -1424,9 +1446,9 @@ cdef class UMFFactor:
     @cython.wraparound(False)
     def _factorize(
         self,
-        index_t[::1] indptr,
-        index_t[::1] indices,
-        value_t[::1] data,
+        const index_t[::1] indptr,
+        const index_t[::1] indices,
+        const value_t[::1] data,
     ):
         """Compute the numeric factorization given the CSC arrays.
 
@@ -1502,38 +1524,35 @@ cdef class UMFFactor:
 
         _handle_errors(status)
 
-    # TODO allow x as input?
-    def solve(self, object b, object A=None, *, object trans='N'):
-        """Solve a linear system using the LU factorization.
+    def solve(self, object b, *, object trans='N', Py_ssize_t rhs_batch_size=100):
+        r"""Solve a linear system using the LU factorization.
 
         This method solves one of the following linear systems:
 
         * :math:`A x = b` (if ``trans='N'``)
-        * :math:`A^{\\top} x = b` (if ``trans='T'`` and :math:`A` is real)
+        * :math:`A^{\top} x = b` (if ``trans='T'`` and :math:`A` is real)
         * :math:`A^{H} x = b` (if ``trans='H'`` and :math:`A` is complex)
-
-        The matrix :math:`A` must have the same shape and nonzero pattern as
-        the one used to create this :class:`UMFFactor` object, but need not
-        have the same values. No check is performed to ensure that the
-        input matrix is compatible with the existing factorization.
 
         Parameters
         ----------
         b : (N,) or (N, K) numpy.ndarray or sparse array
             The right-hand side vector or martrix.
-        A : (N, N) numpy.ndarray or sparse array, optional
-            The input matrix. Must have the same shape and nonzero pattern as
-            the matrix used to create this :class:`UMFFactor` object.
         trans : str, optional
             The type of system to solve. Possible values are:
 
             * ``N``: solve :math:`A x = b` (default)
-            * ``T``: solve :math:`A^{\\top} x = b`
+            * ``T``: solve :math:`A^{\top} x = b`
             * ``H``: solve :math:`A^{H} x = b`
 
             .. note::
 
                 If :math:`A` is real, then ``T`` and ``H`` are equivalent.
+
+        rhs_batch_size : int, optional
+            If ``b`` is a 2D sparse array, this parameter controls the number of
+            columns to be solved simultaneously. A larger number will increase
+            memory consumption by converting more columns at a time to dense
+            arrays, but may improve runtime.
 
         Returns
         -------
@@ -1549,7 +1568,21 @@ cdef class UMFFactor:
             If the matrix is detected to be singular to working precision.
             In that case, the solution will have infinite or NaN values,
             but other entries may still be valid.
+
+        Notes
+        -----
+        The underlying UMFPACK solver can only handle 1D dense array inputs. If the RHS
+        ``b`` is a 2D array, this method will solve each column independently. If ``b``
+        is dense, there is a slight performance gain (~5% in time) by passing it as
+        a Fortran-contiguous array (*e.g.* by using :func:`numpy.asfortranarray`),
+        since the columns are then stored contiguously in memory. Otherwise, each
+        column will be copied to a temporary Fortran-contiguous buffer before solving.
         """
+        if not self.is_numeric:
+            raise UMFPACKError(
+                "Factor is symbolic. Call `UMFFactor.factorize` before solving."
+            )
+
         if self._M != self._N:
             raise ValueError(
                 "Matrix must be square to use the solve method. "
@@ -1568,76 +1601,106 @@ cdef class UMFFactor:
         if not (isinstance(b, np.ndarray) or issparse(b)):
             raise ValueError("b must be an ndarray or sparse matrix.")
 
-        if A is not None:
-            A, _, itype = validate_csc_input(A, require_square=True)
-            self._check_input_matrix(A, itype)
-            # Update cached matrix data
-            self._Ap = A.indptr
-            self._Ai = A.indices
-            self._Ax = A.data
-
-        if b.dtype != self.dtype:
-            raise ValueError(
-                f"LHS and RHS dtypes do not match. {self.dtype=} and {b.dtype=}"
-            )
-
         if b.ndim not in (1, 2):
             raise ValueError("b must be a 1D or 2D array.")
 
         cdef size_t N = <size_t>self.info.data[UMFPACK_NROW]
-        cdef bint return_1D = b.ndim == 1
 
         if b.shape[0] != N:
             raise ValueError(
                 "Right-hand side b must have the same number of rows as A."
             )
 
-        cdef bint return_sparse = issparse(b)
-
-        if return_sparse:
-            b = b.toarray()
+        if not np.can_cast(b.dtype, self.dtype):
+            raise TypeError(f"Cannot safely cast {b.dtype=} to {self.dtype=}.")
         else:
-            b = np.asarray(b)
+            b = b.astype(self.dtype, copy=False)
 
-        if b.ndim == 1:
-            b = b.reshape((N, 1))
-
-        # TODO warn here?
-        # Prepare to solve the system
-        if self._numeric is NULL:
-            self.factorize(A)
+        # Special case: zero-dimension matrix
+        if self._has_zero_dim:
+            return type(b)(b.shape, dtype=b.dtype)
 
         # Check the condition number
         self._check_rcond()
 
-        # Ensure columns are contiguous for multiple RHS
-        b = np.asfortranarray(b)
+        cdef bint return_1D = b.ndim == 1
+        cdef bint return_sparse = issparse(b)
 
-        # Allocate the output array
-        x = np.empty_like(b, order="F")
-
-        self._solve(sys, b, self._Ap, self._Ai, self._Ax, x)
+        # UMFPACK expects 2D RHS
+        if b.ndim == 1:
+            b = b.reshape((N, 1))
 
         if return_sparse:
-            x = csc_array(x, dtype=b.dtype)
-            x.indptr = x.indptr.astype(self.itype)
-            x.indices = x.indices.astype(self.itype)
+            x = self._solve_sparse(sys, b, rhs_batch_size)
+        else:
+            x = np.empty_like(b, order="F")
+            self._solve_dense(sys, b, self._Ap, self._Ai, self._Ax, x)
 
         if return_1D:
             x = x[:, 0]
 
         return x
 
+    cdef _solve_sparse(self, int sys, object b, Py_ssize_t rhs_batch_size):
+        """Solve multiple RHS systems where b is a sparse matrix.
+
+        Parameters
+        ----------
+        sys : int
+            The system type (UMFPACK_A, UMFPACK_Aat, UMFPACK_At).
+        b : 2D array of value_t, shape (N, K)
+            The right-hand side matrix.
+        """
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", SparseEfficiencyWarning)
+            b, _, _ = validate_csc_input(b)
+
+        cdef:
+            Py_ssize_t k
+            Py_ssize_t batch_end
+            Py_ssize_t width
+            Py_ssize_t K = b.shape[1]
+            list x_blocks = []
+            cnp.ndarray b_view
+            cnp.ndarray x_view
+
+        # Pre-allocate dense space for RHS and solution
+        cdef cnp.ndarray b_batch = np.empty(
+            (b.shape[0], min(rhs_batch_size, K)), dtype=b.dtype, order="F"
+        )
+
+        cdef cnp.ndarray x_batch = np.empty(
+            (b.shape[0], min(rhs_batch_size, K)), dtype=b.dtype, order="F"
+        )
+
+        for k in range(0, K, rhs_batch_size):
+            batch_end = min(k + rhs_batch_size, K)
+            width = batch_end - k
+            # Views on the correct columns of the buffers
+            b_view = b_batch[:, :width]
+            x_view = x_batch[:, :width]
+            # Convert the sparse RHS to dense in the buffer
+            b[:, k:batch_end].toarray(out=b_view)
+            # Solve the systems
+            self._solve_dense(sys, b_view, self._Ap, self._Ai, self._Ax, x_view)
+            # Only take the relevant columns
+            x_blocks.append(csc_array(x_view, dtype=b.dtype))
+
+        x = hstack(x_blocks)
+        x.indptr = x.indptr.astype(self.itype, copy=False)
+        x.indices = x.indices.astype(self.itype, copy=False)
+        return x
+
     @cython.boundscheck(False)  # for-loop guaranteed in-bounds
     @cython.wraparound(False)
-    def _solve(
+    def _solve_dense(
         self,
         int sys,
-        value_t[::1, :] b,
-        index_t[::1] indptr,
-        index_t[::1] indices,
-        value_t[::1] data,
-        value_t[::1, :] x
+        cnp.ndarray b,
+        const index_t[::1] indptr not None,
+        const index_t[::1] indices not None,
+        const value_t[::1] data not None,
+        value_t[::1, :] x not None,
     ):
         """Solve multiple RHS systems.
 
@@ -1660,14 +1723,35 @@ cdef class UMFFactor:
             Py_ssize_t k
             Py_ssize_t K = b.shape[1]
             double* data_ptr = <double*>&data[0]
-            double* x_ptr
             double* b_ptr
+            double* x_ptr
+            bint f_contiguous = b.flags['F_CONTIGUOUS']
+            value_t[::1, :] b_F = None
+            value_t[:, :] b_arr = None
+            value_t[::1] b_col = None
+
+        if f_contiguous:
+            # Directly access the contiguous column data
+            b_F = b
+        else:
+            # Allocate temporary buffer for a single column of b
+            b_arr = b
+            b_col = np.empty(
+                b.shape[0], dtype=np.float64 if value_t is double else np.complex128
+            )
 
         for k in range(K):
             # NOTE numpy complex arrays store real and imag parts interleaved,
             # so we can just pass the pointer to the data as double*
+            if f_contiguous:
+                # Directly access the contiguous column data
+                b_ptr = <double*>&b_F[0, k]
+            else:
+                # Input is not contiguous, so copy the column into contiguous buffer
+                b_col[:] = b_arr[:, k]
+                b_ptr = <double*>&b_col[0]
+
             x_ptr = <double*>&x[0, k]
-            b_ptr = <double*>&b[0, k]
 
             # Solve the system
             if self._is_real:
@@ -1736,6 +1820,12 @@ cdef class UMFFactor:
         --------
         numpy.linalg.slogdet
         """
+        if self._has_zero_dim:
+            if self._M == self._N:
+                return (self.dtype.type(1), self.dtype.type(0))  # det([]) = 1
+            else:
+                raise ValueError("Matrix must be square.")
+
         if not self.is_numeric:
             raise ValueError(
                 "Numeric factorization not present. "
@@ -1758,7 +1848,7 @@ cdef class UMFFactor:
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def _slogdet(self, value_t[::1] Mx, double[::1] Ex):
+    def _slogdet(self, value_t[::1] Mx not None, double[::1] Ex not None):
         """Compute the determinant of the matrix.
 
         Parameters
@@ -1909,19 +1999,30 @@ cdef class UMFFactor:
     cdef int _check_rcond(self) except -1:
         """Check the condition number."""
         cdef double rcond = self.info.data[UMFPACK_RCOND]
-        cdef double eps = np.finfo(np.float64).eps
+        cdef double thresh = max(self._M, self._N) * np.finfo(self.dtype).eps
 
         if rcond == 0:
-            raise UMFPACKError("Matrix is indefinite or singular to working precision.")
-        elif rcond < eps:
+            raise UMFPACKSingularMatrixError(
+                "Matrix is indefinite or singular to working precision."
+            )
+        elif rcond < thresh:
             warnings.warn(
                 "Matrix is nearly singular."
                 f"  Results may be inaccurate (rcond={rcond:.2e}).",
                 UMFPACKSingularMatrixWarning
             )
 
-    cdef void _get_numeric(self) except *:
+    cdef int _get_numeric(self) except -1:
         """Extract the numeric factorization data from UMFPACK."""
+        if self._has_zero_dim:
+            # Zero-dimensional matrix: cache empty factors
+            self._L = csr_array((self._M, self._N_inner), dtype=self.dtype)
+            self._U = csc_array((self._N_inner, self._N), dtype=self.dtype)
+            self._P = np.arange(self._M, dtype=self.itype)
+            self._Q = np.arange(self._N, dtype=self.itype)
+            self._Rs = np.ones(self._M, dtype=np.float64)  # always real
+            return 0
+
         if self._numeric is NULL:
             raise UMFPACKError(
                 "Numeric factorization not present. "
@@ -1952,16 +2053,21 @@ cdef class UMFFactor:
         self._L = csr_array((Lx, Lj, Lp), shape=(self._M, self._N_inner))
         self._U = csc_array((Ux, Ui, Up), shape=(self._N_inner, self._N))
 
+        return 0
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def _dispatch_get_numeric(
         self,
-        index_t[::1] Lp, index_t[::1] Lj, value_t[::1] Lx,
-        index_t[::1] Up, index_t[::1] Ui, value_t[::1] Ux,
-        index_t[::1] P,
-        index_t[::1] Q,
-        double[::1] Rs,
+        index_t[::1] Lp not None,
+        index_t[::1] Lj not None,
+        value_t[::1] Lx not None,
+        index_t[::1] Up not None,
+        index_t[::1] Ui not None,
+        value_t[::1] Ux not None,
+        index_t[::1] P not None,
+        index_t[::1] Q not None,
+        double[::1] Rs not None,
     ):
         """Call the appropriate UMFPACK get_numeric function.
 
@@ -2088,6 +2194,7 @@ UMFFactor.report_symbolic.__doc__ = _REPORT_DOC.format(kind="symbolic")
 UMFFactor.report_numeric.__doc__ = _REPORT_DOC.format(kind="numeric")
 UMFFactor.report_control.__doc__ = UMFControl.report.__doc__
 
+
 # -----------------------------------------------------------------------------
 #         Convenience Functions
 # -----------------------------------------------------------------------------
@@ -2171,8 +2278,16 @@ def umf_factor(object A, *, object control=None, **kwargs):
     return UMFFactor(A, control).factorize()
 
 
-def umf_solve(object A, object b, *, object trans='N', object control=None, **kwargs):
-    """Solve a linear system using UMFPACK.
+def umf_solve(
+    object A,
+    object b,
+    *,
+    object trans='N',
+    Py_ssize_t rhs_batch_size=100,
+    object control=None,
+    **kwargs,
+):
+    r"""Solve a linear system using UMFPACK.
 
     This is a convenience function that creates a :class:`UMFFactor` object,
     computes the numeric factorization, and solves the linear system.
@@ -2187,13 +2302,18 @@ def umf_solve(object A, object b, *, object trans='N', object control=None, **kw
         The type of system to solve. Possible values are:
 
         * ``N``: solve :math:`A x = b` (default)
-        * ``T``: solve :math:`A^{\\top} x = b`
+        * ``T``: solve :math:`A^{\top} x = b`
         * ``H``: solve :math:`A^{H} x = b`
 
         .. note::
 
             If :math:`A` is real, then ``T`` and ``H`` are equivalent.
 
+    rhs_batch_size : int, optional
+        If ``b`` is a 2D sparse array, this parameter controls the number of
+        columns to be solved simultaneously. A larger number will increase
+        memory consumption by converting more columns at a time to dense
+        arrays, but may improve runtime.
     control : :class:`UMFControl`, optional
         The control parameters to use for the factorization. If not provided,
         default parameters are used.
@@ -2220,6 +2340,15 @@ def umf_solve(object A, object b, *, object trans='N', object control=None, **kw
 
 
     .. versionadded:: 0.5.0
+
+    Notes
+    -----
+    The underlying UMFPACK solver can only handle 1D dense array inputs. If the RHS
+    ``b`` is a 2D array, this method will solve each column independently. If ``b`` is
+    dense, there is a slight performance gain (~5% in time) by passing it as
+    a Fortran-contiguous array (*e.g.* by using :func:`numpy.asfortranarray`), since
+    the columns are then stored contiguously in memory. Otherwise, each column will be
+    copied to a temporary Fortran-contiguous buffer before solving.
 
     Examples
     --------
@@ -2257,7 +2386,11 @@ def umf_solve(object A, object b, *, object trans='N', object control=None, **kw
     # factorize() and solve() will each warn for a singular matrix,
     # so we catch the warnings from factorize() and re-raise only once.
     with warnings.catch_warnings(record=True) as ws:
-        x = UMFFactor(A, control).factorize().solve(b, trans=trans)
+        x = (
+            UMFFactor(A, control)
+            .factorize()
+            .solve(b, trans=trans, rhs_batch_size=rhs_batch_size)
+        )
 
     # Raise only the latest singular matrix warning from solve
     if ws:
