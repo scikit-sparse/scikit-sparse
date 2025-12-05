@@ -1241,15 +1241,17 @@ cdef class CholeskyFactor:
     ----------
     A : (N, N) array_like or sparse array
         An array convertible to a sparse matrix in Compressed Sparse Column
-        (CSC) format. The matrix must be square and symmetric positive
-        definite. Only the upper or lower triangular part of the matrix is
-        used, and no check is made for symmetry.
+        (CSC) format.
     sym_kind : str in {"sym", "row", "col"}, optional
         The type of factorization for which to analyze the matrix:
 
-        * ``sym``: Symmetric factorization. No check is made for symmetry.
+        * ``sym``: Symmetric factorization.  Only the upper or lower triangular part of
+          the matrix is used (depending on ``lower``), and no check is made for
+          symmetry.
         * ``row``: Unsymmetric factorization of :math:`A A^{\\top}`.
         * ``col``: Unsymmetric factorization of :math:`A^{\\top} A`.
+
+        The resulting matrix must be square and symmetric positive definite.
 
     supernodal_mode : str in {"auto", "simplicial", "supernodal"}, optional
         The type of factorization to use:
@@ -1301,6 +1303,13 @@ cdef class CholeskyFactor:
         The integer type used for indices and indptr in the factor.
     dtype : numpy.dtype
         The data type used for numerical values in the factor.
+    sym_kind : str
+        The symmetry kind used for the factorization.
+    rcond : float
+        A rough estimate of the reciprocal of the condition number of the matrix,
+        defined as ``(L.diagonal().min() / L.diagonal().max())**2`` for an ``LL.T``
+        factorization. Estimated during the numeric factorization. If
+        :meth:`.factorize` has not yet been called, this value is ``-1.0``.
     colcount : *(N,)* :obj:`numpy.ndarray` of int
         The number of nonzeros in each column of the factor.
     nnz : int
@@ -1359,12 +1368,15 @@ cdef class CholeskyFactor:
         https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/analyze.c
     """
 
-    cdef cholmod_common _Common
-    cdef cholmod_common *_cm
-    cdef cholmod_factor *_factor
-    cdef bint _use_int32
-    cdef bint _is_lower
-    cdef int _stype
+    cdef:
+        cholmod_common _Common
+        cholmod_common *_cm
+        cholmod_factor *_factor
+        bint _use_int32
+        bint _is_lower
+        int _stype
+        readonly object sym_kind
+        readonly double rcond
 
     def __init__(
         self,
@@ -1375,9 +1387,7 @@ cdef class CholeskyFactor:
         object sym_kind=None,
         object supernodal_mode=None,
     ):
-        A, self._use_int32, _ = validate_csc_input(
-            A, require_square=True, ensure_double=False
-        )
+        A, self._use_int32, _ = validate_csc_input(A, ensure_double=False)
 
         if sym_kind is None:
             sym_kind = "sym"
@@ -1390,6 +1400,9 @@ cdef class CholeskyFactor:
                 f"Unknown symmetry kind: {sym_kind}. "
                 "Must be one of 'sym', 'row', 'col'."
             )
+
+        if sym_kind == "sym" and A.shape[0] != A.shape[1]:
+            raise ValueError(f"Expected square matrix. Got {A.shape}.")
 
         if supernodal_mode not in _supernodal_modes:
             raise ValueError(
@@ -1415,12 +1428,14 @@ cdef class CholeskyFactor:
 
         # Use lower or upper triangular part of A
         self._is_lower = lower
+        self.sym_kind = sym_kind
+        self.rcond = -1.0
         cdef int stype = -1 if self._is_lower else 1
         cdef bint transpose = False
 
-        if sym_kind in ["row", "col"]:
+        if self.sym_kind in ["row", "col"]:
             stype = 0                        # unsymmetric A @ A.T or A.T @ A
-            transpose = (sym_kind == "col")  # A.T @ A
+            transpose = (self.sym_kind == "col")  # A.T @ A
 
         _cholmod_sparse_from_csc(
             A.shape, A.indptr, A.indices, A.data, stype, <uintptr_t>Ac
@@ -1443,11 +1458,11 @@ cdef class CholeskyFactor:
         if transpose:
             if self._use_int32:
                 C = cholmod_transpose(Ac, CHOLMOD_TRANS_PATTERN, self._cm)
-                self._factor = cholmod_analyze(Ac, self._cm)
+                self._factor = cholmod_analyze(C, self._cm)
                 cholmod_free_sparse(&C, self._cm)
             else:
                 C = cholmod_l_transpose(Ac, CHOLMOD_TRANS_PATTERN, self._cm)
-                self._factor = cholmod_l_analyze(Ac, self._cm)
+                self._factor = cholmod_l_analyze(C, self._cm)
                 cholmod_l_free_sparse(&C, self._cm)
         else:
             if self._use_int32:
@@ -1456,19 +1471,17 @@ cdef class CholeskyFactor:
                 self._factor = cholmod_l_analyze(Ac, self._cm)
 
         # Check for errors
-        _handle_errors(self._cm.status, self._factor.minor)
+        cdef int minor = -1 if self._factor is NULL else self._factor.minor
+        _handle_errors(self._cm.status, minor)
 
     def __dealloc__(self):
         """Deallocate memory used by the CholeskyFactor."""
-        if self._cm is not NULL:
-            if self._use_int32:
-                if self._factor is not NULL:
-                    cholmod_free_factor(&self._factor, self._cm)
-                cholmod_finish(self._cm)
-            else:
-                if self._factor is not NULL:
-                    cholmod_l_free_factor(&self._factor, self._cm)
-                cholmod_l_finish(self._cm)
+        if self._use_int32:
+            cholmod_free_factor(&self._factor, self._cm)
+            cholmod_finish(self._cm)
+        else:
+            cholmod_l_free_factor(&self._factor, self._cm)
+            cholmod_l_finish(self._cm)
 
     def _require_factorized(self):
         """Raise an error if the factor is symbolic only."""
@@ -1736,7 +1749,7 @@ cdef class CholeskyFactor:
         """
         assert self._factor is not NULL, "The factor has not been initialized."
 
-        A, _, _ = validate_csc_input(A, require_square=True, ensure_double=False)
+        A, _, _ = validate_csc_input(A, ensure_double=False)
 
         if ldl is None:
             if self.is_numeric:
@@ -1778,14 +1791,34 @@ cdef class CholeskyFactor:
         betac[0] = beta
         betac[1] = 0.0
 
+        # If the symbolic analysis was for the unsymmetric case, determine
+        # whether to factorize A @ A.T or A.T @ A
+        cdef bint transpose = False
+        if self._stype == 0:
+            # Unsymmetric case: factorize A @ A.T or A.T @ A
+            transpose = (self.sym_kind == "col")
+
         # Factorize the matrix
-        if self._use_int32:
-            cholmod_factorize_p(Ac, betac, NULL, 0, self._factor, self._cm)
+        if transpose:
+            if self._use_int32:
+                C = cholmod_transpose(Ac, CHOLMOD_TRANS_CONJ, self._cm)
+                cholmod_factorize_p(C, betac, NULL, 0, self._factor, self._cm)
+                cholmod_free_sparse(&C, self._cm)
+            else:
+                C = cholmod_l_transpose(Ac, CHOLMOD_TRANS_CONJ, self._cm)
+                cholmod_l_factorize_p(C, betac, NULL, 0, self._factor, self._cm)
+                cholmod_l_free_sparse(&C, self._cm)
         else:
-            cholmod_l_factorize_p(Ac, betac, NULL, 0, self._factor, self._cm)
+            if self._use_int32:
+                cholmod_factorize_p(Ac, betac, NULL, 0, self._factor, self._cm)
+            else:
+                cholmod_l_factorize_p(Ac, betac, NULL, 0, self._factor, self._cm)
 
         # Check for errors
         _handle_errors(self._cm.status, self._factor.minor)
+
+        # Update rcond
+        self._rcond()
 
         return self  # for method chaining
 
@@ -1796,12 +1829,14 @@ cdef class CholeskyFactor:
         Parameters
         ----------
         b : (N,) or (N, K) ndarray or sparse matrix
-            The right-hand side vector or matrix.
+            The right-hand side vector or matrix. Must be a type that can be safely
+            cast to the data type of the factor. The number of rows in ``b`` must be
+            equal to the size of the factor.
 
         Returns
         -------
         x : (N,) or (N, K) ndarray or sparse matrix
-            The solution vector or matrix, returned in the same format as `b`.
+            The solution vector or matrix, returned in the same format as ``b``.
 
         Raises
         ------
@@ -1869,7 +1904,12 @@ cdef class CholeskyFactor:
                 "Right-hand side b must have the same number of rows as L."
             )
 
-        # Special case: empty matrix
+        if not np.can_cast(b.dtype, self.dtype):
+            raise TypeError(f"Cannot safely cast {b.dtype=} to {self.dtype=}.")
+        else:
+            b = b.astype(self.dtype)
+
+        # Special case: zero-dimension matrix
         if N == 0:
             return type(b)(b.shape, dtype=b.dtype)
 
@@ -1957,26 +1997,27 @@ cdef class CholeskyFactor:
 
         return _ndarray_from_cholmod_dense(Xd, self._use_int32, self._cm)
 
+    cdef int _rcond(self) except -1:
+        """Compute the reciprocal condition number."""
+        if self._use_int32:
+            self.rcond = cholmod_rcond(self._factor, self._cm)
+        else:
+            self.rcond = cholmod_l_rcond(self._factor, self._cm)
+        _handle_errors(self._cm.status)
+        return 0
+
     cdef int _check_rcond(self) except -1:
         """Check the condition number."""
-        cdef double rcond
-        cdef double eps = np.finfo(np.float64).eps
+        cdef double thresh = self._factor.n * np.finfo(self.dtype).eps
 
-        if self._use_int32:
-            rcond = cholmod_rcond(self._factor, self._cm)
-        else:
-            rcond = cholmod_l_rcond(self._factor, self._cm)
-
-        _handle_errors(self._cm.status)
-
-        if rcond == 0:
+        if self.rcond == 0:
             raise CholmodNotPositiveDefiniteError(
                 "Matrix is indefinite or singular to working precision."
             )
-        elif rcond < eps:
+        elif self.rcond < thresh:
             warnings.warn(
                 "Matrix is nearly singular."
-                f"  Results may be inaccurate (rcond={rcond:.2e}).",
+                f"  Results may be inaccurate (rcond={self.rcond:.2e}).",
                 CholmodWarning,
             )
 
@@ -2213,6 +2254,7 @@ cdef class CholeskyFactor:
         self._require_factorized()
 
         cdef bint A_use_int32
+        # TODO support non-square matrices with sym_kind='row'
         A, A_use_int32, _ = validate_csc_input(A, require_square=True, ensure_double=False)
 
         if A.shape[0] != self.N:

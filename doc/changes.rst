@@ -75,6 +75,12 @@ v0.5.0
     :meth:`~sksparse.cholmod.CholeskyFactor.solve` method.
     The :obj:`~sksparse.cholmod.CholeskyFactor` is not callable.
 
+  - The new :meth:`~sksparse.cholmod.CholeskyFactor.solve` method checks the
+    condition number and raises a :exc:`~sksparse.cholmod.CholmodNotPositiveDefiniteError` if the
+    matrix is exactly singular, or a :exc:`~sksparse.cholmod.CholmodWarning` if the matrix is
+    ill-conditioned. Previously, no warning would be issued. See the
+    :attr:`~sksparse.cholmod.CholeskyFactor.rcond` property for more details.
+
   - Add multiple properties to the :obj:`~sksparse.cholmod.CholeskyFactor`
     class for convenient access to :code:`cholmod_factor` attributes. See the
     full documentation for details.
@@ -83,6 +89,10 @@ v0.5.0
     ``has_sorted_indices`` or ``has_canonical_format`` flags would silently
     lead to incorrect results. The input matrix is now modified into
     a canonical CSC format, regardless of the input format.
+
+  - Add support for single-precision (float32/complex64) input matrices. The
+    output factor and solve results will match the input precision. Previously,
+    all inputs were converted to double-precision.
 
 * Create the :mod:`~sksparse.amd` module, which provides the AMD ordering method.
 * Create the :mod:`~sksparse.btf` module, which provides the BTF ordering method.
