@@ -121,6 +121,7 @@ known-first-party = ["sksparse"]
 "__init__.py" = ['D', 'I001', 'F403', 'F405']  # ignore import sorting, wildcard imports, and undefined names
 "test_*.py" = ['D101', 'D102', 'D103', 'E501']  # ignore docstring checks in test files
 "setup.py" = ['D100', 'D101', 'D102', 'D103', 'D104']  # ignore docstrings
+"benchmarks/*" = ['D100', 'D101', 'D102', 'D103', 'D104']  # ignore docstrings
 
 [tool.ruff.lint.pydocstyle]
 convention = "numpy"
