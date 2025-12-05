@@ -168,9 +168,13 @@ def generate_random_matrices(
         if itype is not None:
             A.indices = A.indices.astype(itype)
             A.indptr = A.indptr.astype(itype)
+        else:
+            itype = A.indices.dtype.type  # assign for use in the test ID
 
         yield pytest.param(
-            A, id=f"random_{trial:02d}::{A.shape}::{A.nnz}::{dtype.__name__}"
+            A,
+            id=(f"random_{trial:02d}::{A.shape}::{A.nnz}::"
+                f"{itype.__name__}::{dtype.__name__}"),
         )
 
 
