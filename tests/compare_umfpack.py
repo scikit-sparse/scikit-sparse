@@ -90,7 +90,7 @@ def run_package_comparison(df_file, force_update=False):
 
     assert df_file.parent.exists(), f"Data path does not exist: {df_file.parent}"
     print(f"Running performance tests for {df_file}...")
-    Ns = np.unique(np.logspace(1, 3, num=20, dtype=int))
+    Ns = np.unique(np.logspace(1, 4, num=10, dtype=int))
     sqrtNs = np.unique([int(np.sqrt(N)) for N in Ns])
 
     results = []
