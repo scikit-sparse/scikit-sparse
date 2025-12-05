@@ -96,10 +96,11 @@ def validate_csc_input(A, require_square=False, ensure_double=True):
             A = A.astype(np.complex128, copy=False)
 
     # NOTE as of scipy 1.16.2, A.has_sorted_indices and A.has_canonical_format
-    #   are not always set correctly!
+    #   are not always set correctly! In particular, A.setdiag(...) can lead to
+    #   incorrect flags. Therefore, we manually fix the format here.
     # Manually set the flags to False to force fixing the format.
-    A.has_sorted_indices = False
-    A.has_canonical_format = False
+    # A.has_sorted_indices = False
+    # A.has_canonical_format = False
     A.sum_duplicates()  # sort indices and sum duplicates
 
     assert A.has_sorted_indices
