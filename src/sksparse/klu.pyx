@@ -1641,7 +1641,7 @@ cdef class KLUFactor:
         ``klu_condest`` for more accurate estimate from the full LU decomposition.
         """
         cdef double rcond = self._cm.rcond if self._use_int32 else self._l_cm.rcond
-        cdef double eps = np.finfo(np.float64).eps
+        cdef double thresh = self._N * np.finfo(self.dtype).eps
 
         cdef int singular_col = (
             self._cm.singular_col if self._use_int32 else self._l_cm.singular_col
@@ -1652,7 +1652,7 @@ cdef class KLUFactor:
                 "Matrix is indefinite or singular to working precision. "
                 f"Failed on column {singular_col}."
             )
-        elif rcond < eps:
+        elif rcond < thresh:
             warnings.warn(
                 "Matrix is nearly singular."
                 f"  Results may be inaccurate (rcond={rcond:.2e}).",
