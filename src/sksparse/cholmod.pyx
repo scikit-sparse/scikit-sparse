@@ -1907,7 +1907,7 @@ cdef class CholeskyFactor:
         if not np.can_cast(b.dtype, self.dtype):
             raise TypeError(f"Cannot safely cast {b.dtype=} to {self.dtype=}.")
         else:
-            b = b.astype(self.dtype)
+            b = b.astype(self.dtype, copy=False)
 
         # Special case: zero-dimension matrix
         if N == 0:
