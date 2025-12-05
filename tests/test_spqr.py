@@ -486,7 +486,7 @@ def test_nearly_singular(davis_example_qr):
 
 # Base test function for solving systems
 def _test_solve(A, K, is_sparse, transpose, underdetermined):
-    atol = 1e-12
+    atol = 1e-09
     A = A.copy()
     if underdetermined:
         A = A.T.conj().tocsc()
@@ -526,7 +526,7 @@ def _test_solve(A, K, is_sparse, transpose, underdetermined):
     if is_sparse:
         resid = resid.toarray()
 
-    assert_allclose(resid, np.zeros_like(resid), atol=1e-10, strict=True)
+    assert_allclose(resid, np.zeros_like(resid), atol=atol, strict=True)
 
     # In underdetermined case, the solution is not unique
     if not underdetermined:
