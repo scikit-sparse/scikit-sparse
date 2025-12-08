@@ -90,10 +90,10 @@ def validate_csc_input(A, require_square=False, ensure_double=True):
 
     # Ensure double precision if requested
     if ensure_double:
-        if np.issubdtype(A.dtype, np.floating) and A.dtype != np.float64:
-            A = A.astype(np.float64)
-        elif np.issubdtype(A.dtype, np.complexfloating) and A.dtype != np.complex128:
-            A = A.astype(np.complex128)
+        if np.issubdtype(A.dtype, np.floating):
+            A = A.astype(np.float64, copy=False)
+        elif np.issubdtype(A.dtype, np.complexfloating):
+            A = A.astype(np.complex128, copy=False)
 
     # NOTE as of scipy 1.16.2, A.has_sorted_indices and A.has_canonical_format
     #   are not always set correctly!
