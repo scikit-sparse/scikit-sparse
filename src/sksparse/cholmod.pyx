@@ -1051,7 +1051,7 @@ cdef void _set_ordering_method(object order, cholmod_common* cm):
         )
 
 
-cdef inline object _npitype_class_from_iype(int itype):
+cdef inline object _npitype_class_from_itype(int itype):
     """Get the NumPy integer dtype class corresponding to the given CHOLMOD itype.
 
     Parameters
@@ -1373,8 +1373,8 @@ cdef class CholeskyFactor:
         cholmod_common *_cm
         cholmod_factor *_factor
         bint _use_int32
-        bint _is_lower
         int _stype
+        readonly bint is_lower
         readonly object sym_kind
         readonly double rcond
 
@@ -1427,10 +1427,10 @@ cdef class CholeskyFactor:
         cdef cholmod_sparse *C
 
         # Use lower or upper triangular part of A
-        self._is_lower = lower
+        self.is_lower = lower
         self.sym_kind = sym_kind
         self.rcond = -1.0
-        cdef int stype = -1 if self._is_lower else 1
+        cdef int stype = -1 if self.is_lower else 1
         cdef bint transpose = False
 
         if self.sym_kind in ["row", "col"]:
@@ -1522,10 +1522,6 @@ cdef class CholeskyFactor:
         return bool(self._factor.is_ll)
 
     @property
-    def is_lower(self):
-        return bool(self._is_lower)
-
-    @property
     def is_super(self):
         return bool(self._factor.is_super)
 
@@ -1535,7 +1531,7 @@ cdef class CholeskyFactor:
 
     @property
     def itype(self):
-        return np.dtype(_npitype_class_from_iype(self._factor.itype))
+        return np.dtype(_npitype_class_from_itype(self._factor.itype))
 
     @property
     def dtype(self):
@@ -1608,8 +1604,10 @@ cdef class CholeskyFactor:
         _handle_errors(cf._cm.status)
 
         cf._use_int32 = self._use_int32
-        cf._is_lower = self._is_lower
+        cf.is_lower = self.is_lower
         cf._stype = self._stype
+        cf.sym_kind = self.sym_kind
+        cf.rcond = self.rcond
 
         return cf
 
@@ -1644,7 +1642,7 @@ cdef class CholeskyFactor:
             raise ValueError("kind must be 'LL' or 'LDL'.")
 
         if lower is None:
-            lower = self._is_lower
+            lower = self.is_lower
 
         # Drop explicit zeros from returned copies
         if kind == "LL":
@@ -1778,9 +1776,8 @@ cdef class CholeskyFactor:
         cdef cholmod_sparse Amatrix
         cdef cholmod_sparse *Ac = &Amatrix
 
-        stype = self._stype  # set in __cinit__ with sym_kind
         _cholmod_sparse_from_csc(
-            A.shape, A.indptr, A.indices, A.data, stype, <uintptr_t>Ac
+            A.shape, A.indptr, A.indices, A.data, self._stype, <uintptr_t>Ac
         )
 
         # Set beta
@@ -2020,6 +2017,8 @@ cdef class CholeskyFactor:
                 f"  Results may be inaccurate (rcond={self.rcond:.2e}).",
                 CholmodWarning,
             )
+
+        return 0
 
     def update(self, C):
         return self._update(C, updown="up")
