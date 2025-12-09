@@ -511,8 +511,9 @@ square_As = [
 
 @pytest.mark.parametrize("A", square_As)
 @pytest.mark.parametrize("K", [0, 1, 3], ids=lambda k: f"K={k}")
+@pytest.mark.parametrize("trans", ["N", "T", "H"], ids=lambda t: f"trans={t}")
 @pytest.mark.parametrize("is_sparse", [False, True], ids=["dense", "sparse"])
-def test_solve(A, K, is_sparse):
+def test_solve(A, K, trans, is_sparse):
     atol = 1e-12
     A = A.copy()
     A.setdiag(A.diagonal() + 1.0)  # make non-singular
@@ -532,8 +533,14 @@ def test_solve(A, K, is_sparse):
         expect_x = np.asarray(data, dtype=A.dtype)
 
     # Solve the system
-    b = A @ expect_x
-    x = umf_solve(A, b)
+    if trans == "N":
+        b = A @ expect_x
+    elif trans == "T":
+        b = A.T @ expect_x
+    else:  # trans == "H"
+        b = A.conj().T @ expect_x
+
+    x = umf_solve(A, b, trans=trans)
 
     # Compare
     if is_sparse:
