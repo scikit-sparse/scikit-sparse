@@ -27,7 +27,7 @@ def test_empty_input(itype):
     empty_A = sparse.csc_array((0, 0))
     empty_A.indptr = empty_A.indptr.astype(itype)
     empty_A.indices = empty_A.indices.astype(itype)
-    R = cholesky(empty_A)
+    R = cholesky(empty_A, order=None)
     assert_array_equal(R.toarray(), empty_A.toarray(), strict=True)
 
 
@@ -44,7 +44,7 @@ def test_zero_input(itype):
 @pytest.mark.parametrize("dtype", DTYPES)
 def test_singleton_matrix(dtype):
     singleton_A = sparse.csc_array([[1]], dtype=dtype)
-    L = cholesky(singleton_A, lower=True)
+    L = cholesky(singleton_A, lower=True, order=None)
     expect_L = singleton_A.copy()
     assert_array_equal(L.toarray(), expect_L.toarray(), strict=True)
 
@@ -80,7 +80,7 @@ def test_noncanonical_input(noncanonical_A):
             assert p in expect_unsorted_cols
             print(f"Column {p} is not sorted: {col_idx}")
 
-    R = cholesky(A)
+    R = cholesky(A, order=None)
     assert_allclose((R.T.conj() @ R).toarray(), A.toarray(), atol=1e-12)
 
 
@@ -89,7 +89,7 @@ def test_itype(davis_example_chol, itype):
     A = davis_example_chol
     A.indptr = A.indptr.astype(itype)
     A.indices = A.indices.astype(itype)
-    R = cholesky(A)
+    R = cholesky(A, order=None)
     assert R.indptr.dtype == itype
     assert R.indices.dtype == itype
 
@@ -151,8 +151,8 @@ def test_ordering(A, order):
 @pytest.mark.parametrize("A", test_As)
 def test_lower(A):
     atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
-    R = cholesky(A)
-    L = cholesky(A, lower=True)
+    R = cholesky(A, order=None)
+    L = cholesky(A, lower=True, order=None)
     assert_allclose(R.T.conj().toarray(), L.toarray(), atol=atol)
 
 
@@ -164,7 +164,7 @@ def test_beta(A, beta, order):
     N = A.shape[0]
 
     if order is None:
-        L = cholesky(A, beta, lower=True)
+        L = cholesky(A, beta, lower=True, order=order)
         expect_LL = (A + beta * sparse.eye_array(N)).toarray()
     else:
         L, p = cholesky(A, beta, lower=True, order=order)

@@ -34,14 +34,17 @@ DTYPES = [np.float32, np.float64, np.complex64, np.complex128]
 def assert_LLT_equals_A(f, A, rtol=1e-7, atol=1e-15):
     """Assert that L @ L.T.conj() equals A."""
     L = f.get_factor(lower=True)
-    assert_allclose((L @ L.T.conj()).toarray(), A.toarray(), rtol=rtol, atol=atol)
+    p = f.get_perm()
+    LLT = (L @ L.T.conj()).toarray()
+    PAPT = A[p[:, np.newaxis], p].toarray()
+    assert_allclose(LLT, PAPT, rtol=rtol, atol=atol)
 
 
 @pytest.mark.parametrize("dtype", DTYPES)
 def test_convert_factor(davis_example_chol, dtype):
     atol = 1e-15 if dtype in (np.float64, np.complex128) else 1e-6
     A = davis_example_chol.astype(dtype)
-    f = cho_factor(A, lower=True)
+    f = cho_factor(A, lower=True, order=None)
     L, D = f.get_factor(kind="LDL")
     assert_allclose((L @ D @ L.T.conj()).toarray(), A.toarray(), atol=atol)
 
@@ -282,8 +285,8 @@ def test_sym(A, sym_kind):
     print(f"\nmin(eig({A_str})): {lamAXX:.2e}")
 
     # Test symbolic analysis
-    f = CholeskyFactor(A, sym_kind=sym_kind)
-    g = CholeskyFactor(AXX, sym_kind="sym")
+    f = CholeskyFactor(A, sym_kind=sym_kind, order=None)
+    g = CholeskyFactor(AXX, sym_kind="sym", order=None)
     assert_array_equal(f.colcount, g.colcount)
 
     # Test numeric factorization

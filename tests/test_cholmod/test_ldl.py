@@ -27,7 +27,7 @@ def test_empty_input(itype):
     empty_A = sparse.csc_array((0, 0))
     empty_A.indptr = empty_A.indptr.astype(itype)
     empty_A.indices = empty_A.indices.astype(itype)
-    L, D = ldl(empty_A)
+    L, D = ldl(empty_A, order=None)
     assert_array_equal(L.toarray(), empty_A.toarray(), strict=True)
     assert_array_equal(D.toarray(), empty_A.toarray(), strict=True)
 
@@ -45,7 +45,7 @@ def test_zero_input(itype):
 @pytest.mark.parametrize("dtype", DTYPES)
 def test_singleton_matrix(dtype):
     singleton_A = sparse.csc_array([[1]], dtype=dtype)
-    L, D = ldl(singleton_A)
+    L, D = ldl(singleton_A, order=None)
     expect_L = expect_D = singleton_A.copy()
     assert_array_equal(L.toarray(), expect_L.toarray(), strict=True)
     assert_array_equal(D.toarray(), expect_D.toarray(), strict=True)
@@ -59,7 +59,7 @@ def test_singleton_matrix(dtype):
 def test_itype(A, itype):
     A.indptr = A.indptr.astype(itype)
     A.indices = A.indices.astype(itype)
-    L, _ = ldl(A)
+    L, _ = ldl(A, order=None)
     assert L.indptr.dtype == itype
     assert L.indices.dtype == itype
 
@@ -117,8 +117,8 @@ def test_ordering(A, order):
 @pytest.mark.parametrize("A", test_As)
 def test_lower(A):
     atol = 1e-12 if A.dtype in (np.float64, np.complex128) else 1e-5
-    R, Dr = ldl(A, lower=False)
-    L, Dl = ldl(A)
+    R, Dr = ldl(A, lower=False, order=None)
+    L, Dl = ldl(A, order=None)
     assert_allclose(R.T.conj().toarray(), L.toarray(), atol=atol)
     assert_allclose(Dr.toarray(), Dl.toarray(), atol=atol)
 
@@ -131,7 +131,7 @@ def test_beta(A, beta, order):
     N = A.shape[0]
 
     if order is None:
-        L, D = ldl(A, beta)
+        L, D = ldl(A, beta, order=order)
         expect_LDL = (A + beta * sparse.eye_array(N)).toarray()
     else:
         L, D, p = ldl(A, beta, order=order)

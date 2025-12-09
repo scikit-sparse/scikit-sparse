@@ -81,7 +81,7 @@ def test_itype(davis_example_chol, itype):
     A.indptr = A.indptr.astype(itype)
     A.indices = A.indices.astype(itype)
     N = A.shape[0]
-    f = CholeskyFactor(A)
+    f = CholeskyFactor(A, order=None)
     p = f.perm
     count = f.colcount
     expect_count = np.array([3, 3, 4, 3, 3, 4, 4, 3, 3, 2, 1], dtype=itype)
