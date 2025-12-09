@@ -13,6 +13,8 @@
 import warnings
 
 import numpy as np
+from packaging import version
+from scipy import __version__ as scipy_version
 from scipy.sparse import SparseEfficiencyWarning, csc_array, issparse
 
 
@@ -79,10 +81,6 @@ def validate_csc_input(A, require_square=False, ensure_double=True):
     except ValueError:
         raise ValueError("Input must be convertible to CSC format.")
 
-    # A copy will reset the flags, and avoid modifying the input. Generally,
-    # users would not expect the input matrix to be modified.
-    # A = A.copy()
-
     # Coerce bool or int data to float
     if np.issubdtype(A.dtype, np.bool_) or np.issubdtype(A.dtype, np.integer):
         dtype = np.result_type(A.dtype, np.float32)
@@ -96,10 +94,19 @@ def validate_csc_input(A, require_square=False, ensure_double=True):
             A = A.astype(np.complex128, copy=False)
 
     # NOTE as of scipy 1.16.2, A.has_sorted_indices and A.has_canonical_format
-    #   are not always set correctly!
-    # Manually set the flags to False to force fixing the format.
-    A.has_sorted_indices = False
-    A.has_canonical_format = False
+    # are not always set correctly! In particular, A.setdiag(...) can lead to
+    # incorrect flags.
+    #
+    # A copy will reset the flags, and avoid modifying the input. Generally,
+    # users would not expect the input matrix to be modified.
+    # A = A.copy()
+    #
+    # To save on memory, we manually set the flags to False to force
+    # sum_duplicates() to re-sort and re-sum any duplicates.
+    if version.parse(scipy_version) < version.parse("1.17.0"):
+        A.has_sorted_indices = False
+        A.has_canonical_format = False
+
     A.sum_duplicates()  # sort indices and sum duplicates
 
     assert A.has_sorted_indices
