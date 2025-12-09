@@ -1268,9 +1268,7 @@ cdef class CholeskyFactor:
         If True, use the lower triangular part of ``A``.
     order : str in {"default", "best", "natural", "metis", \
             "nesdis", "amd", "colamd", "postordered"}, optional
-        The permutation algorithm to use for the factorization. By default,
-        the natural ordering of the input matrix is used. The other options
-        are:
+        The permutation algorithm to use for the factorization. Options are:
 
         * ``default``: Use the default method, which first tries AMD, then METIS.
         * ``best``: Automatically select the best ordering based on the input.
@@ -1281,6 +1279,7 @@ cdef class CholeskyFactor:
           for the symmetric case, or the COLAMD algorithm for the
           unsymmetric case (:math:`A A^{{\\top}}` or :math:`A^{{\\top}} A`).
         * ``postordered``: Use natural ordering followed by postordering.
+        * ``natural`` or ``None``: No permutation is applied (identity permutation).
 
         By default, methods other than ``natural`` will also be
         postordered.
@@ -1383,7 +1382,7 @@ cdef class CholeskyFactor:
         object A,
         *,
         bint lower=True,
-        object order=None,
+        object order="default",
         object sym_kind=None,
         object supernodal_mode=None,
     ):
@@ -2496,7 +2495,7 @@ CholeskyFactor.downdate.__doc__ = _DOC_UPDATE_TEMPLATE.format(
 #         Convenience functions
 # -----------------------------------------------------------------------------
 def cho_factor(
-    A, beta=0.0, *, lower=False, order=None, sym_kind=None, supernodal_mode=None
+    A, beta=0.0, *, lower=False, order="default", sym_kind=None, supernodal_mode=None
 ):
     return CholeskyFactor(
         A, lower=lower, order=order, sym_kind=sym_kind, supernodal_mode=supernodal_mode
@@ -2504,7 +2503,7 @@ def cho_factor(
 
 
 def ldl_factor(
-    A, beta=0.0, *, lower=True, order=None, sym_kind=None, supernodal_mode=None
+    A, beta=0.0, *, lower=True, order="default", sym_kind=None, supernodal_mode=None
 ):
     return CholeskyFactor(
         A, lower=lower, order=order, sym_kind=sym_kind, supernodal_mode=supernodal_mode
@@ -2513,7 +2512,7 @@ def ldl_factor(
 
 # csc_arrays from the factorization, and optionally the permutation
 def cholesky(
-    A, beta=0.0, *, lower=False, order=None, sym_kind=None, supernodal_mode=None
+    A, beta=0.0, *, lower=False, order="default", sym_kind=None, supernodal_mode=None
 ):
     f = cho_factor(
         A,
@@ -2528,7 +2527,7 @@ def cholesky(
     return R if order is None else (R, p)
 
 
-def ldl(A, beta=0.0, *, lower=True, order=None, sym_kind=None, supernodal_mode=None):
+def ldl(A, beta=0.0, *, lower=True, order="default", sym_kind=None, supernodal_mode=None):
     f = ldl_factor(
         A,
         beta=beta,
@@ -2561,8 +2560,7 @@ lower : bool, optional
     upper triangular factor `R`.
 order : None or str in {{"default", "best", "natural", "metis", "nesdis", \
         "amd", "colamd", "postordered"}}, optional
-    The permutation algorithm to use for the factorization. By default, the
-    natural ordering of the input matrix is used. The other options are:
+    The permutation algorithm to use for the factorization. Options are:
 
     * ``default``: Use the default method, which first tries AMD, then METIS.
     * ``best``: Automatically select the best ordering based on the input.
@@ -2573,6 +2571,7 @@ order : None or str in {{"default", "best", "natural", "metis", "nesdis", \
         symmetric case, or the COLAMD algorithm for the unsymmetric case
         (:math:`A A^{{\\top}}` or :math:`A^{{\\top}} A`).
     * ``postordered``: Use natural ordering followed by postordering.
+    * ``natural`` or ``None``: No permutation is applied (identity permutation).
 
     By default, methods other than ``natural`` will also be postordered.
 
