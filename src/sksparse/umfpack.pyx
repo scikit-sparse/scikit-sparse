@@ -1651,9 +1651,10 @@ cdef class UMFFactor:
         b : 2D array of value_t, shape (N, K)
             The right-hand side matrix.
         """
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", SparseEfficiencyWarning)
-            b, _, _ = validate_csc_input(b)
+        if b.shape[1] == 1:
+            b = b.tocsc()  # do not warn for conversion of a vector
+
+        b, _, _ = validate_csc_input(b)
 
         cdef:
             Py_ssize_t k
