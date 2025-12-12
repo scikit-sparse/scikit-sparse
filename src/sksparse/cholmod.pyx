@@ -1921,15 +1921,7 @@ cdef class CholeskyFactor:
         if issparse(b):
             X = self._solve_sparse(b.tocsc())
         else:
-            # For LDL, permute the RHS
-            if not self.is_ll:
-                b = b[self.perm]
-
             X = self._solve_dense(np.asfortranarray(b))
-
-        # For LDL, unpermute the solution
-        if not self.is_ll:
-            X = X[np.argsort(self.perm)]
 
         # Convert to 1D array if input b is 1D
         if return_1D:
@@ -1943,10 +1935,6 @@ cdef class CholeskyFactor:
         cdef cholmod_sparse Bspmatrix
         cdef cholmod_sparse* Bs = &Bspmatrix
 
-        # For LDL, permute the RHS
-        if not self.is_ll:
-            b = b[self.perm]
-
         cdef int stype = 0
 
         b, _, _ = validate_csc_input(b, ensure_double=False)
@@ -1958,12 +1946,10 @@ cdef class CholeskyFactor:
         # Solve the system
         cdef cholmod_sparse* Xs
 
-        cdef int system = CHOLMOD_A if self._factor.is_ll else CHOLMOD_LDLt
-
         if self._use_int32:
-            Xs = cholmod_spsolve(system, self._factor, Bs, self._cm)
+            Xs = cholmod_spsolve(CHOLMOD_A, self._factor, Bs, self._cm)
         else:
-            Xs = cholmod_l_spsolve(system, self._factor, Bs, self._cm)
+            Xs = cholmod_l_spsolve(CHOLMOD_A, self._factor, Bs, self._cm)
 
         _handle_errors(self._cm.status)
 
@@ -1982,12 +1968,10 @@ cdef class CholeskyFactor:
         # Solve the system
         cdef cholmod_dense* Xd
 
-        cdef int system = CHOLMOD_A if self._factor.is_ll else CHOLMOD_LDLt
-
         if self._use_int32:
-            Xd = cholmod_solve(system, self._factor, Bd, self._cm)
+            Xd = cholmod_solve(CHOLMOD_A, self._factor, Bd, self._cm)
         else:
-            Xd = cholmod_l_solve(system, self._factor, Bd, self._cm)
+            Xd = cholmod_l_solve(CHOLMOD_A, self._factor, Bd, self._cm)
 
         _handle_errors(self._cm.status)
 
