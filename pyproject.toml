@@ -62,20 +62,16 @@ dev = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/broesler/scikit-sparse"
-"Bug Tracker" = "https://github.com/broesler/scikit-sparse/issues"
+"Homepage" = "https://github.com/scikit-sparse/scikit-sparse"
+"Bug Tracker" = "https://github.com/scikit-sparse/scikit-sparse/issues"
 
 # This data is excluded from the wheel package, but not necessarily from the
 # sdist (for sdist, see: MANIFEST.in)
 [tool.setuptools.exclude-package-data]
 sksparse = ["*.c", "*.pyx"]
 
-# [tool.setuptools.packages.find]
-# exclude = ["cython_debug"]
-
 [tool.cython]
 language_level = "3"
-# gdb_debug = true
 
 [tool.ruff]
 line-length = 88

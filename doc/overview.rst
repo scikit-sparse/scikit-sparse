@@ -90,7 +90,7 @@ Contact
 Post your suggestions and questions directly to our `GitHub Issues page
 <github_issues_>`_.
 
-.. _github_issues: https://github.com/broesler/scikit-sparse/issues
+.. _github_issues: https://github.com/scikit-sparse/scikit-sparse/issues
 
 Developers
 ----------

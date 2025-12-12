@@ -1,7 +1,7 @@
 .. start-badges
 
-.. image:: https://img.shields.io/github/v/release/broesler/scikit-sparse
-   :target: https://github.com/broesler/scikit-sparse/releases/latest
+.. image:: https://img.shields.io/github/v/release/scikit-sparse/scikit-sparse
+   :target: https://github.com/scikit-sparse/scikit-sparse/releases/latest
    :alt: Latest GitHub release
 
 .. image:: https://img.shields.io/pypi/v/scikit-sparse-dev
@@ -12,8 +12,8 @@
    :target: https://anaconda.org/conda-forge/scikit-sparse-dev
    :alt: Latest conda-forge release
 
-.. image:: https://github.com/broesler/scikit-sparse/actions/workflows/ci-dev.yml/badge.svg?branch=dev
-   :target: https://github.com/broesler/scikit-sparse/actions/workflows/ci-dev.yml
+.. image:: https://github.com/scikit-sparse/scikit-sparse/actions/workflows/ci-dev.yml/badge.svg?branch=dev
+   :target: https://github.com/scikit-sparse/scikit-sparse/actions/workflows/ci-dev.yml
    :alt: CI Status
 
 .. image:: https://readthedocs.org/projects/scikit-sparse-dev/badge/?version=latest

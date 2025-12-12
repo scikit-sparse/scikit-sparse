@@ -157,7 +157,7 @@ pygments_style = "sphinx"
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
 
-GITHUB_URL = "https://github.com/broesler/scikit-sparse"
+GITHUB_URL = "https://github.com/scikit-sparse/scikit-sparse"
 GITHUB_BRANCH = "dev"
 
 PROJECT_ROOT = Path(__file__).parent.parent

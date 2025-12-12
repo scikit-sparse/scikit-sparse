@@ -64,8 +64,8 @@ Learn More
 * :doc:`API Reference <reference/index>` - Detailed API documentation
 * :doc:`Change Log <changes>` - List of changes by version
 
-.. _github_repo: https://github.com/broesler/scikit-sparse
-.. _github_issues: https://github.com/broesler/scikit-sparse/issues
+.. _github_repo: https://github.com/scikit-sparse/scikit-sparse
+.. _github_issues: https://github.com/scikit-sparse/scikit-sparse/issues
 
 
 .. toctree::
