@@ -60,20 +60,21 @@ v0.5.0
   - The :code:`ordering_method` parameter has been renamed to :code:`order`.
 
   - The :code:`Factor` methods :code:`L`, :code:`D`, :code:`LD`, :code:`L_D`,
-    and :code:`P`, have been removed in factor of the methods
+    and :code:`P`, have been removed in favor of the methods
     :meth:`~sksparse.cholmod.CholeskyFactor.get_factor` and
     :meth:`~sksparse.cholmod.CholeskyFactor.get_perm`.
 
-  - The property :code:`perm` and
-    method :attr:`~sksparse.cholmod.CholeskyFactor.factor` have been added
+  - The properties :attr:`~sksparse.cholmod.CholeskyFactor.perm` and
+    :attr:`~sksparse.cholmod.CholeskyFactor.factor` have been added
     to return read-only views of the permutation vector and factor matrix,
     respectively.
 
-  - The :code:`Factor` methods :code:`solve_LDLt`, :code:`solve_LD`,
-    :code:`solve_DLt`, :code:`solve_L`, :code:`solve_Lt`, and :code:`solve_D`
-    have been removed in favor of the single
+  - The :code:`Factor.solve_A` method has been replaced by the
     :meth:`~sksparse.cholmod.CholeskyFactor.solve` method.
-    The :obj:`~sksparse.cholmod.CholeskyFactor` is not callable.
+    The :code:`Factor` methods :code:`solve_LDLt`, :code:`solve_LD`,
+    :code:`solve_DLt`, :code:`solve_L`, :code:`solve_Lt`, and :code:`solve_D`
+    have been removed. The :obj:`~sksparse.cholmod.CholeskyFactor` is not
+    callable.
 
   - The new :meth:`~sksparse.cholmod.CholeskyFactor.solve` method checks the
     condition number and raises a :exc:`~sksparse.cholmod.CholmodNotPositiveDefiniteError` if the
@@ -118,6 +119,8 @@ v0.5.0
   Python 3.9 will reach its end of life in October 2025, so remove support for
   it now. Numpy will end support for all 1.x versions by September 2025. SciPy
   v1.14 (released June 2024) will be supported until the end of 2026.
+  SuiteSparse 7.4.0 introduces single precision support in CHOLMOD 5.1.0.
+
 
 v0.4.4
 ------
