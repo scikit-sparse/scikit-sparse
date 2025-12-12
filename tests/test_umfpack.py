@@ -540,6 +540,10 @@ def test_solve(A, K, trans, is_sparse):
     else:  # trans == "H"
         b = A.conj().T @ expect_x
 
+    # Avoid umf_solve SparseEfficiencyWarning
+    if is_sparse and b.ndim == 2:
+        b = b.tocsc()
+
     x = umf_solve(A, b, trans=trans)
 
     # Compare

@@ -49,15 +49,15 @@ def test_input_conversion(matrix_type):
         case _:
             raise ValueError(f"Unknown matrix type: {matrix_type}")
 
-    if matrix_type == "csc":
+    if matrix_type in ("csc", "csc_matrix"):
         result, use_int32, out_itype = validate_csc_input(A)
     else:
         with pytest.warns(
-            sparse.SparseEfficiencyWarning, match="not in CSC array format"
+            sparse.SparseEfficiencyWarning, match="not in CSC format"
         ):
             result, use_int32, out_itype = validate_csc_input(A)
 
-    assert isinstance(result, sparse.csc_array)
+    assert isinstance(result, sparse.csc_array) or isinstance(result, sparse.csc_matrix)
     assert_array_equal(
         result.toarray(), A.toarray() if sparse.issparse(A) else A, strict=True
     )
