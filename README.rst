@@ -4,33 +4,26 @@
    :target: https://github.com/scikit-sparse/scikit-sparse/releases/latest
    :alt: Latest GitHub release
 
-.. image:: https://img.shields.io/pypi/v/scikit-sparse-dev
-   :target: https://pypi.org/project/scikit-sparse-dev/
+.. image:: https://img.shields.io/pypi/v/scikit-sparse
+   :target: https://pypi.org/project/scikit-sparse/
    :alt: Latest PyPI release
 
-.. image:: https://img.shields.io/conda/vn/conda-forge/scikit-sparse-dev
-   :target: https://anaconda.org/conda-forge/scikit-sparse-dev
+.. image:: https://img.shields.io/conda/vn/conda-forge/scikit-sparse
+   :target: https://anaconda.org/conda-forge/scikit-sparse
    :alt: Latest conda-forge release
 
 .. image:: https://github.com/scikit-sparse/scikit-sparse/actions/workflows/ci-dev.yml/badge.svg?branch=dev
    :target: https://github.com/scikit-sparse/scikit-sparse/actions/workflows/ci-dev.yml
    :alt: CI Status
 
-.. image:: https://readthedocs.org/projects/scikit-sparse-dev/badge/?version=latest
-   :target: https://scikit-sparse-dev.readthedocs.io/en/latest/
+.. image:: https://readthedocs.org/projects/scikit-sparse/badge/?version=latest
+   :target: https://scikit-sparse.readthedocs.io/en/latest/
 
 .. end-badges
 
 ========================
 Scikit-Sparse (sksparse)
 ========================
-
-**NOTE**:
-
-    This is the README for the development version of scikit-sparse.
-    For the stable version, see `the GitHub repository <upstream_repo_>`_, and
-    `the stable docs <upstream_docs_>`_.
-
 
 The ``scikit-sparse`` package is a companion to the `scipy.sparse
 <scipy_sparse_>`_ package for sparse matrix manipulation in Python. It provides
@@ -44,7 +37,7 @@ For more details on usage see `the docs <sksparse_docs_>`_.
 .. _upstream_docs: https://scikit-sparse.readthedocs.io
 .. _scipy_sparse: https://docs.scipy.org/doc/scipy/reference/sparse.html
 .. _suitesparse_website: https://people.engr.tamu.edu/davis/suitesparse.html
-.. _sksparse_docs: https://scikit-sparse-dev.readthedocs.org
+.. _sksparse_docs: https://scikit-sparse.readthedocs.org
    
 .. start-installation
 
@@ -99,11 +92,11 @@ Installing Scikit-Sparse
 
 Once you have SuiteSparse installed, you can install ``scikit-sparse`` with::
 
-    $ conda install -c conda-forge scikit-sparse-dev
+    $ conda install -c conda-forge scikit-sparse
 
 or if you prefer to use pip, you can install it with::
 
-    $ pip install scikit-sparse-dev
+    $ pip install scikit-sparse
 
 Check if the installation was successful by running the following command::
 
@@ -115,11 +108,11 @@ Check if the installation was successful by running the following command::
 See `Troubleshooting <docs_trouble_>`_ for more information on determining
 which SuiteSparse library is being used.
 
-.. _docs_trouble: https://scikit-sparse-dev.readthedocs.io/en/latest/overview.html#troubleshooting
+.. _docs_trouble: https://scikit-sparse.readthedocs.io/en/latest/overview.html#troubleshooting
 
 
 ----
 
 Copyright © 2009–2025, the `scikit-sparse developers <docs_dev_>`_.
 
-.. _docs_dev: https://scikit-sparse-dev.readthedocs.io/en/latest/overview.html#developers
+.. _docs_dev: https://scikit-sparse.readthedocs.io/en/latest/overview.html#developers

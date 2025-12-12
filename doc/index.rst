@@ -29,9 +29,9 @@ Installation
 
 .. code-block:: bash
 
-    conda install -c conda-forge scikit-sparse-dev
+    conda install -c conda-forge scikit-sparse
     # or
-    pip install scikit-sparse-dev
+    pip install scikit-sparse
 
 
 Quick Example
