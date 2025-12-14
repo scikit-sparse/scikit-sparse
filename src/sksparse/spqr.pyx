@@ -1202,7 +1202,7 @@ cdef class SPQRFactor:
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def _qmult_dense(self, int method, value_t[::1, :] X):
+    def _qmult_dense(self, int method, value_t[::1, :] X not None):
         """Multiply a dense matrix by Q."""
         cdef cholmod_dense Xdense
         cdef cholmod_dense *Xd = &Xdense
@@ -1331,7 +1331,7 @@ cdef class SPQRFactor:
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def _solve_dense(self, value_t[::1, :] b, bint transpose):
+    def _solve_dense(self, value_t[::1, :] b not None, bint transpose):
         """Solve a linear system with a dense right-hand side."""
         # Get the b vector or matrix into CHOLMOD format
         cdef cholmod_dense Bmatrix
@@ -1973,8 +1973,8 @@ cdef object _qmult_dense(
 def _qmult(
     int method,
     object H,
-    value_t[::1, :] tau,
-    index_t[::1] v,
+    value_t[::1, :] tau not None,
+    index_t[::1] v not None,
     object X,
 ):
     """Dispatch the correct typed qmult function."""
