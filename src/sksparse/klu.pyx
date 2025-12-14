@@ -956,9 +956,9 @@ cdef class KLUFactor:
     def _init_symbolic(
         self,
         Py_ssize_t N,
-        index_t[::1] indptr,
-        index_t[::1] indices,
-        value_t[::1] data,
+        index_t[::1] indptr not None,
+        index_t[::1] indices not None,
+        value_t[::1] data not None,
     ):
         """Compute the symbolic factorization.
 
@@ -1293,9 +1293,9 @@ cdef class KLUFactor:
     @cython.wraparound(False)
     def _factorize(
         self,
-        index_t[::1] indptr,
-        index_t[::1] indices,
-        value_t[::1] data,
+        index_t[::1] indptr not None,
+        index_t[::1] indices not None,
+        value_t[::1] data not None,
     ):
         """Compute the numeric factorization given the CSC arrays.
 
@@ -1350,9 +1350,9 @@ cdef class KLUFactor:
     @cython.wraparound(False)
     def _refactorize(
         self,
-        index_t[::1] indptr,
-        index_t[::1] indices,
-        value_t[::1] data,
+        index_t[::1] indptr not None,
+        index_t[::1] indices not None,
+        value_t[::1] data not None,
     ):
         """Re-compute the numeric factorization given the CSC arrays.
 
@@ -1599,7 +1599,7 @@ cdef class KLUFactor:
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def _solve(self, size_t K, value_t[::1] x):
+    def _solve(self, size_t K, value_t[::1] x not None):
         """Solve Ax = b.
 
         Parameters
@@ -1631,7 +1631,7 @@ cdef class KLUFactor:
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def _tsolve(self, size_t K, value_t[::1] x):
+    def _tsolve(self, size_t K, value_t[::1] x not None):
         """Solve xA = b.
 
         Parameters
@@ -1754,11 +1754,13 @@ cdef class KLUFactor:
                 KLUSingularMatrixWarning
             )
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def _rgrowth(
         self,
-        index_t[::1] indptr,
-        index_t[::1] indices,
-        value_t[::1] data
+        index_t[::1] indptr not None,
+        index_t[::1] indices not None,
+        value_t[::1] data not None,
     ):
         """Compute the growth factor of the LU factorization."""
         if self._use_int32:
@@ -1802,7 +1804,7 @@ cdef class KLUFactor:
                 )
             _handle_errors(self._l_cm.status)
 
-    cdef void _get_numeric(self) except *:
+    cdef int _get_numeric(self) except -1:
         """Extract and cache the numeric factors from the klu_numeric struct."""
         if (self._use_int32 and self._numeric is NULL) or (
             not self._use_int32 and self._l_numeric is NULL
@@ -1885,13 +1887,22 @@ cdef class KLUFactor:
     @cython.wraparound(False)
     def _extract(
         self,
-        index_t[::1] Lp, index_t[::1] Li, value_t[::1] Lx,
-        index_t[::1] Up, index_t[::1] Ui, value_t[::1] Ux,
-        index_t[::1] Fp, index_t[::1] Fi, value_t[::1] Fx,
-        index_t[::1] P,
-        index_t[::1] Q,
-        double[::1] Rs,
-        index_t[::1] R,
+        index_t[::1] Lp not None,
+        index_t[::1] Li not None,
+        value_t[::1] Lx not None,
+        #
+        index_t[::1] Up not None,
+        index_t[::1] Ui not None,
+        value_t[::1] Ux not None,
+        #
+        index_t[::1] Fp not None,
+        index_t[::1] Fi not None,
+        value_t[::1] Fx not None,
+        #
+        index_t[::1] P not None,
+        index_t[::1] Q not None,
+        double[::1] Rs not None,
+        index_t[::1] R not None,
     ):
         """Call the appropriate KLU extract function.
 
@@ -1946,13 +1957,25 @@ cdef class KLUFactor:
     @cython.wraparound(False)
     def _z_extract(
         self,
-        index_t[::1] Lp, index_t[::1] Li, value_t[::1] Lx, value_t[::1] Lz,
-        index_t[::1] Up, index_t[::1] Ui, value_t[::1] Ux, value_t[::1] Uz,
-        index_t[::1] Fp, index_t[::1] Fi, value_t[::1] Fx, value_t[::1] Fz,
-        index_t[::1] P,
-        index_t[::1] Q,
-        double[::1] Rs,
-        index_t[::1] R,
+        index_t[::1] Lp not None,
+        index_t[::1] Li not None,
+        value_t[::1] Lx not None,
+        value_t[::1] Lz not None,
+        #
+        index_t[::1] Up not None,
+        index_t[::1] Ui not None,
+        value_t[::1] Ux not None,
+        value_t[::1] Uz not None,
+        #
+        index_t[::1] Fp not None,
+        index_t[::1] Fi not None,
+        value_t[::1] Fx not None,
+        value_t[::1] Fz not None,
+        #
+        index_t[::1] P not None,
+        index_t[::1] Q not None,
+        double[::1] Rs not None,
+        index_t[::1] R not None,
     ):
         """Call the appropriate KLU extract function.
 
