@@ -437,6 +437,25 @@ def test_solve(A, K, is_sparse):
         assert_allclose(xt, expect_x.T, atol=atol)
 
 
+@pytest.mark.parametrize(
+    "rhs_batch_size", [1, 10, 50, 100], ids=lambda b: f"rhs_batch_size={b}"
+)
+def test_solve_many_sparse_RHS(davis_example_qr, rhs_batch_size):
+    A = davis_example_qr
+    A.setdiag(A.diagonal() + 1.0)  # make non-singular
+    N = A.shape[0]
+    K = 56  # large, arbitrary number of RHS
+    s = np.arange(1, N + 1, dtype=A.dtype)
+    data = np.array([i * s for i in range(1, K + 1)]).T
+    expect_x = sparse.csc_array(data, dtype=A.dtype)
+    b = A @ expect_x
+    f = klu_factor(A)
+    x = f.solve(b, rhs_batch_size=rhs_batch_size)
+    assert_allclose(x.toarray(), expect_x.toarray(), atol=1e-12)
+    x = klu_solve(A, b, rhs_batch_size=rhs_batch_size)
+    assert_allclose(x.toarray(), expect_x.toarray(), atol=1e-12)
+
+
 @pytest.mark.parametrize("problem", ["well1033", "illc1033", "well1850", "illc1850"])
 def test_solve_real(problem):
     A, b = load_problem(problem)
