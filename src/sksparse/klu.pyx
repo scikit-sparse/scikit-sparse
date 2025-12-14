@@ -71,10 +71,11 @@ References
 """
 
 cimport cython
+cimport numpy as cnp
 
 from copy import deepcopy
 import numpy as np
-from scipy.sparse import issparse, csc_array
+from scipy.sparse import issparse, csc_array, hstack
 import warnings
 
 from .utils import validate_csc_input
@@ -955,9 +956,9 @@ cdef class KLUFactor:
     def _init_symbolic(
         self,
         Py_ssize_t N,
-        index_t[::1] indptr,
-        index_t[::1] indices,
-        value_t[::1] data,
+        index_t[::1] indptr not None,
+        index_t[::1] indices not None,
+        value_t[::1] data not None,
     ):
         """Compute the symbolic factorization.
 
@@ -1292,9 +1293,9 @@ cdef class KLUFactor:
     @cython.wraparound(False)
     def _factorize(
         self,
-        index_t[::1] indptr,
-        index_t[::1] indices,
-        value_t[::1] data,
+        index_t[::1] indptr not None,
+        index_t[::1] indices not None,
+        value_t[::1] data not None,
     ):
         """Compute the numeric factorization given the CSC arrays.
 
@@ -1349,9 +1350,9 @@ cdef class KLUFactor:
     @cython.wraparound(False)
     def _refactorize(
         self,
-        index_t[::1] indptr,
-        index_t[::1] indices,
-        value_t[::1] data,
+        index_t[::1] indptr not None,
+        index_t[::1] indices not None,
+        value_t[::1] data not None,
     ):
         """Re-compute the numeric factorization given the CSC arrays.
 
@@ -1406,7 +1407,7 @@ cdef class KLUFactor:
                 )
             _handle_errors(self._l_cm.status)
 
-    def solve(self, object b, *, bint transpose=False):
+    def solve(self, object b, *, bint transpose=False, Py_ssize_t rhs_batch_size=100):
         r"""Solve a linear system using the KLU factorization.
 
         This method solves a linear system for :math:`x` given the right-hand side
@@ -1429,6 +1430,13 @@ cdef class KLUFactor:
         ----------
         b : (N,) or (N, K) numpy.ndarray
             The right-hand side vector or matrix.
+        transpose : bool, optional
+            If True, solve :math:`x A = b`, otherwise, solve :math:`A x = b`.
+        rhs_batch_size : int, optional
+            If ``b`` is a 2D sparse array, this parameter controls the number of
+            columns to be solved simultaneously. A larger number will increase
+            memory consumption by converting more columns at a time to dense
+            arrays, but may improve runtime.
 
         Returns
         -------
@@ -1444,9 +1452,8 @@ cdef class KLUFactor:
         if b.ndim not in (1, 2):
             raise ValueError("b must be a 1D or 2D array.")
 
-        cdef bint return_1D = b.ndim == 1
-        cdef size_t N = b.shape[0] if (b.ndim == 1 or not transpose) else b.shape[1]
-        cdef size_t K = 1 if b.ndim == 1 else (b.shape[0] if transpose else b.shape[1])
+        cdef Py_ssize_t N = b.shape[0] if (b.ndim == 1 or not transpose) else b.shape[1]
+        cdef Py_ssize_t K = 1 if b.ndim == 1 else (b.shape[0] if transpose else b.shape[1])
 
         if N != self._N:
             raise ValueError(
@@ -1462,49 +1469,137 @@ cdef class KLUFactor:
         # Check the condition number
         self._check_rcond()
 
-        cdef bint return_sparse = issparse(b)
+        cdef bint is_sparse = issparse(b)
 
-        if return_sparse:
-            b = b.toarray()
-        else:
-            b = np.asarray(b)
-
-        # Ensure columns are contiguous for multiple RHS
-        b = np.asfortranarray(b)
-
-        # The klu_solve function overwrites the input with the output
-        x = b.copy()
+        if not is_sparse:
+            b = np.asfortranarray(b)
 
         if transpose:
-            x = x.T.conj()
+            b = b.T.conj()
 
-        # klu_solve expects B as a column-oriented 1D array
-        x = x.reshape(-1, order='F')
-
-        if transpose:
-            self._tsolve(K, x)
+        # Solve the system
+        if is_sparse:
+            x = self._solve_sparse(K, b, transpose, rhs_batch_size)
         else:
-            self._solve(K, x)
-
-        # Reshape X into a  2D array
-        x = x.reshape(self._N, K, order='F')
-
-        if return_sparse:
-            x = csc_array(x, dtype=b.dtype)
-            x.indptr = x.indptr.astype(self.itype, copy=False)
-            x.indices = x.indices.astype(self.itype, copy=False)
-
-        if return_1D:
-            x = x[:, 0]
+            x = self._solve_dense(K, b, transpose)
 
         if transpose:
             x = x.T.conj()
 
         return x
 
+    cdef _solve_sparse(
+        self,
+        Py_ssize_t K,
+        object b,
+        bint transpose,
+        Py_ssize_t rhs_batch_size
+    ):
+        """Solve Ax = b for sparse right-hand sides.
+
+        Parameters
+        ----------
+        K : int
+            The number of right-hand sides to solve.
+        b : (N,) or (N, K) sparse array
+            RHS vector or matrix.
+        transpose : bool
+            If True, solve x A = b, else solve A x = b.
+        rhs_batch_size : int
+            Number of columns of b to convert to dense at one time.
+
+        Returns
+        -------
+        x : (N, K) csc_array
+            The solution matrix.
+        """
+        cdef bint return_1D = b.ndim == 1
+        if return_1D:
+            b = b.reshape((-1, 1))
+
+        if b.shape[1] == 1:
+            b = b.tocsc()  # do not warn for conversion of a vector
+
+        b, _, _ = validate_csc_input(b)
+
+        cdef:
+            Py_ssize_t k
+            Py_ssize_t batch_end
+            Py_ssize_t width
+            list x_blocks = []
+            cnp.ndarray b_view
+            cnp.ndarray x_view
+
+        # Pre-allocate dense space for RHS (input) -> solution (output)
+        cdef cnp.ndarray b_batch = np.empty(
+            (b.shape[0], min(rhs_batch_size, K)), dtype=b.dtype, order="F"
+        )
+
+        cdef cnp.ndarray x_batch = np.empty(
+            (b.shape[0], min(rhs_batch_size, K)), dtype=b.dtype, order="F"
+        )
+
+        for k in range(0, K, rhs_batch_size):
+            batch_end = min(k + rhs_batch_size, K)
+            width = batch_end - k
+            # Views on the correct columns of the buffers
+            b_view = b_batch[:, :width]
+            x_view = x_batch[:, :width]
+            # Convert the sparse RHS to dense in the buffer
+            b[:, k:batch_end].toarray(out=b_view)
+            # Solve the systems
+            self._solve_dense(width, b_view, transpose, out=x_view)
+            # Only take the relevant columns
+            x_blocks.append(csc_array(x_view, dtype=b.dtype))
+
+        x = hstack(x_blocks)
+        x.indptr = x.indptr.astype(self.itype, copy=False)
+        x.indices = x.indices.astype(self.itype, copy=False)
+
+        if return_1D:
+            x = x[:, 0]
+
+        return x
+
+    cdef _solve_dense(
+        self,
+        Py_ssize_t K,
+        cnp.ndarray b,
+        bint transpose,
+        cnp.ndarray out=None
+    ):
+        """Solve Ax = b for dense right-hand sides.
+
+        Parameters
+        ----------
+        K : int
+            The number of right-hand sides to solve.
+        b : (N, K) ndarray
+            The right-hand side matrix.
+        transpose : bool
+            Whether to solve the transposed system.
+        out : (N, K) ndarray, optional
+            If provided, pre-allocated space for the solution.
+        """
+        if out is None:
+            out = np.empty_like(b, order="F")
+
+        # The klu_solve function overwrites the input with the output
+        np.copyto(out, b)
+
+        # klu_solve expects B as a column-oriented 1D array, so make a flat view
+        cdef cnp.ndarray x = out.reshape(-1, order="F", copy=False)
+
+        if transpose:
+            self._tsolve(K, x)
+        else:
+            self._solve(K, x)
+
+        return out
+
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def _solve(self, size_t K, value_t[::1] x):
+    def _solve(self, size_t K, value_t[::1] x not None):
         """Solve Ax = b.
 
         Parameters
@@ -1536,7 +1631,7 @@ cdef class KLUFactor:
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def _tsolve(self, size_t K, value_t[::1] x):
+    def _tsolve(self, size_t K, value_t[::1] x not None):
         """Solve xA = b.
 
         Parameters
@@ -1659,11 +1754,13 @@ cdef class KLUFactor:
                 KLUSingularMatrixWarning
             )
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def _rgrowth(
         self,
-        index_t[::1] indptr,
-        index_t[::1] indices,
-        value_t[::1] data
+        index_t[::1] indptr not None,
+        index_t[::1] indices not None,
+        value_t[::1] data not None,
     ):
         """Compute the growth factor of the LU factorization."""
         if self._use_int32:
@@ -1707,7 +1804,7 @@ cdef class KLUFactor:
                 )
             _handle_errors(self._l_cm.status)
 
-    cdef void _get_numeric(self) except *:
+    cdef int _get_numeric(self) except -1:
         """Extract and cache the numeric factors from the klu_numeric struct."""
         if (self._use_int32 and self._numeric is NULL) or (
             not self._use_int32 and self._l_numeric is NULL
@@ -1790,13 +1887,22 @@ cdef class KLUFactor:
     @cython.wraparound(False)
     def _extract(
         self,
-        index_t[::1] Lp, index_t[::1] Li, value_t[::1] Lx,
-        index_t[::1] Up, index_t[::1] Ui, value_t[::1] Ux,
-        index_t[::1] Fp, index_t[::1] Fi, value_t[::1] Fx,
-        index_t[::1] P,
-        index_t[::1] Q,
-        double[::1] Rs,
-        index_t[::1] R,
+        index_t[::1] Lp not None,
+        index_t[::1] Li not None,
+        value_t[::1] Lx not None,
+        #
+        index_t[::1] Up not None,
+        index_t[::1] Ui not None,
+        value_t[::1] Ux not None,
+        #
+        index_t[::1] Fp not None,
+        index_t[::1] Fi not None,
+        value_t[::1] Fx not None,
+        #
+        index_t[::1] P not None,
+        index_t[::1] Q not None,
+        double[::1] Rs not None,
+        index_t[::1] R not None,
     ):
         """Call the appropriate KLU extract function.
 
@@ -1851,13 +1957,25 @@ cdef class KLUFactor:
     @cython.wraparound(False)
     def _z_extract(
         self,
-        index_t[::1] Lp, index_t[::1] Li, value_t[::1] Lx, value_t[::1] Lz,
-        index_t[::1] Up, index_t[::1] Ui, value_t[::1] Ux, value_t[::1] Uz,
-        index_t[::1] Fp, index_t[::1] Fi, value_t[::1] Fx, value_t[::1] Fz,
-        index_t[::1] P,
-        index_t[::1] Q,
-        double[::1] Rs,
-        index_t[::1] R,
+        index_t[::1] Lp not None,
+        index_t[::1] Li not None,
+        value_t[::1] Lx not None,
+        value_t[::1] Lz not None,
+        #
+        index_t[::1] Up not None,
+        index_t[::1] Ui not None,
+        value_t[::1] Ux not None,
+        value_t[::1] Uz not None,
+        #
+        index_t[::1] Fp not None,
+        index_t[::1] Fi not None,
+        value_t[::1] Fx not None,
+        value_t[::1] Fz not None,
+        #
+        index_t[::1] P not None,
+        index_t[::1] Q not None,
+        double[::1] Rs not None,
+        index_t[::1] R not None,
     ):
         """Call the appropriate KLU extract function.
 
@@ -1991,7 +2109,15 @@ def klu_factor(A, *, KLUControl control=None, **kwargs):
     return KLUFactor(A, control).factorize(A)
 
 
-def klu_solve(A, b, *, KLUControl control=None, bint transpose=False, **kwargs):
+def klu_solve(
+    A,
+    b,
+    *,
+    KLUControl control=None,
+    bint transpose=False,
+    Py_ssize_t rhs_batch_size=100,
+    **kwargs,
+):
     r"""Solve a linear system using KLU.
 
     This function solves a linear system for :math:`x` given the right-hand side
@@ -2022,6 +2148,11 @@ def klu_solve(A, b, *, KLUControl control=None, bint transpose=False, **kwargs):
         If not provided, default parameters are used.
     transpose : bool, optional
         If True, solve :math:`x A = b`, otherwise, solve :math:`A x = b`.
+    rhs_batch_size : int, optional
+        If ``b`` is a 2D sparse array, this parameter controls the number of
+        columns to be solved simultaneously. A larger number will increase
+        memory consumption by converting more columns at a time to dense
+        arrays, but may improve runtime.
     **kwargs
         Additional keyword arguments passed to the :class:`KLUControl` constructor.
 
@@ -2074,7 +2205,11 @@ def klu_solve(A, b, *, KLUControl control=None, bint transpose=False, **kwargs):
     # factorize() and solve() will each warn for a singular matrix,
     # so we catch the warnings from factorize() and re-raise only once.
     with warnings.catch_warnings(record=True) as ws:
-        x = KLUFactor(A, control).factorize(A).solve(b, transpose=transpose)
+        x = (
+            KLUFactor(A, control)
+            .factorize(A)
+            .solve(b, transpose=transpose, rhs_batch_size=rhs_batch_size)
+        )
 
     # Raise only the latest singular matrix warning from solve
     if ws:
