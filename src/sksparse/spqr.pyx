@@ -76,6 +76,7 @@ References
 
 cimport cython
 from cython cimport doublecomplex as cdouble
+cimport numpy as cnp
 
 from sksparse.cholmod cimport (
     CHOLMOD_OK,
@@ -101,7 +102,7 @@ from sksparse.cholmod cimport (
 )
 
 import numpy as np
-from scipy.sparse import csc_array, issparse
+from scipy.sparse import csc_array, issparse, hstack
 from typing import NamedTuple
 import warnings
 
@@ -943,7 +944,6 @@ cdef class SPQRFactor:
         else:
             cholmod_l_finish(self._cm)
 
-
     def __repr__(self):
         cls_name = self.__class__.__name__
         factor_type = 'numeric' if self.is_numeric else 'symbolic'
@@ -1202,7 +1202,7 @@ cdef class SPQRFactor:
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def _qmult_dense(self, int method, value_t[::1, :] X):
+    def _qmult_dense(self, int method, value_t[::1, :] X not None):
         """Multiply a dense matrix by Q."""
         cdef cholmod_dense Xdense
         cdef cholmod_dense *Xd = &Xdense
@@ -1233,7 +1233,7 @@ cdef class SPQRFactor:
 
         return _ndarray_from_cholmod_dense(Yd, self._use_int32, self._cm)
 
-    def solve(self, object b, *, bint transpose=False):
+    def solve(self, object b, *, bint transpose=False, Py_ssize_t rhs_batch_size=100):
         self._require_numeric()
 
         if not (isinstance(b, np.ndarray) or issparse(b)):
@@ -1265,38 +1265,73 @@ cdef class SPQRFactor:
             )
 
         cdef bint return_1D = b.ndim == 1
-        cdef bint return_sparse = issparse(b)
 
         # CHOLMOD routines require a 2D array
         if b.ndim == 1:
-            if not transpose:
-                b = b.reshape((self._M, 1))
-            else:
-                b = b.reshape((self._N, 1))
+            b = b.reshape((-1, 1))
 
-        # The SuiteSparseQR_solve "sparse" routine just converts b to
-        # cholmod_dense internally.
         if issparse(b):
-            b = b.toarray()
-
-        # Ensure columns are contiguous for multiple RHS
-        b = np.asfortranarray(b)
-
-        x = self._solve(b, transpose)
-
-        if return_sparse:
-            x = csc_array(x, dtype=b.dtype)
-            x.indptr = x.indptr.astype(self.itype, copy=False)
-            x.indices = x.indices.astype(self.itype, copy=False)
+            x = self._solve_sparse(b, transpose, rhs_batch_size)
+        else:
+            x = self._solve_dense(np.asfortranarray(b), transpose)
 
         if return_1D:
             x = x[:, 0]
 
         return x
 
+    cdef _solve_sparse(self, object b, bint transpose, Py_ssize_t rhs_batch_size):
+        """Solve multiple RHS systems where b is a sparse matrix.
+
+        Parameters
+        ----------
+        sys : int
+            The system type (UMFPACK_A, UMFPACK_Aat, UMFPACK_At).
+        b : 2D array of value_t, shape (N, K)
+            The right-hand side matrix.
+        rhs_batch_size : int
+            The number of columsn to convert to dense simultaneously.
+        """
+        if b.shape[1] == 1:
+            b = b.tocsc()  # do not warn for conversion of a vector
+
+        b, _, _ = validate_csc_input(b)
+
+        cdef:
+            Py_ssize_t k
+            Py_ssize_t batch_end
+            Py_ssize_t width
+            Py_ssize_t K = b.shape[1]
+            list x_blocks = []
+            cnp.ndarray b_view
+            cnp.ndarray x_batch
+
+        # Pre-allocate dense space for RHS and solution
+        cdef cnp.ndarray b_batch = np.empty(
+            (b.shape[0], min(rhs_batch_size, K)), dtype=b.dtype, order="F"
+        )
+
+        for k in range(0, K, rhs_batch_size):
+            batch_end = min(k + rhs_batch_size, K)
+            width = batch_end - k
+            # Views on the correct columns of the buffers
+            b_view = b_batch[:, :width]
+            # Convert the sparse RHS to dense in the buffer
+            b[:, k:batch_end].toarray(out=b_view)
+            # Solve the systems
+            x_batch = self._solve_dense(b_view, transpose)
+            # Only take the relevant columns
+            x_blocks.append(csc_array(x_batch, dtype=b.dtype))
+
+        x = hstack(x_blocks)
+        x.indptr = x.indptr.astype(self.itype, copy=False)
+        x.indices = x.indices.astype(self.itype, copy=False)
+
+        return x
+
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def _solve(self, value_t[::1, :] b, bint transpose):
+    def _solve_dense(self, value_t[::1, :] b not None, bint transpose):
         """Solve a linear system with a dense right-hand side."""
         # Get the b vector or matrix into CHOLMOD format
         cdef cholmod_dense Bmatrix
@@ -1513,14 +1548,17 @@ def spqr_factor(A, *, use_singletons=False, order=None, tol=None):
         return SPQRFactor(A, use_singletons=False, order=order, tol=tol).factorize(A)
 
 
-def spqr_solve(A, b, *, transpose=False, min2norm=True):
+def spqr_solve(A, b, *, transpose=False, min2norm=True, Py_ssize_t rhs_batch_size=100):
     A, _, _ = validate_csc_input(A)
     M, N = A.shape
 
     if M < N and min2norm:
-        return SPQRFactor(A.T.tocsc(), use_singletons=True).solve(b, transpose=True)
-    else:
-        return SPQRFactor(A, use_singletons=True).solve(b, transpose=transpose)
+        A = A.T.tocsc()
+        transpose = True
+
+    return SPQRFactor(A, use_singletons=True).solve(
+        b, transpose=transpose, rhs_batch_size=rhs_batch_size
+    )
 
 
 # -------------------------------------------------------------------------------------
@@ -1935,8 +1973,8 @@ cdef object _qmult_dense(
 def _qmult(
     int method,
     object H,
-    value_t[::1, :] tau,
-    index_t[::1] v,
+    value_t[::1, :] tau not None,
+    index_t[::1] v not None,
     object X,
 ):
     """Dispatch the correct typed qmult function."""
@@ -2066,6 +2104,11 @@ b : (M,) or (M, K) numpy.ndarray
 transpose : bool, optional
     Whether to solve the transposed system. Default is False.
 {min2norm}
+rhs_batch_size : int, optional
+    If ``b`` is a 2D sparse array, this parameter controls the number of
+    columns to be solved simultaneously. A larger number will increase
+    memory consumption by converting more columns at a time to dense
+    arrays, but may improve runtime.
 
 Returns
 -------
