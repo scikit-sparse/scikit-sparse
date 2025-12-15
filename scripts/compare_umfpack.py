@@ -13,9 +13,6 @@ Compare the scikit-sparse UMFPACK interface with the existing scikit-umfpack
 interface.
 """
 
-import gc
-import timeit
-import tracemalloc
 from functools import partial
 from pathlib import Path
 
@@ -31,6 +28,8 @@ from tqdm import tqdm
 
 from sksparse.umfpack import umf_factor
 
+from .utils import measure_perf
+
 SEED = 565656
 
 SAVE_FIGS = False
@@ -39,47 +38,6 @@ DATA_PATH = Path(__file__).absolute().parent.parent.parent / "_dev_data"
 DATA_PATH.mkdir(parents=True, exist_ok=True)
 
 PKG_NAMES = ["sksparse", "scikit-umfpack"]
-
-
-def measure_perf(func, N_repeats=5, N_samples=None):
-    """Measure time and memory usage of a function.
-
-    Parameters
-    ----------
-    func : callable
-        The function to measure.
-
-    Returns
-    -------
-    time : float
-        The minimum execution time in seconds.
-    peak_mb : float
-        The peak memory usage in megabytes.
-    """
-    # Measure timing (multiple runs)
-    timer = timeit.Timer(func)
-    if N_samples is None:
-        N_samples, _ = timer.autorange()
-    ts = timer.repeat(repeat=N_repeats, number=N_samples)
-    ts = np.array(ts) / N_samples
-    time = np.min(ts)
-
-    # Measure memory usage (single pass)
-    gc.collect()  # force garbage collection before measuring
-    tracemalloc.start()
-
-    try:
-        func()
-    except Exception:
-        tracemalloc.stop()
-        raise
-
-    _, peak = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
-
-    peak_mb = peak / (1024**2)  # convert to MB
-
-    return time, peak_mb
 
 
 def run_package_comparison(df_file, force_update=False):
