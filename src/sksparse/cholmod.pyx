@@ -1669,6 +1669,67 @@ cdef class CholeskyFactor:
 
         return cf
 
+    def change_factor(self, kind=None):
+        """Change the type of factorization used by the object.
+
+        This method changes the type of factorization used by the object
+        between ``LL.T`` and ``LDL.T``. The symbolic analysis is reused,
+        so this method does not require refactorization of the matrix.
+
+        Parameters
+        ----------
+        kind : str in {'LL', 'LDL'}, optional
+            The type of factorization to use. If ``LL``, use the Cholesky
+            factor `L` such that :math:`L L^{\\top} = P A P^{\\top}`. If
+            ``LDL``, use the combined `LD` factor such that
+            :math:`L D L^{\\top} = P A P^{\\top}`. Default is None, which
+            switches to the other type of factorization.
+
+        See Also
+        --------
+        factor, get_factor
+        """
+        self._require_factorized()
+
+        if kind is None:
+            kind = "LDL" if self.is_ll else "LL"
+
+        if kind not in ("LL", "LDL"):
+            raise ValueError("kind must be 'LL' or 'LDL'.")
+
+        # Clear cached properties
+        self._clear_cache()
+
+        cdef int to_ll = (kind == "LL")
+        cdef int to_super = self._factor.is_super
+        cdef int to_packed = True
+        cdef int to_monotonic = self._factor.is_monotonic
+
+        if self._factor.itype == CHOLMOD_INT:
+            cholmod_change_factor(
+                self._factor.xtype,
+                to_ll,
+                to_super,
+                to_packed,
+                to_monotonic,
+                self._factor,
+                self._cm,
+            )
+        else:
+            cholmod_l_change_factor(
+                self._factor.xtype,
+                to_ll,
+                to_super,
+                to_packed,
+                to_monotonic,
+                self._factor,
+                self._cm,
+            )
+
+        _handle_errors(self._cm.status)
+
+        return self
+
     def get_factor(self, kind=None, lower=None):
         """Return a copy of the Cholesky factor in the specified format.
 
