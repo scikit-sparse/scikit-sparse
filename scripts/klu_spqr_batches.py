@@ -22,10 +22,9 @@ from scipy import sparse
 from scipy.sparse.linalg import LaplacianNd
 from tqdm import tqdm
 
+from scripts.utils import measure_perf
 from sksparse.klu import klu_factor
 from sksparse.spqr import spqr_factor
-
-from .utils import measure_perf
 
 SEED = 565656
 
@@ -46,14 +45,14 @@ def run_batch_comparison(df_file, force_update=False):
 
     # Build the results DataFrame
     densities = [0.01, 0.1, 0.5, 1.0]
-    batch_sizes = [1, 3, 10, 30, 100, 300, 1_000, 3_000, 10_000]
+    batch_sizes = [1, 3, 10, 30, 100, 300, 1_000, 3_000]
 
     Nsq = 100
     Ng = np.sqrt(Nsq).astype(int)
     A = -LaplacianNd((Ng, Ng), dtype=float).tosparse().tocsc()
     A[-1, -1] += 1.0  # make sure A is non-singular
     N = A.shape[0]
-    K = 9_056  # arbitrary number of RHS
+    K = 1_056  # arbitrary number of RHS
 
     # Pre-factor the matrix
     lu = klu_factor(A)
@@ -80,7 +79,11 @@ def run_batch_comparison(df_file, force_update=False):
                 )
 
     # Build the results DataFrame
-    df = pd.DataFrame(results).set_index(["rhs_batch_size", "density"]).sort_index()
+    df = (
+        pd.DataFrame(results)
+        .set_index(["solver", "rhs_batch_size", "density"])
+        .sort_index()
+    )
     df.columns.name = "metric"
 
     df.to_pickle(df_file)
@@ -99,7 +102,7 @@ if __name__ == "__main__":
         fig, axs = plt.subplots(num=fignum, nrows=2, sharex=True, clear=True)
         fig.suptitle(
             f"Batch RHS {name.upper()} Solve Performance\n"
-            "A (100, 100) 2D Laplacian, B (100, 9,056)"
+            "A (100, 100) 2D Laplacian, B (100, 1,056)"
         )
         fig.set_size_inches((6.4, 8), forward=True)
 
