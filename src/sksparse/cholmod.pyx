@@ -1337,6 +1337,13 @@ cdef class CholeskyFactor:
             factor. It will be modified if the factor is modified (*e.g.*, by
             calling :meth:`.factorize`). To get a copy, use
             :meth:`.get_factor`.
+    L : :class:`~scipy.sparse.csc_array`
+        The lower triangular factor in Compressed Sparse Column (CSC) format.
+    R : :class:`~scipy.sparse.csc_array`
+        The upper triangular factor in Compressed Sparse Column (CSC) format.
+    D : :class:`~scipy.sparse.dia_array`
+        A view of the diagonal factor in DIAgonal format. If ``self.is_ll``,
+        this is the identity matrix.
 
     Raises
     ------
@@ -1376,6 +1383,13 @@ cdef class CholeskyFactor:
         readonly bint is_lower
         readonly object sym_kind
         readonly double rcond
+        # Cached factors
+        cnp.ndarray _perm
+        cnp.ndarray _colcount
+        object _L
+        object _R
+        object _D
+        object _factor_view
 
     def __init__(
         self,
@@ -1487,6 +1501,14 @@ cdef class CholeskyFactor:
         if not self.is_numeric:
             raise CholmodError("Factor is symbolic. Call `factorize` before updating.")
 
+    def _clear_cache(self):
+        """Clear cached properties."""
+        self._factor_view = None
+        self._perm = None
+        self._L = None
+        self._R = None
+        self._D = None
+
     def __repr__(self):
         return (
             f"CholeskyFactor("
@@ -1546,7 +1568,11 @@ cdef class CholeskyFactor:
 
     @property
     def colcount(self):
-        return _ndarray_int_view_from_factor(self._factor.ColCount, self._factor.n, self)
+        if self._colcount is None:
+            self._colcount = _ndarray_int_view_from_factor(
+                self._factor.ColCount, self._factor.n, self
+            )
+        return self._colcount
 
     @property
     def nnz(self):
@@ -1559,11 +1585,44 @@ cdef class CholeskyFactor:
 
     @property
     def perm(self):
-        return _ndarray_int_view_from_factor(self._factor.Perm, self._factor.n, self)
+        if self._perm is None:
+            self._perm = _ndarray_int_view_from_factor(self._factor.Perm, self._factor.n, self)
+        return self._perm
 
     @property
     def factor(self):
-        return _csc_view_from_cholmod_factor(self)
+        if self._factor_view is None:
+            self._factor_view = _csc_view_from_cholmod_factor(self)
+        return self._factor_view
+
+    @property
+    def L(self):
+        if self._L is None:
+            if self.is_ll:
+                self._L = self.get_factor(kind="LL", lower=self.is_lower)
+            else:
+                self._L, self._D = self.get_factor(kind="LDL", lower=self.is_lower)
+        return self._L
+
+    @property
+    def R(self):
+        if self._R is None:
+            if self._L is None:
+                if self.is_ll:
+                    self._L = self.get_factor(kind="LL", lower=self.is_lower)
+                else:
+                    self._L, self._D = self.get_factor(kind="LDL", lower=self.is_lower)
+            self._R = self._L.T.conj()
+        return self._R
+
+    @property
+    def D(self):
+        if self._D is None:
+            if self.is_ll:
+                self._D = eye_array(self.N, dtype=self.dtype)
+            else:
+                self._L, self._D = self.get_factor(kind="LDL", lower=self.is_lower)
+        return self._D
 
     # -------------------------------------------------------------------------
     #         Public Methods
@@ -1609,6 +1668,67 @@ cdef class CholeskyFactor:
         cf.rcond = self.rcond
 
         return cf
+
+    def change_factor(self, kind=None):
+        """Change the type of factorization used by the object.
+
+        This method changes the type of factorization used by the object
+        between ``LL.T`` and ``LDL.T``. The symbolic analysis is reused,
+        so this method does not require refactorization of the matrix.
+
+        Parameters
+        ----------
+        kind : str in {'LL', 'LDL'}, optional
+            The type of factorization to use. If ``LL``, use the Cholesky
+            factor `L` such that :math:`L L^{\\top} = P A P^{\\top}`. If
+            ``LDL``, use the combined `LD` factor such that
+            :math:`L D L^{\\top} = P A P^{\\top}`. Default is None, which
+            switches to the other type of factorization.
+
+        See Also
+        --------
+        factor, get_factor
+        """
+        self._require_factorized()
+
+        if kind is None:
+            kind = "LDL" if self.is_ll else "LL"
+
+        if kind not in ("LL", "LDL"):
+            raise ValueError("kind must be 'LL' or 'LDL'.")
+
+        # Clear cached properties
+        self._clear_cache()
+
+        cdef int to_ll = (kind == "LL")
+        cdef int to_super = self._factor.is_super
+        cdef int to_packed = True
+        cdef int to_monotonic = self._factor.is_monotonic
+
+        if self._factor.itype == CHOLMOD_INT:
+            cholmod_change_factor(
+                self._factor.xtype,
+                to_ll,
+                to_super,
+                to_packed,
+                to_monotonic,
+                self._factor,
+                self._cm,
+            )
+        else:
+            cholmod_l_change_factor(
+                self._factor.xtype,
+                to_ll,
+                to_super,
+                to_packed,
+                to_monotonic,
+                self._factor,
+                self._cm,
+            )
+
+        _handle_errors(self._cm.status)
+
+        return self
 
     def get_factor(self, kind=None, lower=None):
         """Return a copy of the Cholesky factor in the specified format.
@@ -1756,6 +1876,9 @@ cdef class CholeskyFactor:
 
         if not isinstance(ldl, bool):
             raise ValueError("ldl must be a boolean value.")
+
+        # Clear cached properties
+        self._clear_cache()
 
         # See CHOLMOD/MATLAB/ldlchol.c and/or lchol.c for details
         self._cm.final_asis = False
@@ -2023,6 +2146,9 @@ cdef class CholeskyFactor:
         if C.shape[0] != N:
             raise ValueError("Update matrix C must have the same number of rows as L.")
 
+        # Clear cached properties
+        self._clear_cache()
+
         # Ensure C is in CSC format
         if C.ndim == 1:
             C = C.reshape((-1, 1)).tocsc()  # (N, 1)
@@ -2126,6 +2252,9 @@ cdef class CholeskyFactor:
                 "Update matrix C must have the same number of rows as L."
             )
 
+        # Clear cached properties
+        self._clear_cache()
+
         # Get C Matrix
         cdef cholmod_sparse Cmatrix
         cdef cholmod_sparse* Cc = &Cmatrix
@@ -2178,6 +2307,9 @@ cdef class CholeskyFactor:
             raise IndexError(
                 f"Row index k={k} is out of bounds for matrix of size {self.N}."
             )
+
+        # Clear cached properties
+        self._clear_cache()
 
         cdef int ok
 
@@ -2256,6 +2388,9 @@ cdef class CholeskyFactor:
 
         if A.nnz == 0:
             raise CholmodNotPositiveDefiniteError("Input matrix not positive definite.")
+
+        # Clear cached properties
+        self._clear_cache()
 
         # Get sparse *pattern*
         cdef cholmod_sparse Amatrix
