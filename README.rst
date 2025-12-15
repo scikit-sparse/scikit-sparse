@@ -32,12 +32,15 @@ proper, typically because they depend on external libraries with
 GPL licenses, such as `SuiteSparse <suitesparse_website_>`_.
 
 For more details on usage see `the docs <sksparse_docs_>`_.
+To upgrade from scikit-sparse v0.4.16 to v0.5.0, see `Upgrading to v0.5.0
+<sksparse_upgrading_>`_.
 
 .. _upstream_repo: https://github.com/scikit-sparse/scikit-sparse
 .. _upstream_docs: https://scikit-sparse.readthedocs.io
 .. _scipy_sparse: https://docs.scipy.org/doc/scipy/reference/sparse.html
 .. _suitesparse_website: https://people.engr.tamu.edu/davis/suitesparse.html
 .. _sksparse_docs: https://scikit-sparse.readthedocs.org
+.. _sksparse_upgrading: https://scikit-sparse.readthedocs.org/en/latest/changes.html#upgrading-from-v0-4-x
    
 .. start-installation
 
