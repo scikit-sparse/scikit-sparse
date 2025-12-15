@@ -23,6 +23,7 @@ from scipy.sparse.linalg import LaplacianNd
 from tqdm import tqdm
 
 from sksparse.klu import klu_factor
+from sksparse.spqr import spqr_factor
 
 from .utils import measure_perf
 
@@ -56,6 +57,7 @@ def run_batch_comparison(df_file, force_update=False):
 
     # Pre-factor the matrix
     lu = klu_factor(A)
+    qr = spqr_factor(A)
 
     results = []
 
@@ -64,16 +66,18 @@ def run_batch_comparison(df_file, force_update=False):
         b = sparse.random_array((N, K), density=d, format="csc", random_state=SEED)
 
         for rhs_batch_size in tqdm(batch_sizes, leave=False):
-            solve_func = partial(lu.solve, b, rhs_batch_size=rhs_batch_size)
-            time, mem = measure_perf(solve_func)
-            results.append(
-                {
-                    "rhs_batch_size": rhs_batch_size,
-                    "density": d,
-                    "time": time,
-                    "memory": mem,
-                }
-            )
+            for name, factor in zip(["klu", "spqr"], [lu, qr]):
+                solve_func = partial(factor.solve, b, rhs_batch_size=rhs_batch_size)
+                time, mem = measure_perf(solve_func)
+                results.append(
+                    {
+                        "solver": name,
+                        "rhs_batch_size": rhs_batch_size,
+                        "density": d,
+                        "time": time,
+                        "memory": mem,
+                    }
+                )
 
     # Build the results DataFrame
     df = pd.DataFrame(results).set_index(["rhs_batch_size", "density"]).sort_index()
@@ -87,47 +91,50 @@ def run_batch_comparison(df_file, force_update=False):
 #         Run the Tests
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
-    df = run_batch_comparison(DATA_PATH / "klu_batch_results.pkl", force_update=False)
+    df_batch = run_batch_comparison(DATA_PATH / "batch_results.pkl", force_update=False)
 
-    # Plot results
-    fig, axs = plt.subplots(num=1, nrows=2, sharex=True, clear=True)
-    fig.suptitle(
-        "Batch RHS Sparse Solve Performance\nA (100, 100) 2D Laplacian, B (100, 9,056)"
-    )
-    fig.set_size_inches((6.4, 8), forward=True)
-
-    for i, col in enumerate(["time", "memory"]):
-        sns.lineplot(
-            ax=axs[i],
-            data=df,
-            x="rhs_batch_size",
-            y=col,
-            hue="density",
-            hue_norm=mpl.colors.LogNorm(),
-            palette="flare",
-            marker="o",
-            legend=(i == 0),
+    for fignum, name in enumerate(["klu", "spqr"]):
+        df = df_batch.xs(name, level="solver")
+        # Plot results
+        fig, axs = plt.subplots(num=fignum, nrows=2, sharex=True, clear=True)
+        fig.suptitle(
+            f"Batch RHS {name.upper()} Solve Performance\n"
+            "A (100, 100) 2D Laplacian, B (100, 9,056)"
         )
-        axs[i].grid(True, which="both")
+        fig.set_size_inches((6.4, 8), forward=True)
 
-    axs[0].legend(title="density")
-    axs[0].set(
-        ylabel="time [s]",
-        yscale="log",
-    )
+        for i, col in enumerate(["time", "memory"]):
+            sns.lineplot(
+                ax=axs[i],
+                data=df,
+                x="rhs_batch_size",
+                y=col,
+                hue="density",
+                hue_norm=mpl.colors.LogNorm(),
+                palette="flare",
+                marker="o",
+                legend=(i == 0),
+            )
+            axs[i].grid(True, which="both")
 
-    axs[1].set(
-        xscale="log",
-        xlabel="RHS Batch Size",
-        ylabel="peak memory [MB]",
-    )
+        axs[0].legend(title="density")
+        axs[0].set(
+            ylabel="time [s]",
+            yscale="log",
+        )
 
-    if SAVE_FIGS:
-        fig_file = DATA_PATH / "klu_batch.pdf"
-        fig.savefig(fig_file)
-        print(f"Saved figure to: {fig_file}")
+        axs[1].set(
+            xscale="log",
+            xlabel="RHS Batch Size",
+            ylabel="peak memory [MB]",
+        )
 
-    plt.show()
+        if SAVE_FIGS:
+            fig_file = DATA_PATH / f"{name}_batch.pdf"
+            fig.savefig(fig_file)
+            print(f"Saved figure to: {fig_file}")
+
+        plt.show()
 
 
 # =============================================================================
