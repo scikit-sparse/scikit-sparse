@@ -3,5 +3,6 @@
 include LICENSE.txt
 include README.rst
 recursive-include src/sksparse *.pyx *.pxd *.c
-recursive-exclude tests *
-recursive-exclude *.egg-info *
+prune tests
+prune scripts *
+prune *.egg-info
