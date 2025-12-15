@@ -3,6 +3,101 @@ Changes
 
 v0.5.0
 ------
+
+Upgrading from v0.4.x
++++++++++++++++++++++
+The :mod:`sksparse.cholmod` module has undergone major API changes in this
+release. Please see the :ref:`API Changes <v0.5.0-api-changes>` section below
+for a detailed list of changes. The new API is not backward compatible with
+previous versions, so code written for v0.4.x will need to be updated to work
+with v0.5.0. Code can be upgraded using the following changes to the
+``sksparse.cholmod`` API:
+
++---------------------------+-------------------------------------------+-------------------------------------------------+
+| API Change                | v0.4.x                                    | v0.5.0                                          |
++===========================+===========================================+=================================================+
+| Symbolic Analysis         | ``analyze(A)``                            | ``CholeskyFactor(A)``                           |
+|                           +-------------------------------------------+-------------------------------------------------+
+|                           | ``analyze_AAt(A)``                        | ``CholeskyFactor(A, sym_kind="row")``           |
++---------------------------+-------------------------------------------+-------------------------------------------------+
+| Numeric Factorization     | ``cholesky(A)``                           | ``cho_factor(A)``                               |
+|                           +-------------------------------------------+-------------------------------------------------+
+|                           | ``cholesky_AAt(A)``                       | ``cho_factor(A, sym_kind="row")``               |
++---------------------------+-------------------------------------------+-------------------------------------------------+
+| kwargs                    | ``mode``                                  | ``supernodal_mode``                             |
+|                           +-------------------------------------------+-------------------------------------------------+
+|                           | ``ordering_method``                       | ``order``                                       |
+|                           +-------------------------------------------+-------------------------------------------------+
+|                           | ``use_long``                              | not used                                        |
++---------------------------+-------------------------------------------+-------------------------------------------------+
+| Solving Linear Systems    | ``f.solve_A(b)``                          | ``f.solve(b)``                                  |
+|                           +-------------------------------------------+-------------------------------------------------+
+|                           | ``f.solve_LDLt(b)``                       | ``f.solve(b, system="LDLt")``                   |
+|                           +-------------------------------------------+-------------------------------------------------+
+|                           | ``f.solve_LD(b)``                         | ``f.solve(b, system="LD")``                     |
+|                           +-------------------------------------------+-------------------------------------------------+
+|                           | ``f.solve_DLt(b)``                        | ``f.solve(b, system="DLt")``                    |
+|                           +-------------------------------------------+-------------------------------------------------+
+|                           | ``f.solve_L(b)``                          | ``f.solve(b, system="L")``                      |
+|                           +-------------------------------------------+-------------------------------------------------+
+|                           | ``f.solve_Lt(b)``                         | ``f.solve(b, system="Lt")``                     |
+|                           +-------------------------------------------+-------------------------------------------------+
+|                           | ``f.solve_D(b)``                          | ``f.solve(b, system="D")``                      |
++---------------------------+-------------------------------------------+-------------------------------------------------+
+| Modifying Factorization   | ``f.cholesky(A)``                         | ``f = cho_factor(A)``                           |
+|                           +-------------------------------------------+-------------------------------------------------+
+|                           | ``f.cholesky_AAt(A)``                     | ``f = cho_factor(A, sym_kind="row")``           |
+|                           +-------------------------------------------+-------------------------------------------------+
+|                           | ``f.cholesky_inplace(A)``                 | ``f.factorize(A)``                              |
+|                           +-------------------------------------------+-------------------------------------------------+
+|                           | ``f.cholesky_AAt_inplace(A)``             | ``f.factorize(A, sym_kind="row")``              |
+|                           +-------------------------------------------+-------------------------------------------------+
+|                           | ``f.update_inplace(C, subtract=False)``   | ``f.update(C)``                                 |
+|                           +-------------------------------------------+-------------------------------------------------+
+|                           | ``f.update_inplace(C, subtract=True)``    | ``f.downdate(C)``                               |
++---------------------------+-------------------------------------------+-------------------------------------------------+
+| Extracting Factors        | ``L = f.L()``                             | ``L = f.get_factor(kind="LL", lower=True)``     |
+|                           |                                           +-------------------------------------------------+
+|                           |                                           | .. code-block:: python                          |
+|                           |                                           |                                                 |
+|                           |                                           |     if not f.is_ll:                             |
+|                           |                                           |         f.change_factor(kind="LL")              |
+|                           |                                           |     L = f.L                                     |
+|                           +-------------------------------------------+-------------------------------------------------+
+|                           | ``LD = f.LD()``                           | .. code-block:: python                          |
+|                           |                                           |                                                 |
+|                           |                                           |     if f.is_ll:                                 |
+|                           |                                           |         f.change_factor(kind="LDL")             |
+|                           |                                           |     LD = scipy.sparse.csc_array(f.factor)       |
+|                           +-------------------------------------------+-------------------------------------------------+
+|                           | ``L, D = f.L_D()``                        | ``L, D = f.get_factor(kind="LDL", lower=True)`` |
+|                           |                                           +-------------------------------------------------+
+|                           |                                           | .. code-block:: python                          |
+|                           |                                           |                                                 |
+|                           |                                           |     if f.is_ll:                                 |
+|                           |                                           |         f.change_factor(kind="LDL")             |
+|                           |                                           |     L, D = f.L, f.D                             |
+|                           +-------------------------------------------+-------------------------------------------------+
+|                           | ``D = f.D()``                             | ``_, D = f.get_factor(kind="LDL", lower=True)`` |
+|                           |                                           +-------------------------------------------------+
+|                           |                                           | .. code-block:: python                          |
+|                           |                                           |                                                 |
+|                           |                                           |     if f.is_ll:                                 |
+|                           |                                           |         f.change_factor(kind="LDL")             |
+|                           |                                           |     D = f.D                                     |
+|                           +-------------------------------------------+-------------------------------------------------+
+|                           | ``p = f.P()``                             | ``p = f.get_perm()``                            |
++---------------------------+-------------------------------------------+-------------------------------------------------+
+| Permuting Vectors         | ``f.apply_P(b)``                          | ``b[f.perm]``                                   |
+|                           +-------------------------------------------+-------------------------------------------------+
+|                           | ``f.apply_Pt(b)``                         | ``b[np.argsort(f.perm)]``                       |
++---------------------------+-------------------------------------------+-------------------------------------------------+
+
+
+.. _v0.5.0-api-changes:
+
+API Changes
++++++++++++
 * Major API updates to the :mod:`sksparse.cholmod` module. The module has been
   updated to resemble the existing :func:`scipy.linalg.cholesky` interface, as
   well as provide additional functions present in the SuiteSparse CHOLMOD
@@ -69,12 +164,16 @@ v0.5.0
     to return read-only views of the permutation vector and factor matrix,
     respectively.
 
-  - The :code:`Factor.solve_A` method has been replaced by the
+  - The :code:`Factor` methods :code:`solve_A`, :code:`solve_LDLt`,
+    :code:`solve_LD`, :code:`solve_DLt`, :code:`solve_L`, :code:`solve_Lt`, and
+    :code:`solve_D` method have been replaced by the
     :meth:`~sksparse.cholmod.CholeskyFactor.solve` method.
-    The :code:`Factor` methods :code:`solve_LDLt`, :code:`solve_LD`,
-    :code:`solve_DLt`, :code:`solve_L`, :code:`solve_Lt`, and :code:`solve_D`
-    have been removed. The :obj:`~sksparse.cholmod.CholeskyFactor` is not
-    callable.
+
+  - The :obj:`~sksparse.cholmod.CholeskyFactor` is not callable.
+
+  - The :code:`Factor.apply_P` and :code:`Factor.apply_Pt` methods have been
+    removed. Use ``p = f.get_perm(); x_p = x[p]`` and ``x
+    = x_p[np.argsort(p)]`` instead.
 
   - The new :meth:`~sksparse.cholmod.CholeskyFactor.solve` method checks the
     condition number and raises a :exc:`~sksparse.cholmod.CholmodNotPositiveDefiniteError` if the
@@ -116,10 +215,10 @@ v0.5.0
   - SciPy < 1.14
   - SuiteSparse < 7.4.0
 
-  Python 3.9 will reach its end of life in October 2025, so remove support for
-  it now. Numpy will end support for all 1.x versions by September 2025. SciPy
-  v1.14 (released June 2024) will be supported until the end of 2026.
-  SuiteSparse 7.4.0 introduces single precision support in CHOLMOD 5.1.0.
+  Python 3.9 reached its end of life in October 2025. Numpy ended support for
+  all 1.x versions in September 2025. SciPy v1.14 (released June 2024) will be
+  supported until the end of 2026. SuiteSparse 7.4.0 introduces single
+  precision support in CHOLMOD 5.1.0.
 
 
 v0.4.4
