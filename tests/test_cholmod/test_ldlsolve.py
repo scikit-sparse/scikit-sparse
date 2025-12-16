@@ -197,3 +197,82 @@ def test_ldlsolve(A, order, K, is_sparse):
         assert_allclose(x.toarray(), expect_x.toarray(), rtol=rtol, atol=atol)
     else:
         assert_allclose(x, expect_x, rtol=rtol, atol=atol)
+
+
+@pytest.mark.parametrize("order", [None, "default"])
+@pytest.mark.parametrize("is_sparse", [False, True], ids=["dense", "sparse"])
+class TestLDLSolveSystems:
+    @staticmethod
+    @pytest.fixture
+    def factor_system(davis_example_chol, order, is_sparse):
+        A = davis_example_chol.copy()
+        A.setdiag(A.diagonal() + 1.0)  # improve conditioning
+
+        rtol = 1e-08 if A.dtype in (np.float64, np.complex128) else 1e-3
+        atol = 1e-15 if A.dtype in (np.float64, np.complex128) else 1e-8
+
+        # Build RHS
+        N = A.shape[0]
+        expect_x = np.arange(1, N + 1, dtype=A.dtype)
+
+        if is_sparse:
+            expect_x = sparse.coo_array(expect_x, dtype=A.dtype)
+
+        f = ldl_factor(A, order=order)
+
+        return f, expect_x, rtol, atol
+
+    def test_system_LDLt(self, factor_system):
+        f, expect_x, rtol, atol = factor_system
+        L, D = f.L, f.D
+        x = f.solve(L @ D @ L.T.conj() @ expect_x, system="LDLt")
+        if sparse.issparse(expect_x):
+            x = x.toarray()
+            expect_x = expect_x.toarray()
+        assert_allclose(x, expect_x, rtol=rtol, atol=atol)
+
+    def test_system_LD(self, factor_system):
+        f, expect_x, rtol, atol = factor_system
+        L, D = f.L, f.D
+        x = f.solve(L @ D @ expect_x, system="LD")
+        if sparse.issparse(expect_x):
+            x = x.toarray()
+            expect_x = expect_x.toarray()
+        assert_allclose(x, expect_x, rtol=rtol, atol=atol)
+
+    def test_system_DLt(self, factor_system):
+        f, expect_x, rtol, atol = factor_system
+        L, D = f.L, f.D
+        x = f.solve(D @ L.T.conj() @ expect_x, system="DLt")
+        if sparse.issparse(expect_x):
+            x = x.toarray()
+            expect_x = expect_x.toarray()
+        assert_allclose(x, expect_x, rtol=rtol, atol=atol)
+
+    def test_system_L(self, factor_system):
+        f, expect_x, rtol, atol = factor_system
+        L = f.L
+        x = f.solve(L @ expect_x, system="L")
+        if sparse.issparse(expect_x):
+            x = x.toarray()
+            expect_x = expect_x.toarray()
+        assert_allclose(x, expect_x, rtol=rtol, atol=atol)
+
+    def test_system_Lt(self, factor_system):
+        f, expect_x, rtol, atol = factor_system
+        Lt = f.L.T
+        x = f.solve(Lt @ expect_x, system="Lt")
+        if sparse.issparse(expect_x):
+            x = x.toarray()
+            expect_x = expect_x.toarray()
+        assert_allclose(x, expect_x, rtol=rtol, atol=atol)
+
+    def test_system_D(self, factor_system):
+        f, expect_x, rtol, atol = factor_system
+        D = f.D
+        x = f.solve(D @ expect_x, system="D")
+        if sparse.issparse(expect_x):
+            x = x.toarray()
+            expect_x = expect_x.toarray()
+        assert_allclose(x, expect_x, rtol=rtol, atol=atol)
+
