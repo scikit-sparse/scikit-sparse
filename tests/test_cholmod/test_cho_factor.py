@@ -49,6 +49,22 @@ def test_convert_factor(davis_example_chol, dtype):
     assert_allclose((L @ D @ L.T.conj()).toarray(), A.toarray(), atol=atol)
 
 
+@pytest.mark.parametrize("lower", [False, True])
+def test_properties(davis_example_chol, lower):
+    atol = 1e-15
+    A = davis_example_chol
+    f = cho_factor(A, order=None, lower=lower)
+    N = A.shape[0]
+    assert f.N == N
+    assert f.nnz == f.factor.nnz
+    assert f.is_lower == lower
+    # Check that L, R are independent of lower
+    L, R, D = f.L, f.R, f.D
+    assert_array_equal(D.toarray(), np.eye(N))
+    assert_allclose((L @ L.T).toarray(), A.toarray(), atol=atol)
+    assert_allclose((R.T @ R).toarray(), A.toarray(), atol=atol)
+
+
 @pytest.mark.parametrize("order", [None, "amd"])
 def test_view_vs_get(davis_example_chol, order):
     A = davis_example_chol
