@@ -1599,9 +1599,9 @@ cdef class CholeskyFactor:
     def L(self):
         if self._L is None:
             if self.is_ll:
-                self._L = self.get_factor(kind="LL", lower=self.is_lower)
+                self._L = self.get_factor(kind="LL", lower=True)
             else:
-                self._L, self._D = self.get_factor(kind="LDL", lower=self.is_lower)
+                self._L, self._D = self.get_factor(kind="LDL", lower=True)
         return self._L
 
     @property
@@ -1609,9 +1609,9 @@ cdef class CholeskyFactor:
         if self._R is None:
             if self._L is None:
                 if self.is_ll:
-                    self._L = self.get_factor(kind="LL", lower=self.is_lower)
+                    self._L = self.get_factor(kind="LL", lower=True)
                 else:
-                    self._L, self._D = self.get_factor(kind="LDL", lower=self.is_lower)
+                    self._L, self._D = self.get_factor(kind="LDL", lower=True)
             self._R = self._L.T.conj()
         return self._R
 
@@ -1621,7 +1621,7 @@ cdef class CholeskyFactor:
             if self.is_ll:
                 self._D = eye_array(self.N, dtype=self.dtype)
             else:
-                self._L, self._D = self.get_factor(kind="LDL", lower=self.is_lower)
+                self._L, self._D = self.get_factor(kind="LDL", lower=True)
         return self._D
 
     # -------------------------------------------------------------------------
