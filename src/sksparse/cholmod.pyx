@@ -1002,6 +1002,17 @@ cdef dict _supernodal_modes = {
 }
 
 
+cdef dict _solve_systems = {
+    "A": CHOLMOD_A,
+    "LDLt": CHOLMOD_LDLt,
+    "LD": CHOLMOD_LD,
+    "DLt": CHOLMOD_DLt,
+    "L": CHOLMOD_L,
+    "Lt": CHOLMOD_Lt,
+    "D": CHOLMOD_D,
+}
+
+
 cdef dict _ordering_methods = {
     "default": None,
     "best": None,
@@ -1941,7 +1952,7 @@ cdef class CholeskyFactor:
 
         return self  # for method chaining
 
-    def solve(self, b):
+    def solve(self, b, system="A"):
         """Solve the linear system :math:`A x = b` for `x`, using the
         factorization.
 
@@ -1951,6 +1962,25 @@ cdef class CholeskyFactor:
             The right-hand side vector or matrix. Must be a type that can be safely
             cast to the data type of the factor. The number of rows in ``b`` must be
             equal to the size of the factor.
+        system : str in {'A', 'LDLt', 'LD', 'DLt', 'L', 'Lt', 'D'}, optional
+            The system to solve. Options are:
+
+            * ``A``: Solve :math:`A x = b`.
+            * ``LDLt``: Solve :math:`L D L^{\\top} x = b`.
+            * ``LD``: Solve :math:`L D x = b`.
+            * ``DLt``: Solve :math:`D L^{\\top} x = b`.
+            * ``L``: Solve :math:`L x = b`.
+            * ``Lt``: Solve :math:`L^{\\top} x = b`.
+            * ``D``: Solve :math:`D x = b`.
+
+            Here, ``L`` and ``D`` are the factors from the LDL factorization of
+            the matrix.
+
+            .. note::
+
+                Only the ``A`` system accounts for the permutation used in the
+                factorization. The other systems solve the equations using the
+                factors directly, without applying the permutation.
 
         Returns
         -------
@@ -2028,6 +2058,15 @@ cdef class CholeskyFactor:
         else:
             b = b.astype(self.dtype, copy=False)
 
+        cdef int _system
+        try:
+            _system = _solve_systems[system]
+        except KeyError:
+            raise ValueError(
+                f"Unknown factorization mode: {system}. "
+                f"Must be one of {set(_solve_systems.keys())}."
+            )
+
         # Special case: zero-dimension matrix
         if N == 0:
             return type(b)(b.shape, dtype=b.dtype)
@@ -2042,9 +2081,9 @@ cdef class CholeskyFactor:
             b = b.reshape((N, 1))
 
         if issparse(b):
-            X = self._solve_sparse(b.tocsc())
+            X = self._solve_sparse(b.tocsc(), _system)
         else:
-            X = self._solve_dense(np.asfortranarray(b))
+            X = self._solve_dense(np.asfortranarray(b), _system)
 
         # Convert to 1D array if input b is 1D
         if return_1D:
@@ -2052,7 +2091,7 @@ cdef class CholeskyFactor:
 
         return X
 
-    cdef object _solve_sparse(self, object b):
+    cdef object _solve_sparse(self, object b, int system):
         """Solve the system A x = b with a sparse right-hand side."""
         # Get the b vector or matrix into CHOLMOD format
         cdef cholmod_sparse Bspmatrix
@@ -2070,9 +2109,9 @@ cdef class CholeskyFactor:
         cdef cholmod_sparse* Xs
 
         if self._use_int32:
-            Xs = cholmod_spsolve(CHOLMOD_A, self._factor, Bs, self._cm)
+            Xs = cholmod_spsolve(system, self._factor, Bs, self._cm)
         else:
-            Xs = cholmod_l_spsolve(CHOLMOD_A, self._factor, Bs, self._cm)
+            Xs = cholmod_l_spsolve(system, self._factor, Bs, self._cm)
 
         _handle_errors(self._cm.status)
 
@@ -2080,7 +2119,7 @@ cdef class CholeskyFactor:
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def _solve_dense(self, floating_t[::1, :] b not None):
+    def _solve_dense(self, floating_t[::1, :] b not None, int system):
         """Solve the system A x = b with a dense right-hand side."""
         # Get the b vector or matrix into CHOLMOD format
         cdef cholmod_dense Bmatrix
@@ -2092,9 +2131,9 @@ cdef class CholeskyFactor:
         cdef cholmod_dense* Xd
 
         if self._use_int32:
-            Xd = cholmod_solve(CHOLMOD_A, self._factor, Bd, self._cm)
+            Xd = cholmod_solve(system, self._factor, Bd, self._cm)
         else:
-            Xd = cholmod_l_solve(CHOLMOD_A, self._factor, Bd, self._cm)
+            Xd = cholmod_l_solve(system, self._factor, Bd, self._cm)
 
         _handle_errors(self._cm.status)
 
