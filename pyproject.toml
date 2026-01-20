@@ -4,8 +4,8 @@ requires = ["setuptools>=61.0", "wheel", "Cython>=3.0", "numpy>=2.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "scikit-sparse-dev"
-version = "0.5.0.dev3"
+name = "scikit-sparse"
+version = "0.5.0"
 description = "Scikit-sparse is a Python wrapper for the SuiteSparse sparse matrix library."
 readme = "README.rst"
 requires-python = ">=3.10"
