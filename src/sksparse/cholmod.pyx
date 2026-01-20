@@ -106,6 +106,7 @@ from cpython.ref cimport Py_INCREF
 cimport cython
 cimport numpy as cnp
 
+from collections import namedtuple
 import numpy as np
 
 from scipy.sparse import csc_array, diags_array, eye_array, issparse
@@ -2998,6 +2999,12 @@ ldl.__doc__ = _CHOLMOD_DOC_TEMPLATE.format(
 # -----------------------------------------------------------------------------
 #         Symbolic Functions
 # -----------------------------------------------------------------------------
+SymbolicCholFactor = namedtuple(
+    "SymbolicCholFactor",
+    ["count", "h", "parent", "post", "L"]
+)
+
+
 def symbfact(A, *, kind=None, bint lower=False, bint return_factor=False):
     """Symbolic factorization of a sparse matrix for Cholesky or LDL.
 
@@ -3310,9 +3317,9 @@ def symbfact(A, *, kind=None, bint lower=False, bint return_factor=False):
         cholmod_l_finish(cm)
 
     if return_factor:
-        return count, h, parent, post, L
+        return SymbolicCholFactor(count, h, parent, post, L)
     else:
-        return count, h, parent, post
+        return SymbolicCholFactor(count, h, parent, post, None)
 
 
 def etree(A, *, kind=None, bint return_post=False):
