@@ -21,6 +21,7 @@ from sksparse.cholmod import (
     CholmodNotPositiveDefiniteError,
     CholmodWarning,
     cho_factor,
+    cho_solve,
 )
 
 from ..helpers import generate_random_matrices, load_problem
@@ -248,12 +249,15 @@ def test_solve(A, order, K, is_sparse):
     # Solve the system
     b = A @ expect_x
     x = cho_factor(A, order=order).solve(b)
+    xs = cho_solve(A, b, order=order)
 
     # Compare
     if is_sparse:
         assert_allclose(x.toarray(), expect_x.toarray(), rtol=rtol, atol=atol)
+        assert_allclose(xs.toarray(), expect_x.toarray(), rtol=rtol, atol=atol)
     else:
         assert_allclose(x, expect_x, rtol=rtol, atol=atol)
+        assert_allclose(xs, expect_x, rtol=rtol, atol=atol)
 
 
 @pytest.mark.parametrize("order", [None, "default"])
