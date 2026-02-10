@@ -38,6 +38,7 @@ Function Interface
 
     cholesky - Computes the Cholesky factorization of a sparse matrix.
     ldl - Computes the LDL.T factorization of a sparse matrix.
+    cho_solve - Solves a linear system using a Cholesky factorization.
 
 
 Object Interface
@@ -128,6 +129,7 @@ __all__ = [
     "SeparatorTree",
     "bisect",
     "cho_factor",
+    "cho_solve",
     "cholesky",
     "etree",
     "ldl",
@@ -2698,6 +2700,96 @@ def ldl(A, beta=0.0, *, lower=True, order="default", sym_kind=None, supernodal_m
     R, D = f.get_factor()
     p = f.get_perm()
     return (R, D) if order is None else (R, D, p)
+
+
+def cho_solve(A, b, *, lower=False, order="default"):
+    """Solve the linear system `A x = b` for `x`, using the
+    Cholesky factorization.
+
+    The matrix `A` is factorized using the same parameters as in :func:`cho_factor`,
+    and subject to the same positive definiteness requirements.
+
+    Parameters
+    ----------
+    b : (N,) or (N, K) ndarray or sparse matrix
+        The right-hand side vector or matrix. Must be a type that can be safely cast to
+        the data type of the ``A`` matrix. The number of rows in ``b`` must be equal to
+        the size of the ``A`` matrix.
+    lower : bool, optional
+        If True, use only the lower triangular part of ``A``, otherwise use the upper
+        triangular part.
+    order : None or str in {{"default", "best", "natural", "metis", "nesdis", \
+            "amd", "colamd", "postordered"}}, optional
+        The permutation algorithm to use for the factorization. Options are:
+
+        * ``default``: Use the default method, which first tries AMD, then METIS.
+        * ``best``: Automatically select the best ordering based on the input.
+        * ``metis``: Use the METIS library for graph partitioning.
+        * ``nesdis``: Use the NESDIS library for nested dissection.
+        * ``amd``: Use the Approximate Minimum Degree (AMD) algorithm.
+        * ``colamd``: Use the Approximate Minimum Degree (AMD) algorithm for the
+            symmetric case, or the COLAMD algorithm for the unsymmetric case
+            (:math:`A A^{{\\top}}` or :math:`A^{{\\top}} A`).
+        * ``postordered``: Use natural ordering followed by postordering.
+        * ``natural`` or ``None``: No permutation is applied (identity permutation).
+
+        By default, methods other than ``natural`` will also be postordered.
+
+        .. warning::
+
+            The ordering method ``best`` may be quite slow for large matrices,
+            but if the factorization is reused many times, it can be worth it.
+
+
+    Returns
+    -------
+    x : (N,) or (N, K) ndarray or sparse matrix
+        The solution vector or matrix, returned in the same format as ``b``.
+
+    Raises
+    ------
+    CholmodNotPositiveDefiniteError
+        If the matrix ``A`` is exactly singular, or singular to working
+        precision.
+
+    Notes
+    -----
+    This function solves the linear system:
+
+    .. math::
+
+        R^{\\top} R x = b,
+
+    where `R` is the upper triangular factor from the Cholesky factorization
+    of `A`. The input `b` is either dense or sparse, vector or matrix.
+
+    If ``order`` was not ``natural`` when the factorization was computed,
+    solve the system:
+
+    .. math::
+
+        P^{\\top} R^{\\top} R P x = b
+
+    where `P` is the permutation matrix corresponding to the permutation
+    vector. Similarly, if ``lower`` was True when the factorization was
+    computed, the system solved is:
+
+    .. math::
+
+        P^{\\top} L L^{\\top} P x = b.
+
+    This function uses the CHOLMOD library to solve the linear system. It
+    is intended to combine the MATLAB interfaces ``cholmod2.m``
+    [#cholmod_cc]_.
+
+    .. versionadded:: 0.5.0
+
+    References
+    ----------
+    .. [#cholmod_cc] ``cholmod2.c`` - CHOLMOD MATLAB interface
+        https://github.com/DrTimothyAldenDavis/SuiteSparse/blob/dev/CHOLMOD/MATLAB/cholmod2.c
+    """
+    return cho_factor(A, lower=lower, order=order).solve(b)
 
 
 # -----------------------------------------------------------------------------
