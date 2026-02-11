@@ -95,7 +95,6 @@ from sksparse.cholmod cimport (
     _cholmod_dense_from_ndarray,
     _ndarray_from_cholmod_dense,
     _copy_cholmod_common,
-    _ndarray_copy_from_intptr,
     _csc_from_cholmod_sparse,
     cholmod_free,
     cholmod_l_free,
@@ -111,7 +110,7 @@ from sksparse.cholmod import _cholmod_sparse_from_csc
 from .utils import validate_csc_input
 
 
-__all = [
+__all__ = [
     "SPQRError",
     "SPQRNotInstalledError",
     "SPQROutOfMemoryError",
