@@ -263,7 +263,7 @@ cdef int _handle_errors(int status, minor=None) except -1 with gil:
     status_msg = f"(code {status:d})"
 
     # Fallback to generic error for unknown codes
-    exc_class, msg = _ERROR_MAP.get(status, CholmodError)
+    exc_class, msg = _ERROR_MAP.get(status, (CholmodError, "An unknown error occurred."))
     full_msg = msg + " " + status_msg
 
     if minor is not None:
