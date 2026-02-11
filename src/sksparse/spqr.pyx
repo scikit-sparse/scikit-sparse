@@ -2023,11 +2023,15 @@ def spqr_qmult(house, X, method="QX"):
         H, tau, v = house
         H, _, itype = validate_csc_input(H)
         tau = np.asfortranarray(tau).reshape((1, -1))  # for cholmod_dense
-        assert tau.shape == (1, H.shape[1])
-        assert tau.dtype == H.dtype
+        if tau.shape != (1, H.shape[1]):
+            raise TypeError("tau shape mismatch")
+        if tau.dtype != H.dtype:
+            raise TypeError("tau dtype mismatch")
         v = np.asfortranarray(v)
-        assert v.shape == (H.shape[0],)
-        assert v.dtype == itype
+        if v.shape != (H.shape[0],):
+            raise TypeError("v shape mismatch")
+        if v.dtype != itype:
+            raise TypeError("v dtype mismatch")
     except Exception:
         raise ValueError(
             "house must be a tuple of (H, tau, v) representing the "

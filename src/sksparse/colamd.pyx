@@ -330,7 +330,8 @@ def _colamd(
     if Alen == 0:
         raise ValueError("Recommended Alen is zero: one of {A.nnz, M, N} is erroneous.")
 
-    assert Alen >= nnz, "Recommended Alen is less than nnz."
+    if Alen < nnz:
+        raise COLAMDError("Recommended Alen is less than nnz.")
 
     # Copy the input arrays, since they are altered in the C function
     itype = np.int32 if index_t is int32_t else np.int64

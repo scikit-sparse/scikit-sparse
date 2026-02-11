@@ -458,8 +458,9 @@ cdef class KLUControl:
             self._tol = self._FLOAT_NONE
         else:
             try:
-                assert 0.0 <= value <= 1.0
-            except (AssertionError, TypeError):
+                if value < 0.0 or value > 1.0:
+                    raise ValueError("tol must be a float in the range [0, 1].")
+            except TypeError:
                 raise ValueError("tol must be a float in the range [0, 1].")
             self._tol = value
 
@@ -473,8 +474,9 @@ cdef class KLUControl:
             self._memgrow = self._FLOAT_NONE
         else:
             try:
-                assert value > 1.0
-            except (AssertionError, TypeError):
+                if value <= 1.0:
+                    raise ValueError("memgrow must be a float greater than 1.0.")
+            except TypeError:
                 raise ValueError("memgrow must be a float greater than 1.0.")
             self._memgrow = value
 
@@ -488,8 +490,9 @@ cdef class KLUControl:
             self._initmem_amd = self._FLOAT_NONE
         else:
             try:
-                assert value > 1.0
-            except (AssertionError, TypeError):
+                if value <= 1.0:
+                    raise ValueError("initmem_amd must be a float greater than 1.0.")
+            except TypeError:
                 raise ValueError("initmem_amd must be a float greater than 1.0.")
             self._initmem_amd = value
 
@@ -503,8 +506,9 @@ cdef class KLUControl:
             self._initmem = self._FLOAT_NONE
         else:
             try:
-                assert value > 0.0
-            except (AssertionError, TypeError):
+                if value <= 0.0:
+                    raise ValueError("initmem must be a float greater than 0.0.")
+            except TypeError:
                 raise ValueError("initmem must be a float greater than 0.0.")
             self._initmem = value
 
@@ -916,6 +920,7 @@ cdef class KLUFactor:
     cdef int _init_common(self, KLUControl control=None) except -1:
         """Initialize the KLU common struct with default or user settings."""
         # Initialize common struct with defaults
+        cdef int status
         if self._use_int32:
             self._cm = &self._common
             assert klu_defaults(self._cm)

@@ -111,8 +111,8 @@ def validate_csc_input(A, require_square=False, ensure_double=True):
 
     A.sum_duplicates()  # sort indices and sum duplicates
 
-    assert A.has_sorted_indices
-    assert A.has_canonical_format
+    if not (A.has_sorted_indices and A.has_canonical_format):
+        raise ValueError("Failed to convert input to canonical CSC format.")
 
     # Choose index width: int32 or int64
     use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32

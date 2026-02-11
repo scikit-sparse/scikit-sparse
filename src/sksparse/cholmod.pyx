@@ -343,7 +343,8 @@ def _cholmod_sparse_from_csc(
     cdef cholmod_sparse* A = <cholmod_sparse*>A_static
     memset(A, 0, sizeof(cholmod_sparse))
 
-    assert len(shape) == 2
+    if len(shape) != 2:
+        raise ValueError("shape must be a tuple of length 2.")
 
     # Set the matrix dimensions and properties
     A.nrow = shape[0]

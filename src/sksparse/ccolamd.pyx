@@ -345,7 +345,8 @@ def _ccolamd(
     if Alen == 0:
         raise ValueError("Recommended Alen is zero: one of {A.nnz, M, N} is erroneous.")
 
-    assert Alen >= nnz, "Recommended Alen is less than nnz."
+    if Alen < nnz:
+        raise CCOLAMDError("Recommended Alen is less than nnz.")
 
     cdef index_t *constraints_ptr = NULL
 
