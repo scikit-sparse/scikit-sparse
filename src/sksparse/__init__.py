@@ -61,22 +61,13 @@ References
 """
 
 from importlib.metadata import version, PackageNotFoundError
+from importlib import import_module
 
 try:
     __version__ = version("scikit-sparse-dev")
 except PackageNotFoundError:
     # package is not installed, so we set a default version
     __version__ = "0.0.0.dev0"
-
-from . import amd
-from . import btf
-from . import camd
-from . import ccolamd
-from . import cholmod
-from . import colamd
-from . import klu
-from . import spqr
-from . import umfpack
 
 __all__ = [
     "amd",
@@ -89,3 +80,22 @@ __all__ = [
     "spqr",
     "umfpack",
 ]
+
+
+def __getattr__(name):
+    """Lazy import submodules.
+
+    This function allows users to import a single submodule, e.g. ``from
+    sksparse import cholmod``, without importing the entire package. It is
+    helpful in cases where the entire SuiteSparse package is not installed.
+    """
+    if name in __all__:
+        module = import_module(f".{name}", __name__)
+        globals()[name] = module  # cache the naame
+        return module
+    else:
+        raise AttributeError(f"module {repr(__name__)} has no attribute {repr(name)}")
+
+
+def __dir__():
+    return __all__
