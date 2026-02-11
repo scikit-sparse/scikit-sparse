@@ -17,6 +17,8 @@ from packaging import version
 from scipy import __version__ as scipy_version
 from scipy.sparse import SparseEfficiencyWarning, csc_array, issparse
 
+_HAS_SCIPY_SORT_BUG = version.parse(scipy_version) < version.parse("1.17.0")
+
 
 def validate_csc_input(A, require_square=False, ensure_double=True):
     """Validate and convert input matrix to CSC format.
@@ -103,7 +105,7 @@ def validate_csc_input(A, require_square=False, ensure_double=True):
     #
     # To save on memory, we manually set the flags to False to force
     # sum_duplicates() to re-sort and re-sum any duplicates.
-    if version.parse(scipy_version) < version.parse("1.17.0"):
+    if _HAS_SCIPY_SORT_BUG:
         A.has_sorted_indices = False
         A.has_canonical_format = False
 
