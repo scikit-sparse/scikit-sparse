@@ -1,4 +1,4 @@
-# Copyright (C) 2008-2017 The scikit-sparse developers:
+# Copyright (C) 2008-2025 The scikit-sparse developers:
 #
 # 2008        David Cournapeau        <cournape@gmail.com>
 # 2009-2015   Nathaniel Smith         <njs@pobox.com>
@@ -10,113 +10,107 @@
 # 2016-2017   Joscha Reimer           <jor@informatik.uni-kiel.de>
 # 2021-       Justin Ellis            <justin.ellis18@gmail.com>
 # 2022-       Aaron Johnson           <aaron9035@gmail.com>
-
-"""Sparse matrix tools.
-
-This is a home for sparse matrix code in Python that plays well with
-scipy.sparse, but that is somehow unsuitable for inclusion in scipy
-proper. Usually this will be because it is released under the GPL.
-
-So far we have a wrapper for the CHOLMOD library for sparse Cholesky
-decomposition. Further contributions are welcome!
-"""
+# 2025-       Bernard Roesler         <bernard.roesler@gmail.com>
 
 import os
 import subprocess
 import sys
+from pathlib import Path
 
-import numpy as np
-from Cython.Build import cythonize
-from setuptools import Extension, find_packages, setup
+from setuptools import Extension, setup
 
-DISTNAME = "scikit-sparse"
-DESCRIPTION = "Scikit sparse matrix package"
-LONG_DESCRIPTION = __doc__
-MAINTAINER = "Aaron Johnson"
-MAINTAINER_EMAIL = "aaron9035@gmail.com"
-URL = "https://github.com/scikit-sparse/scikit-sparse"
-LICENSE = "BSD"
 
-INCLUDE_DIRS = [
-    np.get_include(),
-    sys.prefix + "/include",
-    # Debian's suitesparse-dev installs to
-    "/usr/include/suitesparse",
-]
+def get_numpy_include():
+    """Get the include directory for NumPy."""
+    try:
+        import numpy as np  # noqa: PLC0415
+
+        return np.get_include()
+    except ImportError:
+        return []
+
+
+INCLUDE_DIRS = []
 LIBRARY_DIRS = []
 
-# check if suitesparse is installed via homebrew
-homebrew_suitesparse_dir = (
-    subprocess.run(
-        "readlink -f $(brew --prefix suitesparse)",
-        shell=True,
-        stdout=subprocess.PIPE,
-    )
-    .stdout.decode()
-    .strip()
-)
-if homebrew_suitesparse_dir:  # empty string if not found (because error is printed to stderr)
-    INCLUDE_DIRS.append(
-        # Include directory for homebrew-installed suitesparse
-        homebrew_suitesparse_dir
-        + "/include/suitesparse/",
-    )
-    LIBRARY_DIRS.append(
-        # Library directory for homebrew-installed suitesparse
-        homebrew_suitesparse_dir
-        + "/lib"
-    )
+numpy_include = get_numpy_include()
+if numpy_include:
+    INCLUDE_DIRS.append(numpy_include)
 
+# Check user SuiteSparse directories first
 user_include_dir = os.getenv("SUITESPARSE_INCLUDE_DIR")
 user_library_dir = os.getenv("SUITESPARSE_LIBRARY_DIR")
+
 if user_include_dir:
     INCLUDE_DIRS.append(user_include_dir)
 
 if user_library_dir:
     LIBRARY_DIRS.append(user_library_dir)
 
-setup(
-    install_requires=["numpy>=1.13.3", "scipy>=0.19"],
-    python_requires=">=3.6",
-    packages=find_packages(),
-    package_data={
-        "": ["test_data/*.mtx.gz"],
-    },
-    name=DISTNAME,
-    version="0.4.16",  # remember to update __init__.py
-    maintainer=MAINTAINER,
-    maintainer_email=MAINTAINER_EMAIL,
-    description=DESCRIPTION,
-    license=LICENSE,
-    url=URL,
-    long_description=LONG_DESCRIPTION,
-    classifiers=[
-        "Development Status :: 3 - Alpha",
-        "Environment :: Console",
-        "Intended Audience :: Developers",
-        "Intended Audience :: Science/Research",
-        "License :: OSI Approved :: BSD License",
-        "Programming Language :: Cython",
-        "Topic :: Scientific/Engineering",
-        "Topic :: Scientific/Engineering :: Mathematics",
-        "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
-        "Programming Language :: Python :: 3.10",
-        "Programming Language :: Python :: 3.11",
-        "Programming Language :: Python :: 3.12",
-    ],
-    # You may specify the directory where CHOLMOD is installed using the
-    # library_dirs and include_dirs keywords in the lines below.
-    ext_modules=cythonize(
-        Extension(
-            "sksparse.cholmod",
-            ["sksparse/cholmod.pyx"],
-            include_dirs=INCLUDE_DIRS,
-            library_dirs=LIBRARY_DIRS,
-            libraries=["cholmod"],
+# Check if suitesparse is installed via conda
+conda_prefix = os.getenv("CONDA_PREFIX")
+
+if conda_prefix:
+    if os.name == "nt":  # Windows
+        conda_include = Path(conda_prefix) / "Library" / "include" / "suitesparse"
+        conda_lib = Path(conda_prefix) / "Library" / "lib"
+    else:
+        conda_include = Path(conda_prefix) / "include" / "suitesparse"
+        conda_lib = Path(conda_prefix) / "lib"
+
+    if conda_include.is_dir():
+        INCLUDE_DIRS.append(str(conda_include))
+    if conda_lib.is_dir():
+        LIBRARY_DIRS.append(str(conda_lib))
+
+# Check if suitesparse is installed via homebrew
+try:
+    homebrew_prefix = (
+        subprocess.run(
+            "readlink -f $(brew --prefix suitesparse)",
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=True,  # raise an error if command fails
         )
-    ),
-)
+        .stdout.decode()
+        .strip()
+    )
+    brew_include = Path(homebrew_prefix) / "include" / "suitesparse"
+    brew_lib = Path(homebrew_prefix) / "lib"
+    if brew_include.is_dir():
+        INCLUDE_DIRS.append(str(brew_include))
+    if brew_lib.is_dir():
+        LIBRARY_DIRS.append(str(brew_lib))
+except Exception:
+    pass
+
+# Check system-wide directories
+INCLUDE_DIRS.append(str(Path(sys.prefix) / "include"))
+INCLUDE_DIRS.append("/usr/include/suitesparse")  # Linux default path
+
+extension_names = [
+    "cholmod",
+    "amd",
+    "btf",
+    "camd",
+    "colamd",
+    "ccolamd",
+    "klu",
+    "spqr",
+    "umfpack",
+]
+
+extensions = [
+    Extension(
+        f"sksparse.{name}",
+        [f"src/sksparse/{name}.pyx"],
+        include_dirs=INCLUDE_DIRS,
+        library_dirs=LIBRARY_DIRS,
+        libraries=[name] if name != "spqr" else ["cholmod", "spqr"],
+    )
+    for name in extension_names
+]
+
+# No need to call "cythonize" here. Rely on pyproject.toml.
+setup(ext_modules=extensions)

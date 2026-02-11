@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 #
 # scikit-sparse documentation build configuration file, created by
 # sphinx-quickstart on Wed Feb 10 23:17:16 2016.
@@ -12,55 +11,103 @@
 #
 # All configuration values have a default; values that are commented out
 # serve to show the default.
+"""Configuration file for the Sphinx documentation builder."""
 
-import sys
+import inspect
 import os
+import re
+import sys
+from importlib import import_module
+from pathlib import Path
+from urllib.parse import quote
+
+import sksparse
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-if not os.environ.get('READTHEDOCS'):
-    sys.path.insert(0, os.path.abspath('..'))
+if not os.environ.get("READTHEDOCS"):
+    sys.path.insert(0, Path("..").resolve().as_posix())
 
 # -- General configuration ------------------------------------------------
 
 # If your documentation needs a minimal Sphinx version, state it here.
-#needs_sphinx = '1.0'
+# needs_sphinx = '1.0'
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.doctest',
-    'sphinx.ext.mathjax',
-    'sphinx.ext.viewcode',
+    "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",  # page-per-object
+    "sphinx.ext.doctest",
+    "sphinx.ext.intersphinx",
+    "sphinx.ext.mathjax",
+    "sphinx.ext.napoleon",  # numpy style docstrings
+    "sphinx.ext.viewcode",
+    "sphinx.ext.linkcode",
+    "sphinx_copybutton",  # add "copy" button to code blocks
 ]
 
+
+def map_intersphinx(url, local_inv):
+    """Map an intersphinx inventory, using a local copy if available.
+
+    Parameters
+    ----------
+    url : str
+        URL of the intersphinx inventory.
+    local_inv : str
+        Path to the local inventory file.
+
+    Returns
+    -------
+    tuple
+        Tuple of (url, local_inv or None).
+    """
+    if Path(local_inv).exists():
+        return (url, str(local_inv))
+    return (url, None)
+
+
+intersphinx_mapping = {
+    "python": map_intersphinx("https://docs.python.org/3", '_intersphinx/python.inv'),
+    "numpy": map_intersphinx("https://numpy.org/doc/stable", '_intersphinx/numpy.inv'),
+    "scipy": map_intersphinx(
+        "https://docs.scipy.org/doc/scipy", '_intersphinx/scipy.inv'
+    ),
+}
+
+intersphinx_timeout = 120     # seconds to wait for a response
+intersphinx_cache_limit = 30  # days to cache the inventories
+
+nitpicky = True  # warn about all references where the target cannot be found
+
+napoleon_use_param = False  # ignore text after colon in param description
+napoleon_use_rtype = False  # don't show seprate section for return type
+
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = ["_templates"]
 
 # The suffix(es) of source filenames.
 # You can specify multiple suffix as a list of string:
-# source_suffix = ['.rst', '.md']
-source_suffix = '.rst'
+source_suffix = {".rst": "restructuredtext"}
 
 # The encoding of source files.
-#source_encoding = 'utf-8-sig'
+# source_encoding = 'utf-8-sig'
 
 # The master toctree document.
-master_doc = 'index'
+master_doc = "index"
 
 # General information about the project.
-project = 'scikit-sparse'
-copyright = '2016, Antony Lee'
-author = 'Antony Lee'
+project = "scikit-sparse"
+copyright = "2016–­2025, The scikit-sparse developers"
+author = "The scikit-sparse developers"
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
-import sksparse
 # The short X.Y version.
 version = sksparse.__version__
 # The full version, including alpha/beta/rc tags.
@@ -71,203 +118,319 @@ release = version
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = "en"
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:
-#today = ''
+# today = ''
 # Else, today_fmt is used as the format for a strftime call.
-#today_fmt = '%B %d, %Y'
+# today_fmt = '%B %d, %Y'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['_build']
+exclude_patterns = ["_build", "**/_drafts"]
 
 # The reST default role (used for this markup: `text`) to use for all
 # documents.
-#default_role = None
+# default_role = None
 
 # If true, '()' will be appended to :func: etc. cross-reference text.
-#add_function_parentheses = True
+# add_function_parentheses = True
 
 # If true, the current module name will be prepended to all description
 # unit titles (such as .. function::).
-#add_module_names = True
+# add_module_names = True
 
 # If true, sectionauthor and moduleauthor directives will be shown in the
 # output. They are ignored by default.
-#show_authors = False
+# show_authors = False
 
 # The name of the Pygments (syntax highlighting) style to use.
-pygments_style = 'sphinx'
+pygments_style = "sphinx"
 
 # A list of ignored prefixes for module index sorting.
-#modindex_common_prefix = []
+# modindex_common_prefix = []
 
 # If true, keep warnings as "system message" paragraphs in the built documents.
-#keep_warnings = False
+# keep_warnings = False
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
+
+GITHUB_URL = "https://github.com/scikit-sparse/scikit-sparse"
+GITHUB_BRANCH = "dev"
+
+PROJECT_ROOT = Path(__file__).parent.parent
+
+
+def get_cython_lineno(src_path: Path, obj_name: str) -> int | None:
+    """Get the line number of a Cython object in its .pyx source file.
+
+    Parameters
+    ----------
+    src_path
+        Path to the .pyx source file.
+    obj_name
+        Name of the object to find.
+
+    Returns
+    -------
+    int or None
+        Line number of the object in the source file, or None if not found.
+    """
+    pat = re.compile(
+        rf"^\s*(cdef|cpdef|def|class)\s+.*?\b{re.escape(obj_name)}\b\s*(\(|:|=)",
+    )
+
+    try:
+        with src_path.open() as fp:
+            for i, line in enumerate(fp, start=1):
+                if pat.search(line):
+                    return i
+    except FileNotFoundError:
+        pass
+
+    if obj_name == "CholeskyFactor.factorize":
+        breakpoint()
+    return None
+
+
+# linkcode setup
+def linkcode_resolve(domain, info):
+    """Determine the URL corresponding to Python object."""
+    if domain != "py":
+        return None
+
+    if not info["module"]:
+        return None
+
+    modname = info["module"]
+    fullname = info["fullname"]
+
+    if not modname or not fullname:
+        return None
+
+    # --- Get Python object ---
+    try:
+        module = import_module(modname)
+        obj = module
+        for part in fullname.split("."):
+            obj = getattr(obj, part)
+    except Exception:
+        obj = None  # Cython object, or cannot be found
+
+    # --- Get source file and line number ---
+    filename = None
+    lineno = None
+
+    if obj is not None:
+        try:
+            filename = inspect.getsourcefile(obj)
+        except TypeError:
+            pass
+
+    if filename is not None and filename != "<string>":
+        # ---------- Pure Python Objects ----------
+        # Get the line number
+        try:
+            _, lineno = inspect.getsourcelines(obj)
+        except Exception:
+            pass
+
+        src_path = Path(filename)
+    else:
+        # ---------- Cython Objects ----------
+        potential_pyx_path = Path(*modname.split("."))
+        src_path = PROJECT_ROOT / potential_pyx_path.with_suffix(".pyx")
+        obj_simple_name = fullname.split(".")[-1]
+        lineno = get_cython_lineno(src_path, obj_simple_name)
+
+    # Construct the path relative to the Git repo root
+    try:
+        rel_path = src_path.relative_to(PROJECT_ROOT)
+    except ValueError:
+        return None  # file not in the scikit-sparse repo
+
+    github_path = quote(rel_path.as_posix())
+
+    url = f"{GITHUB_URL}/blob/{GITHUB_BRANCH}/{github_path}"
+
+    if lineno:
+        url += f"#L{lineno}"
+
+    return url
 
 
 # -- Options for HTML output ----------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'alabaster'
+html_theme = "furo"
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
 html_theme_options = {
-    "github_user": "scikit-sparse",
-    "github_repo": "scikit-sparse",
-    "github_banner": True}
+    "source_repository": GITHUB_URL,
+    "source_branch": GITHUB_BRANCH,
+    "source_directory": "doc/",
+    "top_of_page_buttons": ["view"],
+    "footer_icons": [
+        {
+            "name": "GitHub",
+            "url": GITHUB_URL,
+            "html": """
+                <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"></path>
+                </svg>
+            """,  # noqa: E501
+            "class": "",
+        },
+    ],
+}
 
 # Add any paths that contain custom themes here, relative to this directory.
-#html_theme_path = []
+# html_theme_path = []
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
-#html_title = None
+# html_title = None
 
 # A shorter title for the navigation bar.  Default is the same as html_title.
-#html_short_title = None
+# html_short_title = None
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-#html_logo = None
+# html_logo = None
 
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
 # pixels large.
-#html_favicon = None
+# html_favicon = None
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+# html_static_path = ['_static']
 
 # Add any extra paths that contain custom files (such as robots.txt or
 # .htaccess) here, relative to this directory. These files are copied
 # directly to the root of the documentation.
-#html_extra_path = []
+# html_extra_path = []
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
-#html_last_updated_fmt = '%b %d, %Y'
+# html_last_updated_fmt = '%b %d, %Y'
 
 # If true, SmartyPants will be used to convert quotes and dashes to
 # typographically correct entities.
-#html_use_smartypants = True
+# html_use_smartypants = True
 
 # Custom sidebar templates, maps document names to template names.
-#html_sidebars = {}
+# html_sidebars = {}
 
 # Additional templates that should be rendered to pages, maps page names to
 # template names.
-#html_additional_pages = {}
+# html_additional_pages = {}
 
 # If false, no module index is generated.
-#html_domain_indices = True
+# html_domain_indices = True
 
 # If false, no index is generated.
-#html_use_index = True
+# html_use_index = True
 
 # If true, the index is split into individual pages for each letter.
-#html_split_index = False
+# html_split_index = False
 
 # If true, links to the reST sources are added to the pages.
-#html_show_sourcelink = True
+# html_show_sourcelink = True
 
 # If true, "Created using Sphinx" is shown in the HTML footer. Default is True.
-#html_show_sphinx = True
+# html_show_sphinx = True
 
 # If true, "(C) Copyright ..." is shown in the HTML footer. Default is True.
-#html_show_copyright = True
+html_show_copyright = True
 
 # If true, an OpenSearch description file will be output, and all pages will
 # contain a <link> tag referring to it.  The value of this option must be the
 # base URL from which the finished HTML is served.
-#html_use_opensearch = ''
+# html_use_opensearch = ''
 
 # This is the file name suffix for HTML files (e.g. ".xhtml").
-#html_file_suffix = None
+# html_file_suffix = None
 
 # Language to be used for generating the HTML full-text search index.
 # Sphinx supports the following languages:
 #   'da', 'de', 'en', 'es', 'fi', 'fr', 'h', 'it', 'ja'
 #   'nl', 'no', 'pt', 'ro', 'r', 'sv', 'tr'
-#html_search_language = 'en'
+# html_search_language = 'en'
 
 # A dictionary with options for the search language support, empty by default.
 # Now only 'ja' uses this config value
-#html_search_options = {'type': 'default'}
+# html_search_options = {'type': 'default'}
 
 # The name of a javascript file (relative to the configuration directory) that
 # implements a search results scorer. If empty, the default will be used.
-#html_search_scorer = 'scorer.js'
+# html_search_scorer = 'scorer.js'
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'scikit-sparsedoc'
+htmlhelp_basename = "scikit-sparsedoc"
 
 # -- Options for LaTeX output ---------------------------------------------
 
 latex_elements = {
-# The paper size ('letterpaper' or 'a4paper').
-#'papersize': 'letterpaper',
-
-# The font size ('10pt', '11pt' or '12pt').
-#'pointsize': '10pt',
-
-# Additional stuff for the LaTeX preamble.
-#'preamble': '',
-
-# Latex figure (float) alignment
-#'figure_align': 'htbp',
+    # The paper size ('letterpaper' or 'a4paper').
+    #'papersize': 'letterpaper',
+    # The font size ('10pt', '11pt' or '12pt').
+    #'pointsize': '10pt',
+    # Additional stuff for the LaTeX preamble.
+    #'preamble': '',
+    # Latex figure (float) alignment
+    #'figure_align': 'htbp',
 }
 
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'scikit-sparse.tex', 'scikit-sparse Documentation',
-     'Antony Lee', 'manual'),
+    (
+        master_doc,
+        "scikit-sparse.tex",
+        "scikit-sparse Documentation",
+        "Antony Lee",
+        "manual",
+    ),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
 # the title page.
-#latex_logo = None
+# latex_logo = None
 
 # For "manual" documents, if this is true, then toplevel headings are parts,
 # not chapters.
-#latex_use_parts = False
+# latex_use_parts = False
 
 # If true, show page references after internal links.
-#latex_show_pagerefs = False
+# latex_show_pagerefs = False
 
 # If true, show URL addresses after external links.
-#latex_show_urls = False
+# latex_show_urls = False
 
 # Documents to append as an appendix to all manuals.
-#latex_appendices = []
+# latex_appendices = []
 
 # If false, no module index is generated.
-#latex_domain_indices = True
+# latex_domain_indices = True
 
 
 # -- Options for manual page output ---------------------------------------
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [
-    (master_doc, 'scikit-sparse', 'scikit-sparse Documentation',
-     [author], 1)
-]
+man_pages = [(master_doc, "scikit-sparse", "scikit-sparse Documentation", [author], 1)]
 
 # If true, show URL addresses after external links.
-#man_show_urls = False
+# man_show_urls = False
 
 
 # -- Options for Texinfo output -------------------------------------------
@@ -276,19 +439,25 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'scikit-sparse', 'scikit-sparse Documentation',
-     author, 'scikit-sparse', 'One line description of project.',
-     'Miscellaneous'),
+    (
+        master_doc,
+        "scikit-sparse",
+        "scikit-sparse Documentation",
+        author,
+        "scikit-sparse",
+        "One line description of project.",
+        "Miscellaneous",
+    ),
 ]
 
 # Documents to append as an appendix to all manuals.
-#texinfo_appendices = []
+# texinfo_appendices = []
 
 # If false, no module index is generated.
-#texinfo_domain_indices = True
+# texinfo_domain_indices = True
 
 # How to display URL addresses: 'footnote', 'no', or 'inline'.
-#texinfo_show_urls = 'footnote'
+# texinfo_show_urls = 'footnote'
 
 # If true, do not generate a @detailmenu in the "Top" node's menu.
-#texinfo_no_detailmenu = False
+# texinfo_no_detailmenu = False

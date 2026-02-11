@@ -1,0 +1,114 @@
+# Part of the scikit-sparse project.
+# Copyright (C) 2025 Bernard Roesler. All rights reserved.
+# See pyproject.toml for full author list and LICENSE.txt for license details.
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# =============================================================================
+#     File: test_utils.py
+#  Created: 2025-08-12 21:32
+# =============================================================================
+
+"""Test cases for utility functions in scikit-sparse."""
+
+import numpy as np
+import pytest
+from numpy.testing import assert_array_equal
+from scipy import sparse
+
+from sksparse.utils import validate_csc_input
+
+
+def test_1D_input():
+    with pytest.raises(ValueError, match="Input must be 2D"):
+        validate_csc_input(np.arange(10))
+
+
+def test_nonsquare_require_square():
+    with pytest.raises(ValueError, match="Input must be square"):
+        validate_csc_input(sparse.csc_array((3, 4)), require_square=True)
+
+
+def test_ND_input():
+    with pytest.raises(ValueError, match="Input must be 2D"):
+        validate_csc_input(np.empty((2, 3, 4)))
+
+
+@pytest.mark.parametrize("matrix_type", ["dense", "csc", "coo", "csc_matrix"])
+def test_input_conversion(matrix_type):
+    A = sparse.csc_array(np.arange(12.0).reshape(3, 4))
+
+    match matrix_type:
+        case "dense":
+            A = A.toarray()
+        case "csc":
+            A = A.tocsc()
+        case "coo":
+            A = A.tocoo()
+        case "csc_matrix":
+            A = sparse.csc_matrix(A)
+        case _:
+            raise ValueError(f"Unknown matrix type: {matrix_type}")
+
+    if matrix_type in ("csc", "csc_matrix"):
+        result, use_int32, out_itype = validate_csc_input(A)
+    else:
+        with pytest.warns(
+            sparse.SparseEfficiencyWarning, match="not in CSC format"
+        ):
+            result, use_int32, out_itype = validate_csc_input(A)
+
+    assert isinstance(result, sparse.csc_array) or isinstance(result, sparse.csc_matrix)
+    assert_array_equal(
+        result.toarray(), A.toarray() if sparse.issparse(A) else A, strict=True
+    )
+    assert use_int32
+    assert out_itype == np.int32
+
+
+BOOL_TYPES = [bool, np.bool_]
+INT_TYPES = [np.int8, np.int16, np.int32, np.int64, int]
+FLOAT_TYPES = [np.float32, np.float64, float]
+COMPLEX_TYPES = [np.complex64, np.complex128, complex]
+
+
+def _test_type_promotion(dtype, expected_dtype, ensure_double=False):
+    A = sparse.csc_array(np.arange(12).reshape(3, 4)).astype(dtype)
+    result, use_int32, out_itype = validate_csc_input(A, ensure_double=ensure_double)
+    assert isinstance(result, sparse.csc_array)
+    assert result.dtype == expected_dtype
+    assert use_int32
+    assert out_itype == np.int32
+
+
+@pytest.mark.parametrize("dtype", BOOL_TYPES)
+def test_bool_type_promotion(dtype):
+    _test_type_promotion(dtype, np.float32)
+
+
+@pytest.mark.parametrize("dtype", INT_TYPES)
+def test_int_type_promotion(dtype):
+    if dtype in [np.int8, np.int16]:
+        expected_dtype = np.float32
+    else:
+        expected_dtype = np.float64
+    _test_type_promotion(dtype, expected_dtype)
+
+
+@pytest.mark.parametrize("dtype", FLOAT_TYPES)
+def test_float_type_promotion(dtype):
+    _test_type_promotion(dtype, dtype)
+
+
+@pytest.mark.parametrize("dtype", COMPLEX_TYPES)
+def test_complex_type_promotion(dtype):
+    _test_type_promotion(dtype, dtype)
+
+
+@pytest.mark.parametrize("dtype", BOOL_TYPES + INT_TYPES + FLOAT_TYPES)
+def test_ensure_double_bool_int_float(dtype):
+    _test_type_promotion(dtype, np.float64, ensure_double=True)
+
+
+@pytest.mark.parametrize("dtype", COMPLEX_TYPES)
+def test_ensure_double_complex(dtype):
+    _test_type_promotion(dtype, np.complex128, ensure_double=True)

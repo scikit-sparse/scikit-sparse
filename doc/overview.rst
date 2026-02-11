@@ -1,91 +1,108 @@
+========
 Overview
 ========
 
 Introduction
 ------------
 
-The :mod:`scikit-sparse` package (previously known as :mod:`scikits.sparse`)
-is a companion to the :mod:`scipy.sparse` library for sparse matrix
-manipulation in Python. All :mod:`scikit-sparse` routines expect and
-return :mod:`scipy.sparse` matrices (usually in CSC format). The intent
-of :mod:`scikit-sparse` is to wrap GPL'ed code such as `SuiteSparse
-<http://www.suitesparse.com>`_, which cannot be
-included in SciPy proper.
+The ``scikit-sparse`` package (previously known as ``scikits.sparse``)
+is a companion to the :mod:`scipy.sparse` library for sparse matrix manipulation
+in Python. All :mod:`sksparse` routines expect and return :mod:`scipy.sparse`
+matrices (usually in CSC format). The intent of :mod:`sksparse` is to wrap code
+with a GPL license, such as `SuiteSparse <suitesparse_website_>`_, which cannot
+be included in SciPy proper.
 
-Currently our coverage is rather... sparse, with only a wrapper for
-the CHOLMOD routines for sparse Cholesky decomposition, but we hope
-that this will expand over time. Contributions of new wrappers are
-very welcome, especially if you can follow the style of the existing
-interfaces.
+.. _suitesparse_website: https://people.engr.tamu.edu/davis/suitesparse.html
 
-Download
---------
+.. include:: ../README.rst
+   :start-after: .. start-installation
+   :end-before:  .. end-installation
 
-The current release may be downloaded from the Python Package index at
 
-  https://pypi.python.org/pypi/scikit-sparse/
+Troubleshooting
++++++++++++++++
 
-Or from the `homepage <https://github.com/scikit-sparse/scikit-sparse>`_
-at
+The installation will automatically detect the SuiteSparse library and compile
+the necessary Cython code. It will check for the SuiteSparse library in the
+following order:
 
-  https://github.com/scikit-sparse/scikit-sparse/releases
+    1. The environment variables ``SUITESPARSE_INCLUDE_DIR`` and
+       ``SUITESPARSE_LIB_DIR`` (if set, these will override the default search
+       paths)
+    2. Your active conda environment path
+    3. Your homebrew paths (*e.g.* ``/opt/homebrew/include/suitesparse``)
+    4. Typical system paths (*e.g.* ``/usr/include/suitesparse`` on Linux, or
+       ``/usr/local/include/suitesparse`` on macOS)
 
-Or the latest *development version* may be found in our `Git
-repository <https://github.com/scikit-sparse/scikit-sparse>`_::
+The first path that contains the SuiteSparse headers and libraries will be used.
 
-  $ git clone git://github.com/scikit-sparse/scikit-sparse.git
 
-Requirements
-------------
+To see which SuiteSparse library was found, you can run the following command on
+MacOS or Linux::
 
-Installing :mod:`scikit-sparse` requires:
+    $ CHECK_SKSPARSE_INSTALL=$(python -c 'import sksparse.cholmod; print(sksparse.cholmod.__file__)')
 
-* `Python <http://python.org/>`_
-* `NumPy <http://numpy.scipy.org/>`_
-* `SciPy <http://www.scipy.org/>`_
-* `Cython <http://www.cython.org/>`_
-* CHOLMOD (included in `SuiteSparse <http://www.suitesparse.com>`_)
+Then, use one of the following commands depending on your operating system.
 
-Test versions are:
-* Python: 3.7, 3.6
-* NumPy: 1.15, 1.14, 1.13
-* SciPy: 1.1, 1.0, 0.19
-* SuiteSparse: 5.2
-(Other versions may work but are untested.)
 
-On Debian/Ubuntu systems, the following command should suffice::
+MacOS
+^^^^^
 
-  $ sudo apt-get install python-scipy libsuitesparse-dev
+On MacOS, use the following command to check where the SuiteSparse
+installation was found::
 
-On Arch Linux, run::
+    $ otool -L $CHECK_SKSPARSE_INSTALL | grep cholmod
 
-  $ sudo pacman -S suitesparse
+Look for a line that contains ``cholmod.*\.dylib`` or ``cholmod.*\.a``. The
+output might be something like::
 
-Installation
-------------
+    $ otool -L $CHECK_SKSPARSE_INSTALL | grep cholmod
+    /Users/username/src/scikit-sparse/sksparse/cholmod.cpython-313-darwin.so:
+            @rpath/libcholmod.5.dylib (compatibility version 5.0.0, current version 5.3.1)
+            /usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1351.0.0)
 
-As usual, ::
+The ``@rpath/libcholmod.5.dylib`` indicates that the library was found on the
+relative path. To resolve this path, run::
 
-  $ pip install --user scikit-sparse
+    $ otool -l @rpath/libcholmod.5.dylib | grep -A2 LC_RPATH
+          cmd LC_RPATH
+      cmdsize 72
+         path /Users/username/anaconda3/envs/scikit-sparse/lib (offset 12)
 
-or with conda ::
+which indicates that the library was found on the conda path.
 
-  $ conda install -c conda-forge scikit-sparse
+
+Linux
+^^^^^
+
+On Linux, use the following commands instead::
+
+    $ ldd $CHECK_SKSPARSE_INSTALL | grep cholmod
+    $ readelf -d $CHECK_SKSPARSE_INSTALL | grep -E '(RPATH|RUNPATH)'
+    0x000000000000001d (RUNPATH)            Library runpath: [/home/user/anaconda3/envs/scikit-sparse/lib]
+
+also confirming installation on the conda path.
+
 
 Contact
 -------
 
-Post your suggestions and questions directly to our `bug tracker
-<https://github.com/scikit-sparse/scikit-sparse/issues>`_.
+Post your suggestions and questions directly to our `GitHub Issues page
+<github_issues_>`_.
+
+.. _github_issues: https://github.com/scikit-sparse/scikit-sparse/issues
 
 Developers
 ----------
 
 * 2008        `David Cournapeau        <cournape@gmail.com>`_
-* 2009-2015   `Nathaniel Smith         <njs@pobox.com>`_
+* 2009–2015   `Nathaniel Smith         <njs@pobox.com>`_
 * 2010        `Dag Sverre Seljebotn    <dagss@student.matnat.uio.no>`_
 * 2014        `Leon Barrett            <lbarrett@climate.com>`_
 * 2015        `Yuri                    <yuri@tsoft.com>`_
-* 2016-2017   `Antony Lee              <anntzer.lee@gmail.com>`_
+* 2016–2017   `Antony Lee              <anntzer.lee@gmail.com>`_
 * 2016        `Alex Grigorievskiy      <alex.grigorievskiy@gmail.com>`_
-* 2016-2018   `Joscha Reimer           <jor@informatik.uni-kiel.de>`_
+* 2016–2018   `Joscha Reimer           <jor@informatik.uni-kiel.de>`_
+* 2021-       `Justin Ellis            <justin.ellis18@gmail.com>`_
+* 2022-       `Aaron Johnson           <aaron9035@gmail.com>`_
+* 2025–       `Bernard Roesler         <bernard.roesler@gmail.com>`_
