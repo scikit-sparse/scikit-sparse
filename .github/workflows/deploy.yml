@@ -7,35 +7,27 @@ on:
       - published
 
 jobs:
+  build:
+    uses: ./.github/workflows/build-check.yml
+
   deploy:
+    needs: [build]
     runs-on: ubuntu-latest
     environment: deploy
     permissions:
       # IMPORTANT: this permission is mandatory for trusted publishing
       id-token: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Download sdist from Ubuntu 3.10
+        uses: actions/download-artifact@v4
         with:
-          python-version: "3.10"  # minimum supported version
+          name: dist
+          path: dist/
 
-      - name: Install non-python dependencies on linux
-        if: runner.os == 'Linux'
+      - name: Remove wheel files (publish sdist only)
         run: |
-          sudo apt-get update
-          sudo apt-get install libsuitesparse-dev
-
-      - name: Install build tools
-        run: |
-          pip install --upgrade pip
-          pip install build
-
-      - name: Build sdist and wheel
-        run: |
-          python -m build
+          rm -f dist/*.whl
+          ls -lh dist/
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
