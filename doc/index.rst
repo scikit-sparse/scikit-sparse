@@ -63,6 +63,7 @@ Learn More
 * :doc:`User Guide <tutorial/index>` - Tutorials and examples
 * :doc:`API Reference <reference/index>` - Detailed API documentation
 * :doc:`Change Log <changes>` - List of changes by version
+* :doc:`Contributing <contributing>` - Guidelines for contributing to the project
 
 .. _github_repo: https://github.com/broesler/scikit-sparse
 .. _github_issues: https://github.com/broesler/scikit-sparse/issues
@@ -80,3 +81,5 @@ Learn More
    API Reference <reference/index>
 
    Change Log <changes>
+
+   Contributing <contributing>
