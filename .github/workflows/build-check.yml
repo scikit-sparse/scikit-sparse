@@ -22,9 +22,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - name: Install uv with python
+        uses: astral-sh/setup-uv@v7
         with:
+          enable-cache: true
           python-version: ${{ matrix.python-version }}
 
       - name: Install non-python dependencies on mac
@@ -37,14 +38,9 @@ jobs:
         run: |
           sudo apt-get install libsuitesparse-dev
 
-      - name: Install build tools
-        run: |
-          pip install --upgrade pip
-          pip install build
-
       - name: Build sdist and wheel
         run: |
-          python -m build
+          uv build
 
       - name: List sdist contents
         run: |
@@ -56,10 +52,10 @@ jobs:
           echo "---- Wheel contents ----"
           unzip -l dist/*.whl
 
-      - name: Check wheel for .c/.pyx (should be excluded)
+      - name: Check wheel for .c[pp]/.pyx (should be excluded)
         run: |
-          if unzip -l dist/*.whl | grep -E '\.c$|\.pyx$'; then
-            echo "::error::Wheel includes Cython source or C files"
+          if unzip -l dist/*.whl | grep -E '\.c(pp)?$|\.pyx$'; then
+            echo "::error::Wheel includes Cython source or C/C++ files"
             exit 1
           fi
 
@@ -75,10 +71,10 @@ jobs:
           micromamba create -n test-wheel python=${{ matrix.python-version }} -y
           micromamba activate test-wheel
           micromamba install -c conda-forge suitesparse -y
-          pip install dist/*.whl
+          uv pip install dist/*.whl
           cd ..  # cd out of repo to avoid import issues
-          pip show scikit-sparse
-          pip show scikit-sparse-dev
+          uv pip show scikit-sparse
+          uv pip show scikit-sparse-dev
           python -c "import sksparse; print(f'Wheel loaded from: {sksparse.__file__}')"
 
       - name: Create new conda env and install sdist
@@ -87,11 +83,11 @@ jobs:
           micromamba create -n test-sdist python=${{ matrix.python-version }} -y
           micromamba activate test-sdist
           micromamba install -c conda-forge suitesparse pytest -y
-          pip install dist/scikit_sparse*.tar.gz
+          uv pip install dist/scikit_sparse*.tar.gz
           SRC_DIR=$(pwd)
           cd ..  # cd out of repo to avoid import issues
-          pip show scikit-sparse
-          pip show scikit-sparse-dev
+          uv pip show scikit-sparse
+          uv pip show scikit-sparse-dev
           python -c "import sksparse; print(f'sdist loaded from: {sksparse.__file__}')"
           # Run tests on the installed package
           cp -R ${SRC_DIR}/tests ./tests
