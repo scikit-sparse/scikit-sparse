@@ -1,0 +1,13 @@
+name: sksparse-dev
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.13
+  - uv
+  # --- Compiled dependencies ---
+  - suitesparse>=7.4
+  - cython>=3.0
+  - cxx-compiler
+  # Manage benchmarking
+  - asv
