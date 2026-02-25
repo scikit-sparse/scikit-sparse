@@ -274,6 +274,9 @@ cdef class KLUInfo:
         The pivot tolerance used.
     mempeak : int
         Peak memory usage in bytes.
+
+
+    .. versionadded:: 0.5.0
     """
     noffdiag : int | None = None
     nrealloc : int | None = None
@@ -412,6 +415,9 @@ cdef class KLUControl:
         * ``max``
 
         Default is ``None``, which uses the ``KLU`` default setting of ``max``.
+
+
+    .. versionadded:: 0.5.0
     """
     cdef:
         double _FLOAT_NONE

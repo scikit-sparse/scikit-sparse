@@ -88,6 +88,7 @@ def maxtrans(A):
             If row ``i`` is not matched with any column,
             then ``jmatch[i] = -1``.
 
+
     .. versionadded:: 0.5.0
 
     References
@@ -200,6 +201,7 @@ def strongcomp(A, q=None):
         The array of indices of the start of each block in the permuted matrix.
         Block ``b`` is in rows/columns ``r[b]`` to ``r[b+1] - 1``.
         The number of blocks is ``len(r) - 1``.
+
 
     .. versionadded:: 0.5.0
 

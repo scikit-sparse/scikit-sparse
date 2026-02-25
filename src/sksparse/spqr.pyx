@@ -345,6 +345,9 @@ cdef class SPQRInfo:
         Total time in seconds.
     flops : int
         Actual flops for the factorization and solve (including backsolve).
+
+
+    .. versionadded:: 0.5.0
     """
     nnzR_upper_bound : int | None = None
     nnzH_upper_bound : int | None = None
@@ -1684,6 +1687,9 @@ class SPQRHouseholder(NamedTuple):
         The Householder coefficients.
     perm : ~numpy.ndarray of int
         The column permutation vector.
+
+
+    .. versionadded:: 0.5.0
     """
     H: ~scipy.sparse.csc_array
     tau: ~numpy.ndarray
