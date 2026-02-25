@@ -241,7 +241,7 @@ def linkcode_resolve(domain, info):
     else:
         # ---------- Cython Objects ----------
         potential_pyx_path = Path(*modname.split("."))
-        src_path = PROJECT_ROOT / potential_pyx_path.with_suffix(".pyx")
+        src_path = PROJECT_ROOT / "src" / potential_pyx_path.with_suffix(".pyx")
         obj_simple_name = fullname.split(".")[-1]
         lineno = get_cython_lineno(src_path, obj_simple_name)
 

@@ -1383,6 +1383,12 @@ cdef class CholeskyFactor:
         Always use the constructor ``CholeskyFactor(...)`` to create a new object.
 
 
+    .. versionadded:: 0.1.0
+
+    .. versionchanged:: 0.5.0
+        Refactored to ``CholeskyFactor`` from just ``Factor``. Now incorporates
+        ``Common`` factor into the object. Major API changes.
+
     References
     ----------
     .. [#analyze_c] ``analyze.c`` - CHOLMOD MATLAB analyze function
@@ -3452,6 +3458,7 @@ def etree(A, *, kind=None, bint return_post=False):
     post : (N,) ndarray of int, optional
         The postorder of the elimination tree. The first node in the postorder
         is the root of the tree.
+
 
     .. versionadded:: 0.5.0
 
