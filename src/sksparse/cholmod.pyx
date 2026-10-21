@@ -1887,7 +1887,7 @@ cdef class CholeskyFactor:
             and self._has_pattern(A)
         )
         if not same_pattern:
-            A, _, _ = validate_csc_input(A, ensure_double=False)
+            A, _, _ = validate_csc_input(A, ensure_double=False, itype=self.itype)
             same_pattern = self._has_pattern(A)
 
         if ldl is None:
@@ -2124,7 +2124,7 @@ cdef class CholeskyFactor:
 
         cdef int stype = 0
 
-        b, _, _ = validate_csc_input(b, ensure_double=False)
+        b, _, _ = validate_csc_input(b, ensure_double=False, itype=self.itype)
 
         _cholmod_sparse_from_csc(
             b.shape, b.indptr, b.indices, b.data, stype, <uintptr_t>&Bspmatrix
@@ -2218,7 +2218,7 @@ cdef class CholeskyFactor:
             C = C.reshape((-1, 1)).tocsc()  # (N, 1)
 
         cdef int stype = 0  # use all of C
-        C, _, _ = validate_csc_input(C, ensure_double=False)
+        C, _, _ = validate_csc_input(C, ensure_double=False, itype=self.itype)
 
         cdef cholmod_sparse Cmatrix
         cdef cholmod_sparse* Cc = &Cmatrix
@@ -2328,7 +2328,7 @@ cdef class CholeskyFactor:
         if C.ndim == 1:
             C = C.reshape((-1, 1)).tocsc()  # (N, 1)
 
-        C, _, _ = validate_csc_input(C, ensure_double=False)
+        C, _, _ = validate_csc_input(C, ensure_double=False, itype=self.itype)
         _cholmod_sparse_from_csc(
             C.shape, C.indptr, C.indices, C.data, stype, <uintptr_t>&Cmatrix
         )
@@ -2431,19 +2431,14 @@ cdef class CholeskyFactor:
         """
         self._require_factorized()
 
-        cdef bint A_use_int32
         # TODO support non-square matrices with sym_kind='row'
-        A, A_use_int32, _ = validate_csc_input(A, require_square=True, ensure_double=False)
+        A, _, _ = validate_csc_input(
+            A, require_square=True, ensure_double=False, itype=self.itype
+        )
 
         if A.shape[0] != self.N:
             raise ValueError(
                 "Input matrix A must have the same number of rows as L."
-            )
-
-        if self._use_int32 and not A_use_int32:
-            raise ValueError(
-                "A and factor must have the same integer type. "
-                f"Got {A.indptr.dtype=}, but {self._use_int32=}."
             )
 
         # Special Cases
