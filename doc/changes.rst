@@ -34,6 +34,13 @@ v0.5.1 (unreleased)
   :meth:`~sksparse.cholmod.CholeskyFactor.rowadd`, or
   :meth:`~sksparse.cholmod.CholeskyFactor.resymbol` differs from that of the
   factor. The index arrays are now converted.
+* :meth:`~sksparse.cholmod.CholeskyFactor.update`,
+  :meth:`~sksparse.cholmod.CholeskyFactor.downdate`,
+  :meth:`~sksparse.cholmod.CholeskyFactor.rowadd`, and
+  :meth:`~sksparse.cholmod.CholeskyFactor.rowdel` raise the exception that
+  matches the CHOLMOD error (*e.g.*,
+  :exc:`~sksparse.cholmod.CholmodInvalidInputError`), and
+  :meth:`~sksparse.cholmod.CholeskyFactor.resymbol` no longer ignores errors.
 
 v0.5.0
 ------

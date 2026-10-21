@@ -2271,6 +2271,7 @@ cdef class CholeskyFactor:
             cholmod_l_free_sparse(&C_perm, self._cm)
 
         if not ok:
+            _handle_errors(self._cm.status)
             raise CholmodError("Update or downdate failed.")
 
         return self
@@ -2342,6 +2343,7 @@ cdef class CholeskyFactor:
             ok = cholmod_l_rowadd(k, Cc, self._factor, self._cm)
 
         if not ok:
+            _handle_errors(self._cm.status)
             raise CholmodError("cholmod_rowadd failed.")
 
         return self
@@ -2383,6 +2385,7 @@ cdef class CholeskyFactor:
             ok = cholmod_l_rowdel(k, NULL, self._factor, self._cm)
 
         if not ok:
+            _handle_errors(self._cm.status)
             raise CholmodError("cholmod_rowdel failed.")
 
         return self
@@ -2478,6 +2481,7 @@ cdef class CholeskyFactor:
             else:
                 cholmod_l_resymbol(Ac, NULL, 0, True, self._factor, self._cm)
 
+        _handle_errors(self._cm.status)
         return self
 
     def logdet(self):

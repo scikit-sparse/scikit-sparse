@@ -16,7 +16,7 @@ from numpy.testing import assert_allclose
 from scipy import sparse
 from scipy.sparse.linalg import LaplacianNd
 
-from sksparse.cholmod import ldl_factor
+from sksparse.cholmod import CholmodInvalidInputError, ldl_factor
 
 Ng = 15  # arbitrary problem size A = (Ng**2, Ng**2)
 
@@ -251,3 +251,13 @@ def test_mixed_itype(A, itype):
     assert f.itype == itype
     x = np.arange(N, dtype=np.float64)
     assert_allclose(f.solve((B + C @ C.T) @ x), x, atol=1e-10)
+
+
+def test_update_error(A):
+    """Test that a CHOLMOD error raises the matching exception."""
+    f = ldl_factor(A)
+    C = sparse.csc_array(([0.5], ([1], [0])), shape=(A.shape[0], 1), dtype=np.float32)
+    with pytest.raises(CholmodInvalidInputError):
+        f.update(C)  # float32 C for a float64 factor
+    with pytest.raises(CholmodInvalidInputError):
+        f.rowadd(1, C)
