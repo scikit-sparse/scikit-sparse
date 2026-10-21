@@ -10,12 +10,20 @@
 
 """Unit tests for the cholmod module."""
 
+import gc
+
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose, assert_array_equal
 from scipy import sparse
 
-from sksparse.cholmod import CholmodNotPositiveDefiniteError, cholesky
+from sksparse.cholmod import (
+    CholeskyFactor,
+    CholmodNotPositiveDefiniteError,
+    cho_factor,
+    cholesky,
+    ldl,
+)
 
 from ..helpers import generate_random_matrices, is_valid_permutation
 
@@ -171,3 +179,21 @@ def test_beta(A, beta, order):
         expect_LL = (A[p][:, p] + beta * sparse.eye_array(N)).toarray()
 
     assert_allclose((L @ L.T.conj()).toarray(), expect_LL, atol=atol)
+
+
+@pytest.mark.parametrize("attr", ["perm", "colcount", "nnz", "factor", "repr"])
+def test_no_reference_cycle(davis_example_chol, attr):
+    """Test that a factor is freed after its arrays have been used."""
+
+    def n_factors():
+        gc.collect()
+        return sum(isinstance(x, CholeskyFactor) for x in gc.get_objects())
+
+    A = davis_example_chol
+    n0 = n_factors()
+    f = cho_factor(A, order="amd")
+    _ = repr(f) if attr == "repr" else getattr(f, attr)
+    del f, _
+    cholesky(A, order="amd")
+    ldl(A, order="amd")
+    assert n_factors() == n0

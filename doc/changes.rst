@@ -17,6 +17,14 @@ v0.5.1 (unreleased)
   type of the matrix before changing the factor. Previously, a matrix with the
   wrong data type could leave an ``LDL.T`` factor with the wrong
   :attr:`~sksparse.cholmod.CholeskyFactor.is_ll`, which gave wrong results.
+* Fix a memory leak: a :obj:`~sksparse.cholmod.CholeskyFactor` was never freed
+  after its :attr:`~sksparse.cholmod.CholeskyFactor.perm`,
+  :attr:`~sksparse.cholmod.CholeskyFactor.colcount`, or
+  :attr:`~sksparse.cholmod.CholeskyFactor.factor` was used, which includes
+  ``repr()`` and every call to :func:`~sksparse.cholmod.cholesky` and
+  :func:`~sksparse.cholmod.ldl`. :attr:`~sksparse.cholmod.CholeskyFactor.perm`
+  and :attr:`~sksparse.cholmod.CholeskyFactor.colcount` are now read-only
+  copies, instead of views of the factor.
 
 v0.5.0
 ------

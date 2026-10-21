@@ -112,6 +112,7 @@ import numpy as np
 
 from scipy.sparse import csc_array, diags_array, eye_array, issparse
 import warnings
+import weakref
 
 from .utils import validate_csc_input
 
@@ -955,47 +956,6 @@ cdef cnp.ndarray _ndarray_copy_from_intptr(void* ptr, size_t N, bint use_int32):
     return p.copy()  # return a copy in case ptr is freed
 
 
-cdef cnp.ndarray _ndarray_int_view_from_factor(
-    void* ptr, size_t N, CholeskyFactor py_factor
-):
-    """Create a NumPy array from the an integer vector in a CHOLMOD factor.
-
-    Parameters
-    ----------
-    ptr : void*
-        A pointer to the C array, *e.g.* ``cholmod_factor.Perm``.
-    N : size_t
-        The size of the vector.
-    py_factor : CholeskyFactor
-        The CholeskyFactor object from which to extract the permutation.
-
-    Returns
-    -------
-    p : ndarray
-        The permutation vector as a NumPy array. This array is *read-only*,
-        so attempts to modify it will raise an error.
-    """
-    cdef cholmod_factor *L = py_factor._factor
-
-    if L is NULL:
-        raise ValueError("The factor pointer is NULL.")
-
-    if ptr is NULL:
-        raise ValueError("The input pointer is NULL.")
-
-    cdef int np_itypenum = _np_itypenum_from_cholmod(L.itype)
-    p = cnp.PyArray_SimpleNewFromData(1, [N], np_itypenum, ptr)
-
-    # NOTE need to increment reference count of base manually,
-    # since the PyArray_SetBaseObject steals a reference.
-    Py_INCREF(py_factor)
-    if cnp.PyArray_SetBaseObject(p, py_factor) < 0:
-        raise MemoryError("Failed to set base object for array.")
-    cnp.PyArray_CLEARFLAGS(p, cnp.NPY_ARRAY_WRITEABLE)  # set to be read-only
-
-    return p
-
-
 # -----------------------------------------------------------------------------
 #         Utilities
 # -----------------------------------------------------------------------------
@@ -1332,7 +1292,7 @@ cdef class CholeskyFactor:
         The ordering method used for the factorization. If an unknown ordering
         was used, returns the integer value.
     perm : *(N,)* :obj:`numpy.ndarray` of int
-        A read-only view of the permutation vector used for the factorization.
+        A read-only copy of the permutation vector used for the factorization.
     factor : :obj:`~scipy.sparse.csc_array`
         A view of the the Cholesky factor in Compressed Sparse Column (CSC)
         format. If ``self.is_ll``, the returned matrix is lower triangular.
@@ -1612,9 +1572,10 @@ cdef class CholeskyFactor:
     @property
     def colcount(self):
         if self._colcount is None:
-            self._colcount = _ndarray_int_view_from_factor(
-                self._factor.ColCount, self._factor.n, self
+            self._colcount = _ndarray_copy_from_intptr(
+                self._factor.ColCount, self._factor.n, self._use_int32
             )
+            self._colcount.flags.writeable = False
         return self._colcount
 
     @property
@@ -1629,14 +1590,21 @@ cdef class CholeskyFactor:
     @property
     def perm(self):
         if self._perm is None:
-            self._perm = _ndarray_int_view_from_factor(self._factor.Perm, self._factor.n, self)
+            self._perm = _ndarray_copy_from_intptr(
+                self._factor.Perm, self._factor.n, self._use_int32
+            )
+            self._perm.flags.writeable = False
         return self._perm
 
     @property
     def factor(self):
-        if self._factor_view is None:
-            self._factor_view = _csc_view_from_cholmod_factor(self)
-        return self._factor_view
+        # NOTE cache a weak reference, since the view has self as its base,
+        # and a reference cycle through a NumPy array is never garbage collected.
+        Lv = None if self._factor_view is None else self._factor_view()
+        if Lv is None:
+            Lv = _csc_view_from_cholmod_factor(self)
+            self._factor_view = weakref.ref(Lv)
+        return Lv
 
     @property
     def L(self):
