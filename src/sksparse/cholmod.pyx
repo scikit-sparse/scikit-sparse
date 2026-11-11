@@ -1775,16 +1775,20 @@ cdef class CholeskyFactor:
         if lower is None:
             lower = self.is_lower
 
+        # Convert a copy of the factor if needed, so that this one is unchanged
+        same_kind = self.is_ll == (kind == "LL")
+        cf = self if same_kind and not self.is_super else self.copy()
+
         # Drop explicit zeros from returned copies
         if kind == "LL":
-            L = _csc_view_from_cholmod_factor(self, ldl=False).copy()
+            L = _csc_view_from_cholmod_factor(cf, ldl=False).copy()
             L.eliminate_zeros()
             if not lower:
                 L = L.T.conj()
             return L
         else:
             # Extract L and D from combined LD factor
-            L = _csc_view_from_cholmod_factor(self, ldl=True).copy()
+            L = _csc_view_from_cholmod_factor(cf, ldl=True).copy()
             D = diags_array(L.diagonal())
             L.setdiag(1.0)
             L.eliminate_zeros()
@@ -2271,6 +2275,7 @@ cdef class CholeskyFactor:
             cholmod_l_free_sparse(&C_perm, self._cm)
 
         if not ok:
+            _handle_errors(self._cm.status)
             raise CholmodError("Update or downdate failed.")
 
         return self
@@ -2342,6 +2347,7 @@ cdef class CholeskyFactor:
             ok = cholmod_l_rowadd(k, Cc, self._factor, self._cm)
 
         if not ok:
+            _handle_errors(self._cm.status)
             raise CholmodError("cholmod_rowadd failed.")
 
         return self
@@ -2383,6 +2389,7 @@ cdef class CholeskyFactor:
             ok = cholmod_l_rowdel(k, NULL, self._factor, self._cm)
 
         if not ok:
+            _handle_errors(self._cm.status)
             raise CholmodError("cholmod_rowdel failed.")
 
         return self
@@ -2478,6 +2485,7 @@ cdef class CholeskyFactor:
             else:
                 cholmod_l_resymbol(Ac, NULL, 0, True, self._factor, self._cm)
 
+        _handle_errors(self._cm.status)
         return self
 
     def logdet(self):

@@ -34,6 +34,20 @@ v0.5.1 (unreleased)
   :meth:`~sksparse.cholmod.CholeskyFactor.rowadd`, or
   :meth:`~sksparse.cholmod.CholeskyFactor.resymbol` differs from that of the
   factor. The index arrays are now converted.
+* :meth:`~sksparse.cholmod.CholeskyFactor.update`,
+  :meth:`~sksparse.cholmod.CholeskyFactor.downdate`,
+  :meth:`~sksparse.cholmod.CholeskyFactor.rowadd`, and
+  :meth:`~sksparse.cholmod.CholeskyFactor.rowdel` raise the exception that
+  matches the CHOLMOD error (*e.g.*,
+  :exc:`~sksparse.cholmod.CholmodInvalidInputError`), and
+  :meth:`~sksparse.cholmod.CholeskyFactor.resymbol` no longer ignores errors.
+* :meth:`~sksparse.cholmod.CholeskyFactor.get_factor` (and
+  :attr:`~sksparse.cholmod.CholeskyFactor.L`,
+  :attr:`~sksparse.cholmod.CholeskyFactor.R`, and
+  :attr:`~sksparse.cholmod.CholeskyFactor.D`) no longer convert the factor in
+  place. Previously, ``get_factor(kind="LDL")`` of an ``LL.T`` factor changed
+  :attr:`~sksparse.cholmod.CholeskyFactor.is_ll`, so that the next
+  :meth:`~sksparse.cholmod.CholeskyFactor.factorize` computed ``LDL.T``.
 
 v0.5.0
 ------

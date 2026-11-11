@@ -23,6 +23,7 @@ from sksparse.cholmod import (
     CholmodInvalidInputError,
     CholmodNotPositiveDefiniteError,
     cho_factor,
+    ldl_factor,
 )
 
 from ..helpers import generate_random_matrices
@@ -117,6 +118,19 @@ def test_change_factor(davis_example_chol):
     # Convert back to LL^T
     f.change_factor(kind="LL")
     assert f.is_ll
+
+
+def test_get_factor_unchanged(davis_example_chol):
+    A = davis_example_chol
+    f = cho_factor(A, supernodal_mode="supernodal")
+    f.get_factor(kind="LDL")
+    assert f.is_ll  # not converted in place
+    f.factorize(A)  # keeps the LL.T form
+    assert f.is_ll
+    g = ldl_factor(A)
+    L = f.get_factor(lower=True).toarray()
+    assert_allclose(g.get_factor(kind="LL", lower=True).toarray(), L, atol=1e-14)
+    assert not g.is_ll
 
 
 @pytest.fixture
