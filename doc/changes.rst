@@ -8,6 +8,9 @@ v0.5.1
   ``ldl=False``, so refactorizations are much faster (up to 40 times for large
   matrices). An ``LDL.T`` factorization, or a matrix with a different sparsity
   pattern, uses the simplicial algorithm, as before.
+* :meth:`~sksparse.cholmod.CholeskyFactor.factorize` gives a correct factor for
+  a matrix with entries outside the analyzed sparsity pattern. Previously, a
+  supernodal factor silently gave wrong results for such a matrix.
 * :meth:`~sksparse.cholmod.CholeskyFactor.logdet` reads the diagonal directly
   from the factor, instead of copying and converting it.
 * :meth:`~sksparse.cholmod.CholeskyFactor.factorize` skips the validation (and
