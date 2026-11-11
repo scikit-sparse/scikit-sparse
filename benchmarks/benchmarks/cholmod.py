@@ -107,3 +107,18 @@ class SolveSuite:
 
     def peakmem_solve(self, Nsq, K, is_sparse):
         self._run_solve(Nsq, K, is_sparse)
+
+
+class RefactorizeSuite:
+    param_names = ["Nsq"]
+    params = [Nsqs]
+
+    def setup(self, Nsq):
+        self.A = laplacian_2d(Nsq)
+        self.f = cholmod.cho_factor(self.A, order="default")
+
+    def time_refactorize(self, Nsq):
+        self.f.factorize(self.A)
+
+    def time_logdet(self, Nsq):
+        self.f.logdet()

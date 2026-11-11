@@ -205,6 +205,11 @@ cdef extern from "cholmod.h":
         int itype
         int xtype
         int dtype
+        size_t nsuper
+        size_t xsize
+        void *super
+        void *pi
+        void *px
 
     ctypedef struct cholmod_sparse:
         size_t nrow

@@ -1,6 +1,23 @@
 Changes
 =======
 
+v0.5.1 (unreleased)
+-------------------
+* A supernodal :obj:`~sksparse.cholmod.CholeskyFactor` now stays supernodal
+  after :meth:`~sksparse.cholmod.CholeskyFactor.factorize` with
+  ``ldl=False``, so refactorizations are much faster (up to 40 times for large
+  matrices). An ``LDL.T`` factorization, or a matrix with a different sparsity
+  pattern, uses the simplicial algorithm, as before.
+* :meth:`~sksparse.cholmod.CholeskyFactor.logdet` reads the diagonal directly
+  from the factor, instead of copying and converting it.
+* :meth:`~sksparse.cholmod.CholeskyFactor.factorize` skips the validation (and
+  sorting) of a CSC matrix with exactly the analyzed sparsity pattern and index
+  type.
+* :meth:`~sksparse.cholmod.CholeskyFactor.factorize` checks the shape and data
+  type of the matrix before changing the factor. Previously, a matrix with the
+  wrong data type could leave an ``LDL.T`` factor with the wrong
+  :attr:`~sksparse.cholmod.CholeskyFactor.is_ll`, which gave wrong results.
+
 v0.5.0
 ------
 

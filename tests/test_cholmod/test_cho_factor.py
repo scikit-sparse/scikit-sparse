@@ -357,3 +357,103 @@ def test_sym(A, sym_kind):
     Lf = f.get_factor().toarray()
     Lg = g.get_factor().toarray()
     assert_allclose(Lf, Lg, rtol=rtol, atol=atol)
+
+
+# -----------------------------------------------------------------------------
+#         Supernodal Refactorization
+# -----------------------------------------------------------------------------
+def _random_spd(N=60, dtype=np.float64):
+    B = sparse.random_array((N, N), density=0.08, format="csc", rng=0)
+    return (B @ B.T + N * sparse.eye_array(N)).astype(dtype).tocsc()
+
+
+@pytest.mark.parametrize("dtype", DTYPES)
+@pytest.mark.parametrize("supernodal_mode", ["simplicial", "supernodal"])
+@pytest.mark.parametrize("ldl", [False, True])
+def test_refactor_supernodal(dtype, supernodal_mode, ldl):
+    rtol = 1e-7 if dtype in (np.float64, np.complex128) else 1e-3
+    A = _random_spd(dtype=dtype)
+    f = cho_factor(A, supernodal_mode=supernodal_mode)
+    for beta in [1.0, 2.0]:
+        f.factorize(A, ldl=ldl, beta=beta)
+        # A supernodal LL.T factor stays supernodal
+        assert f.is_super == (supernodal_mode == "supernodal" and not ldl)
+        B = A.toarray() + beta * np.eye(A.shape[0], dtype=dtype)
+        assert_allclose(f.logdet(), np.linalg.slogdet(B)[1], rtol=rtol)
+        assert_allclose(B @ f.solve(B[:, 0]), B[:, 0], rtol=rtol, atol=rtol)
+
+
+def test_refactor_supernodal_new_pattern():
+    A = _random_spd()
+    f = cho_factor(A, supernodal_mode="supernodal")
+    B = sparse.csc_array(A.toarray() + 0.01)  # entries outside of the pattern
+    f.factorize(B)
+    assert not f.is_super  # simplicial algorithm
+    x = np.arange(A.shape[0], dtype=np.float64)
+    assert_allclose(f.solve(B @ x), x, rtol=1e-10, atol=1e-12)
+
+
+def test_refactor_supernodal_ldl_indefinite():
+    A = _random_spd()
+    N = A.shape[0]
+    f = cho_factor(A, order="natural", supernodal_mode="supernodal")
+    B = A.tolil()
+    B[-1, -1] -= 2 * N  # indefinite, so only the simplicial LDL.T works
+    B = B.tocsc()
+    f.factorize(B, ldl=True)
+    assert not f.is_ll
+    x = np.arange(N, dtype=np.float64)
+    assert_allclose(f.solve(B @ x), x, rtol=1e-8, atol=1e-10)
+
+
+def test_supernodal_change_factor_resymbol():
+    A = _random_spd()
+    f = cho_factor(A, supernodal_mode="supernodal")
+    p = f.perm
+    f.change_factor("LDL")
+    assert not f.is_ll
+    L, D = f.get_factor(kind="LDL", lower=True)
+    PAPT = A[p[:, np.newaxis], p].toarray()
+    assert_allclose((L @ D @ L.T).toarray(), PAPT, atol=1e-12)
+    f = cho_factor(A, supernodal_mode="supernodal")
+    f.resymbol(A[p[:, np.newaxis], p].tocsc())
+    assert not f.is_super  # CHOLMOD can only resymbol a simplicial factor
+    assert_LLT_equals_A(f, A, atol=1e-12)
+
+
+def test_refactor_skips_validation(monkeypatch):
+    A = _random_spd()
+    f = cho_factor(A, supernodal_mode="supernodal")
+
+    def validate(*args, **kwargs):
+        raise RuntimeError("validated")
+
+    monkeypatch.setattr("sksparse.cholmod.validate_csc_input", validate)
+    f.factorize(2 * A)  # exactly the analyzed pattern
+    assert f.is_super
+    assert_LLT_equals_A(f, 2 * A, atol=1e-12)
+    C = 2 * A
+    other = np.int64 if f.itype == np.int32 else np.int32
+    C.indptr, C.indices = C.indptr.astype(other), C.indices.astype(other)
+    D, E = 2 * A, 2 * A
+    D.data = D.data[:-1]  # too short
+    E.data = np.repeat(E.data, 2)[::2]  # not contiguous
+    for B in [C, D, E, (2 * A).tocoo(), 2 * A.toarray()]:
+        with pytest.raises(RuntimeError, match="validated"):
+            f.factorize(B)
+
+
+@pytest.mark.parametrize("change_factor", [False, True])
+def test_refactor_invalid_input(change_factor):
+    A = _random_spd()
+    N = A.shape[0]
+    f = cho_factor(A, supernodal_mode="supernodal")
+    if change_factor:
+        f.change_factor("LDL")
+    state = (f.is_super, f.is_ll)
+    for B in [_random_spd(N=N + 1), A.astype(np.complex128)]:
+        with pytest.raises(CholmodInvalidInputError):
+            f.factorize(B, ldl=False)
+        assert (f.is_super, f.is_ll) == state  # the factor is intact
+        x = np.arange(1.0, N + 1)
+        assert_allclose(f.solve(A @ x), x)

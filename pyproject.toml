@@ -56,7 +56,7 @@ dev = [
     "build",
     "pre-commit",
     "pytest",
-    "ruff",
+    "ruff==0.14.3",
     "sphinx",
     "furo",
     "sphinx-copybutton",
