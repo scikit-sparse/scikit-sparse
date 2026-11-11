@@ -1,8 +1,8 @@
 Changes
 =======
 
-v0.5.1 (unreleased)
--------------------
+v0.5.1
+------
 * A supernodal :obj:`~sksparse.cholmod.CholeskyFactor` now stays supernodal
   after :meth:`~sksparse.cholmod.CholeskyFactor.factorize` with
   ``ldl=False``, so refactorizations are much faster (up to 40 times for large
