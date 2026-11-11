@@ -25,6 +25,15 @@ v0.5.1 (unreleased)
   :func:`~sksparse.cholmod.ldl`. :attr:`~sksparse.cholmod.CholeskyFactor.perm`
   and :attr:`~sksparse.cholmod.CholeskyFactor.colcount` are now read-only
   copies, instead of views of the factor.
+* Fix crashes, spurious errors, and wrong results when the index type
+  (``int32`` or ``int64``) of a matrix passed to
+  :meth:`~sksparse.cholmod.CholeskyFactor.factorize`,
+  :meth:`~sksparse.cholmod.CholeskyFactor.solve`,
+  :meth:`~sksparse.cholmod.CholeskyFactor.update`,
+  :meth:`~sksparse.cholmod.CholeskyFactor.downdate`,
+  :meth:`~sksparse.cholmod.CholeskyFactor.rowadd`, or
+  :meth:`~sksparse.cholmod.CholeskyFactor.resymbol` differs from that of the
+  factor. The index arrays are now converted.
 
 v0.5.0
 ------

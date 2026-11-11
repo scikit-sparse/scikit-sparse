@@ -220,3 +220,34 @@ def test_ldlrowmod(A, expect_x, b, f):
 
     assert_allclose((Aa @ x).toarray(), b.toarray(), atol=1e-12)
     assert_allclose(x.toarray(), xs, atol=1e-12)
+
+
+@pytest.mark.parametrize("itype", [np.int32, np.int64])
+def test_mixed_itype(A, itype):
+    """Test inputs whose index type differs from that of the factor."""
+
+    def with_itype(M, dtype):
+        M = sparse.csc_array(M, copy=True)
+        M.indptr, M.indices = M.indptr.astype(dtype), M.indices.astype(dtype)
+        return M
+
+    other = np.int64 if itype == np.int32 else np.int32
+    N = A.shape[0]
+    f = ldl_factor(with_itype(A, itype))
+    assert f.itype == itype
+
+    B = with_itype(2 * A, other)
+    f.factorize(B)
+    b = with_itype(sparse.eye_array(N, 2, format="csc"), other)
+    assert_allclose((B @ f.solve(b)).toarray(), b.toarray(), atol=1e-12)
+
+    p = f.perm
+    S = with_itype(B[p[:, np.newaxis], p], other)
+    f.rowdel(3)
+    f.rowadd(3, S[:, [3]])
+    C = with_itype(sparse.csc_array(([0.5], ([1], [0])), shape=(N, 1)), other)
+    f.update(C)
+    f.resymbol(with_itype(S + C[p] @ C[p].T, other))
+    assert f.itype == itype
+    x = np.arange(N, dtype=np.float64)
+    assert_allclose(f.solve((B + C @ C.T) @ x), x, atol=1e-10)

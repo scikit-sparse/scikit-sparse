@@ -20,7 +20,7 @@ from scipy.sparse import SparseEfficiencyWarning, csc_array, issparse
 _HAS_SCIPY_SORT_BUG = version.parse(scipy_version) < version.parse("1.17.0")
 
 
-def validate_csc_input(A, require_square=False, ensure_double=True):
+def validate_csc_input(A, require_square=False, ensure_double=True, itype=None):
     """Validate and convert input matrix to CSC format.
 
     Integer and boolean data types are converted to float32 by default.
@@ -39,6 +39,8 @@ def validate_csc_input(A, require_square=False, ensure_double=True):
         Otherwise, it will retain its original floating-point precision
         (float32 or complex64), or the minimum precision required to convert
         integer or boolean types.
+    itype : dtype, optional
+        If given, the index arrays are converted to this integer type.
 
     Returns
     -------
@@ -113,6 +115,12 @@ def validate_csc_input(A, require_square=False, ensure_double=True):
 
     if not (A.has_sorted_indices and A.has_canonical_format):
         raise ValueError("Failed to convert input to canonical CSC format.")
+
+    # NOTE set the index arrays after construction, since the constructor
+    # may choose a different index type.
+    if itype is not None and not (A.indptr.dtype == A.indices.dtype == itype):
+        A = csc_array((A.data, A.indices, A.indptr), shape=A.shape)
+        A.indptr, A.indices = A.indptr.astype(itype), A.indices.astype(itype)
 
     # Choose index width: int32 or int64
     use_int32 = A.indptr.dtype == np.int32 and A.indices.dtype == np.int32
